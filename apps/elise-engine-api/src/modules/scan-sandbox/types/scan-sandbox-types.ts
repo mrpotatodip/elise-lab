@@ -1,3 +1,5 @@
+import type { ScanPath } from "#/lib/scan-path";
+
 // -----
 // Agent
 // -----
@@ -20,7 +22,20 @@ export type MeteredTokens = { inputTokens: number; outputTokens: number; cacheRe
 // reservedUsd is what calls still in flight may yet cost; a meter
 // stored before it existed has none.
 // -----
-export type Meter = MeteredTokens & { budgetUsd: number; spentUsd: number; reservedUsd?: number };
+export type Meter = MeteredTokens & { budgetUsd: number; spentUsd: number; reservedUsd?: number; refused?: boolean };
+
+// -----
+// The Phases of a full Scan. A Phase record is kept in the Sandbox when
+// the Phase starts: the allowance it may spend (its slice plus what
+// the Phase before left), and what the meter had spent already, so the
+// Phase's own spend is the difference. refused says the meter turned
+// a model call away: the slice ran out. It is the only way to tell a
+// Phase that spent its slice from one that failed.
+// -----
+export type FullPhase = "recon" | "hunt" | "check" | "report";
+export type PhaseRecord = { phase: FullPhase; allowanceUsd: number; startSpentUsd: number; spentUsd: number | null; exhausted: boolean };
+export type PhaseState = { meter: Meter; records: PhaseRecord[] };
+export type PhaseEnd ={ phase: FullPhase; allowanceUsd: number; spentUsd: number; exhausted: boolean };
 // -----
 // A private repo the Outbound handler signs for: the install and the
 // repo it may mint a token for, and repo as owner/name in lowercase.
@@ -36,5 +51,7 @@ export type OutboundAnthropicKey = { accountId: string; sealed: string };
 // -----
 // repo is the one repo this scan reads, as owner/name in lowercase.
 // Outbound passes git requests for no other repo, public or not.
+// path is the Sandbox namespace the sandboxId belongs to; a Scan
+// that started before there were two has none and is lite.
 // -----
-export type OutboundProps = { sandboxId: string; repo: string; github?: OutboundGithub; anthropicKey?: OutboundAnthropicKey };
+export type OutboundProps = { sandboxId: string; repo: string; path?: ScanPath; github?: OutboundGithub; anthropicKey?: OutboundAnthropicKey };
