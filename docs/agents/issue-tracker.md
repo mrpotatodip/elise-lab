@@ -1,10 +1,18 @@
 # Issue tracker
 
-This lab copy (`ts-elise-lab`) has no GitHub remote yet. Infer the repo from `git remote -v` once one exists.
+Issues live on GitHub: `origin` is `mrpotatodip/ts-elise-lab`, which redirects to `mrpotatodip/ts-mrpotato-lab`. That repo is **public**, so a spec or ticket holds behaviour and decisions only: no exploit detail, no secrets, no customer data.
 
-Until then, write tickets as local markdown under the relevant `apps/<project>/.scratch/<feature>/`. Specs (PRDs) already live there as `PRD.md`.
+## Specs and tickets
 
-When a remote exists, use the `gh` CLI:
+- A spec is a **parent issue** titled `<Feature>: spec`: problem, solution, behaviour, out of scope, a task list of its tickets, and what moves to the glossary or an ADR when it ships. Label it `spec` (purple), and nothing else, so a spec is told from a ticket at a glance.
+- Each ticket is a **sub-issue** of the spec, with its blockers in a "Blocked by" section. Label it `ready-for-agent`, or `ready-for-human` when a person must run it.
+- Draft and discuss in the spec's thread. When the feature ships, move what is still true into the glossary, then close the spec.
+- Link sub-issues with `gh api -X POST repos/<owner>/<repo>/issues/<spec>/sub_issues -F sub_issue_id=<id>`, where `<id>` is the child's `gh api repos/<owner>/<repo>/issues/<n> --jq .id`, not its number.
+- Do not add a `PRD.md` under `.scratch/`; older ones there stay as they are.
+
+## Commands
+
+Use the `gh` CLI:
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`
 - **Read an issue**: `gh issue view <number> --comments`
@@ -17,8 +25,8 @@ When a remote exists, use the `gh` CLI:
 
 ## When a skill says "publish to the issue tracker"
 
-If there is no GitHub remote, write the ticket under `apps/<project>/.scratch/<feature>/` and note that it still needs to be filed on GitHub.
+File it with `gh` as described above. Only if `gh` is unavailable, write it under `apps/<project>/.scratch/<feature>/` and note that it still needs filing.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the local scratch file, or `gh issue view <number> --comments` if the remote exists.
+`gh issue view <number> --comments`, and the spec it hangs off.
