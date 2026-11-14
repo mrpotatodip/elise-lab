@@ -1,12 +1,15 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { runEffect } from "#/lib/effect-query";
 import { dbConnect, type DbConnectType } from "#/lib/db-connection";
+import { sandboxesOf } from "#/lib/scan-path";
 import type { ScanParams } from "#/schemas";
 import { findSealedKeyEffect } from "#/modules/anthropic-key";
 import { findBranchEffect, findBranchesAtTipEffect, isCommitId } from "#/modules/branches";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
 import { listPriorsEffect, recordScanSvc, SCAN_RECORDS_PRIOR_LIMIT, type PriorFinding } from "#/modules/scan-records";
+import type { FullPhase } from "#/modules/scan-sandbox";
+import { SCAN_WORKFLOW_MAX_POLLS } from "#/modules/scan-workflow/constants";
 import type { Bindings } from "#/types/variables";
 import { runScan } from "./run-scan";
 import { settleScanCredit } from "./settle-scan-credit";
@@ -38,10 +41,36 @@ const priorsOf = async (env: Bindings, params: ScanParams): Promise<PriorFinding
 };
 
 export class ScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
+  // -----
+  // The Sandbox namespace this Workflow starts its Scans in.
+  // FullScanWorkflow overrides it.
+  // -----
+  protected get sandboxes(): Bindings["SANDBOX"] {
+    return sandboxesOf(this.env, "lite");
+  }
+
+  // -----
+  // How many 10-second polls the audit may take: 40 minutes for lite.
+  // FullScanWorkflow overrides it with its own limit.
+  // -----
+  protected get maxPolls(): number {
+    return SCAN_WORKFLOW_MAX_POLLS;
+  }
+
+  // -----
+  // The Phases this Workflow runs, in order. A lite Scan has none: it is
+  // one run of the agent. FullScanWorkflow overrides it.
+  // -----
+  protected get phases(): readonly FullPhase[] | undefined {
+    return undefined;
+  }
+
   async run(event: WorkflowEvent<ScanParams>, step: WorkflowStep) {
     return runScan(
       {
-        sandbox: event.payload.runnerId ? runnerSandbox(dbConnect(this.env.DATABASE_URL), event.payload, event.payload.runnerId) : this.env.SANDBOX.getByName(event.payload.scanId),
+        maxPolls: this.maxPolls,
+        phases: event.payload.runnerId ? undefined : this.phases,
+        sandbox: event.payload.runnerId ? runnerSandbox(dbConnect(this.env.DATABASE_URL), event.payload, event.payload.runnerId) : this.sandboxes.getByName(event.payload.scanId),
         ledger: neonScanRepo(dbConnect(this.env.DATABASE_URL)),
         reports: this.env.REPORTS,
         readPriors: (params) => priorsOf(this.env, params),
