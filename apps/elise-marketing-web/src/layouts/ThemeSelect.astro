@@ -1,0 +1,28 @@
+---
+import { THEMES } from "../constants/themes";
+---
+
+<label class="theme-select">
+  <span class="theme-select__label">Theme</span>
+  <select id="theme-select">
+    {THEMES.map((theme) => <option value={theme.id}>{theme.label}</option>)}
+  </select>
+</label>
+
+<script>
+  import { THEME_STORAGE_KEY } from "../constants/themes";
+
+  const select = document.querySelector<HTMLSelectElement>("#theme-select");
+  if (select) {
+    select.value = document.documentElement.dataset.theme ?? "default";
+    select.addEventListener("change", () => {
+      if (select.value === "default") delete document.documentElement.dataset.theme;
+      else document.documentElement.dataset.theme = select.value;
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, select.value);
+      } catch {
+        // The choice still applies to this page without storage.
+      }
+    });
+  }
+</script>

@@ -1,6 +1,13 @@
 ---
 import "../styles/global.css";
 import { SITE } from "../constants/site";
+import { FIRST_THEME, SKY_DIR, THEMES, THEME_SKIES, THEME_STORAGE_KEY } from "../constants/themes";
+
+// Runs in <head> before first paint, so a saved theme never flashes the first one.
+// It also picks one sky at random for each picture theme on every load.
+const skyLists = Object.fromEntries(Object.entries(THEME_SKIES).map(([theme, files]) => [theme, files.map((file) => SKY_DIR + file)]));
+const themeIds = THEMES.map((theme) => theme.id);
+const themeInit = `try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})||${JSON.stringify(FIRST_THEME)},d=document.documentElement;if(${JSON.stringify(themeIds)}.indexOf(t)>-1){if(t==="default")delete d.dataset.theme;else d.dataset.theme=t}}catch(e){}try{if(localStorage.getItem("elise.motion")==="off")document.documentElement.dataset.motion="off"}catch(e){}try{var L=${JSON.stringify(skyLists)},d=document.documentElement;Object.keys(L).forEach(function(k){var s=L[k];d.style.setProperty("--"+k+"-sky","url("+s[Math.floor(Math.random()*s.length)]+")")})}catch(e){}`;
 
 interface Props {
   title?: string;
@@ -9,10 +16,23 @@ interface Props {
 
 const { title = SITE.title, description = SITE.description } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL("/og.jpg", Astro.site);
+const ogImageAlt = "EliseLAB: Security agents that read your code before an attacker does.";
+
+// Structured data for search engines. It states only what the page says: no price, rating or review.
+const structuredData = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: SITE.name,
+  url: new URL("/", Astro.site).href,
+  applicationCategory: "SecurityApplication",
+  operatingSystem: "Web",
+  description,
+});
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme={FIRST_THEME}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -21,15 +41,25 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <link rel="canonical" href={canonical} />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta name="twitter:card" content="summary" />
-    <script is:inline>
-      document.documentElement.style.setProperty("--sky", `url("/theme-bgs/bg-daylight-${1 + Math.floor(Math.random() * 3)}.jpeg")`);
-    </script>
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
+    <meta name="theme-color" content="#f1f2f4" />
+    <script type="application/ld+json" set:html={structuredData}></script>
+    <script is:inline set:html={themeInit}></script>
   </head>
   <body>
     <slot />
