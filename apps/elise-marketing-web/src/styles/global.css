@@ -1,28 +1,9 @@
-:root {
-  /* The dashboard's Daylight theme: a white page with a painted sky at the top
-     and glass cards. Base.astro sets --sky to a random one of the three. */
-  --sky: url("/theme-bgs/bg-daylight-1.jpeg");
-  --bg-color: oklch(1 0 0);
-  --card: oklch(1 0 0 / 0.74);
-  --foreground: oklch(0.15 0.012 258);
-  --muted-foreground: oklch(0.34 0.012 258);
-  --border: oklch(0 0 0 / 0.14);
-  --primary: oklch(0.22 0.012 258);
-  --primary-foreground: oklch(0.98 0.002 258);
-  --severity-high: oklch(0.42 0.14 50);
-  --severity-high-soft: oklch(0.7 0.16 50 / 13%);
-  --radius: 0.75rem;
-  --shadow-card: 0 1px 0 rgb(255 255 255 / 80%) inset, 0 1px 2px rgb(0 0 0 / 6%), 0 8px 24px rgb(0 0 0 / 5%);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-}
+/* Tokens, themes and the sky come from the dashboard: see DESIGN.md. */
+@import "./tokens.css";
+@import "./themes.css";
 
 * {
   box-sizing: border-box;
-}
-
-html {
-  background-color: var(--bg-color);
 }
 
 body {
@@ -30,29 +11,6 @@ body {
   font-family: var(--font-sans);
   line-height: 1.6;
   color: var(--foreground);
-}
-
-/* The sky is a 1778 by 592 banner, centred at the top, with its sides and
-   bottom faded into the page: the same layer and mask as the dashboard. */
-html::before {
-  content: "";
-  position: fixed;
-  z-index: -1;
-  top: 0;
-  left: 50%;
-  width: min(150%, 2250px);
-  aspect-ratio: 3 / 1;
-  transform: translateX(-50%);
-  pointer-events: none;
-  background: var(--sky) center / 100% 100% no-repeat;
-  -webkit-mask-image:
-    linear-gradient(to right, transparent, rgb(0 0 0 / 0.08) 6%, rgb(0 0 0 / 0.3) 13%, rgb(0 0 0 / 0.65) 22%, #000 34%, #000 66%, rgb(0 0 0 / 0.65) 78%, rgb(0 0 0 / 0.3) 87%, rgb(0 0 0 / 0.08) 94%, transparent),
-    linear-gradient(to bottom, #000 10%, rgb(0 0 0 / 0.85) 25%, rgb(0 0 0 / 0.55) 45%, rgb(0 0 0 / 0.25) 65%, rgb(0 0 0 / 0.07) 82%, transparent);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(to right, transparent, rgb(0 0 0 / 0.08) 6%, rgb(0 0 0 / 0.3) 13%, rgb(0 0 0 / 0.65) 22%, #000 34%, #000 66%, rgb(0 0 0 / 0.65) 78%, rgb(0 0 0 / 0.3) 87%, rgb(0 0 0 / 0.08) 94%, transparent),
-    linear-gradient(to bottom, #000 10%, rgb(0 0 0 / 0.85) 25%, rgb(0 0 0 / 0.55) 45%, rgb(0 0 0 / 0.25) 65%, rgb(0 0 0 / 0.07) 82%, transparent);
-  mask-composite: intersect;
 }
 
 a {
@@ -79,51 +37,90 @@ a {
   text-decoration: none;
 }
 
-.brand img {
+.brand-mark {
+  flex: none;
+  width: 1.75rem;
   height: 1.75rem;
-  width: auto;
-  /* The file has an opaque white background: round it into a tile. */
-  border-radius: 0.375rem;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Buttons and the select are the dashboard's: 36px high (40px for .lg), 8px radius,
+   14px medium text, the primary shadow on the filled one, a hairline on the outline
+   one, a 1px press and a 2px ring with a 2px offset on focus. */
+.theme-select select {
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--input);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+  background: transparent;
+  box-shadow: var(--shadow-control);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .button {
   display: inline-flex;
   align-items: center;
-  padding: 0.6rem 1.1rem;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding: 0 1rem;
+  border: 0;
   border-radius: 0.5rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   text-decoration: none;
   text-shadow: none;
   color: var(--primary-foreground);
   background: var(--primary);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 12%) inset, 0 1px 2px rgb(0 0 0 / 25%);
+  box-shadow: var(--shadow-primary);
+}
+
+.button.lg {
+  height: 2.5rem;
+  padding: 0 1.5rem;
 }
 
 .button:hover {
-  background: oklch(0.33 0.01 258);
+  background: color-mix(in oklch, var(--primary) 90%, transparent);
 }
 
 .button:active {
   transform: translateY(1px);
-  background: oklch(0.18 0.012 258);
 }
 
-.button.quiet {
+.button.outline {
   color: var(--foreground);
-  background: var(--card);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
-  border: 1px solid var(--border);
-  -webkit-backdrop-filter: blur(10px) saturate(1.4);
-  backdrop-filter: blur(10px) saturate(1.4);
+  background: transparent;
+  border: 1px solid var(--input);
+  box-shadow: var(--shadow-control);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
-.button.quiet:hover {
-  background: oklch(0.96 0.002 258);
-}
-
-.button.quiet:active {
-  background: oklch(0.93 0.004 258);
+.button.outline:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
 
 .skip-link {
@@ -143,40 +140,42 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 3px;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
-.hero-grid {
+/* The hero is two rows so the picture of the app starts high on the page: the headline across the
+   full width (two lines on a desktop), then the paragraph beside the buttons. */
+.hero {
+  padding-block: clamp(1.5rem, 4vw, 3rem) clamp(1.5rem, 3vw, 2rem);
+  /* Text sits straight on the sky: the theme's halo keeps it readable. */
+  text-shadow: var(--halo);
+}
+
+.hero-row {
   display: grid;
-  gap: 2rem 3rem;
-  align-items: center;
+  gap: 1.5rem 3rem;
+  align-items: end;
   grid-template-columns: minmax(0, 1fr);
 }
 
-@media (min-width: 62rem) {
-  .hero-grid {
-    grid-template-columns: minmax(0, 1fr) 25rem;
+@media (min-width: 56rem) {
+  .hero-row {
+    grid-template-columns: minmax(0, 52ch) auto;
+    justify-content: start;
   }
 }
 
-.hero-card {
-  margin: 0;
-  padding-block: 1rem;
+.hero-cta {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
 }
 
-.hero-card figcaption {
-  margin-top: 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--muted-foreground);
-}
-
-.hero {
-  padding-block: clamp(3rem, 9vw, 7rem) clamp(2.5rem, 6vw, 5rem);
-  max-width: 46rem;
-  /* Text sits straight on the sky: a soft white halo keeps it readable. */
-  text-shadow: 0 0 14px oklch(1 0 0 / 0.9), 0 0 3px oklch(1 0 0 / 0.7);
+/* The hint is as wide as the two buttons above it, balanced so no word is left alone. */
+.hero-cta .hint {
+  max-width: 34ch;
+  text-wrap: balance;
 }
 
 h1 {
@@ -187,13 +186,27 @@ h1 {
   text-wrap: balance;
 }
 
+.hero h1 {
+  margin-bottom: 1.25rem;
+}
+
 .lede {
-  margin: 1.25rem 0 2rem;
+  margin: 0;
   max-width: 52ch;
   font-size: 1.15rem;
-  /* Darker than the muted ink: this line sits on the painted sky. */
-  color: oklch(0.26 0.012 258);
+  /* A stronger ink than muted text in the sky themes: this line sits on the sky. */
+  color: var(--lede);
   text-wrap: pretty;
+}
+
+/* The credited link in the hero paragraph reads as a link, in the paragraph's own ink. */
+.lede a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lede a:hover {
+  color: var(--foreground);
 }
 
 .actions {
@@ -202,104 +215,311 @@ h1 {
   gap: 0.75rem;
 }
 
-section {
-  padding-block: clamp(2rem, 5vw, 3.5rem);
+/* The application is the page's picture: the dashboard's Scans screen at full width. */
+.showcase {
+  position: relative;
+  left: 50%;
+  /* Wider than the text column, so the picture of the dashboard reads at a useful size. */
+  width: min(100vw - 3rem, 88rem);
+  margin: 0;
+  transform: translateX(-50%);
 }
 
-.hint {
-  margin: 0.75rem 0 0;
-  max-width: 52ch;
-  font-size: 0.9rem;
-  color: oklch(0.26 0.012 258);
+.showcase figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+
+/* The "Pause animations" control sets data-motion="off": nothing moves, as under reduced motion. */
+:root[data-motion="off"] *,
+:root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  animation: none !important;
+  transition-duration: 0s !important;
+}
+
+section {
+  padding-block: clamp(2.5rem, 6vw, 4rem);
 }
 
 h2 {
-  margin: 0 0 1.5rem;
+  margin: 0 0 0.375rem;
   font-size: clamp(1.5rem, 3vw, 2rem);
   letter-spacing: -0.02em;
 }
 
-.grid {
+/* One row per step: a short text beside a full-size picture of the screen it describes. */
+.steps {
   display: grid;
-  gap: 2rem;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.card {
+.steps > li {
+  display: grid;
+  align-items: center;
+  gap: 1.5rem 3rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 56rem) {
+  .steps > li {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr);
+  }
+}
+
+.steps h3 {
+  margin: 0 0 0.375rem;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.steps p {
+  margin: 0;
+  max-width: 48ch;
+  /* This text sits on the painted sky, so it takes the stronger ink and the halo. */
+  color: var(--lede);
+  text-shadow: var(--halo);
+}
+
+/* Three short points under the lead sentence: a plain list, one idea each. */
+.steps ul {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 48ch;
+  margin: 1rem 0 0;
+  padding: 0 0 0 1.125rem;
+  color: var(--lede);
+  text-shadow: var(--halo);
+}
+
+.steps ul li::marker {
+  color: var(--lede);
+}
+
+/* Each picture of the app reserves its exact box before it loads, so nothing moves when it does.
+   The ratios are the pictures' design sizes; below 43rem a picture switches to its narrow design
+   (358 by 440), as the pictures themselves do. Until a picture has hydrated it stays invisible. */
+/* contain: size keeps the picture's own height, drawn tall before it hydrates, from stretching the box. */
+.frame {
+  contain: size;
+}
+
+.frame--tour { aspect-ratio: 1440 / 760; }
+.frame--connect { aspect-ratio: 760 / 540; }
+.frame--audit { aspect-ratio: 760 / 480; }
+.frame--report { aspect-ratio: 760 / 700; }
+
+@media (max-width: 43rem) {
+  .frame {
+    /* An explicit width: with auto margins a grid item would shrink to nothing. */
+    width: 100%;
+    aspect-ratio: 358 / 440;
+    max-width: 358px;
+    margin-inline: auto;
+  }
+}
+
+.frame:not([data-ready]) .ss-fit,
+.frame:not([data-ready]) .ss-fit * {
+  visibility: hidden !important;
+}
+
+.step-fig {
+  min-width: 0;
+  /* Until a picture scrolls into view it is drawn at its full design width: keep that from
+     widening the page on a phone. */
+  overflow-x: clip;
+}
+
+/* Pricing: two cards in the dashboard's card style (token surface, hairline, card shadow). */
+.plans {
+  display: grid;
+  /* Each card is as tall as its own text: no empty space under the shorter one. */
+  align-items: start;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 48rem) {
+  .plans {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.plan {
   padding: 1.5rem;
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 0.25rem);
+  border-radius: var(--radius);
   background: var(--card);
+  color: var(--card-foreground);
   box-shadow: var(--shadow-card);
-  -webkit-backdrop-filter: blur(10px) saturate(1.4);
-  backdrop-filter: blur(10px) saturate(1.4);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
-.card h3 {
+.plan h3 {
   margin: 0 0 0.375rem;
-  font-size: 0.9375rem;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
 }
 
-.card p {
+.plan-price {
   margin: 0;
-  color: var(--muted-foreground);
-}
-
-.step-number {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  margin-bottom: 0.9rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 650;
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-  color: var(--primary-foreground);
-  background: var(--primary);
 }
 
-.example {
-  display: grid;
-  gap: 2rem;
-  align-items: center;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+.plan-price span {
+  margin-left: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
 }
 
-.example p {
+.plan-summary {
+  margin: 1rem 0 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
   max-width: 52ch;
+  font-size: 1rem;
+  line-height: 1.625;
+}
+
+.plan ul {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 52ch;
+  margin: 1rem 0 0;
+  padding: 0 0 0 1.125rem;
+  font-size: 1rem;
+  line-height: 1.5;
   color: var(--muted-foreground);
 }
 
-.finding-head {
-  display: flex;
-  flex-wrap: wrap;
+/* What to know: four plain facts, a hairline above each. */
+.facts {
+  display: grid;
+  gap: 2rem 3rem;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 1.5rem 0 0;
+}
+
+@media (min-width: 48rem) {
+  .facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.section-note {
+  max-width: 52ch;
+  margin: 0 0 2rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--lede);
+  text-shadow: var(--halo);
+}
+
+/* The one next step under the plans, before they can be bought. */
+.plans-action {
+  margin: 2rem 0 0;
+}
+
+.facts > div {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.facts h3 {
+  margin: 0 0 0.375rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.facts p {
+  max-width: 52ch;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.625;
+  color: var(--lede);
+  text-shadow: var(--halo);
+}
+
+.closing {
+  text-align: center;
+}
+
+.closing p {
+  max-width: 52ch;
+  margin: 0 auto 1.5rem;
+  color: var(--lede);
+  text-shadow: var(--halo);
+}
+
+.closing .hint {
+  margin: 0.75rem auto 0;
+}
+
+/* Anchor links in the nav: shown where there is room. */
+.nav-links {
+  display: none;
+  gap: 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.nav-links a {
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.75rem;
+  min-height: 1.5rem;
+  text-decoration: none;
+  /* The stronger ink of the sky themes: these links sit on the painted sky. */
+  color: var(--lede);
 }
 
-.pill {
-  padding: 0.1rem 0.6rem;
-  border: 1px solid color-mix(in oklch, var(--severity-high) 25%, transparent);
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 650;
-  color: var(--severity-high);
-  background: var(--severity-high-soft);
+.nav-links a:hover {
+  color: var(--foreground);
 }
 
-.pill.tag {
-  border-color: var(--border);
-  color: var(--muted-foreground);
-  background: transparent;
+@media (min-width: 48rem) {
+  .nav-links {
+    display: flex;
+  }
+}
+
+.hint {
+  max-width: 52ch;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--lede);
 }
 
 .footer-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 1rem 2rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
 }
 
 .footer-row a {
@@ -308,31 +528,12 @@ h2 {
   min-height: 1.5rem;
 }
 
-.mono {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--muted-foreground);
-}
-
-.finding dt {
-  margin-top: 0.9rem;
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-}
-
-.finding dd {
-  margin: 0.15rem 0 0;
-}
-
-.closing {
-  text-align: center;
-}
-
-.closing .actions {
-  justify-content: center;
+/* The theme select lives in the footer: a visible label, then the select. */
+.theme-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
 }
 
 footer {

@@ -9,7 +9,8 @@ export function useReducedMotion() {
   const [reduced, setReduced] = useState(false)
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReduced(mq.matches)
+    // The page's own "Pause animations" control sets data-motion="off" on <html>.
+    const update = () => setReduced(mq.matches || document.documentElement.dataset.motion === 'off')
     update()
     mq.addEventListener('change', update)
     return () => mq.removeEventListener('change', update)

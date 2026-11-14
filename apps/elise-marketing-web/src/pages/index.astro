@@ -1,7 +1,10 @@
 ---
 import Base from "../layouts/Base.astro";
+import Logo from "../layouts/Logo.astro";
+import ThemeSelect from "../layouts/ThemeSelect.astro";
 import ScansCard from "../stageshow/ScansCard";
-import { EXAMPLE_FINDING, FEATURES, SITE, STEPS } from "../constants/site";
+import { AuditStep, ConnectStep, ReportStep } from "../stageshow/Steps";
+import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, PRICING, SHOWCASE_CAPTION, SITE, STEPS, STEPS_NOTE } from "../constants/site";
 ---
 
 <Base>
@@ -9,88 +12,118 @@ import { EXAMPLE_FINDING, FEATURES, SITE, STEPS } from "../constants/site";
   <div class="wrap">
     <header class="nav">
       <a class="brand" href="/">
-        <img src="/logomark.png" alt="" width="67" height="28" />
+        <Logo class="brand-mark" />
         {SITE.name}
       </a>
-      <a class="button quiet" href={SITE.appUrl}>Sign in</a>
+      <nav class="nav-links" aria-label="On this page">
+        <a href="#how-it-works">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#what-to-know">What to know</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="button outline" href={SITE.appUrl}>Sign in</a>
+      </div>
     </header>
 
     <main id="main">
-      <div class="hero-grid">
-        <div class="hero">
-          <h1>Find the security flaws in your code before you ship it.</h1>
-          <p class="lede">{SITE.description}</p>
-          <div class="actions">
-            <a class="button" href={SITE.appUrl}>Audit a repository</a>
-            <a class="button quiet" href="#how-it-works">How it works</a>
+      <div class="hero">
+        <h1>Security agents that read your code before an attacker does.</h1>
+        <div class="hero-row">
+          <p class="lede">{LEDE.start}<a href={CLOUDFLARE_SKILL_URL} rel="noopener">{LEDE.link}</a>{LEDE.end}</p>
+          <div class="hero-cta">
+            <div class="actions">
+              <a class="button lg" href={SITE.appUrl}>Audit a repository</a>
+              <a class="button lg outline" href="#how-it-works">How it works</a>
+            </div>
+            <p class="hint">{HERO_HINT}</p>
           </div>
-          <p class="hint">"Audit a repository" opens the Elise app, where you sign in first.</p>
         </div>
-        <figure class="hero-card">
-          <ScansCard client:load />
-          <figcaption>The scan list in Elise, with an example scan. The repositories and findings are made up.</figcaption>
-        </figure>
       </div>
+
+      <figure class="showcase">
+        <div class="frame frame--tour" role="img" aria-label={PICTURE_LABELS.tour}>
+          <div aria-hidden="true"><ScansCard client:idle /></div>
+        </div>
+        <figcaption>
+          <span>{SHOWCASE_CAPTION}</span>
+          <button type="button" class="button outline" id="motion-toggle">Pause animations</button>
+        </figcaption>
+      </figure>
 
       <section id="how-it-works" aria-labelledby="how-heading">
         <h2 id="how-heading">How it works</h2>
-        <ol class="grid" style="list-style: none; margin: 0; padding: 0">
-          {
-            STEPS.map((step, index) => (
-              <li class="card">
-                <div class="step-number">{index + 1}</div>
-                <h3>{step.title}</h3>
-                <p>{step.text}</p>
-              </li>
-            ))
-          }
+        <p class="section-note">{STEPS_NOTE}</p>
+        <ol class="steps">
+          <li>
+            <div class="step-text">
+              <h3>{STEPS[0].title}</h3>
+              <p>{STEPS[0].text}</p>
+              <ul>{STEPS[0].points.map((point) => <li>{point}</li>)}</ul>
+            </div>
+            <div class="step-fig frame frame--connect" role="img" aria-label={PICTURE_LABELS.connect}><div aria-hidden="true"><ConnectStep client:visible /></div></div>
+          </li>
+          <li>
+            <div class="step-text">
+              <h3>{STEPS[1].title}</h3>
+              <p>{STEPS[1].text}</p>
+              <ul>{STEPS[1].points.map((point) => <li>{point}</li>)}</ul>
+            </div>
+            <div class="step-fig frame frame--audit" role="img" aria-label={PICTURE_LABELS.audit}><div aria-hidden="true"><AuditStep client:visible /></div></div>
+          </li>
+          <li>
+            <div class="step-text">
+              <h3>{STEPS[2].title}</h3>
+              <p>{STEPS[2].text}</p>
+              <ul>{STEPS[2].points.map((point) => <li>{point}</li>)}</ul>
+            </div>
+            <div class="step-fig frame frame--report" role="img" aria-label={PICTURE_LABELS.report}><div aria-hidden="true"><ReportStep client:visible /></div></div>
+          </li>
         </ol>
       </section>
 
-      <section aria-labelledby="features-heading">
-        <h2 id="features-heading">What you get</h2>
-        <div class="grid">
+      <section id="pricing" aria-labelledby="pricing-heading">
+        <h2 id="pricing-heading">Pricing</h2>
+        <p class="section-note">{PRICING.note}</p>
+        <div class="plans">
           {
-            FEATURES.map((feature) => (
-              <div class="card">
-                <h3>{feature.title}</h3>
-                <p>{feature.text}</p>
+            PRICING.plans.map((plan) => (
+              <article class="plan">
+                <h3>{plan.name}</h3>
+                <p class="plan-price">
+                  {plan.price}
+                  <span>per month</span>
+                </p>
+                <p class="plan-summary">{plan.summary}</p>
+                <ul>{plan.points.map((point) => <li>{point}</li>)}</ul>
+              </article>
+            ))
+          }
+        </div>
+        <div class="plans-action">
+          <a class="button outline" href={SITE.appUrl}>{PRICING.action}</a>
+          <p class="hint">{PRICING.actionHint}</p>
+        </div>
+      </section>
+
+      <section id="what-to-know" aria-labelledby="know-heading">
+        <h2 id="know-heading">What to know</h2>
+        <div class="facts">
+          {
+            FACTS.map((fact) => (
+              <div>
+                <h3>{fact.title}</h3>
+                <p>{fact.text}</p>
               </div>
             ))
           }
         </div>
       </section>
 
-      <section aria-labelledby="example-heading">
-        <div class="example">
-          <div>
-            <h2 id="example-heading">A finding, in plain words</h2>
-            <p>Here is what one finding looks like. This one is made up to show the format. It is not from a real scan.</p>
-          </div>
-          <article class="card finding">
-            <div class="finding-head">
-              <span class="pill tag">{EXAMPLE_FINDING.label}</span>
-              <span class="pill">{EXAMPLE_FINDING.severity}</span>
-              <strong>{EXAMPLE_FINDING.title}</strong>
-            </div>
-            <span class="mono">{EXAMPLE_FINDING.file}</span>
-            <dl>
-              <dt>How serious</dt>
-              <dd>{EXAMPLE_FINDING.seriousness}</dd>
-              <dt>What it means</dt>
-              <dd>{EXAMPLE_FINDING.meaning}</dd>
-              <dt>The fix</dt>
-              <dd>{EXAMPLE_FINDING.fix}</dd>
-            </dl>
-          </article>
-        </div>
-      </section>
-
       <section class="closing" aria-labelledby="cta-heading">
-        <h2 id="cta-heading">Audit your first repository</h2>
-        <div class="actions">
-          <a class="button" href={SITE.appUrl}>Audit a repository</a>
-        </div>
+        <h2 id="cta-heading">{CLOSING.title}</h2>
+        <p>{CLOSING.text}</p>
+        <a class="button lg" href={SITE.appUrl}>Audit a repository</a>
+        <p class="hint">{CLOSING.hint}</p>
       </section>
     </main>
   </div>
@@ -98,7 +131,48 @@ import { EXAMPLE_FINDING, FEATURES, SITE, STEPS } from "../constants/site";
   <footer>
     <div class="wrap footer-row">
       <span>© {new Date().getFullYear()} {SITE.name}</span>
-      <a href={SITE.appUrl}>Sign in to Elise</a>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="#how-it-works">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#what-to-know">What to know</a>
+        <a href={CLOUDFLARE_SKILL_URL} rel="noopener">Cloudflare's security-audit method</a>
+        <a href={SITE.appUrl}>Sign in</a>
+      </nav>
+      <ThemeSelect />
     </div>
   </footer>
+
+  <script>
+    // A picture of the app stays invisible until its island has hydrated and two frames have passed,
+    // so its first layout (the wide one, then the narrow one) is never painted and never shifts.
+    const reveal = (island: Element) => {
+      const frame = island.closest(".frame");
+      if (!frame) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => frame.setAttribute("data-ready", "")));
+    };
+    document.querySelectorAll("astro-island").forEach((island) => {
+      if (!island.hasAttribute("ssr")) reveal(island);
+      else island.addEventListener("astro:hydrate", () => reveal(island), { once: true });
+    });
+  </script>
+
+  <script>
+    // "Pause animations": the pictures play once as they scroll into view. This keeps them still.
+    const KEY = "elise.motion";
+    const toggle = document.querySelector<HTMLButtonElement>("#motion-toggle");
+    if (toggle) {
+      const off = document.documentElement.dataset.motion === "off";
+      toggle.textContent = off ? "Play animations" : "Pause animations";
+      toggle.addEventListener("click", () => {
+        try {
+          if (off) localStorage.removeItem(KEY);
+          else localStorage.setItem(KEY, "off");
+        } catch {
+          // Without storage the choice cannot be kept, so there is nothing to reload.
+          return;
+        }
+        location.reload();
+      });
+    }
+  </script>
 </Base>

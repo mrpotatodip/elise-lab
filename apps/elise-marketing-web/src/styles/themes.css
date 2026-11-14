@@ -1,0 +1,81 @@
+/* The marketing site's own layer over the copied tokens (tokens.css): the page
+   background, the sky, the glass blur and the text halo. The values match the
+   dashboard's rules for the same themes (globals.css, "Glass" section). */
+
+:root {
+  --glass-blur: none;
+  --halo: none;
+  --lede: var(--muted-foreground);
+}
+
+html {
+  background-color: var(--bg-color, var(--background));
+}
+
+body {
+  background: radial-gradient(60rem 28rem at 85% -8rem, var(--glow), transparent), var(--background);
+}
+
+::selection {
+  background: var(--selection);
+}
+
+/* The no-JavaScript sky, in WebP. tokens.css is a verbatim copy of the dashboard's and still names the
+   JPEG files; these later rules of the same weight win. The site ships only the WebP files. */
+:root[data-theme="daylight"] { --sky: var(--daylight-sky, url("/theme-bgs/bg-daylight-1.webp")); }
+:root[data-theme="greenfields"] { --sky: var(--greenfields-sky, url("/theme-bgs/bg-greenfields-1.webp")); }
+:root[data-theme="moonlight"] { --sky: var(--moonlight-sky, url("/theme-bgs/bg-moonlight-1.webp")); }
+
+/* Daylight, Greenfields and Moonlight blur what is behind a card or control. */
+:root[data-theme="daylight"],
+:root[data-theme="greenfields"],
+:root[data-theme="moonlight"] {
+  --glass-blur: blur(10px) saturate(1.4);
+}
+
+/* Text sits straight on the sky with no glass behind it. A soft halo and a
+   stronger ink keep it readable over bright clouds. */
+:root[data-theme="daylight"] {
+  --halo: 0 0 14px oklch(1 0 0 / 0.9), 0 0 3px oklch(1 0 0 / 0.7);
+  --lede: oklch(0.26 0.012 258);
+}
+
+:root[data-theme="greenfields"] {
+  --halo: 0 0 14px oklch(1 0 0 / 0.9), 0 0 3px oklch(1 0 0 / 0.7);
+  --lede: oklch(0.26 0.02 150);
+}
+
+:root[data-theme="moonlight"] {
+  --halo: 0 0 22px oklch(0.12 0.03 268 / 0.9), 0 0 10px oklch(0.12 0.03 268 / 0.95), 0 1px 3px oklch(0.1 0.03 268 / 0.9);
+  --lede: oklch(0.9 0.008 258);
+}
+
+/* Each sky is a 1778 by 592 banner centred at the top, its sides and bottom
+   eased into the page colour. Daylight and Greenfields show it at 1.5 times
+   its size, Moonlight at 1.1 times, capped at 1950px. */
+:root[data-theme="daylight"]::before,
+:root[data-theme="greenfields"]::before,
+:root[data-theme="moonlight"]::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  left: 50%;
+  width: min(150%, 2250px);
+  aspect-ratio: 3 / 1;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: var(--sky) center / 100% 100% no-repeat;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, rgb(0 0 0 / 0.08) 6%, rgb(0 0 0 / 0.3) 13%, rgb(0 0 0 / 0.65) 22%, #000 34%, #000 66%, rgb(0 0 0 / 0.65) 78%, rgb(0 0 0 / 0.3) 87%, rgb(0 0 0 / 0.08) 94%, transparent),
+    linear-gradient(to bottom, #000 10%, rgb(0 0 0 / 0.85) 25%, rgb(0 0 0 / 0.55) 45%, rgb(0 0 0 / 0.25) 65%, rgb(0 0 0 / 0.07) 82%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent, rgb(0 0 0 / 0.08) 6%, rgb(0 0 0 / 0.3) 13%, rgb(0 0 0 / 0.65) 22%, #000 34%, #000 66%, rgb(0 0 0 / 0.65) 78%, rgb(0 0 0 / 0.3) 87%, rgb(0 0 0 / 0.08) 94%, transparent),
+    linear-gradient(to bottom, #000 10%, rgb(0 0 0 / 0.85) 25%, rgb(0 0 0 / 0.55) 45%, rgb(0 0 0 / 0.25) 65%, rgb(0 0 0 / 0.07) 82%, transparent);
+  mask-composite: intersect;
+}
+
+:root[data-theme="moonlight"]::before {
+  width: min(110%, 1950px);
+}
