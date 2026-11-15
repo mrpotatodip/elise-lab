@@ -9,7 +9,7 @@ import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
 import type { CreateScanEnv } from "#/modules/scans/types";
-import { budgetCapOf, scanRefusalOf } from "#/modules/scans/utils";
+import { budgetCapOf, budgetRefusalHintOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
@@ -55,7 +55,14 @@ export const createScanSvc = (
       }),
     ).pipe(Effect.orDie);
 
-    const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true", new Date());
+    // -----
+    // A full Scan on the platform's key needs a Plan, whatever
+    // BILLING_ENFORCED says: it is the Scan that costs EliseLAB money.
+    // BILLING_ENFORCED keeps its wider rule (own-key and Runner Scans
+    // too) and is not turned on here.
+    // -----
+    const platformFullScan = skill === "full" && !ownKeyScan;
+    const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true" || platformFullScan, new Date());
     if (block) return yield* new RateLimited(block);
 
     // -----
@@ -120,9 +127,11 @@ export const createScanSvc = (
       const reservedUsd = reservedUsdOf(activeScans);
       const usedUsd = (spend.spentUsd + reservedUsd + maxBudgetUsd) * markup;
       if (usedUsd > budgetUsd) {
+        const leftUsd = budgetUsd - (spend.spentUsd + reservedUsd) * markup;
+        const hint = skill === "full" ? `. ${budgetRefusalHintOf(profile, leftUsd, markup)}` : "";
         return yield* new RateLimited({
           code: "MONTHLY_BUDGET_EXCEEDED",
-          message: `This scan could cost up to $${(maxBudgetUsd * markup).toFixed(2)}, but only $${Math.max(0, budgetUsd - (spend.spentUsd + reservedUsd) * markup).toFixed(2)} of the $${budgetUsd} monthly budget is left`,
+          message: `This scan could cost up to $${(maxBudgetUsd * markup).toFixed(2)}, but only $${Math.max(0, leftUsd).toFixed(2)} of the $${budgetUsd} monthly budget is left${hint}`,
         });
       }
     }
