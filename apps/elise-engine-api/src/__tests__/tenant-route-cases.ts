@@ -11,6 +11,7 @@ const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket
 // -----
 const OTHER_REPO = "https://github.com/octocat/Hello-World";
 const OTHER_FINGERPRINT = "b".repeat(64);
+export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
 
 // -----
 // Routes that name no Account of their own: sign-in, the
@@ -49,6 +50,7 @@ export const CROSS_ACCOUNT_CASES = {
     body: { repo: OTHER_REPO, fingerprint: OTHER_FINGERPRINT, body: "Not mine to write" },
     expect: "not-found",
   },
+  "DELETE /findings/comments/:commentId": { kind: "run", path: `/findings/comments/${OTHER_COMMENT_ID}`, method: "DELETE", expect: "not-found" },
   "PUT /findings/triage": pending(74),
   "GET /repos": pending(75),
   "POST /repos": pending(75),

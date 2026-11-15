@@ -90,7 +90,7 @@ export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me
     });
 
     return {
-      user: { id: login.id, name: login.name, email: login.email },
+      user: { id: login.id, name: login.name, email: login.email, partyId: login.partyId },
       partyType: login.partyType,
       isSuperuser: staff.length > 0,
       accounts,

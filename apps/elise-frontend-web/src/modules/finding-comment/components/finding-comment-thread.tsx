@@ -5,6 +5,7 @@ import { Skeleton } from "#/components/ui/skeleton";
 import { useFindingCommentActions, useFindingThread } from "../hooks";
 import type { FindingThreadEvent } from "../schemas";
 import { FindingCommentComposer } from "./finding-comment-composer";
+import { FindingCommentDeleteDialog } from "./finding-comment-delete-dialog";
 import { FindingCommentItem } from "./finding-comment-item";
 
 type FindingCommentThreadProps = {
@@ -12,8 +13,16 @@ type FindingCommentThreadProps = {
   fingerprint: string;
 };
 
-function ThreadEvent({ event }: { event: FindingThreadEvent }) {
-  return <FindingCommentItem comment={event} />;
+type ThreadEventProps = {
+  event: FindingThreadEvent;
+  canDelete: boolean;
+  deleting: boolean;
+  onDelete: (commentId: string) => Promise<void>;
+};
+
+function ThreadEvent({ event, canDelete, deleting, onDelete }: ThreadEventProps) {
+  const actions = canDelete && event.body !== null ? <FindingCommentDeleteDialog pending={deleting} onConfirm={() => onDelete(event.id)} /> : undefined;
+  return <FindingCommentItem comment={event} actions={actions} />;
 }
 
 // -----
@@ -24,8 +33,9 @@ function ThreadEvent({ event }: { event: FindingThreadEvent }) {
 export function FindingCommentThread({ repo, fingerprint }: FindingCommentThreadProps) {
   const { user } = useRouteContext({ from: "/_app" });
   const canComment = hasAccessPower(user?.powers ?? [], "company:findings:comments:create");
+  const canDeleteAny = hasAccessPower(user?.powers ?? [], "company:findings:comments:delete");
   const thread = useFindingThread(repo, fingerprint);
-  const { create } = useFindingCommentActions({ repo, fingerprint });
+  const { create, remove } = useFindingCommentActions({ repo, fingerprint });
 
   return (
     <section aria-labelledby="finding-discussion-title" className="grid gap-4 border-t pt-6">
@@ -44,7 +54,13 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
         ) : (
           <ol className="grid gap-5">
             {thread.data.events.map((event) => (
-              <ThreadEvent key={event.id} event={event} />
+              <ThreadEvent
+                key={event.id}
+                event={event}
+                canDelete={canDeleteAny || (canComment && event.authorPartyId !== null && event.authorPartyId === user?.partyId)}
+                deleting={remove.isPending}
+                onDelete={(commentId) => remove.mutateAsync(commentId).then(() => undefined)}
+              />
             ))}
           </ol>
         ))}

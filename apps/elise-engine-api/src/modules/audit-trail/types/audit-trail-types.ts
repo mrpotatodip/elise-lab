@@ -16,6 +16,7 @@ export type AuditAction =
   | "group.member.removed"
   | "finding.triage.set"
   | "finding.risk.accepted"
+  | "finding.comment.deleted"
   | "github.install.connected"
   | "github.install.removed"
   | "usage.budget.updated"

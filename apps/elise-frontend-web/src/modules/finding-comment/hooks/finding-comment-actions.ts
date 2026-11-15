@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { postFindingComment } from "../api";
+import { deleteFindingComment, postFindingComment } from "../api";
 import { findingCommentKeys } from "./finding-comment-queries";
 
 type CommentTarget = { repo: string; fingerprint: string };
@@ -15,5 +15,11 @@ export function useFindingCommentActions({ repo, fingerprint }: CommentTarget) {
     onError: (error) => toast.error(`We couldn't post that comment. ${error.message}`),
   });
 
-  return { create };
+  const remove = useMutation({
+    mutationFn: (commentId: string) => deleteFindingComment({ data: { commentId } }),
+    onSuccess: reload,
+    onError: (error) => toast.error(`We couldn't delete that comment. ${error.message}`),
+  });
+
+  return { create, remove };
 }

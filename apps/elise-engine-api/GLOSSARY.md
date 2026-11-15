@@ -211,7 +211,7 @@ A login whose Role is `workspace_watcher`: it holds only `company:summary:read`.
 _Avoid_: Viewer, guest
 
 **Audit trail**:
-`access_audit_log`. It holds Team invite and Group changes with the actor's Party, and the Tenant in `after`.
+`access_audit_log`. It holds every kind of change an Account makes to itself, each with the actor's Party and the Tenant in `after`: Team invites, Groups, triage decisions (`finding.triage.set`, `finding.risk.accepted`), comment deletes (`finding.comment.deleted`), GitHub installs, the monthly budget and the Anthropic key.
 
 **Party**:
 Any actor that the system knows. Its type is a row in `party_master_types`: a Person or an Organization.

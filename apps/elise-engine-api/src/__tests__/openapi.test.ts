@@ -25,6 +25,7 @@ describe("GET /openapi.json", () => {
 
     expect(spec.openapi).toBe("3.1.0");
     expect(operations(spec).map(({ route }) => route).toSorted()).toEqual([
+      "DELETE /findings/comments/{commentId}",
       "DELETE /github/installations/{id}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",

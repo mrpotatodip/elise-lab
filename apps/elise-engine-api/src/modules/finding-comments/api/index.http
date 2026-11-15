@@ -16,3 +16,11 @@ x-account-id: {{account}}
 Content-Type: application/json
 
 { "repo": "https://github.com/octocat/Hello-World", "fingerprint": "<64 hex characters>", "body": "Fixed in the next release." }
+
+###
+
+# Delete a comment: its author (who holds company:findings:comments:create) or anyone holding company:findings:comments:delete.
+# The body goes, a marker stays, and the Audit trail gets finding.comment.deleted. The service token is refused.
+DELETE {{baseUrl}}/findings/comments/<comment id>
+Authorization: Bearer <session-token>
+x-account-id: {{account}}

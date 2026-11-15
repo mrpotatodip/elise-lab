@@ -43,7 +43,7 @@ export const ACCESS_CATALOGUE = [
         label: "Findings",
         children: [
           { key: "accepted_risk", label: "Accepted risk", actions: ["update"] },
-          { key: "comments", label: "Finding comment", actions: ["create"] },
+          { key: "comments", label: "Finding comment", actions: ["create", "delete"] },
         ],
       },
       {
