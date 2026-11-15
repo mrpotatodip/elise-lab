@@ -16,14 +16,14 @@ Reach for this file for step 1 of `SKILL.md`, and before the reviewer. It is a f
 
 ## The calls, in order
 
-Use your own tab (`new_page`) and pass its `pageId` to every call. Name files `<route>-<what>-<width>`; the examples use `home` and `1440`.
+Use your own tab (`new_page`) and pass its `pageId` to every call, `navigate_page` and `resize_page` included: a call without one lands on the selected tab, which may be another's. If a browser tool answers `The browser is already running for ... chrome-profile`, another Chrome holds the profile: ask the user before closing it (`pkill -f chrome-devtools-mcp/chrome-profile`). Name files `<route>-<what>-<width>`; the examples use `home` and `1440`.
 
 | # | Call | Saves | Used for |
 |---|---|---|---|
 | 1 | `resize_page` to the width, `navigate_page` to the route | none | |
 | 2 | `evaluate_script` with `sourcePath` set to `evidence.js` in this skill folder, `filePath` set to `home-evidence-1440.json`, `waitForStableDom` false | the numbers: page facts, type sizes, contrast, reading breaks, targets, heading gaps, unlabelled fields, section tops | D3, D7, D8, D11, J6, and the plan for step 4 |
 | 3 | `take_snapshot` with `filePath` set to `home-snapshot-1440.txt` | the page as text | J1 to J6, L1 to L6 (the cold read), WCAG 4.1.2 |
-| 4 | `take_screenshot` of the viewport at the top, then once per entry in `sections` from call 2 (scroll with `evaluate_script`, `scrollTo(0, top - 60)`), at most 6 for desktop | `home-<section>-1440.webp` | D1, D2, D4, D9, D10 and any finding about looks |
+| 4 | `evaluate_script` `scrollTo(0, 0)`, then `take_screenshot` of the viewport at the top, then once per entry in `sections` from call 2 (scroll with `evaluate_script`, `scrollTo(0, top - 60)`), at most 6 for desktop | `home-<section>-1440.webp` | D1, D2, D4, D9, D10 and any finding about looks |
 | 5 | Repeat 1 to 4 at the phone width, but with at most 3 screenshots (top, the widest section, the footer) | `home-*-500.*` | D8, D11 (reflow), PUBLIC-PAGES phones |
 | 6 | `list_console_messages` with `types` set to `["error","warn","issue"]` | none: note each message | every error and warning accounted for |
 | 7 | `lighthouse_audit`, desktop and mobile, with `outputDirPath` set to `lh-<width>/`, then read only `report.json` audits that failed | scores and failed audits | D7, D11, PUBLIC-PAGES speed (CLS) |
