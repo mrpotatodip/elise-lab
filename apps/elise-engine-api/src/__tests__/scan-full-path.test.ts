@@ -35,7 +35,7 @@ beforeEach(() => {
   app = buildApp(testDeps({ scanRepo: () => store.repo, monthSpend: async () => spend })).app;
 });
 
-type Body = { repo: string; skill?: string; profile?: string };
+type Body = { repo: string; profile?: string };
 const post = (env: Bindings, body: Body, account = ACCOUNT) =>
   app.fetch(
     new Request("http://localhost/scans", {
@@ -73,18 +73,20 @@ describe("POST /scans: every new Scan runs the full path", () => {
     expect(queued).toMatchObject({ skill: "full", profile: "quick", maxBudgetUsd: 6 });
   });
 
-  it.each(["lite", "full"])("accepts skill %s and ignores it", async (skill) => {
+  it("answers a request that still sends skill as if the field were not there: queued, stored full", async () => {
     const { env, createdFull } = fakeBindings();
-    const res = await post(env, { repo: repoOf("a"), skill, profile: "deep" });
+    const sent: Body & { skill: string } = { repo: repoOf("a"), profile: "deep", skill: "lite" };
+    const res = await post(env, sent);
 
+    expect(res.status).toBe(201);
     expect(QueuedSchema.parse(await res.json()).data).toMatchObject({ skill: "full", profile: "deep", maxBudgetUsd: 18 });
     expect(createdFull).toHaveLength(1);
   });
 
-  it("refuses an Account with no Plan and no key of its own, also when the request says lite", async () => {
+  it("refuses an Account with no Plan and no key of its own", async () => {
     spend = NO_SPEND;
     const { env, createdFull } = fakeBindings();
-    const res = await post(env, { repo: repoOf("a"), skill: "lite" });
+    const res = await post(env, { repo: repoOf("a") });
 
     expect(res.status).toBe(429);
     expect(ErrorSchema.parse(await res.json()).error.code).toBe("NO_ACTIVE_PLAN");
