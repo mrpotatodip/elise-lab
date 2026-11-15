@@ -24,8 +24,6 @@ import type { RepoFinding } from "../schemas";
 import { repoName } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
-import { RepoVerdictDecision } from "./repo-verdict-decision";
-import { RepoVerdictDiscussion } from "./repo-verdict-discussion";
 
 const RECENT_SCAN_COUNT = 3;
 
@@ -50,14 +48,6 @@ const EMPTY_COPY = {
 } as const satisfies Record<FindingFilter, { title: string; text: string }>;
 
 const asFilter = (value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
-
-// -----
-// Open findings already show in the verdict above, so the history
-// opens on what people decided, then on what a scan fixed, then on
-// everything when neither has any.
-// -----
-const firstFilledFilter = (findings: readonly RepoFinding[]): FindingFilter =>
-  (["decided", "scan"] as const).find((value) => findings.some((f) => findingGroup(f.state, f.triage) === value)) ?? "all";
 
 function ScanLink({ scanId, history }: { scanId: string; history: readonly ScanStatus[] }) {
   const scan = history.find((item) => item.scanId === scanId);
@@ -234,7 +224,7 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
   const queryClient = useQueryClient();
   const findingsOptions = repoFindingsQuery(repoId, { branch });
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useSuspenseInfiniteQuery(findingsOptions);
-  const [filter, setFilter] = useState<FindingFilter>(() => firstFilledFilter(data.pages.flatMap((page) => page.findings)));
+  const [filter, setFilter] = useState<FindingFilter>("action");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<number | undefined>();
   const decided = (fingerprint: string, triage: RepoFinding["triage"]) =>
@@ -252,10 +242,10 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
   const table = useTable({ features: dataTableFeatures, columns: showStatus ? findingColumnsWithStatus : findingColumnsWithoutStatus, data: rows, getRowId: (row) => row.finding.id });
 
   return (
-    <Card>
+    <Card id="branch-findings" className="scroll-mt-20">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-7">
         <div className="grid max-w-xl gap-1.5">
-          <CardTitle>Findings history</CardTitle>
+          <CardTitle>Findings on this branch</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {FILTER_COPY[filter].note}
             {findings.length > 0 ? (filter === "action" ? " Select a row for the impact, evidence and fix, and record your decision." : " Select a row to read the impact, evidence and fix.") : ""}
@@ -450,7 +440,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
       </ShellPageHeader>
 
-      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} Discussion={RepoVerdictDiscussion} compactFindings />}
+      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} findingsHref="#branch-findings" />}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">
