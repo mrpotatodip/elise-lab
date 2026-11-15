@@ -57,3 +57,11 @@
 **2.6 `[House]` Don't write throwaway test or print scripts to check your work.** Run `pnpm check:apps`, or write the one test you will keep.
 
 **2.7 `[House]` Reviewers check the diff for tests.** Flag a new test that 2.3 doesn't allow, a case that duplicates another, and an assertion that only repeats the code (a non-null check, an expected value computed the way the code computes it).
+
+---
+
+## 3. General: Branches and PRs
+
+**3.1 `[House]` Branch from `main`.** `main` takes squash merges only and requires a branch that is up to date. A PR stacked on another open branch keeps that branch's original commits, so it conflicts once the base merges and needs `git rebase --onto origin/main <old base tip>` plus a fresh check, one PR at a time. Stack only when the change needs code the base adds and cannot wait for it to merge; say so in the PR description.
+
+**3.2 `[House]` Reviewers check the base.** Flag a PR whose base is not `main` and whose description does not say why it is stacked.
