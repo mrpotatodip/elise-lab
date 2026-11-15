@@ -5,15 +5,6 @@ import type { CreateScanEnv } from "#/modules/scans/types";
 type BudgetCap = { ok: true; defaultUsd: number; ceilingUsd: number } | { ok: false; message: string };
 
 // -----
-// The Budget cap of a new Scan, read at this one point: what it gets
-// when the request names none (defaultUsd) and the most a request may
-// ask for (ceilingUsd).
-// A Scan on a Runner has its safety cap. Every other Scan, on either
-// key, gets the cap of its profile, and a request may lower it only. A
-// profile whose cap is above MAX_BUDGET_FULL_USD is refused, so a
-// wrong table never starts a Scan.
-// -----
-// -----
 // What a refused full Scan tells the Account about the Monthly budget:
 // the biggest profile below the one asked for whose cap, times the
 // markup, fits in what is left (in credit dollars), or the sentence
@@ -26,6 +17,15 @@ export const budgetRefusalHintOf = (profile: (typeof SCAN_PROFILES)[number], lef
   return `The monthly budget is too low for any profile: $${Math.max(0, leftUsd).toFixed(2)} is left`;
 };
 
+// -----
+// The Budget cap of a new Scan, read at this one point: what it gets
+// when the request names none (defaultUsd) and the most a request may
+// ask for (ceilingUsd).
+// A Scan on a Runner has its safety cap. Every other Scan, on either
+// key, gets the cap of its profile, and a request may lower it only. A
+// profile whose cap is above MAX_BUDGET_FULL_USD is refused, so a
+// wrong table never starts a Scan.
+// -----
 export const budgetCapOf = (
   env: Pick<CreateScanEnv, "MAX_BUDGET_FULL_USD">,
   scan: { profile: (typeof SCAN_PROFILES)[number]; onRunner: boolean },

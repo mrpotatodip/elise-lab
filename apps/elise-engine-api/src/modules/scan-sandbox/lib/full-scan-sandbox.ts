@@ -155,6 +155,13 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     if (!started.includes(phase)) await this.ctx.storage.put<FullPhase[]>(SCAN_SANDBOX_PHASES_KEY, [...started, phase]);
     const remaining = remainingUsd(meter);
     console.log(`scan: phase ${phase} starts, $${remaining.toFixed(4)} of the $${options.maxBudgetUsd} cap left`);
+    // -----
+    // A Phase that ended well can still have spent the whole pool. The
+    // next one could make no call, and `--max-budget-usd 0` is not a run.
+    // -----
+    if (Number(remaining.toFixed(6)) <= 0) {
+      throw new Error(`the budget cap of $${options.maxBudgetUsd} was reached before the ${phase} phase could start`);
+    }
     const files = phaseAgentFiles(phase);
     await this.#files.writeFile(files.prompt, buildPhasePrompt(options, phase));
     await this.#container.exec(["/bin/sh", "-c", buildAgentScript(options, files, Number(remaining.toFixed(6)))], {

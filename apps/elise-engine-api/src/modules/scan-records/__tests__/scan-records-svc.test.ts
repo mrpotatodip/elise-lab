@@ -278,13 +278,15 @@ describe("a profile scan (the full skill)", () => {
 
 const ledger = (...units: Array<{ status: string; unresolved: string[] }>) => JSON.stringify(units);
 
-describe("the partial rule", () => {  it.each([
+describe("the partial rule", () => {
+  it.each([
     ["the Report starts with PARTIAL:", { "REPORT.md": "PARTIAL: money ran out; 3 units were not covered.\n\n- unit-a" }, true],
     ["a unit is deferred for money_exhausted", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "covered", unresolved: [] }, { status: "deferred", unresolved: ["money_exhausted"] }) }, true],
     ["the Report is clean and the ledger is complete", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "covered", unresolved: [] }) }, false],
     ["a quick Scan defers a unit for its own profile", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "deferred", unresolved: ["quick_profile_final_critic"] }) }, false],
     ["PARTIAL: is not on the first line", { "REPORT.md": "# Report\nPARTIAL: later" }, false],
-    ["money_exhausted is on a unit that is not deferred", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "candidate", unresolved: ["money_exhausted"] }) }, false],
+    ["an unvalidated candidate is kept as a candidate unit with money_exhausted", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "candidate", unresolved: ["money_exhausted"] }) }, true],
+    ["a blank line comes before PARTIAL:", { "REPORT.md": "\n\nPARTIAL: money ran out; 1 unit was not covered." }, true],
   ])("a succeeded scan is partial when %s: %j", async (_name, files, expected) => {
     const record = await recordFull({ "findings.json": "[]", ...files });
 
