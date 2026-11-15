@@ -306,7 +306,7 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
         <copy.Icon />
         <div className="grid gap-1.5">
           <AlertDescription className="text-xl font-semibold leading-tight">{copy.title}</AlertDescription>
-          <AlertDescription className="max-w-copy text-foreground">{copy.note}</AlertDescription>
+          <AlertDescription className="max-w-copy text-pretty text-foreground xl:max-w-4xl">{copy.note}</AlertDescription>
         </div>
       </Alert>
       {repoUrl && (
