@@ -307,6 +307,7 @@ describe("watcher session", () => {
     { method: "GET", path: "/findings/comments" },
     { method: "POST", path: "/findings/comments" },
     { method: "DELETE", path: "/findings/comments/00000000-0000-4000-8000-000000000001" },
+    { method: "PATCH", path: "/findings/comments/dddddddd-dddd-4ddd-8ddd-dddddddddddd" },
     { method: "GET", path: "/github/installations" },
     { method: "GET", path: `/repos/${REPO_ID}` },
     { method: "GET", path: `/repos/${REPO_ID}/verdict` },

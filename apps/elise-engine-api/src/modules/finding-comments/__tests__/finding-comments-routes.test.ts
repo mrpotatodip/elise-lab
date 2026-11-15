@@ -131,3 +131,73 @@ describe("what a thread keeps", () => {
     expect(thread.events.map((event) => [event.body, event.authorName])).toEqual([["left behind", null]]);
   });
 });
+
+describe("who may edit a comment", () => {
+  const UNKNOWN_COMMENT_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const edit = (id: string, body: string, token = false) => call(`/findings/comments/${id}`, { method: "PATCH", body: { body }, token });
+
+  const writeAs = async (user: string, body: string) => {
+    signedIn = user;
+    return z.object({ data: FindingCommentSchema }).parse(await (await post(body)).json()).data;
+  };
+
+  beforeAll(async () => {
+    const [type] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
+    const [party] = await test.raw.insert(parties).values({ masterTypeId: type.id }).returning();
+    await test.raw.insert(partyPersons).values({ partyId: party.id, firstName: "Bo", lastName: "Chen" });
+    await test.raw.insert(authUser).values({ id: "bo", name: "Bo Chen", email: "bo@example.com", partyId: party.id });
+  });
+
+  it("lets the author change the text and marks it edited, with the author's name kept", async () => {
+    const written = await writeAs("ada", "first draft");
+    const res = await edit(written.id, "second draft");
+    const saved = z.object({ data: FindingCommentSchema }).parse(await res.json()).data;
+
+    expect([res.status, saved.body, saved.authorName, saved.editedAt !== null, written.editedAt, await threadBodies()]).toEqual([200, "second draft", "Ada Rossi", true, null, ["second draft"]]);
+  });
+
+  it("refuses another member, even one who holds the create Power, and keeps the text", async () => {
+    const written = await writeAs("ada", "mine");
+    signedIn = "bo";
+    const res = await edit(written.id, "hijacked");
+
+    expect([res.status, await threadBodies()]).toEqual([403, ["mine"]]);
+  });
+
+  it("refuses the author once the Role no longer holds the create Power", async () => {
+    const written = await writeAs("ada", "mine");
+    held = READER;
+    const res = await edit(written.id, "too late");
+
+    expect([res.status, await threadBodies()]).toEqual([403, ["mine"]]);
+  });
+
+  it("refuses the service token, which names no author", async () => {
+    const written = await writeAs("ada", "mine");
+    signedIn = undefined;
+    const res = await edit(written.id, "no author", true);
+
+    expect(res.status).toBe(401);
+  });
+
+  it("refuses an edit of a deleted comment", async () => {
+    const [login] = await test.raw.select().from(authUser).where(eq(authUser.id, "ada"));
+    const [deleted] = await test.raw.insert(scanFindingComments).values({ tenantId, repoId, fingerprint: FINGERPRINT, authorPartyId: login.partyId, body: "", deletedAt: new Date() }).returning();
+    const res = await edit(deleted.id, "back again");
+
+    expect(res.status).toBe(409);
+  });
+
+  it("answers 404 for a comment that does not exist", async () => {
+    expect((await edit(UNKNOWN_COMMENT_ID, "nothing")).status).toBe(404);
+  });
+
+  it.each([
+    [FINDING_COMMENT_BODY_MAX, 200],
+    [FINDING_COMMENT_BODY_MAX + 1, 400],
+  ])("answers an edit to %i characters with %i", async (length, status) => {
+    const written = await writeAs("ada", "short");
+
+    expect((await edit(written.id, "x".repeat(length))).status).toBe(status);
+  });
+});

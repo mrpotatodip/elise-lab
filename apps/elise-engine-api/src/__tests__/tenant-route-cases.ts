@@ -51,6 +51,13 @@ export const CROSS_ACCOUNT_CASES = {
     expect: "not-found",
   },
   "DELETE /findings/comments/:commentId": { kind: "run", path: `/findings/comments/${OTHER_COMMENT_ID}`, method: "DELETE", expect: "not-found" },
+  "PATCH /findings/comments/:commentId": {
+    kind: "run",
+    path: `/findings/comments/${OTHER_COMMENT_ID}`,
+    method: "PATCH",
+    body: { body: "Not mine to edit" },
+    expect: "not-found",
+  },
   "PUT /findings/triage": pending(74),
   "GET /repos": pending(75),
   "POST /repos": pending(75),

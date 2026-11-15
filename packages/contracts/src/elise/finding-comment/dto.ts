@@ -17,6 +17,14 @@ export const CreateFindingCommentBodySchema = z.object({
   body: FindingCommentTextSchema,
 });
 
+export const FindingCommentParamSchema = z.object({
+  commentId: z.uuid(),
+});
+
+export const UpdateFindingCommentBodySchema = z.object({
+  body: FindingCommentTextSchema,
+});
+
 // -----
 // One comment as the thread shows it. body is null once the
 // comment is deleted. authorName is null when the author's
@@ -61,6 +69,7 @@ export const FindingThreadSchema = z.object({
 
 export type FindingCommentsQuery = z.infer<typeof FindingCommentsQuerySchema>;
 export type CreateFindingCommentBody = z.infer<typeof CreateFindingCommentBodySchema>;
+export type UpdateFindingCommentBody = z.infer<typeof UpdateFindingCommentBodySchema>;
 export type FindingComment = z.infer<typeof FindingCommentSchema>;
 export type FindingDecision = z.infer<typeof FindingDecisionSchema>;
 export type FindingThreadEvent = z.infer<typeof FindingThreadEventSchema>;

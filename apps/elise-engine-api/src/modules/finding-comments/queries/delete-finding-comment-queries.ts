@@ -1,22 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import type { FindingComment } from "@repo/contracts/elise";
-import { partyPersons, scanFindingComments, type TFindingComment } from "@repo/db-elise/schema";
+import { partyPersons, scanFindingComments } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { insertAuditEntry } from "#/modules/audit-trail";
 import { findingCommentView } from "./finding-comment-view";
-
-export const findFindingCommentEffect = (db: AppDbType, tenantId: string, commentId: string): Effect.Effect<TFindingComment | undefined, DbError> =>
-  Effect.tryPromise({
-    try: () =>
-      db
-        .select()
-        .from(scanFindingComments)
-        .where(and(eq(scanFindingComments.tenantId, tenantId), eq(scanFindingComments.id, commentId)))
-        .then(([row]) => row),
-    catch: toDbError,
-  });
 
 // -----
 // Empties the body, stamps who deleted it and when, and writes

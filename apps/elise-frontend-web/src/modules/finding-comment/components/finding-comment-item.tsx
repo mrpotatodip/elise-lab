@@ -9,14 +9,16 @@ type FindingCommentItemProps = {
   comment: FindingComment;
   markers?: ReactNode;
   actions?: ReactNode;
+  editor?: ReactNode;
 };
 
 // -----
 // One comment: who, when, then the text. markers sit after the time
 // (the "edited" and "deleted" notes) and actions sit at the right end
-// of the same line (edit and delete).
+// of the same line (edit and delete). editor takes the place of the
+// text while its author edits it.
 // -----
-export function FindingCommentItem({ comment, markers, actions }: FindingCommentItemProps) {
+export function FindingCommentItem({ comment, markers, actions, editor }: FindingCommentItemProps) {
   return (
     <li className="flex gap-3">
       <Avatar className="size-8">
@@ -29,7 +31,8 @@ export function FindingCommentItem({ comment, markers, actions }: FindingComment
           {markers}
           {actions && <span className="ml-auto flex items-center gap-1">{actions}</span>}
         </div>
-        {comment.body === null ? <p className="text-sm italic text-muted-foreground">This comment was deleted.</p> : <FindingCommentBody text={comment.body} />}
+        {editor ??
+          (comment.body === null ? <p className="text-sm italic text-muted-foreground">This comment was deleted.</p> : <FindingCommentBody text={comment.body} />)}
       </div>
     </li>
   );

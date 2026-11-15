@@ -19,6 +19,16 @@ Content-Type: application/json
 
 ###
 
+# Edit your own comment (at most 4,000 characters). Only its author, while the Role still holds company:findings:comments:create; a deleted comment answers 409.
+PATCH {{baseUrl}}/findings/comments/<comment id>
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "body": "Fixed in 1.4.2." }
+
+###
+
 # Delete a comment: its author (who holds company:findings:comments:create) or anyone holding company:findings:comments:delete.
 # The body goes, a marker stays, and the Audit trail gets finding.comment.deleted. The service token is refused.
 DELETE {{baseUrl}}/findings/comments/<comment id>

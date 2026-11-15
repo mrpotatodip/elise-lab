@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FINDING_COMMENT_BODY_MAX } from "@repo/contracts/elise";
 
 export { CreateFindingCommentBodySchema, FindingCommentSchema, FindingCommentsQuerySchema, FindingThreadSchema } from "@repo/contracts/elise";
+export { FindingCommentTextSchema } from "@repo/contracts/elise";
 export type { CreateFindingCommentBody, FindingComment, FindingCommentsQuery, FindingDecision, FindingThread, FindingThreadEvent } from "@repo/contracts/elise";
 
 // -----
