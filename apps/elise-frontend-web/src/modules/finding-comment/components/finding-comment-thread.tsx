@@ -6,24 +6,25 @@ import { Button } from "#/components/ui/button";
 import { Skeleton } from "#/components/ui/skeleton";
 import { ScanTime } from "#/modules/scan";
 import { useFindingCommentActions, useFindingThread } from "../hooks";
-import type { FindingThreadEvent } from "../schemas";
+import type { FindingComment, FindingThreadEvent } from "../schemas";
 import { FindingCommentComposer } from "./finding-comment-composer";
 import { FindingCommentEditForm } from "./finding-comment-edit-form";
 import { FindingCommentItem } from "./finding-comment-item";
+import { FindingDecisionItem } from "./finding-decision-item";
 
 type FindingCommentThreadProps = {
   repo: string;
   fingerprint: string;
 };
 
-type ThreadEventProps = {
-  event: FindingThreadEvent;
+type EditableCommentProps = {
+  event: FindingComment;
   canEdit: boolean;
   editPending: boolean;
   onEdit: (commentId: string, body: string) => Promise<boolean>;
 };
 
-function ThreadEvent({ event, canEdit, editPending, onEdit }: ThreadEventProps) {
+function EditableComment({ event, canEdit, editPending, onEdit }: EditableCommentProps) {
   const [editing, setEditing] = useState(false);
   const markers =
     event.editedAt && event.deletedAt === null ? (
@@ -42,6 +43,28 @@ function ThreadEvent({ event, canEdit, editPending, onEdit }: ThreadEventProps) 
       <FindingCommentEditForm commentId={event.id} initialBody={event.body} pending={editPending} onSave={(body) => onEdit(event.id, body)} onCancel={() => setEditing(false)} />
     ) : undefined;
   return <FindingCommentItem comment={event} markers={markers} actions={actions} editor={editor} />;
+}
+
+type ThreadEventProps = Omit<EditableCommentProps, "event" | "canEdit"> & {
+  event: FindingThreadEvent;
+  viewerPartyId: string | null;
+  canWrite: boolean;
+};
+
+function ThreadEvent({ event, viewerPartyId, canWrite, editPending, onEdit }: ThreadEventProps) {
+  switch (event.kind) {
+    case "comment":
+      return (
+        <EditableComment
+          event={event}
+          canEdit={canWrite && viewerPartyId !== null && event.authorPartyId === viewerPartyId && event.deletedAt === null}
+          editPending={editPending}
+          onEdit={onEdit}
+        />
+      );
+    case "decision":
+      return <FindingDecisionItem decision={event} />;
+  }
 }
 
 // -----
@@ -76,7 +99,8 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
               <ThreadEvent
                 key={event.id}
                 event={event}
-                canEdit={canComment && user?.partyId != null && event.authorPartyId === user.partyId && event.deletedAt === null}
+                viewerPartyId={user?.partyId ?? null}
+                canWrite={canComment}
                 editPending={edit.isPending}
                 onEdit={editComment}
               />

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { FINDING_COMMENT_BODY_MAX } from "../constants";
+import { FINDING_TRIAGE_STATUS_VALUES } from "../enums";
 
 const FingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/);
 
@@ -41,11 +42,26 @@ export const FindingCommentSchema = z.object({
 });
 
 // -----
-// A thread is a list of events, oldest first. A comment is
-// the only kind today; the triage decisions join it as a
-// second kind.
+// One triage decision as the thread shows it, from the Audit
+// trail row. actorName is null when the decision was made with
+// the service token or the login was removed. acceptedUntil is
+// set only for an accepted risk.
 // -----
-export const FindingThreadEventSchema = z.discriminatedUnion("kind", [FindingCommentSchema]);
+export const FindingDecisionSchema = z.object({
+  kind: z.literal("decision"),
+  id: z.uuid(),
+  actorName: z.string().nullable(),
+  status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
+  note: z.string().nullable(),
+  acceptedUntil: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+// -----
+// A thread is a list of events, oldest first: comments and
+// triage decisions.
+// -----
+export const FindingThreadEventSchema = z.discriminatedUnion("kind", [FindingCommentSchema, FindingDecisionSchema]);
 
 export const FindingThreadSchema = z.object({
   events: z.array(FindingThreadEventSchema),
@@ -55,5 +71,6 @@ export type FindingCommentsQuery = z.infer<typeof FindingCommentsQuerySchema>;
 export type CreateFindingCommentBody = z.infer<typeof CreateFindingCommentBodySchema>;
 export type UpdateFindingCommentBody = z.infer<typeof UpdateFindingCommentBodySchema>;
 export type FindingComment = z.infer<typeof FindingCommentSchema>;
+export type FindingDecision = z.infer<typeof FindingDecisionSchema>;
 export type FindingThreadEvent = z.infer<typeof FindingThreadEventSchema>;
 export type FindingThread = z.infer<typeof FindingThreadSchema>;
