@@ -22,7 +22,9 @@ export const withoutEvent = (events: readonly FindingThreadEvent[], id: string):
 export const withCommentDeleted = (events: readonly FindingThreadEvent[], id: string, deletedAt: string): FindingThreadEvent[] =>
   events.map((event) => (event.kind === "comment" && event.id === id ? { ...event, body: null, deletedAt } : event));
 
-export const findComment = (events: readonly FindingThreadEvent[], id: string): FindingComment | undefined =>
+export const hasLiveComment = (events: readonly FindingThreadEvent[]): boolean => events.some((event) => event.kind === "comment" && event.body !== null);
+
+export const findComment =(events: readonly FindingThreadEvent[], id: string): FindingComment | undefined =>
   events.find((event): event is FindingComment => event.kind === "comment" && event.id === id);
 
 export const withCommentRestored = (events: readonly FindingThreadEvent[], comment: FindingComment): FindingThreadEvent[] =>

@@ -101,7 +101,7 @@ function bannerOf({ state, triage, fixedOn }: FindingStatusProps): Banner {
     case "came_back":
       return { tone: "danger", title: "Came back", body: "It was fixed before and a scan reported it again. Find what reintroduced it, then decide below." };
     default:
-      return { tone: "neutral", title: "Open: nobody has decided yet", body: "Choose a decision below. Marking it fixed does not confirm the fix: only a scan can do that." };
+      return { tone: "neutral", title: "Open: waiting for a decision", body: "Choose a decision below. Marking it fixed does not confirm the fix: only a scan can do that." };
   }
 }
 

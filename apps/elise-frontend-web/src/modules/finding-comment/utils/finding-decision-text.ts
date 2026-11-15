@@ -4,13 +4,14 @@ const END_DATE = new Intl.DateTimeFormat("en", { month: "short", day: "numeric",
 
 const DECISION_VERBS = {
   open: "reopened this",
-  fixed: "marked this fixed",
+  fixed: "marked this fixed. A scan has not confirmed it yet.",
   false_positive: "marked this a false positive",
 } satisfies Record<Exclude<FindingDecision["status"], "accepted_risk">, string>;
 
 // -----
 // What a decision says after the name: "marked this fixed",
-// "accepted the risk until Jan 12". The end date reads in UTC
+// "accepted the risk until Jan 12". A fixed mark adds that no scan
+// has confirmed it, as the finding banner says. The end date reads in UTC
 // so the server and the browser print the same day.
 // -----
 export const decisionText = (decision: Pick<FindingDecision, "status" | "acceptedUntil">): string =>

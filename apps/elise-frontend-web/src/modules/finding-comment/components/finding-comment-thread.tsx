@@ -1,17 +1,17 @@
 import { useRouteContext } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { hasAccessPower } from "@repo/contracts/elise";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
 import { Skeleton } from "#/components/ui/skeleton";
-import { ScanTime } from "#/modules/scan";
 import { useFindingCommentActions, useFindingThread } from "../hooks";
 import type { FindingComment, FindingThreadEvent } from "../schemas";
-import { isPendingComment } from "../utils";
+import { hasLiveComment, isPendingComment } from "../utils";
 import { FindingCommentComposer } from "./finding-comment-composer";
 import { FindingCommentDeleteDialog } from "./finding-comment-delete-dialog";
 import { FindingCommentEditForm } from "./finding-comment-edit-form";
 import { FindingCommentItem } from "./finding-comment-item";
+import { FindingCommentTime } from "./finding-comment-time";
 import { FindingDecisionItem } from "./finding-decision-item";
 
 type FindingCommentThreadProps = {
@@ -30,10 +30,16 @@ type EditableCommentProps = {
 
 function EditableComment({ event, canEdit, canDelete, editPending, onEdit, onDelete }: EditableCommentProps) {
   const [editing, setEditing] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (wasEditing.current && !editing) editButton.current?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
   const markers =
     event.editedAt && event.deletedAt === null ? (
       <span className="text-muted-foreground">
-        edited <ScanTime value={event.editedAt} />
+        edited <FindingCommentTime value={event.editedAt} />
       </span>
     ) : undefined;
   const showEdit = canEdit && !editing;
@@ -42,7 +48,7 @@ function EditableComment({ event, canEdit, canDelete, editPending, onEdit, onDel
     showEdit || showDelete ? (
       <>
         {showEdit && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          <Button ref={editButton} type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
             Edit
           </Button>
         )}
@@ -110,7 +116,7 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
         (thread.data.events.length === 0 ? (
           <p className="text-sm text-muted-foreground">No one has commented on this finding yet.</p>
         ) : (
-          <ol className="grid gap-5">
+          <ol className="grid gap-5 [list-style-type:'']">
             {thread.data.events.map((event) => (
               <ThreadEvent
                 key={event.id}
@@ -125,6 +131,7 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
             ))}
           </ol>
         ))}
+      {thread.data && thread.data.events.length > 0 && !hasLiveComment(thread.data.events) && <p className="text-sm text-muted-foreground">There are no comments right now.</p>}
       {canComment ? (
         <FindingCommentComposer onPost={(body) => create.mutateAsync(body).then(() => true, () => false)} />
       ) : (

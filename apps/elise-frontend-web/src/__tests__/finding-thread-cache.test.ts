@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FindingComment, FindingDecision } from "#/modules/finding-comment/schemas";
 import {
   findComment,
+  hasLiveComment,
   isPendingComment,
   pendingCommentId,
   withComment,
@@ -46,6 +47,11 @@ describe("the optimistic thread", () => {
 
     expect(events.map((event) => event.id)).toEqual([A, decision.id, pending.id]);
     expect(withoutEvent(events, pending.id).map((event) => event.id)).toEqual([A, decision.id]);
+  });
+
+  it("counts a live comment, and neither a decision nor a deleted marker", () => {
+    expect(hasLiveComment([comment(A, null), decision])).toBe(false);
+    expect(hasLiveComment([comment(A, null), decision, comment(B)])).toBe(true);
   });
 
   it("turns only the deleted comment into the marker, and puts it back when the delete fails", () => {

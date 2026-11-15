@@ -6,6 +6,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { FindingCommentDraftSchema } from "../schemas";
+import { commentCountText } from "../utils";
 
 type FindingCommentComposerProps = {
   onPost: (body: string) => Promise<boolean>;
@@ -49,23 +50,28 @@ export function FindingCommentComposer({ onPost }: FindingCommentComposerProps) 
               value={field.state.value}
               onBlur={field.handleBlur}
               onChange={(event) => field.handleChange(event.target.value)}
-              placeholder="Add a comment for your team. Plain text; https links open."
+              placeholder="Add a comment. Plain text. Secure web links become clickable."
               {...fieldAria(field, "finding-comment-body", "finding-comment-help")}
             />
             {fieldMessage(field) ? (
               <FieldError id="finding-comment-body" message={fieldMessage(field)} />
             ) : (
-              <p id="finding-comment-help" className="text-xs text-muted-foreground tabular-nums">
-                {field.state.value.length} / {FINDING_COMMENT_BODY_MAX}. Everyone on the account can read this. It stays here and never goes to GitHub.
+              <p id="finding-comment-help" className="text-sm leading-normal text-muted-foreground">
+                <span className="tabular-nums">{commentCountText(field.state.value.length, FINDING_COMMENT_BODY_MAX)}.</span> Everyone in this account can read it. It stays here and never goes to GitHub.
+                You can edit or delete it later. No one is notified.
               </p>
             )}
           </div>
         )}
       </form.Field>
       <div className="flex justify-end">
-        <Button type="submit" size="sm">
-          Comment
-        </Button>
+        <form.Subscribe selector={(state) => state.values.body.trim() === ""}>
+          {(empty) => (
+            <Button type="submit" size="sm" disabled={empty}>
+              Comment
+            </Button>
+          )}
+        </form.Subscribe>
       </div>
     </form>
   );

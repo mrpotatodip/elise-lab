@@ -16,7 +16,7 @@ import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
-import { FindingCommentThread } from "#/modules/finding-comment";
+import { FindingCommentThread, findingCommentKeys } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup } from "#/modules/finding";
 import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
@@ -325,10 +325,17 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
           (selectedFinding.state === "fixed_by_code" ? (
             <p className="text-sm text-muted-foreground">No decision is needed: a scan confirmed the fix.</p>
           ) : (
-            <>
-              <span className="text-sm font-medium">Your decision</span>
-              <FindingTriageSelect finding={selectedFinding} also={[repoKeys.detail(repoId)]} onSaved={decided} />
-            </>
+            <div className="grid gap-1">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">Your decision</span>
+                <FindingTriageSelect
+                  finding={selectedFinding}
+                  also={[repoKeys.detail(repoId), findingCommentKeys.thread(selectedFinding.repo, selectedFinding.fingerprint)]}
+                  onSaved={decided}
+                />
+              </div>
+              <p className="text-sm leading-normal text-muted-foreground">Your choice is added to the discussion with your name.</p>
+            </div>
           ))
         }
       />
