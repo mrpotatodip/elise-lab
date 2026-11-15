@@ -30,7 +30,7 @@ export const VERDICT_COPY = {
 export type DecideFindingProps = { repoId: string; repoUrl: string; finding: VerdictFinding };
 export type DecideFinding = ComponentType<DecideFindingProps>;
 
-export type DiscussFindingProps = { repo: string; fingerprint: string; title: string };
+export type DiscussFindingProps = { repo: string; fingerprint: string; finding: Finding };
 export type DiscussFinding = ComponentType<DiscussFindingProps>;
 
 type FindingRowsProps = {
@@ -108,7 +108,7 @@ const decidingColumns = column.columns([
       return (
         <span className="grid justify-items-start gap-1.5">
           <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={finding} />
-          {decide.Discussion && <decide.Discussion repo={decide.repoUrl} fingerprint={finding.fingerprint} title={finding.title} />}
+          {decide.Discussion && <decide.Discussion repo={decide.repoUrl} fingerprint={finding.fingerprint} finding={sheetFinding(finding)} />}
         </span>
       );
     },

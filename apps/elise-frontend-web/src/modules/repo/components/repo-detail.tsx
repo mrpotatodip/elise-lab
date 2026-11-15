@@ -25,6 +25,7 @@ import { repoName } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
 import { RepoVerdictDecision } from "./repo-verdict-decision";
+import { RepoVerdictDiscussion } from "./repo-verdict-discussion";
 
 const RECENT_SCAN_COUNT = 3;
 
@@ -155,7 +156,12 @@ const decisionColumn = findingColumn.display({
       <span className="grid justify-items-start gap-1.5">
         {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId), findingCommentKeys.thread(finding.repo, finding.fingerprint)]} onSaved={onSaved} />}
         <FindingDecisionNote state={finding.state} triage={finding.triage} fixedOn={fixedOn} />
-        <FindingDiscussionButton repo={finding.repo} fingerprint={finding.fingerprint} title={finding.title} />
+        <FindingDiscussionButton
+          repo={finding.repo}
+          fingerprint={finding.fingerprint}
+          finding={fromRecorded(finding)}
+          status={<FindingStatusBadge state={finding.state} triage={finding.triage} />}
+        />
       </span>
     );
   },
@@ -444,7 +450,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
       </ShellPageHeader>
 
-      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} Discussion={FindingDiscussionButton} />}
+      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} Discussion={RepoVerdictDiscussion} />}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">

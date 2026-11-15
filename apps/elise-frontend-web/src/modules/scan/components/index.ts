@@ -1,5 +1,6 @@
 export * from "./scan-activity-chart";
 export * from "./scan-finding-detail";
+export * from "./scan-finding-header";
 export * from "./scan-finding-sheet";
 export * from "./scan-findings-table";
 export * from "./scan-overview";
