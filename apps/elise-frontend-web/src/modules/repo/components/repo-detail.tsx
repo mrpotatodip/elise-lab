@@ -4,6 +4,7 @@ import { useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from "@tan
 import { useTable } from "@tanstack/react-table";
 import { ChevronRight, CircleAlert, ExternalLink, GitBranch, Search, ShieldCheck, Undo2 } from "lucide-react";
 import { Alert, AlertDescription } from "#/components/ui/alert";
+import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
@@ -16,15 +17,14 @@ import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
-import { FindingCommentThread } from "#/modules/finding-comment";
+import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup } from "#/modules/finding";
-import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, type ScanStatus } from "#/modules/scan";
+import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
 import { repoName } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
-import { RepoVerdictDecision } from "./repo-verdict-decision";
 
 const RECENT_SCAN_COUNT = 3;
 
@@ -49,14 +49,6 @@ const EMPTY_COPY = {
 } as const satisfies Record<FindingFilter, { title: string; text: string }>;
 
 const asFilter = (value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
-
-// -----
-// Open findings already show in the verdict above, so the history
-// opens on what people decided, then on what a scan fixed, then on
-// everything when neither has any.
-// -----
-const firstFilledFilter = (findings: readonly RepoFinding[]): FindingFilter =>
-  (["decided", "scan"] as const).find((value) => findings.some((f) => findingGroup(f.state, f.triage) === value)) ?? "all";
 
 function ScanLink({ scanId, history }: { scanId: string; history: readonly ScanStatus[] }) {
   const scan = history.find((item) => item.scanId === scanId);
@@ -101,6 +93,7 @@ type FindingRow = {
   open: () => void;
   repoId: string;
   fixedOn: string | null;
+  blocks: boolean;
   onSaved: ComponentProps<typeof FindingTriageSelect>["onSaved"];
 };
 
@@ -135,7 +128,12 @@ const titleColumn = findingColumn.display({
 const statusColumn = findingColumn.display({
   id: "status",
   header: "Status",
-  cell: ({ row }) => <FindingStatusBadge state={row.original.finding.state} triage={row.original.finding.triage} />,
+  cell: ({ row }) => (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <FindingStatusBadge state={row.original.finding.state} triage={row.original.finding.triage} />
+      {row.original.blocks && <Badge variant="destructive">Blocks shipping</Badge>}
+    </span>
+  ),
 });
 
 const whereColumn = findingColumn.display({
@@ -153,8 +151,14 @@ const decisionColumn = findingColumn.display({
     const { finding, repoId, fixedOn, onSaved } = row.original;
     return (
       <span className="grid justify-items-start gap-1.5">
-        {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId)]} onSaved={onSaved} />}
+        {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId), findingCommentKeys.thread(finding.repo, finding.fingerprint)]} onSaved={onSaved} />}
         <FindingDecisionNote state={finding.state} triage={finding.triage} fixedOn={fixedOn} />
+        <FindingDiscussionButton
+          repo={finding.repo}
+          fingerprint={finding.fingerprint}
+          finding={fromRecorded(finding)}
+          status={<FindingStatusBadge state={finding.state} triage={finding.triage} />}
+        />
       </span>
     );
   },
@@ -223,11 +227,12 @@ const recentScanColumns = scanColumn.columns([
   }),
 ]);
 
-function RepoFindings({ repoId, branch, history }: { repoId: string; branch: string; history: readonly ScanStatus[] }) {
+function RepoFindings({ repoId, branch, commit, history }: { repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[] }) {
+  const blockers = useVerdictBlockers(repoId, commit);
   const queryClient = useQueryClient();
   const findingsOptions = repoFindingsQuery(repoId, { branch });
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useSuspenseInfiniteQuery(findingsOptions);
-  const [filter, setFilter] = useState<FindingFilter>(() => firstFilledFilter(data.pages.flatMap((page) => page.findings)));
+  const [filter, setFilter] = useState<FindingFilter>("action");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<number | undefined>();
   const decided = (fingerprint: string, triage: RepoFinding["triage"]) =>
@@ -238,17 +243,18 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
   const filterItems = FILTER_VALUES.map((value) => ({ value, label: `${FILTER_COPY[value].label} (${countOf(value)}${more})` }));
   const inGroup = filter === "all" ? all : all.filter((f) => findingGroup(f.state, f.triage) === filter);
   const query = search.trim().toLowerCase();
-  const findings = query === "" ? inGroup : inGroup.filter((f) => [f.title, f.file ?? "", f.class].some((text) => text.toLowerCase().includes(query)));
+  const matching = query === "" ? inGroup : inGroup.filter((f) => [f.title, f.file ?? "", f.class].some((text) => text.toLowerCase().includes(query)));
+  const findings = blockers.size === 0 ? matching : matching.toSorted((a, b) => Number(blockers.has(b.fingerprint)) - Number(blockers.has(a.fingerprint)));
   const selectedFinding = selected === undefined ? undefined : findings[selected];
   const showStatus = filter === "action" || filter === "all";
-  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, history), onSaved: decided }));
+  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, history), blocks: blockers.has(finding.fingerprint), onSaved: decided }));
   const table = useTable({ features: dataTableFeatures, columns: showStatus ? findingColumnsWithStatus : findingColumnsWithoutStatus, data: rows, getRowId: (row) => row.finding.id });
 
   return (
-    <Card>
+    <Card id="branch-findings" className="scroll-mt-20">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-7">
         <div className="grid max-w-xl gap-1.5">
-          <CardTitle>Findings history</CardTitle>
+          <CardTitle>Findings on this branch</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {FILTER_COPY[filter].note}
             {findings.length > 0 ? (filter === "action" ? " Select a row for the impact, evidence and fix, and record your decision." : " Select a row to read the impact, evidence and fix.") : ""}
@@ -319,18 +325,22 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
         onSelect={setSelected}
         status={selectedFinding && <FindingStatusBanner state={selectedFinding.state} triage={selectedFinding.triage} fixedOn={fixedOnOf(selectedFinding, history)} />}
         facts={selectedFinding && <RepoFindingFacts finding={selectedFinding} history={history} />}
-        discussion={selectedFinding && <FindingCommentThread key={selectedFinding.fingerprint} repo={selectedFinding.repo} fingerprint={selectedFinding.fingerprint} />}
         decision={
           selectedFinding &&
           (selectedFinding.state === "fixed_by_code" ? (
             <p className="text-sm text-muted-foreground">No decision is needed: a scan confirmed the fix.</p>
           ) : (
-            <>
+            <div className="flex items-center gap-3">
               <span className="text-sm font-medium">Your decision</span>
-              <FindingTriageSelect finding={selectedFinding} also={[repoKeys.detail(repoId)]} onSaved={decided} />
-            </>
+              <FindingTriageSelect
+                finding={selectedFinding}
+                also={[repoKeys.detail(repoId), findingCommentKeys.thread(selectedFinding.repo, selectedFinding.fingerprint)]}
+                onSaved={decided}
+              />
+            </div>
           ))
         }
+        decisionHint={selectedFinding && selectedFinding.state !== "fixed_by_code" && <p className="text-sm leading-normal text-muted-foreground">Your choice is added to the discussion with your name.</p>}
       />
     </Card>
   );
@@ -437,7 +447,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
       </ShellPageHeader>
 
-      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} />}
+      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} findingsHref="#branch-findings" />}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">
@@ -458,7 +468,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
 
       {current ? (
         <Suspense key={current.name} fallback={<RepoFindingsSkeleton />}>
-          <RepoFindings repoId={repoId} branch={current.name} history={repo.history} />
+          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} />
         </Suspense>
       ) : (
         <Card>

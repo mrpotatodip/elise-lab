@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useForm } from "@tanstack/react-form";
 import { FINDING_COMMENT_BODY_MAX } from "@repo/contracts/elise";
 import { Button } from "#/components/ui/button";
@@ -6,6 +7,7 @@ import { Label } from "#/components/ui/label";
 import { Textarea } from "#/components/ui/textarea";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { FindingCommentDraftSchema } from "../schemas";
+import { commentCountText } from "../utils";
 
 type FindingCommentEditFormProps = {
   commentId: string;
@@ -21,6 +23,10 @@ type FindingCommentEditFormProps = {
 // -----
 export function FindingCommentEditForm({ commentId, initialBody, pending, onSave, onCancel }: FindingCommentEditFormProps) {
   const inputId = `finding-comment-edit-${commentId}`;
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
   const form = useForm({
     defaultValues: { body: initialBody },
     validators: { onSubmit: FindingCommentDraftSchema },
@@ -46,6 +52,7 @@ export function FindingCommentEditForm({ commentId, initialBody, pending, onSave
               Edit your comment
             </Label>
             <Textarea
+              ref={inputRef}
               id={inputId}
               name={field.name}
               rows={3}
@@ -57,8 +64,8 @@ export function FindingCommentEditForm({ commentId, initialBody, pending, onSave
             {fieldMessage(field) ? (
               <FieldError id={inputId} message={fieldMessage(field)} />
             ) : (
-              <p id={`${inputId}-help`} className="text-xs text-muted-foreground tabular-nums">
-                {field.state.value.length} / {FINDING_COMMENT_BODY_MAX}
+              <p id={`${inputId}-help`} className="text-sm leading-normal text-muted-foreground tabular-nums">
+                {commentCountText(field.state.value.length, FINDING_COMMENT_BODY_MAX)}
               </p>
             )}
           </div>
