@@ -60,11 +60,13 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
   };
 
   // -----
-  // One Phase of a full Scan: start it, wait for it within its own time
-  // slot, and close it. A Phase that ended with an error after the meter
-  // turned a call away ran out of its slice: it did not fail, so the Scan
-  // goes on and the next Phase starts with its own money. Any other
-  // failure, and a Phase that outruns its time slot, fails the Scan.
+  // One Phase of a full Scan: start it and wait for it within its own
+  // time slot. The Phases share one pool, the Scan's Budget cap. A Phase
+  // that ended well goes on, even if it reached the cap (a Partial Scan).
+  // A Phase that ended with an error after the meter turned a call away
+  // ran out of money, and the Scan fails with an error that says so: no
+  // later Phase could make a call. Any other failure, and a Phase that
+  // outruns its time slot, fails the Scan.
   // -----
   const runPhase = async (phase: FullPhase) => {
     await step.do(`launch-${phase}`, { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_LAUNCH_TIMEOUT }, async () => {
@@ -81,12 +83,14 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
         return polled.state === "failed" ? { state: "failed" as const, error: polled.error } : { state: polled.state };
       });
     }
-    const ended = await step.do(`end-${phase}`, () => sandbox.endPhase(phase));
     if (outcome.state === "running") {
       const tail = await step.do(`log-tail-${phase}`, () => sandbox.agentLogTail());
       throw new Error(`the ${phase} phase timed out after ${minutes} minutes: ${tail}`);
     }
-    if (outcome.state === "failed" && !ended.exhausted) throw new Error(outcome.error ?? `the ${phase} phase failed`);
+    if (outcome.state !== "failed") return;
+    const reached = await step.do(`cap-${phase}`, () => sandbox.capReached());
+    if (reached) throw new Error(`the budget cap of $${params.options.maxBudgetUsd} was reached during the ${phase} phase: ${outcome.error ?? "the agent stopped"}`);
+    throw new Error(outcome.error ?? `the ${phase} phase failed`);
   };
 
   let usage: ScanUsage | null = null;

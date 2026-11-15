@@ -28,19 +28,18 @@ import {
   SCAN_SANDBOX_TRUST_ENV,
   SCAN_SANDBOX_WORK_DIR,
 } from "#/modules/scan-sandbox/constants";
-import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, OutboundGithub, PhaseEnd, PhaseRecord, ScanCheckout } from "#/modules/scan-sandbox/types";
+import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, OutboundGithub, ScanCheckout } from "#/modules/scan-sandbox/types";
 import {
   buildAgentPrompt,
   buildAgentScript,
   buildCloneScript,
   buildPhasePrompt,
   DEFAULT_AGENT_FILES,
-  endedPhase,
   freshMeter,
   parseAgentUsage,
   phaseAgentFiles,
   priceUsage,
-  startedPhase,
+  remainingUsd,
   sumOrNull,
   withReserve,
   withoutReserve,
@@ -132,17 +131,7 @@ export class ScanSandbox extends DurableObject<Bindings> {
 
   async launchAgent(options: ScanOptions, priors: PriorFinding[] = []): Promise<void> {
     console.log("scan: running agent", options, `${priors.length} prior findings`);
-    if ((await this.ctx.storage.get(SCAN_SANDBOX_METER_KEY)) === undefined) {
-      await this.ctx.storage.put<Meter>(SCAN_SANDBOX_METER_KEY, {
-        budgetUsd: options.maxBudgetUsd,
-        spentUsd: 0,
-        reservedUsd: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-      });
-    }
+    await this.#openMeter(options.maxBudgetUsd);
     if (priors.length > 0) await this.#files.writeFile(SCAN_SANDBOX_PRIOR_PATH, JSON.stringify(priors, null, 2));
     await this.#files.writeFile(SCAN_SANDBOX_PROMPT_PATH, buildAgentPrompt(options, priors.length));
     await this.#container.exec(["/bin/sh", "-c", buildAgentScript(options)], {
@@ -154,19 +143,21 @@ export class ScanSandbox extends DurableObject<Bindings> {
   }
 
   // -----
-  // Starts one Phase of a full Scan: sets the meter's cap to what has
-  // been spent plus this Phase's allowance, records the Phase, and runs
-  // the agent on that Phase's prompt and files. The log shows the slice.
+  // Starts one Phase of a full Scan: opens the meter with the whole
+  // Budget cap if this is the first Phase, notes that the Phase started,
+  // and runs the agent on that Phase's prompt and files. The agent's own
+  // cap is what the pool still holds. A retried launch changes nothing:
+  // the meter is already open and the Phase is already noted.
   // -----
   async launchPhase(options: ScanOptions, phase: FullPhase): Promise<void> {
-    const started = startedPhase(options.maxBudgetUsd, phase, await this.#phaseRecords(), (await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY)) ?? freshMeter(0));
-    await this.ctx.storage.put<Meter>(SCAN_SANDBOX_METER_KEY, started.meter);
-    await this.ctx.storage.put<PhaseRecord[]>(SCAN_SANDBOX_PHASES_KEY, started.records);
-    const allowanceUsd = started.records.find((record) => record.phase === phase)?.allowanceUsd ?? 0;
-    console.log(`scan: phase ${phase} starts, slice $${allowanceUsd.toFixed(4)} of the $${options.maxBudgetUsd} cap`);
+    const meter = await this.#openMeter(options.maxBudgetUsd);
+    const started = await this.#startedPhases();
+    if (!started.includes(phase)) await this.ctx.storage.put<FullPhase[]>(SCAN_SANDBOX_PHASES_KEY, [...started, phase]);
+    const remaining = remainingUsd(meter);
+    console.log(`scan: phase ${phase} starts, $${remaining.toFixed(4)} of the $${options.maxBudgetUsd} cap left`);
     const files = phaseAgentFiles(phase);
     await this.#files.writeFile(files.prompt, buildPhasePrompt(options, phase));
-    await this.#container.exec(["/bin/sh", "-c", buildAgentScript(options, files, Number(allowanceUsd.toFixed(6)))], {
+    await this.#container.exec(["/bin/sh", "-c", buildAgentScript(options, files, Number(remaining.toFixed(6)))], {
       cwd: SCAN_SANDBOX_REPO_DIR,
       env: SCAN_SANDBOX_AGENT_ENV,
       stdout: "ignore",
@@ -175,19 +166,12 @@ export class ScanSandbox extends DurableObject<Bindings> {
   }
 
   // -----
-  // Closes a Phase and says what it spent, and whether it spent its
-  // whole slice: the meter turned a call away. A Phase that ends with an
-  // error after that did not fail, it ran out of money, and the next
-  // Phase still starts with its own.
+  // Whether the meter turned a model call away: the Scan spent its whole
+  // Budget cap. A Phase that ends with an error after that did not fail
+  // by itself, it ran out of money.
   // -----
-  async endPhase(phase: FullPhase): Promise<PhaseEnd> {
-    const meter = await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY);
-    const records = endedPhase(await this.#phaseRecords(), phase, meter ?? freshMeter(0));
-    await this.ctx.storage.put<PhaseRecord[]>(SCAN_SANDBOX_PHASES_KEY, records);
-    const record = records.find((found) => found.phase === phase);
-    if (record === undefined || record.spentUsd === null) throw new Error(`the ${phase} phase was never started`);
-    console.log(`scan: phase ${phase} ended, spent $${record.spentUsd.toFixed(4)} of $${record.allowanceUsd.toFixed(4)}${record.exhausted ? " (slice spent)" : ""}`);
-    return { phase, allowanceUsd: record.allowanceUsd, spentUsd: record.spentUsd, exhausted: record.exhausted };
+  async capReached(): Promise<boolean> {
+    return (await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY))?.refused === true;
   }
 
   async pollAgent(): Promise<AgentState> {
@@ -212,8 +196,8 @@ export class ScanSandbox extends DurableObject<Bindings> {
   // -----
   async readUsage(): Promise<ScanUsage | null> {
     const meter = await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY);
-    const records = await this.#phaseRecords();
-    const logs = await Promise.all((records.length > 0 ? records.map((record) => phaseAgentFiles(record.phase)) : [DEFAULT_AGENT_FILES]).map((files) => this.#readText(files.log)));
+    const started = await this.#startedPhases();
+    const logs = await Promise.all((started.length > 0 ? started.map((phase) => phaseAgentFiles(phase)) : [DEFAULT_AGENT_FILES]).map((files) => this.#readText(files.log)));
     const reports = logs.flatMap((log) => (log === null ? [] : [parseAgentUsage(log)])).filter((report) => report !== null);
     const reported = reports.length === 0 ? null : { ...reports[0], turns: sumOrNull(reports.map((report) => report.turns)), durationMs: sumOrNull(reports.map((report) => report.durationMs)) };
     if (meter === undefined) return reported;
@@ -251,8 +235,20 @@ export class ScanSandbox extends DurableObject<Bindings> {
     await this.ctx.storage.deleteAll();
   }
 
-  async #phaseRecords(): Promise<PhaseRecord[]> {
-    return (await this.ctx.storage.get<PhaseRecord[]>(SCAN_SANDBOX_PHASES_KEY)) ?? [];
+  async #startedPhases(): Promise<FullPhase[]> {
+    return (await this.ctx.storage.get<FullPhase[]>(SCAN_SANDBOX_PHASES_KEY)) ?? [];
+  }
+
+  // -----
+  // The Scan's one meter, holding the whole Budget cap. It is made on
+  // the first launch and kept as it is after that.
+  // -----
+  async #openMeter(budgetUsd: number): Promise<Meter> {
+    const existing = await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY);
+    if (existing !== undefined) return existing;
+    const meter = freshMeter(budgetUsd);
+    await this.ctx.storage.put<Meter>(SCAN_SANDBOX_METER_KEY, meter);
+    return meter;
   }
 
   // -----
@@ -260,8 +256,8 @@ export class ScanSandbox extends DurableObject<Bindings> {
   // started, or the one run of a lite Scan.
   // -----
   async #currentFiles(): Promise<AgentFiles> {
-    const last = (await this.#phaseRecords()).at(-1);
-    return last === undefined ? DEFAULT_AGENT_FILES : phaseAgentFiles(last.phase);
+    const last = (await this.#startedPhases()).at(-1);
+    return last === undefined ? DEFAULT_AGENT_FILES : phaseAgentFiles(last);
   }
 
   async #readText(path: string): Promise<string | null> {
