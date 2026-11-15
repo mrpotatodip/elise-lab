@@ -1,4 +1,5 @@
-import type { ScanPath } from "#/lib/scan-path";
+import { scanPathOf, type ScanPath } from "#/lib/scan-path";
+import type { ScanOptions } from "#/schemas";
 import type { ActiveCounts } from "#/modules/scan-ledger";
 import type { CreateScanEnv } from "#/modules/scans/types";
 
@@ -14,6 +15,15 @@ export const accountLimitOf = (env: Pick<CreateScanEnv, "MAX_ACTIVE_SCANS" | "MA
 
 export const globalLimitOf = (env: Pick<CreateScanEnv, "MAX_GLOBAL_LITE_SCANS" | "MAX_GLOBAL_FULL_SCANS">, path: ScanPath): number =>
   Number(path === "full" ? env.MAX_GLOBAL_FULL_SCANS : env.MAX_GLOBAL_LITE_SCANS);
+
+// -----
+// Which of the two counts a live Scan is in. A Scan on a Runner is always
+// in the lite one, whatever Skill it runs: it holds no Sandbox of ours,
+// so it meets only MAX_ACTIVE_SCANS and never uses up a place of the full
+// limit.
+// -----
+export const limitPathOf = (scan: { skill: ScanOptions["skill"]; runner?: { id: string } | null }): ScanPath =>
+  scan.runner ? "lite" : scanPathOf(scan.skill);
 
 // -----
 // Why a new Scan may not start now, or null. The Account's own count is

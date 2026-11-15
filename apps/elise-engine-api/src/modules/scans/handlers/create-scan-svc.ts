@@ -9,7 +9,7 @@ import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
 import type { CreateScanEnv } from "#/modules/scans/types";
-import { budgetCapOf, budgetRefusalHintOf, scanRefusalOf } from "#/modules/scans/utils";
+import { budgetCapOf, budgetRefusalHintOf, limitPathOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
@@ -40,11 +40,14 @@ export const createScanSvc = (
     // The Skill is ours to choose, never the request's: a Scan in our
     // cloud runs the full Skill on the full path, whatever `skill` the
     // request sent (the field is accepted and ignored until #141 removes
-    // it). A Scan on a Runner stays lite until the Runner app runs the
-    // full Skill (#145). No profile means quick.
+    // it). A Scan on a Runner stays lite until RUNNER_FULL_SCANS is
+    // "true", which is set only after a Runner app release that runs
+    // the full Skill and stops at the job's cap is out (#145). It then
+    // runs the full Skill too and still takes no credit. No profile
+    // means quick.
     // -----
     const ownKeyScan = input.runner_id !== undefined || (spend.plan ? spend.plan.keySource === "account" : spend.ownKey);
-    const skill = input.runner_id === undefined ? "full" : "lite";
+    const skill = input.runner_id === undefined || env.RUNNER_FULL_SCANS === "true" ? "full" : "lite";
     const profile = input.profile ?? "quick";
     const cap = budgetCapOf(env, { skill, profile, onRunner: input.runner_id !== undefined, ownKeyScan });
     if (!cap.ok) return yield* new Invalid({ message: cap.message });
@@ -75,15 +78,17 @@ export const createScanSvc = (
     // Each path counts on its own, for the Account and over all Accounts.
     // Every Scan that runs in our cloud is on the full path, so it meets
     // MAX_ACTIVE_FULL_SCANS and MAX_GLOBAL_FULL_SCANS. A Scan on a Runner
-    // is on the lite path: it meets only MAX_ACTIVE_SCANS for its Account.
-    // It holds no Sandbox of ours, so the global caps do not count it and
-    // do not refuse it.
+    // meets only MAX_ACTIVE_SCANS for its Account, whatever Skill it runs,
+    // and the live Scans on a Runner are counted there too, never against
+    // the full limit. It holds no Sandbox of ours, so the global caps do
+    // not count it and do not refuse it.
     // -----
     const path = scanPathOf(options.skill);
+    const limitPath = limitPathOf({ skill: options.skill, runner: input.runner_id === undefined ? null : { id: input.runner_id } });
     const nowMs = Date.now();
     const activeScans = yield* repo.activeSince(accountId, nowMs);
     const globalActive = input.runner_id === undefined ? yield* repo.activeCounts(nowMs) : null;
-    const refusal = scanRefusalOf(env, path, activeScans.filter((scan) => scanPathOf(scan.skill) === path).length, globalActive);
+    const refusal = scanRefusalOf(env, limitPath, activeScans.filter((scan) => limitPathOf(scan) === limitPath).length, globalActive);
     if (refusal) return yield* new RateLimited(refusal);
 
     // -----
