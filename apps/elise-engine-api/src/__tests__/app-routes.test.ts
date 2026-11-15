@@ -116,7 +116,7 @@ describe("envelope", () => {
 
   it("rejects a budget above the ceiling", async () => {
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, max_budget_usd: 5 });
+    const res = await post(env, { repo: REPO, max_budget_usd: 7 });
 
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
@@ -125,21 +125,21 @@ describe("envelope", () => {
 
 describe("POST /scans", () => {
   it("queues a scan and starts the workflow", async () => {
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const res = await post(env, { repo: REPO, model: "claude-haiku-5-5", effort: "low", max_budget_usd: 1 });
     const body = await res.json();
 
     expect(res.status).toBe(201);
-    expect(body).toMatchObject({ data: { status: "queued", model: "claude-haiku-5-5", skill: "lite", maxBudgetUsd: 1 }, error: null });
-    expect(created).toHaveLength(1);
-    expect(created[0].params.accountId).toBe(ACCOUNT);
-    expect(ledger.rows.get(created[0].params.scanId)).toMatchObject({ accountId: ACCOUNT, status: "queued" });
+    expect(body).toMatchObject({ data: { status: "queued", model: "claude-haiku-5-5", skill: "full", maxBudgetUsd: 1 }, error: null });
+    expect(createdFull).toHaveLength(1);
+    expect(createdFull[0].params.accountId).toBe(ACCOUNT);
+    expect(ledger.rows.get(createdFull[0].params.scanId)).toMatchObject({ accountId: ACCOUNT, status: "queued" });
   });
 
-  it("answers 429 when the account has too many active scans", async () => {
+  it("answers 429 when the account already has a live scan in our cloud", async () => {
     const { env } = fakeBindings();
-    for (let i = 0; i < 3; i++) expect((await post(env, { repo: `${REPO}-${i}` })).status).toBe(201);
-    const res = await post(env, { repo: `${REPO}-3` });
+    expect((await post(env, { repo: `${REPO}-0` })).status).toBe(201);
+    const res = await post(env, { repo: `${REPO}-1` });
 
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ error: { code: "TOO_MANY_ACTIVE_SCANS" } });
@@ -147,14 +147,14 @@ describe("POST /scans", () => {
 
   it("counts active scans per account", async () => {
     const { env } = fakeBindings();
-    for (let i = 0; i < 3; i++) await post(env, { repo: `${REPO}-${i}` });
+    await post(env, { repo: `${REPO}-0` });
     const res = await post(env, { repo: `${REPO}-0` }, { ...auth, "x-account-id": OTHER });
 
     expect(res.status).toBe(201);
   });
 
   it("answers 409 for a second active scan of the same repo, however the URL is spelled, and names the running scan", async () => {
-    const { env } = fakeBindings();
+    const { env } = fakeBindings({ MAX_ACTIVE_FULL_SCANS: "3" });
     const running = await queuedScanId(await post(env, { repo: REPO }));
     const res = await post(env, { repo: `${REPO.replace("octocat/Hello-World", "OCTOCAT/hello-world")}.git/` });
 
@@ -172,7 +172,7 @@ describe("POST /scans", () => {
 
 describe("GET /scans", () => {
   it("lists the newest scan first", async () => {
-    const { env } = fakeBindings();
+    const { env } = fakeBindings({ MAX_ACTIVE_FULL_SCANS: "3" });
     const first = await queuedScanId(await post(env, { repo: `${REPO}-a` }));
     await new Promise((resolve) => setTimeout(resolve, 5));
     const second = await queuedScanId(await post(env, { repo: `${REPO}-b` }));

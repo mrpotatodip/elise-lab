@@ -36,9 +36,15 @@ export const createScanSvc = (
     // on the person's own Claude and has a safety cap. A scan on the
     // account's own key is paid by that key, so it gets a higher
     // ceiling than a scan on EliseLAB's key. A request may lower it.
+    //
+    // The Skill is ours to choose, never the request's: a Scan in our
+    // cloud runs the full Skill on the full path, whatever `skill` the
+    // request sent (the field is accepted and ignored until #141 removes
+    // it). A Scan on a Runner stays lite until the Runner app runs the
+    // full Skill (#145). No profile means quick.
     // -----
     const ownKeyScan = input.runner_id !== undefined || (spend.plan ? spend.plan.keySource === "account" : spend.ownKey);
-    const skill = input.skill ?? "lite";
+    const skill = input.runner_id === undefined ? "full" : "lite";
     const profile = input.profile ?? "quick";
     const cap = budgetCapOf(env, { skill, profile, onRunner: input.runner_id !== undefined, ownKeyScan });
     if (!cap.ok) return yield* new Invalid({ message: cap.message });
@@ -67,8 +73,11 @@ export const createScanSvc = (
 
     // -----
     // Each path counts on its own, for the Account and over all Accounts.
-    // A Scan on a Runner holds no Sandbox of ours, so the global caps
-    // do not count it and do not refuse it.
+    // Every Scan that runs in our cloud is on the full path, so it meets
+    // MAX_ACTIVE_FULL_SCANS and MAX_GLOBAL_FULL_SCANS. A Scan on a Runner
+    // is on the lite path: it meets only MAX_ACTIVE_SCANS for its Account.
+    // It holds no Sandbox of ours, so the global caps do not count it and
+    // do not refuse it.
     // -----
     const path = scanPathOf(options.skill);
     const nowMs = Date.now();
@@ -128,7 +137,7 @@ export const createScanSvc = (
       const usedUsd = (spend.spentUsd + reservedUsd + maxBudgetUsd) * markup;
       if (usedUsd > budgetUsd) {
         const leftUsd = budgetUsd - (spend.spentUsd + reservedUsd) * markup;
-        const hint = skill === "full" ? `. ${budgetRefusalHintOf(profile, leftUsd, markup)}` : "";
+        const hint = `. ${budgetRefusalHintOf(profile, leftUsd, markup)}`;
         return yield* new RateLimited({
           code: "MONTHLY_BUDGET_EXCEEDED",
           message: `This scan could cost up to $${(maxBudgetUsd * markup).toFixed(2)}, but only $${Math.max(0, leftUsd).toFixed(2)} of the $${budgetUsd} monthly budget is left${hint}`,
