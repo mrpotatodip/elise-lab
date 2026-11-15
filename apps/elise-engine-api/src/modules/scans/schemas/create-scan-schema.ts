@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS } from "#/constants";
+import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "#/constants";
 import { ScanOptionsSchema } from "#/schemas";
 import { SCANS_GIT_REF, SCANS_GITHUB_REPO } from "#/modules/scans/constants";
 
 export const CreateScanBodySchema = z.object({
   repo: z.string().regex(SCANS_GITHUB_REPO).meta({ example: "https://github.com/octocat/Hello-World" }),
-  skill: z.enum(SCAN_SKILLS).optional(),
   model: z.enum(SCAN_MODELS).optional(),
   effort: z.enum(SCAN_EFFORTS).optional(),
   profile: z.enum(SCAN_PROFILES).optional(),

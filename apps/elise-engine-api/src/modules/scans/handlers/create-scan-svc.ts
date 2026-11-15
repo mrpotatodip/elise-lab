@@ -37,9 +37,9 @@ export const createScanSvc = (
     // ceiling than a scan on EliseLAB's key. A request may lower it.
     //
     // The Skill is ours to choose, never the request's: every new Scan
-    // runs the full Skill on the one Workflow, whatever `skill` the
-    // request sent (the field is accepted and ignored until #146 removes
-    // it), and is stored `full`. That holds for a Scan on a Runner too:
+    // runs the full Skill on the one Workflow and is stored `full`. The
+    // request has no `skill` field, so one that sends it is stripped like
+    // any unknown key. That holds for a Scan on a Runner too:
     // it runs the full Skill on the person's computer, takes no credit
     // and stops at the Runner's own ceiling. No profile means quick.
     // -----

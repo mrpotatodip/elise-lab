@@ -373,10 +373,10 @@ describe("createScanSvc: a Runner", () => {
     expect(await outcome(spend, connected)).toBe(expected);
   });
 
-  it.each(["lite", "full"] as const)("never refuses a scan on a runner for lack of a plan, and stores it full on the full workflow whatever skill (%s) the request sends", async (skill) => {
+  it("never refuses a scan on a runner for lack of a plan, and stores it full on the full workflow", async () => {
     const { env, createdFull } = fakeBindings();
     const mem = memoryScanRepo();
-    const queued = await Effect.runPromise(createScanSvc(env, mem.repo, "acme", { ...onRunner, skill }, NO_SPEND, undefined, hold, connected));
+    const queued = await Effect.runPromise(createScanSvc(env, mem.repo, "acme", onRunner, NO_SPEND, undefined, hold, connected));
 
     expect(queued.skill).toBe("full");
     expect(mem.rows.get(queued.scanId)?.skill).toBe("full");

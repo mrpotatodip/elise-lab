@@ -39,14 +39,14 @@ beforeEach(() => {
   spend = NO_SPEND;
 });
 
-const post = (env: Bindings, body: { repo: string; skill: string; profile: string }) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
+const post = (env: Bindings, body: { repo: string; profile: string }) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
 const ErrorBodySchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
 
 describe("POST /scans: a Monthly budget refusal names the profile that fits", () => {
   it("refuses deep under a $20 Monthly budget, names standard and takes no hold", async () => {
     spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 20 };
     const { env, createdFull } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "deep" });
+    const res = await post(env, { repo: REPO, profile: "deep" });
     const error = ErrorBodySchema.parse(await res.json()).error;
 
     expect(res.status).toBe(429);
@@ -59,7 +59,7 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
   it("names the biggest profile that fits after what the month already spent", async () => {
     spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 20, spentUsd: 6 };
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "deep" });
+    const res = await post(env, { repo: REPO, profile: "deep" });
 
     expect(ErrorBodySchema.parse(await res.json()).error.message).toContain("quick");
   });
@@ -67,7 +67,7 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
   it("says no profile fits, and what is left, when even quick is too much", async () => {
     spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 20, spentUsd: 8 };
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "standard" });
+    const res = await post(env, { repo: REPO, profile: "standard" });
     const error = ErrorBodySchema.parse(await res.json()).error;
 
     expect(error.code).toBe("MONTHLY_BUDGET_EXCEEDED");
@@ -79,7 +79,7 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
 describe("POST /scans: a full Scan on the platform's key needs a Plan", () => {
   it("refuses an Account with no Plan and no key of its own with NO_ACTIVE_PLAN", async () => {
     const { env, createdFull } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "quick" });
+    const res = await post(env, { repo: REPO, profile: "quick" });
 
     expect(res.status).toBe(429);
     expect(ErrorBodySchema.parse(await res.json()).error).toEqual({ code: "NO_ACTIVE_PLAN", message: BILLING_NO_PLAN_MESSAGE });
@@ -93,7 +93,7 @@ describe("POST /scans: a full Scan on the platform's key needs a Plan", () => {
   ])("starts a full Scan for %s", async (_name, account) => {
     spend = account;
     const { env, createdFull } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "quick" });
+    const res = await post(env, { repo: REPO, profile: "quick" });
 
     expect(res.status).toBe(201);
     expect(createdFull).toHaveLength(1);

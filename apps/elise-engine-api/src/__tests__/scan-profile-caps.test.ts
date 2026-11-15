@@ -45,7 +45,7 @@ beforeEach(() => {
   held = [];
 });
 
-type Body = { repo: string; skill?: string; profile?: string; max_budget_usd?: number };
+type Body = { repo: string; profile?: string; max_budget_usd?: number };
 const post = (env: Bindings, body: Body) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
 const getCredit = (env: Bindings) => app.fetch(new Request("http://localhost/usage/credit", { headers }), env, testExecutionContext);
 
@@ -59,7 +59,7 @@ describe("POST /scans: the cap of a profile", () => {
     ["deep", 18, 27],
   ])("gives a full %s scan with no cap in the request $%s and holds $%s", async (profile, cap, hold) => {
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile });
+    const res = await post(env, { repo: REPO, profile });
 
     expect(res.status).toBe(201);
     expect(ScanBodySchema.parse(await res.json()).data).toMatchObject({ profile, maxBudgetUsd: cap });
@@ -68,7 +68,7 @@ describe("POST /scans: the cap of a profile", () => {
 
   it("uses a request cap below the profile's cap", async () => {
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "standard", max_budget_usd: 5 });
+    const res = await post(env, { repo: REPO, profile: "standard", max_budget_usd: 5 });
 
     expect(ScanBodySchema.parse(await res.json()).data.maxBudgetUsd).toBe(5);
     expect(held).toEqual([7.5]);
@@ -76,7 +76,7 @@ describe("POST /scans: the cap of a profile", () => {
 
   it("refuses a request cap above the profile's cap, and takes no hold", async () => {
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "standard", max_budget_usd: 13 });
+    const res = await post(env, { repo: REPO, profile: "standard", max_budget_usd: 13 });
 
     expect(res.status).toBe(400);
     expect(held).toEqual([]);
@@ -84,8 +84,8 @@ describe("POST /scans: the cap of a profile", () => {
 
   it("refuses a profile whose cap is above the ceiling for full scans before any hold, and still starts a profile under it", async () => {
     const { env, createdFull } = fakeBindings({ MAX_BUDGET_FULL_USD: "10" });
-    const refused = await post(env, { repo: REPO, skill: "full", profile: "deep", max_budget_usd: 4 });
-    const started = await post(env, { repo: `${REPO}-2`, skill: "full", profile: "quick" });
+    const refused = await post(env, { repo: REPO, profile: "deep", max_budget_usd: 4 });
+    const started = await post(env, { repo: `${REPO}-2`, profile: "quick" });
 
     expect(refused.status).toBeGreaterThanOrEqual(400);
     expect(ErrorBodySchema.parse(await refused.json()).error.message).toContain("ceiling");
@@ -97,7 +97,7 @@ describe("POST /scans: the cap of a profile", () => {
   it("refuses with INSUFFICIENT_CREDIT when the balance is below the hold", async () => {
     spend = { ...NO_SPEND, plan: { ...PRO, creditBalanceUsd: 17.99 } };
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "standard" });
+    const res = await post(env, { repo: REPO, profile: "standard" });
 
     expect(res.status).toBe(429);
     expect(ErrorBodySchema.parse(await res.json()).error.code).toBe("INSUFFICIENT_CREDIT");
@@ -107,7 +107,7 @@ describe("POST /scans: the cap of a profile", () => {
   it("gives a full scan on the account's own key the same table, not the own-key ceiling of lite", async () => {
     spend = { ...NO_SPEND, ownKey: true };
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "full", profile: "deep" });
+    const res = await post(env, { repo: REPO, profile: "deep" });
 
     expect(ScanBodySchema.parse(await res.json()).data.maxBudgetUsd).toBe(18);
     expect(held).toEqual([]);
