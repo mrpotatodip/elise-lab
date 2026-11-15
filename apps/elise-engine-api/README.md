@@ -6,7 +6,7 @@ Terms are in `GLOSSARY.md`. Routes are mounted in `src/index.ts`.
 
 ## Scan path
 
-A scan runs as Workflow, then `ScanSandbox` Durable Object, then a container built from the `Dockerfile`, which bakes in the lite Skill. A scan with the full Skill runs the same way on its own classes, `FullScanWorkflow` and `FullScanSandbox`, with a container built from `Dockerfile.full`. The container reaches the network only through `Outbound`, which signs model calls with the Anthropic key. The key stays in the Worker.
+A scan runs as the `FullScanWorkflow`, then a `FullScanSandbox` Durable Object, then a container built from `Dockerfile.full`, which holds the full Skill. The container reaches the network only through `Outbound`, which signs model calls with the Anthropic key. The key stays in the Worker.
 
 Neon records every scan in `scans`, `scan_files` and `scan_findings` (`packages/db-elise`). R2 holds the file bytes under `accounts/{accountId}/` and the scan ID. Each object has a `scan_files` row, so nothing in the bucket goes untracked. Only the names in `SCAN_SERVABLE_FILES` are served.
 
@@ -29,7 +29,7 @@ Neon records every scan in `scans`, `scan_files` and `scan_findings` (`packages/
 | `AUTH_SECRET` | better-auth signing secret. |
 | `KEY_ENCRYPTION_SECRET` | Optional. Without it an account cannot save its own Anthropic key. |
 
-`MAX_BUDGET_USD` is a ceiling. A request may lower it, never raise it.
+A scan's budget cap comes from its profile. A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` guards the table of caps.
 
 ## Run it
 

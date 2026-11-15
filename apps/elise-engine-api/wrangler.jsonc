@@ -8,12 +8,7 @@
   // Cloudflare creates the DNS record and certificate for a custom domain; the zone must be on this account.
   "routes": [{ "pattern": "api.eliselab.com", "custom_domain": true }],
   "containers": [
-    {
-      "class_name": "ScanSandbox",
-      "scheduling_policy": "durable_object",
-      "images": { "sandbox": { "dockerfile": "./Dockerfile" } }
-    },
-    // The full worker: its own Sandbox class and Image (Dockerfile.full holds the full Skill; the lite Image does not). A scan picks its path by its Skill, in src/lib/scan-path.ts.
+    // The one Sandbox class and Image of every Scan in our cloud (Dockerfile.full holds the full Skill).
     {
       "class_name": "FullScanSandbox",
       "scheduling_policy": "durable_object",
@@ -21,19 +16,14 @@
     }
   ],
   "durable_objects": {
-    "bindings": [
-      { "class_name": "ScanSandbox", "name": "SANDBOX" },
-      { "class_name": "FullScanSandbox", "name": "SANDBOX_FULL" }
-    ]
+    "bindings": [{ "class_name": "FullScanSandbox", "name": "SANDBOX_FULL" }]
   },
+  // ScanSandbox was the lite Sandbox class: its "deleted" entry retires it, and a lite Scan that is still running loses its Sandbox and its Workflow (elise-scan-workflow is no longer bound). Deploy this only when no lite Scan is queued or running. Keep the entry until the next deploy has gone out; it is harmless after that.
   "exports": {
-    "ScanSandbox": { "type": "durable-object", "storage": "sqlite" },
+    "ScanSandbox": { "type": "durable-object", "state": "deleted" },
     "FullScanSandbox": { "type": "durable-object", "storage": "sqlite" }
   },
-  "workflows": [
-    { "name": "elise-scan-workflow", "binding": "SCAN_WORKFLOW", "class_name": "ScanWorkflow" },
-    { "name": "elise-full-scan-workflow", "binding": "SCAN_WORKFLOW_FULL", "class_name": "FullScanWorkflow" }
-  ],
+  "workflows": [{ "name": "elise-full-scan-workflow", "binding": "SCAN_WORKFLOW_FULL", "class_name": "FullScanWorkflow" }],
   "ratelimits": [
     { "name": "SIGN_UP_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },
     { "name": "SIGN_IN_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
@@ -51,16 +41,14 @@
     "producers": [{ "binding": "INVITE_EMAIL_QUEUE", "queue": "elise-invite-emails" }],
     "consumers": [{ "queue": "elise-invite-emails", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 4, "dead_letter_queue": "elise-invite-emails-dlq" }]
   },
-  "vars": { "ENVIRONMENT": "production", "MODEL": "claude-sonnet-5-5", "EFFORT": "high", "MAX_BUDGET_USD": "2", "MAX_BUDGET_OWN_KEY_USD": "10", "MAX_BUDGET_FULL_USD": "18", "MAX_ACTIVE_SCANS": "3", "MAX_ACTIVE_FULL_SCANS": "1", "MAX_GLOBAL_LITE_SCANS": "30", "MAX_GLOBAL_FULL_SCANS": "3", "MONTHLY_BUDGET_USD": "20", "BUDGET_ALLOWANCE_USD": "1000", "BILLING_ENFORCED": "false", "RUNNER_FULL_SCANS": "false", "DASHBOARD_URL": "https://app.eliselab.com", "INVITE_FROM": "no-reply@hello.eliselab.com", "AUTH_BASE_URL": "https://api.eliselab.com", "AUTH_TRUSTED_ORIGINS": "https://api.eliselab.com,https://app.eliselab.com,http://localhost:3000" }
+  "vars": { "ENVIRONMENT": "production", "MODEL": "claude-sonnet-5-5", "EFFORT": "high", "MAX_BUDGET_FULL_USD": "18", "MAX_ACTIVE_SCANS": "3", "MAX_ACTIVE_FULL_SCANS": "1", "MAX_GLOBAL_FULL_SCANS": "3", "MONTHLY_BUDGET_USD": "20", "BUDGET_ALLOWANCE_USD": "1000", "BILLING_ENFORCED": "false", "DASHBOARD_URL": "https://app.eliselab.com", "INVITE_FROM": "no-reply@hello.eliselab.com", "AUTH_BASE_URL": "https://api.eliselab.com", "AUTH_TRUSTED_ORIGINS": "https://api.eliselab.com,https://app.eliselab.com,http://localhost:3000" }
   // MONTHLY_BUDGET_USD is the default monthly spend per account with no plan (a plan's included credit is the default instead; tenants.monthly_scan_budget_usd overrides both).
   // BUDGET_ALLOWANCE_USD is the most an admin may set as the monthly budget (tenants.monthly_scan_budget_allowance_usd overrides it for one account).
   // BILLING_ENFORCED: "true" refuses new scans from an account with no plan row; "false" lets such accounts run as before. Accounts that have a plan row follow it either way.
-  // RUNNER_FULL_SCANS: "true" runs a new Scan on a Runner with the full Skill (stored skill full, still no credit, counted only by MAX_ACTIVE_SCANS); "false" keeps it lite. Turn it on only after a Runner app release that runs the full Skill (and stops at profileCapUsd) is out: a job sent to an older app runs the full Skill under the Runner's own ceiling only.
-  // MAX_BUDGET_USD is the per-scan spend ceiling for scans on the platform's key: requests may lower it, never raise it.
-  // MAX_BUDGET_OWN_KEY_USD is the same ceiling for scans on an account's own Anthropic key, which pays for them itself. A scan on a Runner has a fixed safety cap in code (RUNNER_MAX_BUDGET_USD).
-  // MAX_BUDGET_FULL_USD (at least 18) guards the default cap of each profile (SCAN_PROFILE_CAPS_USD) for a full scan, on either key: a profile whose cap is above it refuses its scans. Changing it is a deploy. The two ceilings above stay for lite requests until #141 removes them.
-  // MAX_ACTIVE_SCANS and MAX_ACTIVE_FULL_SCANS are how many lite and how many full scans one account may have live at once; each path counts on its own.
-  // MAX_GLOBAL_LITE_SCANS and MAX_GLOBAL_FULL_SCANS are the same counts over all accounts (scans on a Runner are not counted). A new scan over a global cap is refused with SCAN_WORKER_BUSY, not queued. The full values are low on purpose until full scans are measured.
+  // Every new scan runs the full Skill and is stored skill full, a scan on a Runner included. A scan on a Runner takes no credit and has a fixed safety cap in code (RUNNER_MAX_BUDGET_USD): ship the Runner app release that stops at the job's profileCapUsd before this Worker.
+  // MAX_BUDGET_FULL_USD (at least 18) guards the default cap of each profile (SCAN_PROFILE_CAPS_USD), on either key: a profile whose cap is above it refuses its scans, and a request may lower the cap, never raise it. Changing it is a deploy.
+  // MAX_ACTIVE_FULL_SCANS is how many scans in our cloud one account may have live at once. MAX_ACTIVE_SCANS is the same count for scans on a Runner only.
+  // MAX_GLOBAL_FULL_SCANS is the count over all accounts (scans on a Runner are not counted). A new scan over it is refused with SCAN_WORKER_BUSY, not queued. The value is low on purpose until full scans are measured.
   // Secrets (wrangler secret put / --secrets-file): ANTHROPIC_API_KEY, SCAN_API_TOKEN, DATABASE_URL, AUTH_SECRET
   // Optional, for accounts that bring their own Anthropic key: KEY_ENCRYPTION_SECRET (any long random string; changing it makes every saved key unreadable, and those accounts' scans stop until they save the key again)
   // Optional, for private repos: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY (PKCS#8 PEM)

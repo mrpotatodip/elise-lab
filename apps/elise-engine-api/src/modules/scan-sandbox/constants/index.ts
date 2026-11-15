@@ -32,7 +32,6 @@ export const SCAN_SANDBOX_CLONED_MARKER = "/workspace/repo.cloned";
 export const SCAN_SANDBOX_COMMIT_FILE = "/workspace/repo.sha";
 export const SCAN_SANDBOX_BRANCH_FILE = "/workspace/repo.branch";
 export const SCAN_SANDBOX_KIND_FILE = "/workspace/repo.kind";
-export const SCAN_SANDBOX_PRIOR_PATH = "/workspace/prior-findings.json";
 
 // -----
 // Clone

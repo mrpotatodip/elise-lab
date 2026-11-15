@@ -27,7 +27,6 @@
     "active": true,
     "targets": "all",
     "resources": {
-      "../../elise-engine-api/skills/security-audit-lite/": "skills/security-audit-lite/",
       "../../elise-engine-api/skills/security-audit/": "skills/security-audit/"
     },
     "icon": [
