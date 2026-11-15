@@ -16,7 +16,7 @@ A second `lite` scan of a Repo starts from what the first one left open. New Sca
 - **Record first, then mark succeeded.** The scan stays running, and its Repo stays blocked, until its findings and History are saved. If recording fails, the scan fails. A scan that a newer request closed as failed stays failed: later writes from its slow Workflow are refused.
 - **At most 50 Prior findings, worst first.** Each costs the agent tokens. The rest stay open in the History and are not asked about, so they are never closed by omission. Only a `lite` scan of a tracked Branch is given them.
 
-Rules in code: `modules/scan-records/utils/plan-history.ts`. How to check the agent follows them: `skills/security-audit-lite/validate-output.cjs`.
+Rules in code: `modules/scan-records/utils/plan-history.ts`. The lite Skill and its output checker were removed (#141); old lite rows keep the History they wrote.
 
 ## Managing a team
 

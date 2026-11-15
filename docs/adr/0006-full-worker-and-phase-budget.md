@@ -4,8 +4,8 @@ How `apps/elise-engine-api` runs a Scan with the `full` Skill, how a Scan's Budg
 
 ## Two workers inside one Worker
 
-- **The lite path and the full path are separate.** A full Scan has its own Workflow, its own Sandbox class and its own Image. A lite Scan keeps the existing ones. The reason: a full Scan runs for an hour or more and holds a Sandbox the whole time. On shared classes it would take the place of lite Scans and a slow full Scan would stop a person's quick check from starting.
-- **Every new Scan in our cloud takes the full path.** The request's `skill` field is ignored (`create-scan-svc.ts`). A Scan already running finishes on the class it started on. Old lite rows are only read.
+- **There is one path: the full one.** A full Scan has its own Workflow (`FullScanWorkflow`), its own Sandbox class (`FullScanSandbox`) and its own Image (`Dockerfile.full`). The lite Skill, Workflow, Sandbox class and Image were removed (#141). The reason they were separate while both existed: a full Scan runs for an hour or more and holds a Sandbox the whole time, so on shared classes it would have taken the place of lite Scans.
+- **Every new Scan takes the full path, a Scan on a Runner included.** The request's `skill` field is ignored (`create-scan-svc.ts`; #146 removes it). Old lite rows are only read.
 - **It stays one Worker.** Two Workers would mean two deploys, two sets of secrets and two copies of the `Outbound` code that holds the Anthropic key. Separate classes give the isolation we need without that.
 - **Limits are separate too.** A full Scan has a time limit for each Phase (10, 45, 25 and 10 minutes, 90 in all) and counts as live for 130 minutes without a status change. Each path has its own count of live Scans for each Account (`MAX_ACTIVE_FULL_SCANS`, 1) and a count over all Accounts (`MAX_GLOBAL_FULL_SCANS`, 3). A new Scan over a limit is refused with a busy message and no queue. We do not queue because a queue hides a wait that the person cannot see and cannot cancel.
 
@@ -13,7 +13,7 @@ How `apps/elise-engine-api` runs a Scan with the `full` Skill, how a Scan's Budg
 
 - **Three profiles.** `quick`, `standard` and `deep` (the dashboard says Focused, Balanced and Exhaustive). No profile means `quick`. The dashboard form starts on `standard`.
 - **The caps are a table, and they are guesses.** `SCAN_PROFILE_CAPS_USD` (`src/constants/scan-constants.ts`) gives $6, $12 and $18. They stay provisional until the first real Scans (#142) are measured.
-- **A request may lower the cap, never raise it.** `MAX_BUDGET_FULL_USD` ($18 today) is the ceiling that guards the table: a profile whose cap is above it refuses its Scans, so a wrong table never starts one. Lite requests keep `MAX_BUDGET_USD` ($2) and `MAX_BUDGET_OWN_KEY_USD` ($10) until the lite path is removed, so no live lite Scan gets a bigger cap. A Runner Scan keeps `RUNNER_MAX_BUDGET_USD` as its own ceiling.
+- **A request may lower the cap, never raise it.** `MAX_BUDGET_FULL_USD` ($18 today) is the ceiling that guards the table: a profile whose cap is above it refuses its Scans, so a wrong table never starts one. `MAX_BUDGET_USD`, `MAX_BUDGET_OWN_KEY_USD` and `MAX_GLOBAL_LITE_SCANS` went with the lite path. A Runner Scan keeps `RUNNER_MAX_BUDGET_USD` as its own ceiling.
 - **Credit.** A new Scan on the platform's key holds the cap it was given times the Plan's markup (1.5). The Account is charged only what the meter counted, times the markup. `GET /usage/credit` returns each profile's cap and hold.
 
 ## The Budget cap is one pool
@@ -40,11 +40,11 @@ A Scan that runs out of money while the Skill can still write its files ends wit
 
 ## Runner Scans
 
-- **A Runner Scan runs one Agent, not Phases.** The Runner app runs the full Skill and stops at the cap the job carries (`profileCapUsd`, #145). The engine stores a Runner Scan as `full` only when `RUNNER_FULL_SCANS` is `"true"`. It stays `"false"` until a Runner app release that runs the full Skill is out. Deploy order: the engine's job fields, then the app release, then the variable.
+- **A Runner Scan runs one Agent, not Phases.** The Runner app runs the full Skill and stops at the cap the job carries (`profileCapUsd`, #145). The engine stores every Runner Scan as `full`; there is no flag any more. So the deploy order is a rule: the engine's job fields (#144), then the Runner app release that runs the full Skill, then the engine that removes the lite path (#141). An old app that claims a full job runs it under the Runner's own ceiling, not the profile cap. The app release must be cut from a commit before #141 removed the lite Skill folder from its bundle, or be built knowing that a lite job can no longer run.
 - **A Runner Scan takes no credit** and counts only against `MAX_ACTIVE_SCANS` for its Account, never against the full or global caps.
 
 ## Not built here
 
 - The numbers: the profile caps, `MAX_BUDGET_FULL_USD` and the Verdict weights are guesses until #142 measures real Scans.
-- Per-Account caps (a later layer above the defaults), a Report reserve, and the removal of the lite path (#141).
+- Per-Account caps (a later layer above the defaults), a Report reserve, and the removal of the `skill` request field (#146).
 - Phase costs and a Partial badge in the dashboard (#67).

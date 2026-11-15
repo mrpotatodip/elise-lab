@@ -17,7 +17,7 @@ The Cloudflare program in `src/index.ts` that receives HTTP requests and starts 
 _Avoid_: Server, backend, API
 
 **Sandbox**:
-One Durable Object plus the container it starts, used for exactly one scan (class `ScanSandbox`).
+One Durable Object plus the container it starts, used for exactly one scan (class `FullScanSandbox`).
 _Avoid_: VM, box
 
 **Durable Object**:
@@ -47,7 +47,7 @@ The Claude Code program that runs inside the container and reads the repo.
 _Avoid_: Bot, AI
 
 **Skill**:
-A folder of written instructions the agent follows. We have `lite` and `full`. Every new Scan in our cloud runs `full`, whatever the request sent; the Profile sets how much it covers, not the Skill. `lite` stays for old rows, for Scans already running, and for Runner Scans until `RUNNER_FULL_SCANS` is on.
+A folder of written instructions the agent follows. We have one, `full`. Every new Scan runs it, a Runner Scan included, whatever the request sent; the Profile sets how much it covers, not the Skill. `lite` was the first Skill and is gone from the code (#141); it stays only as a value in old rows.
 _Avoid_: Prompt, plugin
 
 **Profile**:
@@ -67,7 +67,7 @@ A profile Scan (any Profile) that ran out of money while the Skill could still w
 _Avoid_: Incomplete, failed Scan
 
 **Full worker**:
-The path every new Scan in our cloud takes, since each runs the `full` Skill: its own Workflow, its own Sandbox class and its own Image, inside the same Worker as the lite path. It has limits of its own, so a long full Scan never blocks a lite Scan. ADR 0006 holds the decisions.
+The only path a Scan takes, since each runs the `full` Skill: its own Workflow, its own Sandbox class and its own Image, inside the Worker. It has limits of its own. ADR 0006 holds the decisions.
 _Avoid_: Full server, second Worker (it is one Worker with two paths)
 
 **Usage**:
@@ -147,7 +147,7 @@ A value stored in the Worker, not in git, such as `ANTHROPIC_API_KEY` or `SCAN_A
 _Avoid_: Env var (an env var is not always secret)
 
 **Budget cap**:
-The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`, provisional). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` is the ceiling that guards that table for full Scans. Lite requests keep `MAX_BUDGET_USD` (and `MAX_BUDGET_OWN_KEY_USD` on the Account's own key) until the lite path is removed. ADR 0006 holds the rules.
+The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`, provisional). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` is the ceiling that guards that table for full Scans. A Runner Scan keeps `RUNNER_MAX_BUDGET_USD` as its own ceiling. ADR 0006 holds the rules.
 _Avoid_: Limit, quota
 
 **Monthly budget**:
