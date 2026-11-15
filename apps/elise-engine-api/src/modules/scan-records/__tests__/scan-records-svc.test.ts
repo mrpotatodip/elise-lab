@@ -237,6 +237,16 @@ describe("a profile scan (the full skill)", () => {
     expect(record.scan).toMatchObject({ priorsGiven: null, priorsCarried: null, priorsClosed: null, priorsUnchecked: null });
   });
 
+  it("writes no History row on a tracked branch even when it is handed priors", async () => {
+    const given = [{ priorId: fp("a"), status: "confirmed" as const, severity: "high" as const, title: "t", class: "authz", file: "src/a.ts", line: 1 }];
+    const record = await Effect.runPromise(
+      buildScanRecordSvc(fullReports({ "findings.json": nestedFindings }), fullParams, REPO_ID, BRANCH, "succeeded", null, null, { ...NO_HISTORY, given }),
+    );
+
+    expect(record.history).toEqual([]);
+    expect(record.scan).toMatchObject({ branchId: BRANCH_ID, priorsGiven: null, priorsClosed: null });
+  });
+
   it("records no rows for a scan that found nothing, and says it was not partial", async () => {
     const record = await recordFull({ "findings.json": "[]", "REPORT.md": "# Report\nNothing found." });
 

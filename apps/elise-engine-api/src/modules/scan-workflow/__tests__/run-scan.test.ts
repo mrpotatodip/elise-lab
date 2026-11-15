@@ -298,6 +298,18 @@ describe("runScan", () => {
     expect(bindings.store.has(`accounts/${ACCOUNT}/scans/scan-1/prior-findings.json`)).toBe(false);
   });
 
+  it("gives a profile Scan no priors and saves no prior-findings.json, whatever the History holds", async () => {
+    const profileScan = params({ options: { ...params().options, skill: "full" } });
+    const { names, ledger, bindings, launches, deps } = setup({ priors: [prior] });
+    await queue(ledger, profileScan);
+
+    await runScan(deps, profileScan, fakeStep(names));
+
+    expect(launches).toEqual([[]]);
+    expect(bindings.store.has(`accounts/${ACCOUNT}/scans/scan-1/prior-findings.json`)).toBe(false);
+    expect(ledger.files.has("scan-1/prior-findings.json")).toBe(false);
+  });
+
   it("fails the scan when its results cannot be recorded, and still tries to record the failure", async () => {
     const { names, calls, ledger, deps } = setup({ recordFails: "succeeded" });
     await queue(ledger, params());

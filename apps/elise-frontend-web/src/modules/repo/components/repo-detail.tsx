@@ -23,6 +23,7 @@ import type { RepoFinding } from "../schemas";
 import { repoName } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
+import { RepoHistoryNote } from "./repo-history-note";
 import { RepoVerdictDecision } from "./repo-verdict-decision";
 
 const RECENT_SCAN_COUNT = 3;
@@ -436,6 +437,8 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
       </ShellPageHeader>
 
       {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} />}
+
+      {open.total > 0 && <RepoHistoryNote byHand />}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">

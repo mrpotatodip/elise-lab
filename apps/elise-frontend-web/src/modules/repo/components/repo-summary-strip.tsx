@@ -3,6 +3,7 @@ import { ShellStatCell as Cell } from "#/modules/shell";
 import { ScanSeverityDots, scanPlural } from "#/modules/scan";
 import type { Repo } from "../schemas";
 import { repoTotals } from "../utils";
+import { RepoHistoryNote } from "./repo-history-note";
 
 // -----
 // The same four answers as the repository summary, as one card with one lead
@@ -10,12 +11,13 @@ import { repoTotals } from "../utils";
 // four boxes of equal weight hide the one that is not. No icon chips and no
 // tints: colour belongs to the findings themselves (the severity dots).
 // -----
-export function RepoSummaryStrip({ repos }: { repos: readonly Repo[] }) {
+export function RepoSummaryStrip({ repos, byHand = false }: { repos: readonly Repo[]; byHand?: boolean }) {
   const totals = repoTotals(repos);
   const notRated = totals.total - Object.values(totals.severity).reduce((sum, count) => sum + count, 0);
 
   return (
-    <section aria-label="Summary across repositories">
+    <section aria-label="Summary across repositories" className="grid gap-6">
+      {totals.total > 0 && <RepoHistoryNote byHand={byHand} />}
       <Card className="grid divide-y lg:grid-cols-4 lg:divide-x lg:divide-y-0">
         <Cell
           lead
