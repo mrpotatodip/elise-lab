@@ -387,7 +387,7 @@ export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan"
                 <copy.Icon aria-hidden="true" className="size-5 shrink-0" />
                 {copy.title}
               </CardTitle>
-              <p className="max-w-copy text-pretty text-sm leading-relaxed text-foreground xl:max-w-4xl">{copy.note}</p>
+              <p className={cn("max-w-copy text-pretty text-sm leading-relaxed xl:max-w-4xl", copy.tone)}>{copy.note}</p>
             </>
           ) : (
             <CardTitle>Ready to ship?</CardTitle>
