@@ -8,16 +8,21 @@ import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { FindingCommentDraftSchema } from "../schemas";
 
 type FindingCommentComposerProps = {
-  pending: boolean;
   onPost: (body: string) => Promise<boolean>;
 };
 
-export function FindingCommentComposer({ pending, onPost }: FindingCommentComposerProps) {
+// -----
+// Clears at once, because the thread already shows the comment. If the
+// post fails, the text comes back so nothing is lost.
+// -----
+export function FindingCommentComposer({ onPost }: FindingCommentComposerProps) {
   const form = useForm({
     defaultValues: { body: "" },
     validators: { onSubmit: FindingCommentDraftSchema },
     onSubmit: async ({ value, formApi }) => {
-      if (await onPost(value.body.trim())) formApi.reset();
+      const body = value.body.trim();
+      formApi.reset();
+      if (!(await onPost(body))) formApi.setFieldValue("body", body);
     },
   });
 
@@ -58,8 +63,8 @@ export function FindingCommentComposer({ pending, onPost }: FindingCommentCompos
         )}
       </form.Field>
       <div className="flex justify-end">
-        <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Posting" : "Comment"}
+        <Button type="submit" size="sm">
+          Comment
         </Button>
       </div>
     </form>
