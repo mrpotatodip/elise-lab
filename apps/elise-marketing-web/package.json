@@ -9,7 +9,7 @@
     "preview": "astro preview --port 3200",
     "lint": "oxlint src",
     "deploy": "node ../../scripts/deploy-guard.mjs apps/elise-marketing-web && astro build && wrangler deploy",
-    "check": "astro check && oxlint src"
+    "check": "astro check && oxlint src && node scripts/check-copy.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.8",
