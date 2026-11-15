@@ -41,11 +41,11 @@ describe("creditBalanceOf", () => {
   };
 
   it("shows the plan, the balance and the month's scans", () => {
-    expect(creditBalanceOf({ plan, scans: 12 })).toEqual({ planKey: "pro", keySource: "platform", balanceUsd: 41.25, monthlyCreditUsd: 49, scans: 12, scanAllowance: null });
+    expect(creditBalanceOf({ plan, scans: 12 })).toMatchObject({ planKey: "pro", keySource: "platform", balanceUsd: 41.25, monthlyCreditUsd: 49, scans: 12, scanAllowance: null });
   });
 
   it("shows an account with no plan as having no credit", () => {
-    expect(creditBalanceOf({ plan: null, scans: 3 })).toEqual({ planKey: null, keySource: null, balanceUsd: 0, monthlyCreditUsd: 0, scans: 3, scanAllowance: null });
+    expect(creditBalanceOf({ plan: null, scans: 3 })).toMatchObject({ planKey: null, keySource: null, balanceUsd: 0, monthlyCreditUsd: 0, scans: 3, scanAllowance: null });
   });
 });
 

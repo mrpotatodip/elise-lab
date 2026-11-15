@@ -57,6 +57,7 @@ export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: 
     EFFORT: "high",
     MAX_BUDGET_USD: "2",
     MAX_BUDGET_OWN_KEY_USD: "10",
+    MAX_BUDGET_FULL_USD: "18",
     MAX_ACTIVE_SCANS: "3",
     MAX_ACTIVE_FULL_SCANS: "1",
     MAX_GLOBAL_LITE_SCANS: "30",
