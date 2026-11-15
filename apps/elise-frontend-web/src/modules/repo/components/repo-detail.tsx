@@ -444,7 +444,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
       </ShellPageHeader>
 
-      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} />}
+      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} Discussion={FindingCommentThread} />}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">

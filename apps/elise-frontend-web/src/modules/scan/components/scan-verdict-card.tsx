@@ -30,11 +30,14 @@ export const VERDICT_COPY = {
 export type DecideFindingProps = { repoId: string; repoUrl: string; finding: VerdictFinding };
 export type DecideFinding = ComponentType<DecideFindingProps>;
 
+export type DiscussFindingProps = { repo: string; fingerprint: string };
+export type DiscussFinding = ComponentType<DiscussFindingProps>;
+
 type FindingRowsProps = {
   title: string;
   hint: string;
   findings: readonly (VerdictFinding & { note?: string; acceptedUntil?: string })[];
-  decide?: { Control: DecideFinding; repoId: string; repoUrl: string };
+  decide?: { Control: DecideFinding; Discussion?: DiscussFinding; repoId: string; repoUrl: string };
   collapsed?: boolean;
 };
 
@@ -154,12 +157,16 @@ function FindingRows({ title, hint, findings, decide, collapsed = false }: Findi
           findings={findings.map(sheetFinding)}
           selected={selectedFinding ? selected : undefined}
           onSelect={setSelected}
+          discussion={selectedFinding && decide.Discussion && <decide.Discussion key={selectedFinding.fingerprint} repo={decide.repoUrl} fingerprint={selectedFinding.fingerprint} />}
           decision={
             selectedFinding && (
-              <>
-                <span className="text-sm font-medium">Your decision</span>
-                <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={selectedFinding} />
-              </>
+              <div className="grid gap-1">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">Your decision</span>
+                  <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={selectedFinding} />
+                </div>
+                {decide.Discussion && <p className="text-sm leading-normal text-muted-foreground">Your choice is added to the discussion with your name.</p>}
+              </div>
             )
           }
         />
@@ -264,9 +271,9 @@ function VerdictChecklist({ verdict }: { verdict: Verdict }) {
   );
 }
 
-type VerdictBodyProps = { verdict: Verdict; repoId: string; repoUrl?: string; branchOpen?: number; Decision?: DecideFinding; compactFindings?: boolean };
+type VerdictBodyProps = { verdict: Verdict; repoId: string; repoUrl?: string; branchOpen?: number; Decision?: DecideFinding; Discussion?: DiscussFinding; compactFindings?: boolean };
 
-function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFindings = false }: VerdictBodyProps) {
+function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, Discussion, compactFindings = false }: VerdictBodyProps) {
   const copy = VERDICT_COPY[verdict.verdict];
   const { scans } = verdict;
   const missing = Math.max(0, scans.required - scans.counted);
@@ -309,7 +316,7 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
           title={`${scanPlural(verdict.open.length, "problem", "problems")} still open on this commit`}
           hint={`These count against the commit. Select one to read the impact and the fix, then record your decision.${oneOffHint}`}
           findings={verdict.open}
-          decide={Decision && repoUrl ? { Control: Decision, repoId, repoUrl } : undefined}
+          decide={Decision && repoUrl ? { Control: Decision, Discussion, repoId, repoUrl } : undefined}
           collapsed={compactFindings}
         />
         <FindingRows title={scanPlural(verdict.accepted.length, "accepted risk", "accepted risks")} hint="An account admin chose to ship with these until the date shown. After that they block again." findings={verdict.accepted} />
@@ -328,7 +335,7 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
   );
 }
 
-type ScanVerdictCardProps = { repoId: string; commit: string; repoUrl?: string; found?: number; scope?: "scan" | "branch"; branchOpen?: number; Decision?: DecideFinding; compactFindings?: boolean };
+type ScanVerdictCardProps = { repoId: string; commit: string; repoUrl?: string; found?: number; scope?: "scan" | "branch"; branchOpen?: number; Decision?: DecideFinding; Discussion?: DiscussFinding; compactFindings?: boolean };
 
 const CHIP_CLASS = "inline-flex min-h-6 items-center gap-1.5 rounded-md border bg-background px-2 py-0.5 text-sm";
 
@@ -356,7 +363,7 @@ function CommitChip({ commit, repoUrl }: { commit: string; repoUrl?: string }) {
   );
 }
 
-export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan", branchOpen, Decision, compactFindings = false }: ScanVerdictCardProps) {
+export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan", branchOpen, Decision, Discussion, compactFindings = false }: ScanVerdictCardProps) {
   const { data, isPending, error } = useQuery(verdictQuery(repoId, commit));
   const nextSteps = data && verdictNextSteps(data);
 
@@ -372,7 +379,7 @@ export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan"
         <CommitChip commit={commit} repoUrl={repoUrl} />
       </CardHeader>
       <CardContent className="grid gap-4">
-        {isPending ? <Skeleton className="h-16" /> : error ? <p className="text-sm text-destructive">We could not load the verdict: {error.message}. Refresh to try again.</p> : <VerdictBody verdict={data} repoId={repoId} repoUrl={repoUrl} branchOpen={branchOpen} Decision={Decision} compactFindings={compactFindings} />}
+        {isPending ? <Skeleton className="h-16" /> : error ? <p className="text-sm text-destructive">We could not load the verdict: {error.message}. Refresh to try again.</p> : <VerdictBody verdict={data} repoId={repoId} repoUrl={repoUrl} branchOpen={branchOpen} Decision={Decision} Discussion={Discussion} compactFindings={compactFindings} />}
       </CardContent>
     </Card>
   );
