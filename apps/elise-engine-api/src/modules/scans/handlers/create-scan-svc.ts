@@ -3,13 +3,13 @@ import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, typ
 import { scanPathOf, workflowOf } from "#/lib/scan-path";
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE, RUNNER_MAX_BUDGET_USD } from "#/modules/runners/constants";
+import { RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE } from "#/modules/runners/constants";
 import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
 import type { CreateScanEnv } from "#/modules/scans/types";
-import { scanRefusalOf } from "#/modules/scans/utils";
+import { budgetCapOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
@@ -38,16 +38,19 @@ export const createScanSvc = (
     // ceiling than a scan on EliseLAB's key. A request may lower it.
     // -----
     const ownKeyScan = input.runner_id !== undefined || (spend.plan ? spend.plan.keySource === "account" : spend.ownKey);
-    const ceiling = input.runner_id !== undefined ? RUNNER_MAX_BUDGET_USD : Number(ownKeyScan ? env.MAX_BUDGET_OWN_KEY_USD : env.MAX_BUDGET_USD);
-    const maxBudgetUsd = input.max_budget_usd ?? ceiling;
-    if (maxBudgetUsd > ceiling) return yield* new Invalid({ message: `max_budget_usd: must be at most ${ceiling}` });
+    const skill = input.skill ?? "lite";
+    const profile = input.profile ?? "quick";
+    const cap = budgetCapOf(env, { skill, profile, onRunner: input.runner_id !== undefined, ownKeyScan });
+    if (!cap.ok) return yield* new Invalid({ message: cap.message });
+    const maxBudgetUsd = input.max_budget_usd ?? cap.defaultUsd;
+    if (maxBudgetUsd > cap.ceilingUsd) return yield* new Invalid({ message: `max_budget_usd: must be at most ${cap.ceilingUsd}` });
 
     const options = yield* Effect.try(() =>
       ScanOptionsSchema.parse({
-        skill: input.skill ?? "lite",
+        skill,
         model: input.model ?? env.MODEL,
         effort: input.effort ?? env.EFFORT,
-        profile: input.profile ?? "quick",
+        profile,
         maxBudgetUsd,
       }),
     ).pipe(Effect.orDie);
