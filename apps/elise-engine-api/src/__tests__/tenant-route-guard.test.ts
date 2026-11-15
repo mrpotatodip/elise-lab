@@ -5,7 +5,7 @@ import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { CROSS_ACCOUNT_CASES, NOT_TENANT_ROUTES, type CrossAccountCase } from "#/__tests__/tenant-route-cases";
+import { CROSS_ACCOUNT_CASES, NOT_TENANT_ROUTES, OTHER_COMMENT_ID, type CrossAccountCase } from "#/__tests__/tenant-route-cases";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 
 const EnvelopeSchema = z.object({ data: z.record(z.string(), z.unknown()).nullable() });
@@ -39,7 +39,7 @@ beforeAll(async () => {
   const otherRepoId = await seedRepo(test, otherTenantId);
   await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"));
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
-  await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
+  await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
 });
 
 afterAll(async () => {

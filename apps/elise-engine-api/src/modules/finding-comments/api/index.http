@@ -16,3 +16,13 @@ x-account-id: {{account}}
 Content-Type: application/json
 
 { "repo": "https://github.com/octocat/Hello-World", "fingerprint": "<64 hex characters>", "body": "Fixed in the next release." }
+
+###
+
+# Edit your own comment (at most 4,000 characters). Only its author, while the Role still holds company:findings:comments:create; a deleted comment answers 409.
+PATCH {{baseUrl}}/findings/comments/<comment id>
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "body": "Fixed in 1.4.2." }

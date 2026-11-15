@@ -1,10 +1,14 @@
 import { useRouteContext } from "@tanstack/react-router";
+import { useState } from "react";
 import { hasAccessPower } from "@repo/contracts/elise";
 import { Alert, AlertDescription } from "#/components/ui/alert";
+import { Button } from "#/components/ui/button";
 import { Skeleton } from "#/components/ui/skeleton";
+import { ScanTime } from "#/modules/scan";
 import { useFindingCommentActions, useFindingThread } from "../hooks";
 import type { FindingThreadEvent } from "../schemas";
 import { FindingCommentComposer } from "./finding-comment-composer";
+import { FindingCommentEditForm } from "./finding-comment-edit-form";
 import { FindingCommentItem } from "./finding-comment-item";
 
 type FindingCommentThreadProps = {
@@ -12,8 +16,32 @@ type FindingCommentThreadProps = {
   fingerprint: string;
 };
 
-function ThreadEvent({ event }: { event: FindingThreadEvent }) {
-  return <FindingCommentItem comment={event} />;
+type ThreadEventProps = {
+  event: FindingThreadEvent;
+  canEdit: boolean;
+  editPending: boolean;
+  onEdit: (commentId: string, body: string) => Promise<boolean>;
+};
+
+function ThreadEvent({ event, canEdit, editPending, onEdit }: ThreadEventProps) {
+  const [editing, setEditing] = useState(false);
+  const markers =
+    event.editedAt && event.deletedAt === null ? (
+      <span className="text-muted-foreground">
+        edited <ScanTime value={event.editedAt} />
+      </span>
+    ) : undefined;
+  const actions =
+    canEdit && !editing ? (
+      <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+        Edit
+      </Button>
+    ) : undefined;
+  const editor =
+    editing && event.body !== null ? (
+      <FindingCommentEditForm commentId={event.id} initialBody={event.body} pending={editPending} onSave={(body) => onEdit(event.id, body)} onCancel={() => setEditing(false)} />
+    ) : undefined;
+  return <FindingCommentItem comment={event} markers={markers} actions={actions} editor={editor} />;
 }
 
 // -----
@@ -25,7 +53,8 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
   const { user } = useRouteContext({ from: "/_app" });
   const canComment = hasAccessPower(user?.powers ?? [], "company:findings:comments:create");
   const thread = useFindingThread(repo, fingerprint);
-  const { create } = useFindingCommentActions({ repo, fingerprint });
+  const { create, edit } = useFindingCommentActions({ repo, fingerprint });
+  const editComment = (commentId: string, body: string) => edit.mutateAsync({ commentId, body }).then(() => true, () => false);
 
   return (
     <section aria-labelledby="finding-discussion-title" className="grid gap-4 border-t pt-6">
@@ -44,7 +73,13 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
         ) : (
           <ol className="grid gap-5">
             {thread.data.events.map((event) => (
-              <ThreadEvent key={event.id} event={event} />
+              <ThreadEvent
+                key={event.id}
+                event={event}
+                canEdit={canComment && user?.partyId != null && event.authorPartyId === user.partyId && event.deletedAt === null}
+                editPending={edit.isPending}
+                onEdit={editComment}
+              />
             ))}
           </ol>
         ))}
