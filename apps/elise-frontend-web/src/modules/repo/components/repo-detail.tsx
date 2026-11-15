@@ -4,6 +4,7 @@ import { useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from "@tan
 import { useTable } from "@tanstack/react-table";
 import { ChevronRight, CircleAlert, ExternalLink, GitBranch, Search, ShieldCheck, Undo2 } from "lucide-react";
 import { Alert, AlertDescription } from "#/components/ui/alert";
+import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
@@ -18,7 +19,7 @@ import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
 import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup } from "#/modules/finding";
-import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, type ScanStatus } from "#/modules/scan";
+import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
 import { repoName } from "../utils";
@@ -92,6 +93,7 @@ type FindingRow = {
   open: () => void;
   repoId: string;
   fixedOn: string | null;
+  blocks: boolean;
   onSaved: ComponentProps<typeof FindingTriageSelect>["onSaved"];
 };
 
@@ -126,7 +128,12 @@ const titleColumn = findingColumn.display({
 const statusColumn = findingColumn.display({
   id: "status",
   header: "Status",
-  cell: ({ row }) => <FindingStatusBadge state={row.original.finding.state} triage={row.original.finding.triage} />,
+  cell: ({ row }) => (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <FindingStatusBadge state={row.original.finding.state} triage={row.original.finding.triage} />
+      {row.original.blocks && <Badge variant="destructive">Blocks shipping</Badge>}
+    </span>
+  ),
 });
 
 const whereColumn = findingColumn.display({
@@ -220,7 +227,8 @@ const recentScanColumns = scanColumn.columns([
   }),
 ]);
 
-function RepoFindings({ repoId, branch, history }: { repoId: string; branch: string; history: readonly ScanStatus[] }) {
+function RepoFindings({ repoId, branch, commit, history }: { repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[] }) {
+  const blockers = useVerdictBlockers(repoId, commit);
   const queryClient = useQueryClient();
   const findingsOptions = repoFindingsQuery(repoId, { branch });
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useSuspenseInfiniteQuery(findingsOptions);
@@ -235,10 +243,11 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
   const filterItems = FILTER_VALUES.map((value) => ({ value, label: `${FILTER_COPY[value].label} (${countOf(value)}${more})` }));
   const inGroup = filter === "all" ? all : all.filter((f) => findingGroup(f.state, f.triage) === filter);
   const query = search.trim().toLowerCase();
-  const findings = query === "" ? inGroup : inGroup.filter((f) => [f.title, f.file ?? "", f.class].some((text) => text.toLowerCase().includes(query)));
+  const matching = query === "" ? inGroup : inGroup.filter((f) => [f.title, f.file ?? "", f.class].some((text) => text.toLowerCase().includes(query)));
+  const findings = blockers.size === 0 ? matching : matching.toSorted((a, b) => Number(blockers.has(b.fingerprint)) - Number(blockers.has(a.fingerprint)));
   const selectedFinding = selected === undefined ? undefined : findings[selected];
   const showStatus = filter === "action" || filter === "all";
-  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, history), onSaved: decided }));
+  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, history), blocks: blockers.has(finding.fingerprint), onSaved: decided }));
   const table = useTable({ features: dataTableFeatures, columns: showStatus ? findingColumnsWithStatus : findingColumnsWithoutStatus, data: rows, getRowId: (row) => row.finding.id });
 
   return (
@@ -461,7 +470,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
 
       {current ? (
         <Suspense key={current.name} fallback={<RepoFindingsSkeleton />}>
-          <RepoFindings repoId={repoId} branch={current.name} history={repo.history} />
+          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} />
         </Suspense>
       ) : (
         <Card>

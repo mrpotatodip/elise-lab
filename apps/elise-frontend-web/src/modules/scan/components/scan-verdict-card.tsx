@@ -5,6 +5,7 @@ import { ChevronRight, ChevronUp, CircleCheck, CircleDashed, CircleHelp, CircleX
 import { cn } from "#/lib/utils";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { Alert, AlertDescription } from "#/components/ui/alert";
+import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
 import { Skeleton } from "#/components/ui/skeleton";
@@ -13,12 +14,12 @@ import type { Finding, Verdict, VerdictFinding } from "../schemas";
 import { ScanFindingSheet } from "./scan-finding-sheet";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanVerdictRun } from "./scan-verdict-run";
-import { scanPlural } from "../utils";
+import { openProblemsSummary, scanPlural, verdictBlockers } from "../utils";
 import { ScanSeverityBadge } from "./scan-severity-badge";
 
 export const VERDICT_COPY = {
   pass: { title: "Passed the scan policy", note: "Scanned enough times and nothing open is over the limits. An AI audit can miss problems, so this is advice and not proof that the commit is safe.", variant: "success", Icon: CircleCheck },
-  fail: { title: "Do not ship yet", note: "Trusted scans left problems that block this commit. You can fix them, or an account admin can accept the risk with a note.", variant: "destructive", Icon: OctagonX },
+  fail: { title: "Do not ship yet", note: "Some open problems block this commit. Decide on each one, or an account admin can accept the risk with a note.", variant: "destructive", Icon: OctagonX },
   cannot_tell: { title: "Cannot tell yet", note: "This is not a failure. This commit needs more scans before the answer can be yes or no.", variant: "warning", Icon: CircleHelp },
 } as const;
 
@@ -200,7 +201,7 @@ function verdictChecks(verdict: Verdict): Check[] {
       state: historyReason ? "fail" : scans.counted === 0 ? "wait" : "ok",
     },
     {
-      label: "Nothing open over the limits",
+      label: "Nothing open blocks this commit",
       detail: `${over.length > 0 ? `${over.join(", ")}.` : openTotal === 0 ? "Nothing is open." : `${openTotal} open, all within the limits.`} Allowed: ${limits.critical} critical, ${limits.high} high, up to ${limits.medium} medium.`,
       state: over.length > 0 ? "fail" : "ok",
     },
@@ -238,8 +239,8 @@ function VerdictChecklist({ verdict }: { verdict: Verdict }) {
     <details className="group rounded-lg border">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-        <span className="text-[15px] font-semibold">How this is decided</span>
-        <span className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+        <span className="text-[15px] font-semibold">Why this answer?</span>
+        <span className="max-w-copy text-sm leading-relaxed text-foreground">
           {checks.length - unmet.length} of {checks.length} checks met{unmet.length > 0 ? `. Not met: ${unmet.map((check) => check.label.toLowerCase()).join(", ")}.` : "."}
         </span>
       </summary>
@@ -271,22 +272,24 @@ type VerdictBodyProps = { verdict: Verdict; repoId: string; repoUrl?: string; br
 // For a screen with one list of findings of its own, the open problems are
 // not listed again: the card gives the count and a link to that list.
 // -----
-function OpenFindingsLink({ count, href, older, oneOffHint }: { count: number; href: string; older: number; oneOffHint: string }) {
+function OpenFindingsLink({ count, blocking, href, older, oneOffHint }: { count: number; blocking: number; href: string; older: number; oneOffHint: string }) {
   if (count === 0) return null;
   const olderHint = older === 0 ? "" : ` The list also holds ${older === 1 ? "1 older finding that is" : `${older} older findings that are`} still open on this branch.`;
   return (
-    <section aria-labelledby="verdict-open-heading" className="grid gap-1.5">
-      <h3 id="verdict-open-heading" className="text-[15px] font-semibold">
-        {scanPlural(count, "problem", "problems")} still open on this commit
-      </h3>
-      <p className="max-w-copy text-sm leading-relaxed text-muted-foreground xl:max-w-3xl">
-        These count against the commit. Read each one and record your decision in{" "}
-        <a href={href} className="rounded-sm font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          Findings on this branch
-        </a>
-        , below.{olderHint}
-        {oneOffHint}
-      </p>
+    <section aria-labelledby="verdict-open-heading" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <div className="grid min-w-0 flex-1 basis-80 gap-1.5">
+        <h3 id="verdict-open-heading" className="text-[15px] font-semibold">
+          {scanPlural(count, "problem", "problems")} still open on this commit
+        </h3>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground xl:max-w-3xl">
+          {openProblemsSummary(count, blocking)}
+          {olderHint}
+          {oneOffHint}
+        </p>
+      </div>
+      <Button variant="outline" nativeButton={false} render={<a href={href} aria-label={`Review ${scanPlural(count, "problem", "problems")} in Findings on this branch`} />}>
+        Review {scanPlural(count, "problem", "problems")}
+      </Button>
     </section>
   );
 }
@@ -328,12 +331,13 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
         <div className="grid gap-1.5">
           <AlertDescription className="text-xl font-semibold leading-tight">{copy.title}</AlertDescription>
           <AlertDescription className="max-w-copy text-pretty text-foreground xl:max-w-4xl">{copy.note}</AlertDescription>
+          {verdict.verdict !== "pass" && <AlertDescription className="max-w-copy text-pretty font-medium text-foreground xl:max-w-4xl">{verdictNextSteps(verdict)}</AlertDescription>}
         </div>
       </Alert>
       <VerdictChecklist verdict={verdict} />
       <div className="grid gap-6">
         {findingsHref ? (
-          <OpenFindingsLink count={verdict.open.length} href={findingsHref} older={branchOpen === undefined ? 0 : Math.max(0, branchOpen - verdict.open.length)} oneOffHint={oneOffHint} />
+          <OpenFindingsLink count={verdict.open.length} blocking={verdictBlockers(verdict).size} href={findingsHref} older={branchOpen === undefined ? 0 : Math.max(0, branchOpen - verdict.open.length)} oneOffHint={oneOffHint} />
         ) : (
           <FindingRows
             title={`${scanPlural(verdict.open.length, "problem", "problems")} still open on this commit`}
@@ -358,14 +362,15 @@ type ScanVerdictCardProps = { repoId: string; commit: string; repoUrl?: string; 
 
 export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan", branchOpen, Decision, compactFindings = false, findingsHref }: ScanVerdictCardProps) {
   const { data, isPending, error } = useQuery(verdictQuery(repoId, commit));
-  const nextSteps = data && verdictNextSteps(data);
 
   return (
     <Card>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-6">
         <div className="grid gap-1.5">
           <CardTitle>Ready to ship?</CardTitle>
-          {nextSteps && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{nextSteps}</p>}
+          <p className="text-sm text-muted-foreground">
+            Commit <span className="font-mono">{commit.slice(0, 7)}</span>
+          </p>
           {scope === "scan" && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The answer belongs to the commit, not to this scan.</p>}
           {found === 0 && data && data.open.length > 0 && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">This scan found nothing. The open problems below come from other scans of the same commit.</p>}
         </div>
