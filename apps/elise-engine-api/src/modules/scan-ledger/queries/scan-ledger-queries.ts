@@ -13,6 +13,22 @@ type ScanRow = typeof scans.$inferSelect;
 const ACTIVE_SCAN_CONFLICT = "This repo already has an active scan";
 
 // -----
+// The Runner each of these scans is on, from its job row. A scan
+// has a job row once its Workflow has queued the job, a few seconds
+// after it starts.
+// -----
+const runnersOf = (db: DbConnectType, ids: string[]) =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select({ scanId: scanRunnerJobs.scanId, id: tenantRunners.id, name: tenantRunners.name })
+        .from(scanRunnerJobs)
+        .innerJoin(tenantRunners, eq(tenantRunners.id, scanRunnerJobs.runnerId))
+        .where(inArray(scanRunnerJobs.scanId, ids)),
+    catch: toDbError,
+  });
+
+// -----
 // The rows with their files, the Runner a scan ran on and, for a
 // scan whose findings are recorded, the counts of what it found.
 // -----
@@ -39,15 +55,7 @@ const withFiles = (db: DbConnectType, rows: ScanRow[]): Effect.Effect<ScanStatus
               .groupBy(scanFindings.scanId, scanFindings.status, scanFindings.severity, scanFindings.origin),
           catch: toDbError,
         });
-        const runners = yield* Effect.tryPromise({
-          try: () =>
-            db
-              .select({ scanId: scanRunnerJobs.scanId, id: tenantRunners.id, name: tenantRunners.name })
-              .from(scanRunnerJobs)
-              .innerJoin(tenantRunners, eq(tenantRunners.id, scanRunnerJobs.runnerId))
-              .where(inArray(scanRunnerJobs.scanId, ids)),
-          catch: toDbError,
-        });
+        const runners = yield* runnersOf(db, ids);
         return rows.map((row) =>
           scanRowToStatus(
             row,
@@ -242,15 +250,21 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
 
   // -----
   // Callers count these scans and add up their budget caps, so the
-  // rows come back with no files, no Runner and no finding counts: a queued or
+  // rows come back with no files and no finding counts: a queued or
   // running scan has no summary, and two more queries on the
-  // path of every new scan would buy nothing.
+  // path of every new scan would buy nothing. They do carry their
+  // Runner, because a scan on a Runner is counted apart from one in
+  // our cloud.
   // -----
   activeSince: (accountId, nowMs) =>
-    Effect.tryPromise({
-      try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), liveScansSql(nowMs))),
-      catch: toDbError,
-    }).pipe(Effect.map((rows) => rows.map((row) => scanRowToStatus(row, [], null)))),
+    Effect.gen(function* () {
+      const rows = yield* Effect.tryPromise({
+        try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), liveScansSql(nowMs))),
+        catch: toDbError,
+      });
+      const runners = rows.length === 0 ? [] : yield* runnersOf(db, rows.map((row) => row.id));
+      return rows.map((row) => scanRowToStatus(row, [], null, runners.find((runner) => runner.scanId === row.id) ?? null));
+    }),
 
   // -----
   // How many live scans each path holds, over every Account. It

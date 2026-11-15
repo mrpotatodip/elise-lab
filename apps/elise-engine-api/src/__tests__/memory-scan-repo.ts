@@ -22,7 +22,7 @@ export function memoryScanRepo() {
   const rows = new Map<string, ScanStatus>();
   const files = new Map<string, StoredFile>();
   const repos = new Map<string, RepoRecord>();
-  const onRunner = new Set<string>();
+  const onRunner = new Map<string, string>();
 
   const artifactsOf = (scanId: string) =>
     [...files.values()]
@@ -48,7 +48,7 @@ export function memoryScanRepo() {
       Effect.suspend(() => {
         const live = [...rows.values()].find((row) => row.repoId === repoId && isLive(row, nowMs));
         if (live) return Effect.fail(new Conflict({ message: `This repo already has an active scan: ${live.scanId}` }));
-        if (params.runnerId !== undefined) onRunner.add(params.scanId);
+        if (params.runnerId !== undefined) onRunner.set(params.scanId, params.runnerId);
         const now = new Date().toISOString();
         rows.set(params.scanId, {
           scanId: params.scanId,
@@ -114,7 +114,15 @@ export function memoryScanRepo() {
         const row = rows.get(scanId);
         return row && row.accountId === accountId ? withFiles(row) : null;
       }),
-    activeSince: (accountId, nowMs) => Effect.sync(() => [...rows.values()].filter((row) => row.accountId === accountId && isLive(row, nowMs)).map(withFiles)),
+    activeSince: (accountId, nowMs) =>
+      Effect.sync(() =>
+        [...rows.values()]
+          .filter((row) => row.accountId === accountId && isLive(row, nowMs))
+          .map((row) => {
+            const runnerId = onRunner.get(row.scanId);
+            return { ...withFiles(row), runner: runnerId === undefined ? null : { id: runnerId, name: "runner" } };
+          }),
+      ),
     activeCounts: (nowMs) =>
       Effect.sync(() => {
         const ours = [...rows.values()].filter((row) => isLive(row, nowMs) && !onRunner.has(row.scanId));

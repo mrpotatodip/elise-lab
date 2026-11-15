@@ -139,6 +139,43 @@ describe("createScanSvc", () => {
       expect(createdFull).toHaveLength(0);
     });
 
+    describe("when a Scan on a Runner runs the full Skill (RUNNER_FULL_SCANS)", () => {
+      const FULL_ON = { RUNNER_FULL_SCANS: "true" };
+
+      it("counts it on MAX_ACTIVE_SCANS of its Account and refuses the next one", async () => {
+        const { env } = fakeBindings({ ...FULL_ON, MAX_ACTIVE_SCANS: "1" });
+        await startOnRunnerOk(env, "acme", "a");
+
+        expect(await startOnRunner(env, "acme", "b")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("lite scans (limit 1)") });
+        expect(await startOnRunnerOk(env, "other", "c")).toMatchObject({ status: "queued" });
+      });
+
+      it("meets neither the full limit of its Account nor the global caps", async () => {
+        const { env, createdFull } = fakeBindings({ ...FULL_ON, MAX_ACTIVE_FULL_SCANS: "0", MAX_GLOBAL_FULL_SCANS: "0" });
+        const queued = await startOnRunnerOk(env, "acme", "a");
+
+        expect(queued).toMatchObject({ status: "queued", skill: "full" });
+        expect(createdFull).toHaveLength(1);
+      });
+
+      it("does not use up the place of a full Scan in our cloud, nor the platform's", async () => {
+        const { env, createdFull } = fakeBindings({ ...FULL_ON, MAX_GLOBAL_FULL_SCANS: "1" });
+        await startOnRunnerOk(env, "other", "a");
+        await startOnRunnerOk(env, "acme", "b");
+        await startOk(env, "acme", "c");
+
+        expect(createdFull).toHaveLength(3);
+        expect(await start(env, "someone", "d")).toMatchObject({ code: "SCAN_WORKER_BUSY" });
+      });
+
+      it("is not held back by a full Scan of its Account in our cloud", async () => {
+        const { env } = fakeBindings({ ...FULL_ON, MAX_ACTIVE_SCANS: "1" });
+        await startOk(env, "acme", "a");
+
+        expect(await startOnRunnerOk(env, "acme", "b")).toMatchObject({ status: "queued", skill: "full" });
+      });
+    });
+
     it("does not let a live scan on a Runner use up the Account's place in our cloud, or the platform's", async () => {
       const { env, createdFull } = fakeBindings({ MAX_GLOBAL_FULL_SCANS: "1" });
       await startOnRunnerOk(env, "other", "a");
@@ -369,6 +406,39 @@ describe("createScanSvc: a Runner", () => {
     await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, skill: "full" }, NO_SPEND, undefined, hold, connected));
 
     expect({ lite: created.length, full: createdFull.length }).toEqual({ lite: 1, full: 0 });
+  });
+
+  describe("once the Runner app can run the full Skill (RUNNER_FULL_SCANS)", () => {
+    const FULL_ON = { RUNNER_FULL_SCANS: "true" };
+
+    it.each([
+      ["is off when the variable is not set", {}, { lite: 1, full: 0 }],
+      ["is off when the variable says false", { RUNNER_FULL_SCANS: "false" }, { lite: 1, full: 0 }],
+      ["is on when the variable says true", FULL_ON, { lite: 0, full: 1 }],
+    ])("the switch %s", async (_name, overrides, expected) => {
+      const { env, created, createdFull } = fakeBindings(overrides);
+      const queued = await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, NO_SPEND, undefined, hold, connected));
+
+      expect({ lite: created.length, full: createdFull.length }).toEqual(expected);
+      expect(queued.skill).toBe(expected.full === 1 ? "full" : "lite");
+    });
+
+    it("keeps the Runner's own ceiling and takes no credit, no Plan and no monthly budget", async () => {
+      held.length = 0;
+      const { env, createdFull } = fakeBindings({ ...FULL_ON, BILLING_ENFORCED: "true" });
+      const spend = onPlan({ creditBalanceUsd: 0 }, { spentUsd: 500, budgetOverrideUsd: 10 });
+      await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, profile: "deep" }, spend, undefined, hold, connected));
+
+      expect(held).toEqual([]);
+      expect(createdFull[0].params).toMatchObject({ runnerId: RUNNER, keySource: "account", options: { skill: "full", profile: "deep", maxBudgetUsd: 50 } });
+    });
+
+    it("refuses a limit above the Runner's ceiling", async () => {
+      const { env } = fakeBindings(FULL_ON);
+      const failure = await Effect.runPromise(Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, max_budget_usd: 60 }, NO_SPEND, undefined, hold, connected)));
+
+      expect(failure._tag).toBe("Invalid");
+    });
   });
 
   it("gives a scan on a runner the safety cap by default and refuses a limit above it", async () => {

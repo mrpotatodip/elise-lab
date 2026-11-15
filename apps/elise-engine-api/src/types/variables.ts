@@ -24,6 +24,7 @@ export type Bindings = {
   MONTHLY_BUDGET_USD: string;
   BUDGET_ALLOWANCE_USD: string;
   BILLING_ENFORCED: string;
+  RUNNER_FULL_SCANS?: string;
   ANTHROPIC_API_KEY: string;
   KEY_ENCRYPTION_SECRET?: string;
   SCAN_API_TOKEN: string;

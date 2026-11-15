@@ -170,6 +170,21 @@ describe("neonScanRepo", () => {
     expect(refused).toMatchObject({ _tag: "Conflict", message: "This repo already has an active scan: win-full" });
   });
 
+  it("says which live scans of the account are on a Runner, so a limit can count them apart", async () => {
+    const repo = neonScanRepo(test.http);
+    await queue(repo, paramsFor(acme, "act-cloud"));
+    await queue(repo, paramsFor(acme, "act-on-runner"));
+    const [runner] = await test.raw.insert(tenantRunners).values({ tenantId: acme, name: "desk", createdBy: acmePartyId }).returning();
+    await test.raw
+      .insert(scanRunnerJobs)
+      .values({ tenantId: acme, scanId: "act-on-runner", runnerId: runner.id, state: "queued", repoUrl: "https://github.com/octocat/act-on-runner", prompt: "p", optionsJson: "{}", priorsJson: "[]" });
+
+    const active = await Effect.runPromise(repo.activeSince(acme, Date.now()));
+
+    expect(active.find((scan) => scan.scanId === "act-on-runner")?.runner).toEqual({ id: runner.id, name: "desk" });
+    expect(active.find((scan) => scan.scanId === "act-cloud")?.runner ?? null).toBeNull();
+  });
+
   it("counts the live scans of every account on each path, and leaves out a scan that is on a Runner", async () => {
     const repo = neonScanRepo(test.http);
     const before = await Effect.runPromise(repo.activeCounts(Date.now()));
