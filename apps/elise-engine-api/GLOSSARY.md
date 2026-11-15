@@ -47,23 +47,27 @@ The Claude Code program that runs inside the container and reads the repo.
 _Avoid_: Bot, AI
 
 **Skill**:
-A folder of written instructions the agent follows. We have `lite` and `full`.
+A folder of written instructions the agent follows. We have `lite` and `full`. Every new Scan in our cloud runs `full`, whatever the request sent; the Profile sets how much it covers, not the Skill. `lite` stays for old rows, for Scans already running, and for Runner Scans until `RUNNER_FULL_SCANS` is on.
 _Avoid_: Prompt, plugin
+
+**Profile**:
+How much audit a Scan is asked for: `quick`, `standard` or `deep` (the dashboard says Focused, Balanced and Exhaustive). It sets the Scan's Budget cap (`SCAN_PROFILE_CAPS_USD`) and its Verdict weight. No Profile means `quick`. ADR 0006 holds the caps.
+_Avoid_: Tier, level, Effort (how hard the agent thinks), Skill
 
 **Step**:
 Where a running Scan is: `cloning`, `auditing` or `saving`. It is null when the Scan has not started or has ended. A full Scan is in the `auditing` Step through all four of its Phases: a Phase is a part of the audit, never a Step.
 _Avoid_: Phase (a Phase is one of recon, hunt, check or report)
 
 **Phase**:
-One of the four Detached runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. Each has its own slice of the Budget cap, its own meter in the Outbound handler and its own time limit. Only a full Scan has Phases; a lite Scan is one run. ADR 0006 holds the rules.
+One of the four Detached runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. They share the one pool of the Scan's Budget cap, and no Phase has a share of its own. Each has its own time limit. Only a full Scan has Phases; a lite Scan is one run. ADR 0006 holds the rules.
 _Avoid_: Step (that is cloning, auditing or saving), stage
 
 **Partial Scan**:
-A full Scan that ran out of money in `hunt` or `check` and still ended with a Report and a findings file that say it is partial and name the units it did not cover. It is charged only what was metered. It is not a failed Scan.
+A profile Scan (any Profile) that ran out of money while the Skill could still write its files, so it ended with a Report that starts `PARTIAL:` and a findings file, both naming the units it did not cover. It is charged only what was metered. It is not a failed Scan. It weighs 0 in a Verdict, and its findings still count as open. A Scan that spends its whole Budget cap with no Report fails instead.
 _Avoid_: Incomplete, failed Scan
 
 **Full worker**:
-The path a Scan takes when it uses the `full` Skill: its own Workflow, its own Sandbox class and its own Image, inside the same Worker as the lite path. It has limits of its own, so a long full Scan never blocks a lite Scan. ADR 0006 holds the decisions.
+The path every new Scan in our cloud takes, since each runs the `full` Skill: its own Workflow, its own Sandbox class and its own Image, inside the same Worker as the lite path. It has limits of its own, so a long full Scan never blocks a lite Scan. ADR 0006 holds the decisions.
 _Avoid_: Full server, second Worker (it is one Worker with two paths)
 
 **Usage**:
@@ -85,24 +89,28 @@ One repo an Account scans, kept once per Account (`scan_repos`) however its URL 
 _Avoid_: Project, target
 
 **Branch**:
-A line of code of a Repo that has a History of its own (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a Scan of it succeeds and the Repo has a free slot, or when a person adds it. The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row. A new Branch starts with an empty History.
+A line of code of a Repo that has a History of its own (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a `lite` Scan of it succeeds and the Repo has a free slot, or when a person adds it. A profile Scan resolves no Branch today, a known gap (ADR 0004). The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row. A new Branch starts with an empty History.
 _Avoid_: Ref (a ref can also be a tag or a commit)
 
 **One-off Scan**:
-A Scan that ends with no Branch: its `ref` is a tag or a commit, the clone was on a detached HEAD, or the Repo has no free slot. It records its Findings and can count toward a Verdict, but it has no Prior findings and no History, and it saves the reason (`untracked_reason`). A `ref` is fetched as a branch first (`refs/heads/NAME`), so a tag with the same name as a branch is never read by mistake.
+A `lite` Scan that ends with no Branch: its `ref` is a tag or a commit, the clone was on a detached HEAD, or the Repo has no free slot. It records its Findings and can count toward a Verdict, but it has no Prior findings and no History, and it saves the reason (`untracked_reason`). A `ref` is fetched as a branch first (`refs/heads/NAME`), so a tag with the same name as a branch is never read by mistake.
 
 **History**:
-Where a Branch's problems stand across its Scans (`scan_repo_findings`), one row per fingerprint, with the Scan that first and last saw it. The state is `open`, `fixed_by_code` (a Scan checked and it was gone) or `regressed` (it was fixed and came back). Only a succeeded `lite` Scan of a tracked Branch changes it, and only inside the transaction that records the Scan.
+Where a Branch's problems stand across its Scans (`scan_repo_findings`), one row per fingerprint, with the Scan that first and last saw it. The state is `open`, `fixed_by_code` (a Scan checked and it was gone) or `regressed` (it was fixed and came back). Only a succeeded `lite` Scan of a tracked Branch changes it, and only inside the transaction that records the Scan. It is frozen: profile Scans never change it, and the open counts of a Repo and its Branches come from it.
 
 **Prior finding**:
-An unresolved problem from the History that the Worker hands the agent (`prior-findings.json`, at most 50, worst first) to re-check before it hunts for new ones. Its `priorId` is its fingerprint. The list is saved with the Scan (`prior-findings.json`), and the answer is judged against it. A one-off Scan gets none. Resolved means fixed by code, or marked fixed, false positive or accepted risk by a person.
+An unresolved problem from the History that the Worker hands the agent (`prior-findings.json`, at most 50, worst first) to re-check before it hunts for new ones. Its `priorId` is its fingerprint. The list is saved with the Scan (`prior-findings.json`), and the answer is judged against it. A one-off Scan and a profile Scan get none. Resolved means fixed by code, or marked fixed, false positive or accepted risk by a person.
 
 **Carried finding**:
 A Prior finding the agent re-checked and still saw. It is repeated in the Scan's `findings.json` with its `priorId` and keeps its fingerprint, so a reworded title does not make it new. A Prior the agent did not answer for stays open and `unchecked`: a problem is closed only by evidence, never by silence.
 
 **Verdict**:
-The answer to "can this commit ship?": `pass`, `fail` or `cannot_tell`. It belongs to one commit and is computed on each request from the Scans of that commit. `pass` means the Scans found nothing over the limit, never that the commit is safe. `cannot_tell` means the Scans cannot be trusted yet (fewer than 2, or a Prior finding left unchecked). Only `pass` ships.
+The answer to "can this commit ship?": `pass`, `fail` or `cannot_tell`. It belongs to one commit and is computed on each request from the Scans of that commit. `pass` means the Scans found nothing over the limit, never that the commit is safe. `cannot_tell` means the Scans cannot be trusted yet (their Verdict weight is below 1, or a Prior finding was left unchecked). Only `pass` ships.
 _Avoid_: Acceptance rate, score, safe
+
+**Verdict weight**:
+How much one succeeded Scan adds to the Verdict of its commit: `quick` 0.5, `standard` 1, `deep` 1, and an old `lite` Scan 1 (`VERDICT_SCAN_WEIGHTS`). The weight is read from the Skill first, so a `lite` Scan weighs 1 whatever its Profile. A Partial Scan weighs 0, and so does an older full Scan whose findings were never recorded. A commit has a Verdict when its Scans weigh 1 or more (`VERDICT_MIN_SCANS`).
+_Avoid_: Points, score
 
 **Accepted risk**:
 A Finding that a signed-in `tenant_admin` or `workspace_admin` chose to ship with. It has a reason, a name in the Audit trail and an end date of at most 90 days. The Verdict lists it until the end date, and after that it blocks again.
@@ -139,16 +147,16 @@ A value stored in the Worker, not in git, such as `ANTHROPIC_API_KEY` or `SCAN_A
 _Avoid_: Env var (an env var is not always secret)
 
 **Budget cap**:
-The most dollars the agent may spend in one scan (`--max-budget-usd`). The ceiling is `MAX_BUDGET_USD`.
+The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`, provisional). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` is the ceiling that guards that table for full Scans. Lite requests keep `MAX_BUDGET_USD` (and `MAX_BUDGET_OWN_KEY_USD` on the Account's own key) until the lite path is removed. ADR 0006 holds the rules.
 _Avoid_: Limit, quota
 
 **Monthly budget**:
-An optional guard on the dollars an Account may spend on scans in a UTC calendar month: `tenants.monthly_scan_budget_usd`, or `MONTHLY_BUDGET_USD` when the Account has no Plan and no own key. On a Plan it applies only once an admin with the Power `company:usage:budget:update` sets it, and it counts in credit dollars (cost times the Plan's markup). A new scan is refused with `MONTHLY_BUDGET_EXCEEDED` when spent plus the cap of running scans plus its own cap would pass it. For a full Scan the refusal names the biggest smaller profile whose cap would fit, or says the budget is too low for any profile and what is left.
+An optional guard on the dollars an Account may spend on scans in a UTC calendar month: `tenants.monthly_scan_budget_usd`. On a Plan it applies only once an admin with the Power `company:usage:budget:update` sets it, and it counts in credit dollars (cost times the Plan's markup). A new scan is refused with `MONTHLY_BUDGET_EXCEEDED` when spent plus the cap of running scans plus its own cap would pass it. For a full Scan the refusal names the biggest smaller profile whose cap would fit, or says the budget is too low for any profile and what is left. The default monthly budget (`MONTHLY_BUDGET_USD`) no longer applies to a new Scan: a Plan Account has only the admin's override, and an Account with no Plan and no key of its own is refused before the budget is read.
 _Avoid_: Quota
 
 **Budget allowance**:
 The most an admin may set as the Monthly budget: `tenants.monthly_scan_budget_allowance_usd`, or `BUDGET_ALLOWANCE_USD` (a sanity maximum) when unset. Only the operator changes it. It does not decide what the platform's key may spend: the credit balance does.
-_Avoid_: Ceiling (that is the Budget cap's `MAX_BUDGET_USD`), limit
+_Avoid_: Ceiling (the ceiling of a Budget cap is in its own entry), limit
 
 **Plan**:
 What an Account pays for: Pro (`pro`, $49 a month, $49 of Included credit) or Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month), a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap (5). The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
