@@ -330,19 +330,17 @@ function RepoFindings({ repoId, branch, commit, history }: { repoId: string; bra
           (selectedFinding.state === "fixed_by_code" ? (
             <p className="text-sm text-muted-foreground">No decision is needed: a scan confirmed the fix.</p>
           ) : (
-            <div className="grid gap-1">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">Your decision</span>
-                <FindingTriageSelect
-                  finding={selectedFinding}
-                  also={[repoKeys.detail(repoId), findingCommentKeys.thread(selectedFinding.repo, selectedFinding.fingerprint)]}
-                  onSaved={decided}
-                />
-              </div>
-              <p className="text-sm leading-normal text-muted-foreground">Your choice is added to the discussion with your name.</p>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">Your decision</span>
+              <FindingTriageSelect
+                finding={selectedFinding}
+                also={[repoKeys.detail(repoId), findingCommentKeys.thread(selectedFinding.repo, selectedFinding.fingerprint)]}
+                onSaved={decided}
+              />
             </div>
           ))
         }
+        decisionHint={selectedFinding && selectedFinding.state !== "fixed_by_code" && <p className="text-sm leading-normal text-muted-foreground">Your choice is added to the discussion with your name.</p>}
       />
     </Card>
   );
