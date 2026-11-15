@@ -13,7 +13,7 @@ import type { Finding, Verdict, VerdictFinding } from "../schemas";
 import { ScanFindingSheet } from "./scan-finding-sheet";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanVerdictRun } from "./scan-verdict-run";
-import { scanPlural } from "../utils";
+import { scanPlural, verdictScansToRun } from "../utils";
 import { ScanSeverityBadge } from "./scan-severity-badge";
 
 export const VERDICT_COPY = {
@@ -189,8 +189,8 @@ function verdictChecks(verdict: Verdict): Check[] {
 
   return [
     {
-      label: `At least ${scanPlural(scans.required, "scan", "scans")} of this commit`,
-      detail: missing === 0 ? `This commit has ${scanPlural(scans.counted, "scan", "scans")}.` : `${scans.counted} of ${scans.required} so far. Run ${missing} more scan${missing === 1 ? "" : "s"} of this exact commit. Only finished lite scans count.`,
+      label: `Scans of this commit that add up to ${scans.required}`,
+      detail: missing === 0 ? `The scans of this commit add up to ${scans.counted}.` : `${scans.counted} of ${scans.required} so far. Run ${scanPlural(verdictScansToRun(missing), "more scan", "more scans")} of this exact commit. A Focused scan counts 0.5, a Balanced or Exhaustive scan counts 1, and a scan that ran out of money counts 0. Only finished scans count.`,
       state: missing === 0 ? "ok" : "wait",
     },
     {
@@ -215,7 +215,7 @@ export function verdictNextSteps(verdict: Verdict): string {
   const { scans, limits, counts, reasons } = verdict;
   const missing = Math.max(0, scans.required - scans.counted);
   const steps: string[] = [];
-  if (missing > 0) steps.push(`run ${scanPlural(missing, "more scan", "more scans")} of this commit`);
+  if (missing > 0) steps.push(`run ${scanPlural(verdictScansToRun(missing), "more scan", "more scans")} of this commit`);
   if (reasons.some((reason) => HISTORY_CODES.has(reason.code))) steps.push("scan again so earlier problems get re-checked");
   const overLimit = (counts.critical > limits.critical ? counts.critical : 0) + (counts.high > limits.high ? counts.high : 0) + (counts.medium > limits.medium ? counts.medium : 0);
   if (overLimit > 0) steps.push(`fix or accept ${scanPlural(overLimit, "problem", "problems")} over the limits`);
@@ -287,7 +287,7 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
       {repoUrl && (
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg border bg-muted/50 p-4">
           <div className="grid min-w-0 flex-1 basis-64 gap-1">
-            <p className="text-sm font-medium">{needsScan ? `Next step: scan this commit ${missing === 1 ? "once more" : `${missing} more times`}` : "Want another look at this exact commit?"}</p>
+            <p className="text-sm font-medium">{needsScan ? `Next step: scan this commit ${verdictScansToRun(missing) === 1 ? "once more" : `${verdictScansToRun(missing)} more times`}` : "Want another look at this exact commit?"}</p>
             <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Scans exactly {verdict.commit.slice(0, 7)}, even if the branch has moved on. The worst result counts.</p>
           </div>
           <div className="flex flex-wrap items-start gap-3">
