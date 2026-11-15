@@ -1,9 +1,8 @@
 import { sql } from "drizzle-orm";
 import { buildApp } from "#/index";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
-import { memoryScanRepo } from "#/__tests__/memory-scan-repo";
-import { noGithubAccess } from "#/__tests__/no-github-access";
 import type { TestDb } from "#/__tests__/test-db";
+import { testDeps } from "#/__tests__/test-deps";
 
 // -----
 // The route's real wrapper runs the job as the elise_app role with
@@ -13,25 +12,17 @@ import type { TestDb } from "#/__tests__/test-db";
 // test opens its database in beforeAll, after the app is built.
 // -----
 export const tenantRouteApp = (openDb: () => TestDb) =>
-  buildApp({
-    scanRepo: () => memoryScanRepo().repo,
-    githubAccess: noGithubAccess,
-    monthSpend: async () => ({ spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: false, plan: null }),
-    holdCredit: async () => ({ held: true, balanceUsd: 0 }),
-    releaseCredit: async () => ({ settled: true, chargeUsd: 0 }),
-    sessionUserId: async () => undefined,
-    userHasAccount: async () => true,
-    userHasPower: async () => true,
-    enqueueInviteEmail: async () => undefined,
-    enqueuePasswordResetEmail: async () => undefined,
-    withTenant: (_c, accountId, run) =>
-      openDb().raw.transaction(async (tx) => {
-        await tx.execute(sql`set local role elise_app`);
-        await tx.execute(sql`select set_config('app.tenant_id', ${accountId}, true)`);
-        // SAFETY: the pglite transaction answers the same calls as the pg transaction the route's real wrapper passes.
-        return run(tx as never);
-      }),
-  }).app;
+  buildApp(
+    testDeps({
+      withTenant: (_c, accountId, run) =>
+        openDb().raw.transaction(async (tx) => {
+          await tx.execute(sql`set local role elise_app`);
+          await tx.execute(sql`select set_config('app.tenant_id', ${accountId}, true)`);
+          // SAFETY: the pglite transaction answers the same calls as the pg transaction the route's real wrapper passes.
+          return run(tx as never);
+        }),
+    }),
+  ).app;
 
 export type TenantRouteApp = ReturnType<typeof tenantRouteApp>;
 
