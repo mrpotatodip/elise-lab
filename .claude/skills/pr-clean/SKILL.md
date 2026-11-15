@@ -14,13 +14,17 @@ Queue the merge: `gh pr merge <n> --squash --delete-branch --auto`. GitHub then 
 
 With auto-merge queued, `gh pr checks <n> --watch` waits for the check, then poll `gh pr view <n> --json state -q .state` until it prints `MERGED`.
 
+`main` requires the branch to be current (`strict`), so a merge can answer `the head branch is not up to date` (`mergeStateStatus` is `BEHIND`) after the check passed, because `main` moved meanwhile. Then run the chain once, in the branch's worktree: `git fetch && git merge origin/main`, `git push`, `gh pr checks <n> --watch`, `gh pr merge <n> --squash --delete-branch`. A merge that conflicts is a file to resolve, and the choice of side is the user's: show the file and ask first. Never `--admin`.
+
 Done when it prints `MERGED`. If a check fails, or the PR is still `OPEN` after the watch, report which check and stop: steps 2 to 4 wait for the merge, and a later `/pr-clean` run resumes here.
 
 ## 2. Remove the worktree
 
-`git worktree remove .claude/worktrees/<name>`. Git refuses a worktree with uncommitted edits; report them and stop.
+A dev server started inside the worktree keeps recreating `node_modules/.vite` there after the removal. Find it first: `lsof -nP -iTCP -sTCP:LISTEN` and `lsof -p <pid> | grep cwd`. A process whose `cwd` is inside the worktree is the user's, so ask before `kill <pid>`.
 
-Done when `git worktree list` no longer shows it.
+`git worktree remove .claude/worktrees/<name>`. Git refuses a worktree with uncommitted edits; report them and stop. The audit evidence under `.review/` goes with the worktree: copy it out first when the user may want it.
+
+Done when `git worktree list` no longer shows it and `ls .claude/worktrees/<name>` finds nothing. A folder of only cache files is a leftover: look at it, then `rm -r` it.
 
 ## 3. Delete the local branch
 
