@@ -2,26 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "#/index";
 import type { Bindings } from "#/types/variables";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "./fake-bindings";
-import { memoryScanRepo } from "./memory-scan-repo";
-import { noGithubAccess } from "./no-github-access";
-import { noTenantDb } from "./no-tenant-db";
+import { testDeps } from "./test-deps";
 
 let signedInUser: string | undefined;
 let managesAccount = false;
 
-const app = buildApp({
-  scanRepo: () => memoryScanRepo().repo,
-  githubAccess: noGithubAccess,
-  monthSpend: async () => ({ spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: false, plan: null }),
-  holdCredit: async () => ({ held: true, balanceUsd: 0 }),
-  releaseCredit: async () => ({ settled: true, chargeUsd: 0 }),
-  sessionUserId: async () => signedInUser,
-  userHasAccount: async () => true,
-  userHasPower: async () => managesAccount,
-  enqueueInviteEmail: async () => undefined,
-  enqueuePasswordResetEmail: async () => undefined,
-  withTenant: noTenantDb,
-}).app;
+const app = buildApp(testDeps({ sessionUserId: async () => signedInUser, userHasPower: async () => managesAccount })).app;
 
 const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const ID = "9b2f6c1e-3a4d-4e5f-8a7b-1c2d3e4f5a6b";
