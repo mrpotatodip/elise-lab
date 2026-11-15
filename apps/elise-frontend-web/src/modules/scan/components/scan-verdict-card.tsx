@@ -1,7 +1,7 @@
 import { useId, useState, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
-import { ChevronRight, ChevronUp, CircleCheck, CircleDashed, CircleHelp, CircleX, ExternalLink, OctagonX } from "lucide-react";
+import { ChevronRight, ChevronUp, CircleCheck, CircleDashed, CircleHelp, CircleX, OctagonX } from "lucide-react";
 import { cn } from "#/lib/utils";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { Alert, AlertDescription } from "#/components/ui/alert";
@@ -355,32 +355,6 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
 
 type ScanVerdictCardProps = { repoId: string; commit: string; repoUrl?: string; found?: number; scope?: "scan" | "branch"; branchOpen?: number; Decision?: DecideFinding; compactFindings?: boolean; findingsHref?: string };
 
-const CHIP_CLASS = "inline-flex min-h-6 items-center gap-1.5 rounded-md border bg-background px-2 py-0.5 text-sm";
-
-function CommitChip({ commit, repoUrl }: { commit: string; repoUrl?: string }) {
-  const short = commit.slice(0, 7);
-  const label = (
-    <>
-      <span className="text-muted-foreground">Commit</span>
-      <span className="font-mono">{short}</span>
-    </>
-  );
-  if (!repoUrl) return <span className={CHIP_CLASS} title="The exact commit this answer is for">{label}</span>;
-  return (
-    <a
-      href={`${repoUrl.replace(/\.git$/, "").replace(/\/$/, "")}/commit/${commit}`}
-      target="_blank"
-      rel="noreferrer"
-      title="The exact commit this answer is for. Open it on GitHub."
-      aria-label={`Open commit ${short} on GitHub`}
-      className={`${CHIP_CLASS} transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-    >
-      {label}
-      <ExternalLink aria-hidden="true" className="size-3 text-muted-foreground" />
-    </a>
-  );
-}
-
 export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan", branchOpen, Decision, compactFindings = false, findingsHref }: ScanVerdictCardProps) {
   const { data, isPending, error } = useQuery(verdictQuery(repoId, commit));
   const nextSteps = data && verdictNextSteps(data);
@@ -394,10 +368,7 @@ export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan"
           {scope === "scan" && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The answer belongs to the commit, not to this scan.</p>}
           {found === 0 && data && data.open.length > 0 && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">This scan found nothing. The open problems below come from other scans of the same commit.</p>}
         </div>
-        <div className="flex flex-wrap items-start gap-3">
-          <CommitChip commit={commit} repoUrl={repoUrl} />
-          {data && repoUrl && <VerdictRescan verdict={data} repoId={repoId} repoUrl={repoUrl} />}
-        </div>
+        {data && repoUrl && <VerdictRescan verdict={data} repoId={repoId} repoUrl={repoUrl} />}
       </CardHeader>
       <CardContent className="grid gap-4">
         {isPending ? <Skeleton className="h-16" /> : error ? <p className="text-sm text-destructive">We could not load the verdict: {error.message}. Refresh to try again.</p> : <VerdictBody verdict={data} repoId={repoId} repoUrl={repoUrl} branchOpen={branchOpen} Decision={Decision} compactFindings={compactFindings} findingsHref={findingsHref} />}
