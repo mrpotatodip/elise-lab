@@ -89,9 +89,9 @@ function ThreadEvent({ event, viewerPartyId, canWrite, canDelete, editingComment
 }
 
 // -----
-// The Discussion section of a finding's detail sheet: the thread,
-// oldest first, with the composer under it. A person who can read
-// but not write sees the thread and no composer.
+// The body of a finding's discussion sheet: the thread, oldest first,
+// with the composer under it. A person who can read but not write sees
+// the thread and no composer.
 // -----
 export function FindingCommentThread({ repo, fingerprint }: FindingCommentThreadProps) {
   const { user } = useRouteContext({ from: "/_app" });
@@ -102,10 +102,7 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
   const editComment = (commentId: string, body: string) => edit.mutateAsync({ commentId, body }).then(() => true, () => false);
 
   return (
-    <section aria-labelledby="finding-discussion-title" className="grid gap-4 border-t pt-6">
-      <h3 id="finding-discussion-title" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Discussion
-      </h3>
+    <section aria-label="Comments" className="grid gap-4">
       {thread.isPending && <Skeleton className="h-16 w-full" />}
       {thread.isError && (
         <Alert variant="destructive">

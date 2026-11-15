@@ -15,7 +15,6 @@ type ScanFindingSheetProps = {
   status?: ReactNode;
   facts?: ReactNode;
   decision?: ReactNode;
-  discussion?: ReactNode;
 };
 
 // -----
@@ -24,7 +23,7 @@ type ScanFindingSheetProps = {
 // without going back to the list. The list keeps the selection, so closing
 // the panel leaves the reviewer where they were.
 // -----
-export function ScanFindingSheet({ findings, selected, onSelect, status, facts, decision, discussion }: ScanFindingSheetProps) {
+export function ScanFindingSheet({ findings, selected, onSelect, status, facts, decision }: ScanFindingSheetProps) {
   const [closing, setClosing] = useState(false);
   const finding = selected === undefined ? undefined : findings[selected];
   const hasPrevious = selected !== undefined && selected > 0;
@@ -80,7 +79,6 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
                   {facts}
                 </dl>
               )}
-              {discussion}
             </SheetBody>
             <SheetFooter>
               <div className="flex items-center gap-3">{decision}</div>

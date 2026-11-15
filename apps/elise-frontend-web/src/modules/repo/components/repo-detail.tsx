@@ -16,7 +16,7 @@ import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
-import { FindingCommentThread, findingCommentKeys } from "#/modules/finding-comment";
+import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup } from "#/modules/finding";
 import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
@@ -153,8 +153,9 @@ const decisionColumn = findingColumn.display({
     const { finding, repoId, fixedOn, onSaved } = row.original;
     return (
       <span className="grid justify-items-start gap-1.5">
-        {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId)]} onSaved={onSaved} />}
+        {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId), findingCommentKeys.thread(finding.repo, finding.fingerprint)]} onSaved={onSaved} />}
         <FindingDecisionNote state={finding.state} triage={finding.triage} fixedOn={fixedOn} />
+        <FindingDiscussionButton repo={finding.repo} fingerprint={finding.fingerprint} title={finding.title} />
       </span>
     );
   },
@@ -319,7 +320,6 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
         onSelect={setSelected}
         status={selectedFinding && <FindingStatusBanner state={selectedFinding.state} triage={selectedFinding.triage} fixedOn={fixedOnOf(selectedFinding, history)} />}
         facts={selectedFinding && <RepoFindingFacts finding={selectedFinding} history={history} />}
-        discussion={selectedFinding && <FindingCommentThread key={selectedFinding.fingerprint} repo={selectedFinding.repo} fingerprint={selectedFinding.fingerprint} />}
         decision={
           selectedFinding &&
           (selectedFinding.state === "fixed_by_code" ? (
@@ -444,7 +444,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
       </ShellPageHeader>
 
-      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} Discussion={FindingCommentThread} />}
+      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} Decision={RepoVerdictDecision} Discussion={FindingDiscussionButton} />}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">

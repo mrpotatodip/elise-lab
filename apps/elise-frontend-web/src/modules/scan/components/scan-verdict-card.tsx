@@ -30,7 +30,7 @@ export const VERDICT_COPY = {
 export type DecideFindingProps = { repoId: string; repoUrl: string; finding: VerdictFinding };
 export type DecideFinding = ComponentType<DecideFindingProps>;
 
-export type DiscussFindingProps = { repo: string; fingerprint: string };
+export type DiscussFindingProps = { repo: string; fingerprint: string; title: string };
 export type DiscussFinding = ComponentType<DiscussFindingProps>;
 
 type FindingRowsProps = {
@@ -104,7 +104,13 @@ const decidingColumns = column.columns([
     meta: { head: "w-56", cell: "align-top" },
     cell: ({ row }) => {
       const { finding, decide } = row.original;
-      return decide ? <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={finding} /> : null;
+      if (!decide) return null;
+      return (
+        <span className="grid justify-items-start gap-1.5">
+          <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={finding} />
+          {decide.Discussion && <decide.Discussion repo={decide.repoUrl} fingerprint={finding.fingerprint} title={finding.title} />}
+        </span>
+      );
     },
   }),
 ]);
@@ -157,7 +163,6 @@ function FindingRows({ title, hint, findings, decide, collapsed = false }: Findi
           findings={findings.map(sheetFinding)}
           selected={selectedFinding ? selected : undefined}
           onSelect={setSelected}
-          discussion={selectedFinding && decide.Discussion && <decide.Discussion key={selectedFinding.fingerprint} repo={decide.repoUrl} fingerprint={selectedFinding.fingerprint} />}
           decision={
             selectedFinding && (
               <div className="grid gap-1">
