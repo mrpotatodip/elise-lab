@@ -292,22 +292,23 @@ function OpenFindingsLink({ count, href, older, oneOffHint }: { count: number; h
 }
 
 // -----
-// The way to ask for another scan of this exact commit, next to the commit
-// chip. With scans still missing, one click runs the missing scan with the
-// settings of the last one, and the other button opens the options.
+// The buttons for the scans a verdict still lacks, in the card header. One
+// click runs the missing scan with the settings of the last one, and the
+// other opens the options. A verdict with every scan it needs has no button.
 // -----
 function VerdictRescan({ verdict, repoId, repoUrl }: { verdict: Verdict; repoId: string; repoUrl: string }) {
   const { scans } = verdict;
   const needsScan = scans.required - scans.counted > 0;
   const { data: list } = useQuery(scansQuery());
   const last = list?.scans.find((scan) => scan.scanId === scans.ids[0]);
+  if (!needsScan) return null;
   return (
     <div className="flex flex-wrap items-start gap-3">
-      {needsScan && last && <ScanVerdictRun repoId={repoId} repoUrl={repoUrl} commit={verdict.commit} last={last} />}
+      {last && <ScanVerdictRun repoId={repoId} repoUrl={repoUrl} commit={verdict.commit} last={last} />}
       <ScanNewDialog
-        label={needsScan && last ? "Choose options" : "Run another scan of this commit"}
+        label={last ? "Choose options" : "Run the missing scan"}
         size="sm"
-        variant={needsScan && !last ? "default" : "outline"}
+        variant={last ? "outline" : "default"}
         repo={repoUrl}
         startRef={verdict.commit}
         startOptions={last && { model: last.model === "claude-opus-5-5" ? undefined : last.model, effort: last.effort, skill: last.skill, profile: last.profile }}
