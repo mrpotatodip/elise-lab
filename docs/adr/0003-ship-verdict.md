@@ -1,6 +1,6 @@
 # Can this commit ship?
 
-How `GET /repos/:repoId/verdict?commit=<sha>` decides in `apps/elise-engine-api`. Terms: `apps/elise-engine-api/GLOSSARY.md` (Verdict, Accepted risk, Prior finding). Rules in code: `modules/verdict/utils/judge-commit.ts`.
+How `GET /repos/:repoId/verdict?commit=<sha>` decides in `apps/elise-engine-api`. Terms: `apps/elise-engine-api/GLOSSARY.md` (Verdict, Verdict weight, Partial Scan, Accepted risk, Prior finding). Rules in code: `modules/verdict/utils/judge-commit.ts`.
 
 ## What a Verdict claims
 
@@ -11,11 +11,12 @@ How `GET /repos/:repoId/verdict?commit=<sha>` decides in `apps/elise-engine-api`
 
 ## When it passes
 
-- **At least 1 succeeded `lite` Scan of the commit** (`VERDICT_MIN_SCANS`). It was 2 until 2026-11-12: one look can miss a problem and the agent differs from run to run. The person reads the Verdict and decides, so one Scan is enough to answer, and a person who wants a second look starts it. A Scan of a ref counts, because the Verdict is about the commit, not the branch. No Scan is `cannot_tell`. EliseLAB spends no tokens unasked.
+- **A weight of at least 1 from the succeeded Scans of the commit** (`VERDICT_MIN_SCANS`). Each Scan adds its weight (`VERDICT_SCAN_WEIGHTS`, in `packages/contracts/src/elise/constants.ts`): `quick` 0.5, `standard` 1, `deep` 1 and an old `lite` Scan 1. So two `quick` Scans, or one `standard` or `deep` Scan, give a Verdict, and one `quick` Scan gives `cannot_tell`. The minimum became weight 1 on 2026-11-12. One look can miss a problem and the agent differs from run to run, but the person reads the Verdict and decides, so one look is enough to answer, and a person who wants a second look starts it. A Scan of a ref counts, because the Verdict is about the commit, not the branch. No Scan is `cannot_tell`. EliseLAB spends no tokens unasked.
+- **A Scan's weight is read from its Skill first.** A `lite` Scan weighs 1 whatever its profile. A full Scan weighs its profile's weight only when its `partial` column is set, which every profile Scan recorded by the current code has. An older full Scan, whose findings were never recorded, weighs 0. A Partial Scan weighs 0, so it cannot make a commit pass by itself, but its findings still count as open. The newest Scans with a weight, taken until their weights reach the minimum, are the window that the unchecked-priors rules read.
 - **Findings are merged, never averaged.** A problem that any Scan of the commit found is open, at the worst severity any Scan gave it. A second Scan can only make the Verdict stricter. A single `not_found` in the History does not cancel a Finding that another Scan of the same commit saw.
-- **Every Prior finding was checked.** In the newest Scan, `priors_unchecked` is 0 and `priors_given` is below 50. At 50 the agent was asked about only the worst 50, so the Verdict cannot tell. Older Scans are not asked: a Scan that ran out of budget must not block a commit that a good Scan has since cleared.
+- **Every Prior finding was checked, in the window.** In each Scan of the window, `priors_unchecked` is 0 and `priors_given` is below 50. At 50 the agent was asked about only the worst 50, so the Verdict cannot tell. Older Scans are not read: a Scan that ran out of budget must not block a commit that a good Scan has since cleared. A profile Scan is given no Prior findings, so its counts are empty and the rule reads them as zero.
 - **Within the limit.** 0 critical, 0 high, at most 3 medium. A problem still `needs_validation` blocks until a person decides it. Low and informational never block. One fixed default for every account; per-account limits wait until someone needs them.
-- **Full Scans do not count (checked 2026-11-13).** The Verdict reads only `lite` Scans (`eq(scans.skill, "lite")` in `verdict-queries.ts`), so a full Scan never enters it, complete or partial, and a Partial Scan can never make a commit `pass`. If full Scans are ever counted, a Partial Scan (one whose ledger has a `deferred` unit with `money_exhausted`, or whose Report starts with `PARTIAL:`) must make the Verdict `cannot_tell`, because it did not cover the whole code.
+- **Every profile Scan counts (checked 2026-11-15).** The Verdict reads the succeeded Scans of the commit whatever their Skill or profile (`verdict-queries.ts` has no filter on the Skill), with their findings and decisions. It does not read the History, which is frozen. A Partial Scan adds no weight, but its findings count as open, so it can never make a commit `pass` on its own.
 
 `cannot_tell` wins over `fail`: the over-limit reason is still listed, but the Scans are not trusted yet.
 
