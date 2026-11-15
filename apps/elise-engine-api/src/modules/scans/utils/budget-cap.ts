@@ -1,5 +1,5 @@
 import { RUNNER_MAX_BUDGET_USD } from "#/modules/runners/constants";
-import { SCAN_PROFILE_CAPS_USD, type SCAN_PROFILES, type SCAN_SKILLS } from "#/constants";
+import { SCAN_PROFILE_CAPS_USD, SCAN_PROFILES, type SCAN_SKILLS } from "#/constants";
 import type { CreateScanEnv } from "#/modules/scans/types";
 
 type BudgetCap = { ok: true; defaultUsd: number; ceilingUsd: number } | { ok: false; message: string };
@@ -14,6 +14,19 @@ type BudgetCap = { ok: true; defaultUsd: number; ceilingUsd: number } | { ok: fa
 // wrong table never starts a Scan. A lite Scan keeps its two ceilings
 // (the platform's key and the Account's own) until #141 removes them.
 // -----
+// -----
+// What a refused full Scan tells the Account about the Monthly budget:
+// the biggest profile below the one asked for whose cap, times the
+// markup, fits in what is left (in credit dollars), or the sentence
+// that none does. It reads the same table as the caps.
+// -----
+export const budgetRefusalHintOf = (profile: (typeof SCAN_PROFILES)[number], leftUsd: number, markup: number): string => {
+  const smaller = SCAN_PROFILES.slice(0, SCAN_PROFILES.indexOf(profile)).toReversed();
+  const fits = smaller.find((name) => SCAN_PROFILE_CAPS_USD[name] * markup <= leftUsd);
+  if (fits) return `The ${fits} profile would fit`;
+  return `The monthly budget is too low for any profile: $${Math.max(0, leftUsd).toFixed(2)} is left`;
+};
+
 export const budgetCapOf = (
   env: Pick<CreateScanEnv, "MAX_BUDGET_USD" | "MAX_BUDGET_OWN_KEY_USD" | "MAX_BUDGET_FULL_USD">,
   scan: { skill: (typeof SCAN_SKILLS)[number]; profile: (typeof SCAN_PROFILES)[number]; onRunner: boolean; ownKeyScan: boolean },
