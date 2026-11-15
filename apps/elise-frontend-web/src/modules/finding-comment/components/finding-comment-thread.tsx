@@ -56,14 +56,16 @@ function EditableComment({ event, canEdit, canDelete, editPending, deleting, onE
   return <FindingCommentItem comment={event} markers={markers} actions={actions} editor={editor} />;
 }
 
-type ThreadEventProps = Omit<EditableCommentProps, "event" | "canEdit" | "canDelete"> & {
+type ThreadEventProps = Omit<EditableCommentProps, "event" | "canEdit" | "canDelete" | "editPending" | "deleting"> & {
   event: FindingThreadEvent;
   viewerPartyId: string | null;
   canWrite: boolean;
   canDelete: (comment: FindingComment) => boolean;
+  editingCommentId: string | null;
+  deletingCommentId: string | null;
 };
 
-function ThreadEvent({ event, viewerPartyId, canWrite, canDelete, editPending, deleting, onEdit, onDelete }: ThreadEventProps) {
+function ThreadEvent({ event, viewerPartyId, canWrite, canDelete, editingCommentId, deletingCommentId, onEdit, onDelete }: ThreadEventProps) {
   switch (event.kind) {
     case "comment":
       return (
@@ -71,8 +73,8 @@ function ThreadEvent({ event, viewerPartyId, canWrite, canDelete, editPending, d
           event={event}
           canEdit={canWrite && viewerPartyId !== null && event.authorPartyId === viewerPartyId && event.deletedAt === null}
           canDelete={event.body !== null && canDelete(event)}
-          editPending={editPending}
-          deleting={deleting}
+          editPending={editingCommentId === event.id}
+          deleting={deletingCommentId === event.id}
           onEdit={onEdit}
           onDelete={onDelete}
         />
@@ -118,8 +120,8 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
                 viewerPartyId={user?.partyId ?? null}
                 canWrite={canComment}
                 canDelete={(comment) => canDeleteAny || (canComment && comment.authorPartyId !== null && comment.authorPartyId === user?.partyId)}
-                editPending={edit.isPending}
-                deleting={remove.isPending}
+                editingCommentId={edit.isPending ? edit.variables.commentId : null}
+                deletingCommentId={remove.isPending ? remove.variables : null}
                 onEdit={editComment}
                 onDelete={(commentId) => remove.mutateAsync(commentId).then(() => undefined)}
               />

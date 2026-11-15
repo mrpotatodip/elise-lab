@@ -102,6 +102,13 @@ describe("what a comment may hold", () => {
     expect((await post("x".repeat(length))).status).toBe(status);
   });
 
+  it("refuses a comment from a session whose login has no Party, since there is no author to show", async () => {
+    signedIn = "no-such-login";
+    const res = await post("No one wrote this.");
+
+    expect([res.status, await threadBodies()]).toEqual([403, []]);
+  });
+
   it("refuses a comment on a fingerprint the Repo does not have", async () => {
     const res = await call("/findings/comments", { method: "POST", body: { repo: REPO, fingerprint: "c".repeat(64), body: "Nothing here." } });
 
@@ -154,6 +161,14 @@ describe("who may edit a comment", () => {
     const saved = z.object({ data: FindingCommentSchema }).parse(await res.json()).data;
 
     expect([res.status, saved.body, saved.authorName, saved.editedAt !== null, written.editedAt, await threadBodies()]).toEqual([200, "second draft", "Ada Rossi", true, null, ["second draft"]]);
+  });
+
+  it("keeps a comment unedited when the saved text is the text it already had", async () => {
+    const written = await writeAs("ada", "same text");
+    const res = await edit(written.id, "same text");
+    const saved = z.object({ data: FindingCommentSchema }).parse(await res.json()).data;
+
+    expect([res.status, saved.body, saved.editedAt]).toEqual([200, "same text", null]);
   });
 
   it("refuses another member, even one who holds the create Power, and keeps the text", async () => {
