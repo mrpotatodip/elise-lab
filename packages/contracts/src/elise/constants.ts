@@ -58,6 +58,13 @@ export const ACCEPTED_RISK_MAX_DAYS = 90;
 export const VERDICT_MIN_SCANS = 1;
 
 // -----
+// Finding comments: the longest body, and how many events
+// of a thread one answer holds
+// -----
+export const FINDING_COMMENT_BODY_MAX = 4000;
+export const FINDING_THREAD_EVENT_LIMIT = 200;
+
+// -----
 // Repos and branches: caps per Account and per Repo
 // -----
 export const REPO_LIMIT_PER_TENANT = 200;

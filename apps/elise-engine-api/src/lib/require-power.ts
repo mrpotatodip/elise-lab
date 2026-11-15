@@ -12,10 +12,15 @@ import type { AppEnv } from "#/types/variables";
 // writes name who made them. The dashboard server forwards the
 // user's session.
 // -----
+export const signedInUserId = async (c: Context<AppEnv>): Promise<string> => {
+  const userId = await c.get("deps").sessionUserId(c);
+  if (!userId) throw new UnauthorizedError();
+  return userId;
+};
+
 export const assertPower = async (c: Context<AppEnv>, power: AccessPower): Promise<string> => {
   const deps = c.get("deps");
-  const userId = await deps.sessionUserId(c);
-  if (!userId) throw new UnauthorizedError();
+  const userId = await signedInUserId(c);
 
   const header = AccountHeaderSchema.safeParse({ "x-account-id": c.req.header("x-account-id") });
   if (!header.success) throw new ValidationError("x-account-id: must be the ID of one of your accounts");

@@ -63,6 +63,14 @@ describe("userHasPowerEffect", () => {
     ["workspace_watcher", "company:team:members:read", false],
     ["workspace_watcher", "company:findings:accepted_risk:update", false],
     ["workspace_watcher", "company:assistant:threads:create", false],
+    ["tenant_admin", "company:findings:comments:create", true],
+    ["workspace_admin", "company:findings:comments:create", true],
+    ["workspace_member", "company:findings:comments:create", true],
+    ["workspace_watcher", "company:findings:comments:create", false],
+    ["tenant_admin", "company:findings:comments:delete", true],
+    ["workspace_admin", "company:findings:comments:delete", true],
+    ["workspace_member", "company:findings:comments:delete", false],
+    ["workspace_watcher", "company:findings:comments:delete", false],
   ])("%s holding %s is %s", async (userId, power, expected) => {
     expect(await has(userId, power)).toBe(expected);
   });

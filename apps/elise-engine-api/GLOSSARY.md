@@ -112,6 +112,18 @@ _Avoid_: Waiver, exception
 One security problem in `findings.json`, with a status of `confirmed` or `needs_validation`.
 _Avoid_: Bug, issue, vulnerability (until a person checks it)
 
+**decision**:
+A triage change to a Finding: its status (`open`, `fixed`, `false_positive` or `accepted_risk`) and its note (`scan_finding_triage`). It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
+_Avoid_: Verdict (that answers a whole commit), status (a Finding has two)
+
+**Comment**:
+Plain text a signed-in member wrote about a Finding (`scan_finding_comments`), at most 4,000 characters, kept with its author's Party. It belongs to the Repo and the Finding's fingerprint, so a rescan shows it again. It stays in the database and dashboard, never in the Report, a Scan file or GitHub. Writing one needs the Power `company:findings:comments:create`; the service token cannot.
+_Avoid_: Note (the decision has a note), reply
+
+**Discussion**:
+The thread of a Finding in the dashboard: its Comments, oldest first, in the detail sheet of the Repo page. Reading it needs the Dashboard Power (`GET /findings/comments`), so a Watcher never sees it.
+_Avoid_: Chat, conversation
+
 **Detached run**:
 Starting the agent in the background with its output in files, then polling for its exit code.
 _Avoid_: Async run
@@ -190,8 +202,16 @@ _Avoid_: Invitation, invite code (an invite code starts a whole new Account: `pl
 A named set of people in one Account, for example "Backend". It grants nothing: Powers still come from a Role. Names are unique per Account, ignoring case. Losing the Role in the Account removes the person from its Groups.
 _Avoid_: Team (the Team is the whole roster), squad
 
+**Power**:
+An action a Role may take, written as a colon path to a leaf of the access catalogue (`@repo/contracts/elise`), for example `company:team:groups:create`. A Role holds exact Powers: no wildcards, and a parent path grants nothing below it. A route asks for one and the Role's grants decide.
+_Avoid_: Permission, scope
+
+**Watcher**:
+A login whose Role is `workspace_watcher`: it holds only `company:summary:read`. It sees the Summary page and nothing behind the Dashboard Power, so it cannot read a Scan, a Discussion or a Verdict.
+_Avoid_: Viewer, guest
+
 **Audit trail**:
-`access_audit_log`. It holds Team invite and Group changes with the actor's Party, and the Tenant in `after`.
+`access_audit_log`. It holds every kind of change an Account makes to itself, each with the actor's Party and the Tenant in `after`: Team invites, Groups, triage decisions (`finding.triage.set`, `finding.risk.accepted`), comment deletes (`finding.comment.deleted`), GitHub installs, the monthly budget and the Anthropic key.
 
 **Party**:
 Any actor that the system knows. Its type is a row in `party_master_types`: a Person or an Organization.
