@@ -22,15 +22,15 @@ const branchAtTip = async (db: DbConnectType, accountId: string, repoId: string,
 
 // -----
 // What the agent is asked to re-check: the unresolved findings
-// of the branch it is reading, for the one skill whose findings
-// are recorded. A scan with no tracked branch (a tag, an older
-// commit, an untracked name, or a branch with no History yet)
-// gets none: its checkout is not the code a History is about.
-// A commit that is the latest of one tracked branch is that
-// branch's code, so it gets that branch's list.
+// of the branch it is reading. runScan asks only for a Scan of
+// the one skill whose findings move the History: a profile Scan
+// gets no priors (the History is frozen). A scan with no tracked
+// branch (a tag, an older commit, an untracked name, or a branch
+// with no History yet) gets none: its checkout is not the code a
+// History is about. A commit that is the latest of one tracked
+// branch is that branch's code, so it gets that branch's list.
 // -----
 const priorsOf = async (env: Bindings, params: ScanParams): Promise<PriorFinding[]> => {
-  if (params.options.skill !== "lite") return [];
   const db = dbConnect(env.DATABASE_URL);
   const scan = await runEffect(neonScanRepo(db).get(params.accountId, params.scanId));
   if (!scan) return [];

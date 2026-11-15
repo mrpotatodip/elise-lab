@@ -113,7 +113,7 @@ export const buildScanRecordSvc = (
     // -----
     // A succeeded full Scan records its findings and its partial
     // flag too, but writes no History row and gets no priors:
-    // that freeze is #137's.
+    // the History is frozen at the end of the lite era.
     // -----
     const profile = status === "succeeded" && params.options.skill === SCAN_RECORDS_PROFILE_SKILL ? yield* readProfileScan(reports, params) : null;
     const movesHistory = recordsFindings && branch.id !== null;
