@@ -137,7 +137,7 @@ export function ScanDetail({ scanId, Decision }: ScanDetailProps) {
       {succeeded && (
         <>
           <ScanSummary scan={scan} />
-          {scan.skill === "lite" && scan.commitSha && <ScanVerdictCard repoId={scan.repoId} commit={scan.commitSha} repoUrl={scan.repo} found={scan.summary?.total ?? 0} Decision={Decision} compactFindings={showFindings} />}
+          {scan.commitSha && <ScanVerdictCard repoId={scan.repoId} commit={scan.commitSha} repoUrl={scan.repo} found={scan.summary?.total ?? 0} Decision={Decision} compactFindings={showFindings} />}
           {scan.skill === "lite" && scan.branchId && <ScanChangeAlerts scanId={scanId} />}
           {scan.skill === "lite" && scan.branchId && (
             <Suspense fallback={<ScanDiffSkeleton />}>
