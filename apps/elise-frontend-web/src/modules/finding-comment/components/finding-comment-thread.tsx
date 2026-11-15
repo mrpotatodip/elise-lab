@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { hasAccessPower } from "@repo/contracts/elise";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
-import { Skeleton } from "#/components/ui/skeleton";
 import { useFindingCommentActions, useFindingThread } from "../hooks";
 import type { FindingComment, FindingThreadEvent } from "../schemas";
 import { hasLiveComment, isPendingComment } from "../utils";
@@ -11,6 +10,7 @@ import { FindingCommentComposer } from "./finding-comment-composer";
 import { FindingCommentDeleteDialog } from "./finding-comment-delete-dialog";
 import { FindingCommentEditForm } from "./finding-comment-edit-form";
 import { FindingCommentItem } from "./finding-comment-item";
+import { FindingCommentSkeleton } from "./finding-comment-skeleton";
 import { FindingCommentTime } from "./finding-comment-time";
 import { FindingDecisionItem } from "./finding-decision-item";
 
@@ -103,7 +103,7 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
 
   return (
     <section aria-label="Comments" className="grid gap-4">
-      {thread.isPending && <Skeleton className="h-16 w-full" />}
+      {thread.isPending && <FindingCommentSkeleton />}
       {thread.isError && (
         <Alert variant="destructive">
           <AlertDescription>We couldn't load the discussion. {thread.error.message}</AlertDescription>
