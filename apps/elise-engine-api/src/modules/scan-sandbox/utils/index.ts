@@ -4,7 +4,7 @@ export * from "./build-agent-script";
 export * from "./build-clone-script";
 export * from "./is-allowed-outbound";
 export * from "./parse-agent-usage";
-export * from "./phase-budget";
+export * from "./meter";
 export * from "./create-usage-scanner";
 export * from "./price-usage";
 export * from "./reserve-usd";

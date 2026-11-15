@@ -24,7 +24,7 @@ describe("buildAgentScript", () => {
     expect(script).toContain("--model claude-haiku-5-5 --effort low --max-budget-usd 1");
   });
 
-  it("gives a Phase its own prompt, log, exit file and lock, and its allowance as the cap", () => {
+  it("gives a Phase its own prompt, log, exit file and lock, and what the pool still holds as the cap", () => {
     const script = buildAgentScript({ ...options, skill: "full" }, phaseAgentFiles("hunt"), 1.25);
 
     expect(script.startsWith("mkdir /workspace/agent-hunt.lock 2>/dev/null || exit 0")).toBe(true);

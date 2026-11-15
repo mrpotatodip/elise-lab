@@ -54,7 +54,7 @@ export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: s
       throw new Error("a Runner does not run a full scan in phases yet");
     },
 
-    endPhase: async () => {
+    capReached: async () => {
       throw new Error("a Runner does not run a full scan in phases yet");
     },
 

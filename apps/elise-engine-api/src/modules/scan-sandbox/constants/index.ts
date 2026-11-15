@@ -84,12 +84,10 @@ export const SCAN_SANDBOX_DEFAULT_PRICE = { input: 10, output: 50, cacheRead: 0.
 
 // -----
 // A full Scan runs four Phases, one after the other, each as its own
-// run of the agent with its own slice of the Budget cap. The shares are
-// provisional guesses (a measurement of real full Scans will replace
-// them) and sit in this one object. They add up to 1.
+// run of the agent. They share one pool: the Scan's Budget cap.
+// The key holds the Phases that have started, in order.
 // -----
 export const SCAN_SANDBOX_FULL_PHASES = ["recon", "hunt", "check", "report"] as const;
-export const SCAN_SANDBOX_PHASE_SHARES = { recon: 0.1, hunt: 0.55, check: 0.25, report: 0.1 } as const;
 export const SCAN_SANDBOX_PHASES_KEY = "phases";
 
 // -----
