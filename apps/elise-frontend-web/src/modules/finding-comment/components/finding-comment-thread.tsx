@@ -6,6 +6,7 @@ import { useFindingCommentActions, useFindingThread } from "../hooks";
 import type { FindingThreadEvent } from "../schemas";
 import { FindingCommentComposer } from "./finding-comment-composer";
 import { FindingCommentItem } from "./finding-comment-item";
+import { FindingDecisionItem } from "./finding-decision-item";
 
 type FindingCommentThreadProps = {
   repo: string;
@@ -13,7 +14,12 @@ type FindingCommentThreadProps = {
 };
 
 function ThreadEvent({ event }: { event: FindingThreadEvent }) {
-  return <FindingCommentItem comment={event} />;
+  switch (event.kind) {
+    case "comment":
+      return <FindingCommentItem comment={event} />;
+    case "decision":
+      return <FindingDecisionItem decision={event} />;
+  }
 }
 
 // -----
