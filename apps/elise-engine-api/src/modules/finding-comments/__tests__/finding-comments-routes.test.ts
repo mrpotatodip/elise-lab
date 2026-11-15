@@ -3,7 +3,7 @@ import { parties, partyMasterTypes, partyPersons, scanFindingComments, scanFindi
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { FINDING_COMMENT_BODY_MAX, FindingThreadSchema, type AccessPower } from "@repo/contracts/elise";
+import { FINDING_COMMENT_BODY_MAX, FindingCommentSchema, type AccessPower } from "@repo/contracts/elise";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { tenantRouteApp } from "#/__tests__/tenant-route-harness";
@@ -14,6 +14,7 @@ let repoId: string;
 let signedIn: string | undefined;
 let held: ReadonlySet<AccessPower>;
 
+const CommentThreadSchema = z.object({ events: z.array(FindingCommentSchema) });
 const FINGERPRINT = "a".repeat(64);
 const REPO = "https://github.com/octocat/Hello-World";
 const THREAD_URL = `/findings/comments?repo=${REPO}&fingerprint=${FINGERPRINT}`;
@@ -36,7 +37,7 @@ const call = (path: string, init: { method?: string; body?: unknown; token?: boo
 const post = (body: string, token = false) => call("/findings/comments", { method: "POST", body: { repo: REPO, fingerprint: FINGERPRINT, body }, token });
 
 const threadBodies = async () => {
-  const { data } = z.object({ data: FindingThreadSchema }).parse(await (await call(THREAD_URL, { token: true })).json());
+  const { data } = z.object({ data: CommentThreadSchema }).parse(await (await call(THREAD_URL, { token: true })).json());
   return data.events.map((event) => event.body);
 };
 
@@ -63,7 +64,7 @@ beforeEach(async () => {
 describe("who may read and write a thread", () => {
   it("lets a member with the create Power write a comment and read it back with the author's name", async () => {
     const res = await post("Fixed in the next release.");
-    const thread = z.object({ data: FindingThreadSchema }).parse(await (await call(THREAD_URL)).json()).data;
+    const thread = z.object({ data: CommentThreadSchema }).parse(await (await call(THREAD_URL)).json()).data;
 
     expect([res.status, thread.events.map((event) => [event.body, event.authorName])]).toEqual([201, [["Fixed in the next release.", "Ada Rossi"]]]);
   });
@@ -125,7 +126,7 @@ describe("what a thread keeps", () => {
     await test.raw.insert(scanFindingComments).values({ tenantId, repoId, fingerprint: FINGERPRINT, authorPartyId: gone.id, body: "left behind" });
     await test.raw.delete(parties).where(eq(parties.id, gone.id));
 
-    const thread = z.object({ data: FindingThreadSchema }).parse(await (await call(THREAD_URL, { token: true })).json()).data;
+    const thread = z.object({ data: CommentThreadSchema }).parse(await (await call(THREAD_URL, { token: true })).json()).data;
 
     expect(thread.events.map((event) => [event.body, event.authorName])).toEqual([["left behind", null]]);
   });

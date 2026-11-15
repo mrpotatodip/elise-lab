@@ -3,10 +3,11 @@ import { hasAccessPower } from "@repo/contracts/elise";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Skeleton } from "#/components/ui/skeleton";
 import { useFindingCommentActions, useFindingThread } from "../hooks";
-import type { FindingThreadEvent } from "../schemas";
+import type { FindingComment, FindingThreadEvent } from "../schemas";
 import { FindingCommentComposer } from "./finding-comment-composer";
 import { FindingCommentDeleteDialog } from "./finding-comment-delete-dialog";
 import { FindingCommentItem } from "./finding-comment-item";
+import { FindingDecisionItem } from "./finding-decision-item";
 
 type FindingCommentThreadProps = {
   repo: string;
@@ -15,14 +16,20 @@ type FindingCommentThreadProps = {
 
 type ThreadEventProps = {
   event: FindingThreadEvent;
-  canDelete: boolean;
+  canDelete: (comment: FindingComment) => boolean;
   deleting: boolean;
   onDelete: (commentId: string) => Promise<void>;
 };
 
 function ThreadEvent({ event, canDelete, deleting, onDelete }: ThreadEventProps) {
-  const actions = canDelete && event.body !== null ? <FindingCommentDeleteDialog pending={deleting} onConfirm={() => onDelete(event.id)} /> : undefined;
-  return <FindingCommentItem comment={event} actions={actions} />;
+  switch (event.kind) {
+    case "comment": {
+      const actions = event.body !== null && canDelete(event) ? <FindingCommentDeleteDialog pending={deleting} onConfirm={() => onDelete(event.id)} /> : undefined;
+      return <FindingCommentItem comment={event} actions={actions} />;
+    }
+    case "decision":
+      return <FindingDecisionItem decision={event} />;
+  }
 }
 
 // -----
@@ -57,7 +64,7 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
               <ThreadEvent
                 key={event.id}
                 event={event}
-                canDelete={canDeleteAny || (canComment && event.authorPartyId !== null && event.authorPartyId === user?.partyId)}
+                canDelete={(comment) => canDeleteAny || (canComment && comment.authorPartyId !== null && comment.authorPartyId === user?.partyId)}
                 deleting={remove.isPending}
                 onDelete={(commentId) => remove.mutateAsync(commentId).then(() => undefined)}
               />

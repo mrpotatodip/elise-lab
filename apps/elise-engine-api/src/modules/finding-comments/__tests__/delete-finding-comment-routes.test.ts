@@ -42,7 +42,11 @@ const seedComment = async (authorPartyId: string | null, body = "a comment") => 
 
 const remove = (commentId: string, token = false) => call(`/findings/comments/${commentId}`, { method: "DELETE", token });
 
-const thread = async () => z.object({ data: FindingThreadSchema }).parse(await (await call(THREAD_URL, { token: true })).json()).data.events;
+const thread = async () =>
+  z
+    .object({ data: FindingThreadSchema })
+    .parse(await (await call(THREAD_URL, { token: true })).json())
+    .data.events.filter((event) => event.kind === "comment");
 
 beforeAll(async () => {
   test = await openTestDb();
