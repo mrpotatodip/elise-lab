@@ -298,7 +298,7 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
               variant={needsScan && !last ? "default" : "outline"}
               repo={repoUrl}
               startRef={verdict.commit}
-              startOptions={last && { model: last.model === "claude-opus-5-5" ? undefined : last.model, effort: last.effort, skill: last.skill, profile: last.profile }}
+              startOptions={last && { model: last.model === "claude-opus-5-5" ? undefined : last.model, effort: last.effort, profile: last.profile }}
             />
           </div>
         </div>

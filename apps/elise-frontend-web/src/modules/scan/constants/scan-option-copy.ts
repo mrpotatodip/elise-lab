@@ -1,4 +1,4 @@
-import type { CreateScanInput } from "../schemas";
+import type { CreateScanInput, ScanStatus } from "../schemas";
 
 export type ScanOption<T extends string> = {
   value: T;
@@ -6,7 +6,11 @@ export type ScanOption<T extends string> = {
   description: string;
 };
 
-export const SCAN_SKILL_OPTIONS: readonly ScanOption<CreateScanInput["skill"]>[] = [
+// -----
+// Names for showing a stored scan's Skill. Nobody picks a Skill any more:
+// a new scan always runs the full one, and only an older scan can be lite.
+// -----
+export const SCAN_SKILL_OPTIONS: readonly ScanOption<ScanStatus["skill"]>[] = [
   {
     value: "lite",
     label: "Quick review",
@@ -18,15 +22,6 @@ export const SCAN_SKILL_OPTIONS: readonly ScanOption<CreateScanInput["skill"]>[]
     description: "A deeper, multi-step review where every confirmed finding is independently verified. Takes longer and uses more budget.",
   },
 ];
-
-// -----
-// The two kinds of review as the new-scan dialog's cards say them: one line
-// each, since the dialog sits on one screen.
-// -----
-export const SCAN_SKILL_SHORT = {
-  lite: "A fast first look for common security mistakes.",
-  full: "Deeper, with every finding checked independently. Takes longer and uses more budget.",
-} satisfies Record<CreateScanInput["skill"], string>;
 
 export const SCAN_PROFILE_OPTIONS: readonly ScanOption<CreateScanInput["profile"]>[] = [
   {

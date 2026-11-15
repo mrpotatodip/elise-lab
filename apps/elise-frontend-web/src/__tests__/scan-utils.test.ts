@@ -99,19 +99,18 @@ describe("scanSidebarItems", () => {
 });
 
 describe("scanPlanSummary", () => {
-  const base = { repo: "https://github.com/honojs/hono", model: "claude-sonnet-5-5", effort: "high", skill: "lite", profile: "standard" } as const;
+  const base = { repo: "https://github.com/honojs/hono", model: "claude-sonnet-5-5", effort: "high", profile: "standard" } as const;
 
   it("says nothing until the repository link is valid", () => {
     expect(scanPlanSummary({ ...base, repo: "not-a-repo" })).toBeNull();
   });
 
-  it("describes a quick review in plain words", () => {
-    expect(scanPlanSummary(base)).toContain("quick review on honojs/hono with Claude Sonnet 5.5");
-  });
-
-  it("mentions coverage only for a full audit", () => {
-    expect(scanPlanSummary({ ...base, skill: "full", profile: "deep" })).toContain("full audit, exhaustive coverage, on honojs/hono");
-    expect(scanPlanSummary(base)).not.toContain("coverage");
+  it.each([
+    ["quick", "focused audit"],
+    ["standard", "balanced audit"],
+    ["deep", "exhaustive audit"],
+  ] as const)("names the %s profile in plain words", (profile, words) => {
+    expect(scanPlanSummary({ ...base, profile })).toContain(`${words} of honojs/hono with Claude Sonnet 5.5`);
   });
 });
 

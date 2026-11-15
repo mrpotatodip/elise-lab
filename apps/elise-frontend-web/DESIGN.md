@@ -87,11 +87,11 @@ All tokens are CSS variables in `src/styles/globals.css` (`:root`), mapped to Ta
 - **Forms**: label above field, one error message under the field it belongs to (`aria-invalid`, `aria-describedby`, `role="alert"`). A toast is for failures that come back from the server, not for input the browser can check. Toasts appear bottom-right so they never cover the topbar actions.
 - **Form copy** is conversational and informative:
   - **Ask a question.** A label is the question the person is answering ("Which repository should we audit?"), not the name of a database column ("Repository", "Skill", "Effort").
-  - **Say what a choice means.** Every option has a plain-language name and one line on the trade-off ("Full audit: a deeper, multi-step review... takes longer and uses more budget"). The raw value (`lite`, `full`) is never the label.
+  - **Say what a choice means.** Every option has a plain-language name and one line on the trade-off ("Exhaustive: the widest coverage and the most cross-checking. Slowest and most expensive"). The raw value (`quick`, `standard`, `deep`) is never the label.
   - **Help before the mistake.** One helper line under a field says what is accepted and what is not ("Private repositories can't be cloned").
   - **Errors say how to fix it.** "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name." Never "Invalid input".
-  - **Show only what applies.** The coverage question appears only for a full audit. Rarely changed settings sit under "Advanced settings".
-  - **Confirm in a sentence.** The footer always says what is about to run ("You're about to run a quick review on owner/name with Claude Sonnet 5.5") and what happens next.
+  - **Show only what applies.** The credit a scan may hold appears only when the engine gives one. Rarely changed settings sit under "Advanced settings".
+  - **Confirm in a sentence.** The footer always says what is about to run ("You're about to run a balanced audit of owner/name with Claude Sonnet 5.5") and what happens next.
   - **Buttons name the action.** "Start audit", not "Submit".
 - **Loading**: `Skeleton` inside `Suspense`. **Refresh** shows a spinning icon while any query is fetching.
 - **Rule** Cache is cleared on sign-out (`queryClient.clear()`), because route loaders read the cache first.
