@@ -1,5 +1,5 @@
 {
-  "id": "bbd51c82-79e8-430e-b92f-6c7e7d168446",
+  "id": "d1639f4f-0f43-4131-9d27-be79c875d1fb",
   "prevId": "d62416e4-b95f-4cc7-adab-c13944d99ec0",
   "version": "7",
   "dialect": "postgresql",
@@ -4968,12 +4968,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "partial": {
-          "name": "partial",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -5248,6 +5242,175 @@
         "scans_key_source": {
           "name": "scans_key_source",
           "value": "\"scans\".\"key_source\" in ('platform', 'account')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.scan_finding_comments": {
+      "name": "scan_finding_comments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_id": {
+          "name": "repo_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_party_id": {
+          "name": "author_party_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by_party_id": {
+          "name": "deleted_by_party_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_scan_finding_comments_thread": {
+          "name": "idx_scan_finding_comments_thread",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "fingerprint",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scan_finding_comments_tenant_id_tenants_id_fk": {
+          "name": "scan_finding_comments_tenant_id_tenants_id_fk",
+          "tableFrom": "scan_finding_comments",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scan_finding_comments_author_party_id_parties_id_fk": {
+          "name": "scan_finding_comments_author_party_id_parties_id_fk",
+          "tableFrom": "scan_finding_comments",
+          "tableTo": "parties",
+          "columnsFrom": [
+            "author_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "scan_finding_comments_deleted_by_party_id_parties_id_fk": {
+          "name": "scan_finding_comments_deleted_by_party_id_parties_id_fk",
+          "tableFrom": "scan_finding_comments",
+          "tableTo": "parties",
+          "columnsFrom": [
+            "deleted_by_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "scan_finding_comments_repo_tenant_fk": {
+          "name": "scan_finding_comments_repo_tenant_fk",
+          "tableFrom": "scan_finding_comments",
+          "tableTo": "scan_repos",
+          "columnsFrom": [
+            "repo_id",
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id",
+            "tenant_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "scan_finding_comments_body": {
+          "name": "scan_finding_comments_body",
+          "value": "\"scan_finding_comments\".\"deleted_at\" is not null or char_length(\"scan_finding_comments\".\"body\") between 1 and 4000"
         }
       },
       "isRLSEnabled": false

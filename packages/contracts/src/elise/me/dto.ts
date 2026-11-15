@@ -16,7 +16,8 @@ export const MeAccountSchema = z.object({
 });
 
 export const MeSchema = z.object({
-  user: z.object({ id: z.string(), name: z.string(), email: z.string() }),
+  // partyId is optional while an older engine does not send it; it tells the dashboard which comments are the login's own.
+  user: z.object({ id: z.string(), name: z.string(), email: z.string(), partyId: z.uuid().optional() }),
   partyType: z.string(),
   isSuperuser: z.boolean(),
   accounts: z.array(MeAccountSchema),

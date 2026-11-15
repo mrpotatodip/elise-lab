@@ -25,6 +25,7 @@ describe("GET /openapi.json", () => {
 
     expect(spec.openapi).toBe("3.1.0");
     expect(operations(spec).map(({ route }) => route).toSorted()).toEqual([
+      "DELETE /findings/comments/{commentId}",
       "DELETE /github/installations/{id}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",
@@ -34,6 +35,7 @@ describe("GET /openapi.json", () => {
       "DELETE /usage/anthropic-key",
       "GET /files",
       "GET /findings",
+      "GET /findings/comments",
       "GET /github/branches",
       "GET /github/installations",
       "GET /github/repos",
@@ -59,8 +61,10 @@ describe("GET /openapi.json", () => {
       "GET /usage/credit",
       "GET /usage/credit/entries",
       "GET /usage/plan",
+      "PATCH /findings/comments/{commentId}",
       "PATCH /groups/{groupId}",
       "PATCH /usage/budget",
+      "POST /findings/comments",
       "POST /github/connect",
       "POST /github/installations",
       "POST /groups",

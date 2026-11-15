@@ -64,6 +64,13 @@ export const VERDICT_MIN_SCANS = 1;
 export const VERDICT_SCAN_WEIGHTS = { quick: 0.5, standard: 1, deep: 1, lite: 1 } as const;
 
 // -----
+// Finding comments: the longest body, and how many events
+// of a thread one answer holds
+// -----
+export const FINDING_COMMENT_BODY_MAX = 4000;
+export const FINDING_THREAD_EVENT_LIMIT = 200;
+
+// -----
 // Repos and branches: caps per Account and per Repo
 // -----
 export const REPO_LIMIT_PER_TENANT = 200;
