@@ -26,6 +26,13 @@ export const scanTokens = (count: number) => COMPACT.format(count);
 
 export const scanPlural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
+// -----
+// The Verdict counts scan weight (a Focused scan is 0.5), so the weight
+// still missing may be a half. The next step is a whole number of scans:
+// one more scan covers a half, and a missing 1 is one Balanced scan.
+// -----
+export const verdictScansToRun = (missingWeight: number) => Math.ceil(missingWeight);
+
 const FAILURE_CAUSES = [
   { test: /out of memory/i, title: "The agent ran out of memory while it read the repository.", advice: "Start a new scan with Claude Haiku 5.5 and low effort, or scan a smaller repository." },
   // -----

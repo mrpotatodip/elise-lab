@@ -2,6 +2,7 @@ import { FINDING_SEVERITY_VALUES, VERDICT_MIN_SCANS, type FindingSeverityValue, 
 import { SCAN_RECORDS_PRIOR_LIMIT } from "#/modules/scan-records";
 import { VERDICT_LIMITS } from "#/modules/verdict/constants";
 import type { JudgedFinding, JudgedScan, JudgeInput } from "#/modules/verdict/types";
+import { scanWeight } from "./scan-weight";
 
 type Reason = Verdict["reasons"][number];
 
@@ -30,19 +31,34 @@ const detail = ({ fingerprint, title, severity, class: kind, file, line, impact,
 const emptyCounts = (): SeverityCounts & { needsValidation: number } => ({ critical: 0, high: 0, medium: 0, low: 0, informational: 0, needsValidation: 0 });
 
 // -----
-// The scans cannot be trusted yet: too few looks at this
-// commit, or a look that did not check every known problem.
-// Only the newest VERDICT_MIN_SCANS are asked: an old scan
-// that ran out of budget must not block a commit that two
-// good scans have since cleared.
+// The newest scans that have a weight, taken until their
+// weights reach VERDICT_MIN_SCANS. The window is all that the
+// unchecked-priors rules read: an old scan that ran out of
+// budget must not block a commit that good scans have since
+// cleared.
 // -----
-const trustReasons = (newestFirst: JudgedScan[]): Reason[] => {
-  if (newestFirst.length === 0) return [{ code: "not_scanned", message: "No succeeded lite scan of this commit" }];
-  const reasons: Reason[] = [];
-  if (newestFirst.length < VERDICT_MIN_SCANS) {
-    reasons.push({ code: "too_few_scans", message: `${newestFirst.length} of ${VERDICT_MIN_SCANS} scans of this commit; run another` });
+const windowOf = (weighted: { scan: JudgedScan; weight: number }[]): JudgedScan[] => {
+  const window: JudgedScan[] = [];
+  let sum = 0;
+  for (const { scan, weight } of weighted) {
+    if (sum >= VERDICT_MIN_SCANS) break;
+    window.push(scan);
+    sum += weight;
   }
-  const window = newestFirst.slice(0, VERDICT_MIN_SCANS);
+  return window;
+};
+
+// -----
+// The scans cannot be trusted yet: too little weight of looks
+// at this commit, or a look that did not check every known
+// problem.
+// -----
+const trustReasons = (read: JudgedScan[], counted: number, window: JudgedScan[]): Reason[] => {
+  if (read.length === 0) return [{ code: "not_scanned", message: "No succeeded scan of this commit that counts" }];
+  const reasons: Reason[] = [];
+  if (counted < VERDICT_MIN_SCANS) {
+    reasons.push({ code: "too_few_scans", message: `Scans of this commit weigh ${counted} of ${VERDICT_MIN_SCANS}; run another (a quick scan counts half)` });
+  }
   if (window.some((scan) => (scan.priorsUnchecked ?? 0) > 0)) {
     reasons.push({ code: "unchecked_priors", message: "A scan did not check every problem the History had open" });
   }
@@ -64,7 +80,11 @@ const overLimit = (counts: ReturnType<typeof emptyCounts>): Reason | null => {
 // -----
 // Can this commit ship? Every rule is here and nothing else
 // is: no database, no clock. The caller gives the succeeded
-// lite scans of the commit and their findings.
+// scans of the commit and their findings.
+//
+// A scan is read when it has a weight or is partial: a partial
+// scan adds no weight, but its findings still count as open. An
+// older full scan has neither, so it is not a look at all.
 //
 // A person's decision counts only where the commit's own
 // scans do not contradict it: a false positive and an
@@ -74,6 +94,11 @@ const overLimit = (counts: ReturnType<typeof emptyCounts>): Reason | null => {
 // -----
 export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput): Verdict => {
   const newestFirst = scans.toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const weights = newestFirst.map((scan) => ({ scan, weight: scanWeight(scan) }));
+  const weighted = weights.filter(({ weight }) => weight > 0);
+  const counted = weighted.reduce((sum, { weight }) => sum + weight, 0);
+  const window = windowOf(weighted);
+  const read = weights.filter(({ weight, scan }) => weight > 0 || scan.partial === true).map(({ scan }) => scan);
   const decisions = new Map(triage.map((row) => [row.fingerprint, row]));
 
   const open: Verdict["open"] = [];
@@ -97,7 +122,7 @@ export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput
     else counts[finding.severity] += 1;
   }
 
-  const untrusted = trustReasons(newestFirst);
+  const untrusted = trustReasons(read, counted, window);
   const over = overLimit(counts);
   const reasons: Reason[] = over ? [...untrusted, over] : untrusted;
   const code: VerdictReasonCode | null = reasons[0]?.code ?? null;
@@ -107,7 +132,7 @@ export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput
     basis: "ai_audit",
     commit,
     reasons,
-    scans: { required: VERDICT_MIN_SCANS, counted: newestFirst.length, ids: newestFirst.map((scan) => scan.id) },
+    scans: { required: VERDICT_MIN_SCANS, counted, ids: read.map((scan) => scan.id) },
     limits: { ...VERDICT_LIMITS },
     counts,
     open,

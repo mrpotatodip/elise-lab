@@ -9,18 +9,19 @@ import type { JudgedFinding, JudgedScan, JudgedTriage } from "#/modules/verdict/
 type CommitEvidence = { scans: JudgedScan[]; findings: JudgedFinding[]; triage: JudgedTriage[] };
 
 // -----
-// What the verdict reads: the newest succeeded lite scans of
-// one commit of one repo (a scan of a ref counts too, because
-// the verdict is about the commit, not the branch), their
-// findings, and the decisions people made about the repo.
+// What the verdict reads: the newest succeeded scans of one
+// commit of one repo, whatever their Skill (a scan of a ref
+// counts too, because the verdict is about the commit, not the
+// branch), their findings, and the decisions people made about
+// the repo. The History is not read.
 // -----
 export const commitEvidenceEffect = (db: DbConnectType, tenantId: string, repoId: string, commit: string): Effect.Effect<CommitEvidence, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const scanRows = await db
-        .select({ id: scans.id, createdAt: scans.createdAt, priorsGiven: scans.priorsGiven, priorsUnchecked: scans.priorsUnchecked })
+        .select({ id: scans.id, createdAt: scans.createdAt, skill: scans.skill, profile: scans.profile, partial: scans.partial, priorsGiven: scans.priorsGiven, priorsUnchecked: scans.priorsUnchecked })
         .from(scans)
-        .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), eq(scans.commitSha, commit), eq(scans.status, "succeeded"), eq(scans.skill, "lite")))
+        .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), eq(scans.commitSha, commit), eq(scans.status, "succeeded")))
         .orderBy(desc(scans.createdAt))
         .limit(VERDICT_SCAN_FETCH_LIMIT);
       if (scanRows.length === 0) return { scans: [], findings: [], triage: [] };

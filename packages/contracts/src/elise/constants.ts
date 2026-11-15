@@ -52,10 +52,16 @@ export const TEAM_INVITE_GROUP_LIMIT = 20;
 
 // -----
 // Verdict: an accepted risk lasts at most this many days;
-// a pass needs this many succeeded lite scans of the commit
+// a pass needs succeeded scans of the commit whose weights
+// add up to VERDICT_MIN_SCANS. A scan weighs what its Skill
+// and profile say: a thin quick scan counts half, so it needs
+// a second one; an old lite scan counts one, as it did when
+// every scan counted one. Provisional until real scans are
+// measured.
 // -----
 export const ACCEPTED_RISK_MAX_DAYS = 90;
 export const VERDICT_MIN_SCANS = 1;
+export const VERDICT_SCAN_WEIGHTS = { quick: 0.5, standard: 1, deep: 1, lite: 1 } as const;
 
 // -----
 // Repos and branches: caps per Account and per Repo

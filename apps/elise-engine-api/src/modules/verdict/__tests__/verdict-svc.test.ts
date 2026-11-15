@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { scanFindings, scanFindingTriage, scans } from "@repo/db-elise/schema";
+import { scanFindings, scanFindingTriage, scanRepoFindings, scans } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { branchIdOf, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { verdictSvc } from "#/modules/verdict/handlers";
 
 let test: TestDb;
@@ -50,7 +50,7 @@ describe("verdictSvc", () => {
     expect(await Effect.runPromise(Effect.flip(verdictSvc(test.http, otherTenantId, repoId, COMMIT, NOW)))).toMatchObject({ _tag: "NotFound" });
   });
 
-  it("counts only succeeded lite scans of this commit, and a scan of a ref counts", async () => {
+  it("counts only succeeded scans of this commit that have a weight, and a scan of a ref counts", async () => {
     await test.raw.insert(scans).values([
       scan("good-1", 1),
       scan("on-branch", 2, { ref: "feature/x" }),
@@ -94,5 +94,82 @@ describe("verdictSvc", () => {
 
     expect(later.verdict).toBe("fail");
     expect(later.open.find((item) => item.title === "problem a")?.acceptanceExpiredAt).toBe("2026-12-01T00:00:00.000Z");
+  });
+});
+
+// -----
+// Scans count by weight: quick 0.5, standard 1, deep 1, an old
+// lite scan 1. Every case has a commit of its own.
+// -----
+type Kind = "quick" | "standard" | "deep" | "lite" | "old-full" | "partial";
+
+const kindValues = (kind: Kind): Partial<typeof scans.$inferInsert> => {
+  if (kind === "lite") return { skill: "lite", profile: "quick", partial: null };
+  if (kind === "old-full") return { skill: "full", profile: "deep", partial: null };
+  if (kind === "partial") return { skill: "full", profile: "deep", partial: true };
+  return { skill: "full", profile: kind, partial: false };
+};
+
+const seedCase = async (commit: string, kinds: Kind[]) => {
+  await test.raw.insert(scans).values(kinds.map((kind, index) => scan(`${commit.slice(0, 4)}-${index}`, index + 1, { commitSha: commit, ...kindValues(kind) })));
+};
+
+describe("verdictSvc: scan weights", () => {
+  it.each<{ name: string; digit: string; kinds: Kind[]; verdict: "pass" | "cannot_tell"; counted: number }>([
+    { name: "one quick scan is not enough", digit: "1", kinds: ["quick"], verdict: "cannot_tell", counted: 0.5 },
+    { name: "two quick scans are enough", digit: "2", kinds: ["quick", "quick"], verdict: "pass", counted: 1 },
+    { name: "one standard scan is enough", digit: "3", kinds: ["standard"], verdict: "pass", counted: 1 },
+    { name: "one deep scan is enough", digit: "4", kinds: ["deep"], verdict: "pass", counted: 1 },
+    { name: "a quick and a standard scan together count", digit: "5", kinds: ["quick", "standard"], verdict: "pass", counted: 1.5 },
+    { name: "one old lite scan is still a verdict", digit: "6", kinds: ["lite"], verdict: "pass", counted: 1 },
+    { name: "an old full scan weighs nothing, its findings were never recorded", digit: "7", kinds: ["old-full"], verdict: "cannot_tell", counted: 0 },
+    { name: "a partial scan alone cannot tell", digit: "8", kinds: ["partial"], verdict: "cannot_tell", counted: 0 },
+  ])("$name", async ({ digit, kinds, verdict, counted }) => {
+    const commit = digit.repeat(40);
+    await seedCase(commit, kinds);
+
+    expect(await run(commit)).toMatchObject({ verdict, scans: { required: 1, counted } });
+  });
+
+  it("lets a newer good scan clear an older partial one that left a problem unchecked", async () => {
+    const commit = "9".repeat(40);
+    await test.raw.insert(scans).values([
+      scan("9999-old", 1, { commitSha: commit, ...kindValues("partial"), priorsUnchecked: 3 }),
+      scan("9999-new", 2, { commitSha: commit, ...kindValues("standard") }),
+    ]);
+
+    expect(await run(commit)).toMatchObject({ verdict: "pass", reasons: [], scans: { counted: 1 } });
+  });
+
+  it("still blocks on an older partial scan while a newer good one is too thin to count alone", async () => {
+    const commit = "a1".repeat(20);
+    await test.raw.insert(scans).values([
+      scan("a1a1-old", 1, { commitSha: commit, ...kindValues("partial"), priorsUnchecked: 3 }),
+      scan("a1a1-new", 2, { commitSha: commit, ...kindValues("quick") }),
+    ]);
+
+    expect(await run(commit)).toMatchObject({ verdict: "cannot_tell", reasons: [{ code: "too_few_scans" }], scans: { counted: 0.5 } });
+  });
+
+  it("counts the findings of a profile scan, and of a partial one that adds no weight", async () => {
+    const commit = "b1".repeat(20);
+    await seedCase(commit, ["partial", "standard"]);
+    await test.raw.insert(scanFindings).values([
+      { ...found("b1b1-0", "d", "critical"), class: "full-audit" },
+      { ...found("b1b1-1", "e", "medium"), class: "full-audit" },
+      { tenantId, scanId: "b1b1-1", findingId: "b1b1-1-f", fingerprint: fp("f"), status: "needs_validation" as const, severity: null, title: "problem f", class: "full-audit" },
+    ]);
+
+    expect(await run(commit)).toMatchObject({ verdict: "fail", counts: { critical: 1, medium: 1, needsValidation: 1 }, scans: { ids: ["b1b1-1", "b1b1-0"] } });
+  });
+
+  it("does not read the frozen History: an open problem there changes nothing", async () => {
+    const commit = "c1".repeat(20);
+    await seedCase(commit, ["standard"]);
+    await test.raw.insert(scans).values(scan("history-scan", 1, { commitSha: ELSEWHERE }));
+    await test.raw.insert(scanFindings).values(found("history-scan", "h", "critical"));
+    await test.raw.insert(scanRepoFindings).values({ repoId, tenantId, branchId: await branchIdOf(test, repoId), fingerprint: fp("h"), state: "open", firstSeenScanId: "history-scan", lastSeenScanId: "history-scan" });
+
+    expect(await run(commit)).toMatchObject({ verdict: "pass", open: [], counts: { critical: 0 } });
   });
 });
