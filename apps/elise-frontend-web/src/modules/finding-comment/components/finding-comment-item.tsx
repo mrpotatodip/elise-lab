@@ -17,13 +17,14 @@ type FindingCommentItemProps = {
 // (the "edited" and "deleted" notes) and actions sit at the right end
 // of the same line (edit and delete). editor takes the place of the
 // text while its author edits it. A deleted comment is one small
-// muted line with the time it was deleted: no avatar, no name.
+// muted line with the time it was written, which keeps its place in
+// the thread, and the time it was deleted: no avatar, no name.
 // -----
 export function FindingCommentItem({ comment, markers, actions, editor }: FindingCommentItemProps) {
   if (comment.body === null) {
     return (
       <li className="pl-11 text-xs text-muted-foreground">
-        A comment was deleted{comment.deletedAt && <> on <FindingCommentTime value={comment.deletedAt} /></>}.
+        A comment from <FindingCommentTime value={comment.createdAt} /> was deleted{comment.deletedAt && <> on <FindingCommentTime value={comment.deletedAt} /></>}.
       </li>
     );
   }
