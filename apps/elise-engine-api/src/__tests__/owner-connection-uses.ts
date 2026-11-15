@@ -43,7 +43,7 @@ export const OWNER_CONNECTION_USES = {
   "modules/runners/lib/runner-of.ts": 2,
   "modules/scan-records/handlers/record-scan-svc.ts": 4,
   "modules/scan-records/types/scan-records-types.ts": 1,
-  "modules/scan-workflow/lib/scan-workflow.ts": 8,
+  "modules/scan-workflow/lib/full-scan-workflow.ts": 8,
   "modules/scan-workflow/lib/settle-scan-credit.ts": 4,
   "modules/scans/api/create-scan.ts": 2,
   "modules/scans/api/diff-scan.ts": 2,

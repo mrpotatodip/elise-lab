@@ -1,6 +1,5 @@
 import { Effect } from "effect";
 import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
-import { scanPathOf, workflowOf } from "#/lib/scan-path";
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
 import { RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE } from "#/modules/runners/constants";
@@ -37,26 +36,23 @@ export const createScanSvc = (
     // account's own key is paid by that key, so it gets a higher
     // ceiling than a scan on EliseLAB's key. A request may lower it.
     //
-    // The Skill is ours to choose, never the request's: a Scan in our
-    // cloud runs the full Skill on the full path, whatever `skill` the
-    // request sent (the field is accepted and ignored until #141 removes
-    // it). A Scan on a Runner stays lite until RUNNER_FULL_SCANS is
-    // "true", which is set only after a Runner app release that runs
-    // the full Skill and stops at the job's cap is out (#145). It then
-    // runs the full Skill too and still takes no credit. No profile
-    // means quick.
+    // The Skill is ours to choose, never the request's: every new Scan
+    // runs the full Skill on the one Workflow, whatever `skill` the
+    // request sent (the field is accepted and ignored until #146 removes
+    // it), and is stored `full`. That holds for a Scan on a Runner too:
+    // it runs the full Skill on the person's computer, takes no credit
+    // and stops at the Runner's own ceiling. No profile means quick.
     // -----
     const ownKeyScan = input.runner_id !== undefined || (spend.plan ? spend.plan.keySource === "account" : spend.ownKey);
-    const skill = input.runner_id === undefined || env.RUNNER_FULL_SCANS === "true" ? "full" : "lite";
     const profile = input.profile ?? "quick";
-    const cap = budgetCapOf(env, { skill, profile, onRunner: input.runner_id !== undefined, ownKeyScan });
+    const cap = budgetCapOf(env, { profile, onRunner: input.runner_id !== undefined });
     if (!cap.ok) return yield* new Invalid({ message: cap.message });
     const maxBudgetUsd = input.max_budget_usd ?? cap.defaultUsd;
     if (maxBudgetUsd > cap.ceilingUsd) return yield* new Invalid({ message: `max_budget_usd: must be at most ${cap.ceilingUsd}` });
 
     const options = yield* Effect.try(() =>
       ScanOptionsSchema.parse({
-        skill,
+        skill: "full",
         model: input.model ?? env.MODEL,
         effort: input.effort ?? env.EFFORT,
         profile,
@@ -65,25 +61,23 @@ export const createScanSvc = (
     ).pipe(Effect.orDie);
 
     // -----
-    // A full Scan on the platform's key needs a Plan, whatever
+    // A Scan on the platform's key needs a Plan, whatever
     // BILLING_ENFORCED says: it is the Scan that costs EliseLAB money.
     // BILLING_ENFORCED keeps its wider rule (own-key and Runner Scans
     // too) and is not turned on here.
     // -----
-    const platformFullScan = skill === "full" && !ownKeyScan;
-    const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true" || platformFullScan, new Date());
+    const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true" || !ownKeyScan, new Date());
     if (block) return yield* new RateLimited(block);
 
     // -----
-    // Each path counts on its own, for the Account and over all Accounts.
-    // Every Scan that runs in our cloud is on the full path, so it meets
-    // MAX_ACTIVE_FULL_SCANS and MAX_GLOBAL_FULL_SCANS. A Scan on a Runner
-    // meets only MAX_ACTIVE_SCANS for its Account, whatever Skill it runs,
-    // and the live Scans on a Runner are counted there too, never against
-    // the full limit. It holds no Sandbox of ours, so the global caps do
-    // not count it and do not refuse it.
+    // Each pool counts on its own, for the Account and over all Accounts.
+    // Every Scan that runs in our cloud meets MAX_ACTIVE_FULL_SCANS and
+    // MAX_GLOBAL_FULL_SCANS. A Scan on a Runner meets only
+    // MAX_ACTIVE_SCANS for its Account, and the live Scans on a Runner are
+    // counted there too, never against the full limit. It holds no
+    // Sandbox of ours, so the global caps do not count it and do not
+    // refuse it.
     // -----
-    const path = scanPathOf(options.skill);
     const limitPath = limitPathOf({ skill: options.skill, runner: input.runner_id === undefined ? null : { id: input.runner_id } });
     const nowMs = Date.now();
     const activeScans = yield* repo.activeSince(accountId, nowMs);
@@ -190,12 +184,7 @@ export const createScanSvc = (
     // A scan whose workflow never starts is never settled by one, so
     // its hold is given back here.
     // -----
-    // -----
-    // The Skill picks the path: a full Scan starts on the full Workflow,
-    // a lite Scan on the original one.
-    // -----
-    const workflow = workflowOf(env, path);
-    yield* Effect.tryPromise({ try: () => workflow.create({ id: params.scanId, params }), catch: toExternalError }).pipe(
+    yield* Effect.tryPromise({ try: () => env.SCAN_WORKFLOW_FULL.create({ id: params.scanId, params }), catch: toExternalError }).pipe(
       Effect.tapError((error) =>
         Effect.all(
           [

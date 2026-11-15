@@ -6,24 +6,25 @@ import type { CreateScanEnv } from "#/modules/scans/types";
 export type ScanRefusal = { code: "TOO_MANY_ACTIVE_SCANS" | "SCAN_WORKER_BUSY"; message: string };
 
 // -----
-// The path's own count of live Scans for one Account. A lite Scan and a
-// full Scan each count only against their own path, so an Account at its
-// full limit can still start a lite Scan and the other way round.
+// The pool's own count of live Scans for one Account. A Scan in our cloud
+// counts in the full pool (MAX_ACTIVE_FULL_SCANS), a Scan on a Runner in
+// the other one (MAX_ACTIVE_SCANS), so an Account at its full limit can
+// still start a Scan on its Runner and the other way round.
 // -----
 export const accountLimitOf = (env: Pick<CreateScanEnv, "MAX_ACTIVE_SCANS" | "MAX_ACTIVE_FULL_SCANS">, path: ScanPath): number =>
   Number(path === "full" ? env.MAX_ACTIVE_FULL_SCANS : env.MAX_ACTIVE_SCANS);
 
-export const globalLimitOf = (env: Pick<CreateScanEnv, "MAX_GLOBAL_LITE_SCANS" | "MAX_GLOBAL_FULL_SCANS">, path: ScanPath): number =>
-  Number(path === "full" ? env.MAX_GLOBAL_FULL_SCANS : env.MAX_GLOBAL_LITE_SCANS);
-
 // -----
 // Which of the two counts a live Scan is in. A Scan on a Runner is always
-// in the lite one, whatever Skill it runs: it holds no Sandbox of ours,
-// so it meets only MAX_ACTIVE_SCANS and never uses up a place of the full
-// limit.
+// in the MAX_ACTIVE_SCANS one ("lite"), whatever Skill it runs: it holds
+// no Sandbox of ours, so it meets only that limit and never uses up a
+// place of the full limit. An old lite Scan that is still live is in it
+// too.
 // -----
 export const limitPathOf = (scan: { skill: ScanOptions["skill"]; runner?: { id: string } | null }): ScanPath =>
   scan.runner ? "lite" : scanPathOf(scan.skill);
+
+const POOL_NAME = { full: "full", lite: "Runner" } as const;
 
 // -----
 // Why a new Scan may not start now, or null. The Account's own count is
@@ -41,10 +42,10 @@ export const scanRefusalOf = (
 ): ScanRefusal | null => {
   const accountLimit = accountLimitOf(env, path);
   if (accountActive >= accountLimit) {
-    return { code: "TOO_MANY_ACTIVE_SCANS", message: `This account already has ${accountActive} active ${path} scans (limit ${accountLimit})` };
+    return { code: "TOO_MANY_ACTIVE_SCANS", message: `This account already has ${accountActive} active ${POOL_NAME[path]} scans (limit ${accountLimit})` };
   }
-  if (globalActive !== null && globalActive[path] >= globalLimitOf(env, path)) {
-    return { code: "SCAN_WORKER_BUSY", message: `EliseLAB is busy with ${path} scans right now. Try again in a few minutes.` };
+  if (path === "full" && globalActive !== null && globalActive.full >= Number(env.MAX_GLOBAL_FULL_SCANS)) {
+    return { code: "SCAN_WORKER_BUSY", message: "EliseLAB is busy with full scans right now. Try again in a few minutes." };
   }
   return null;
 };

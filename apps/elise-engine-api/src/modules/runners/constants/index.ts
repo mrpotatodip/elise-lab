@@ -37,7 +37,6 @@ export const RUNNER_MAX_BUDGET_USD = 50;
 export const RUNNER_PROMPT_PLACE = {
   repoDir: "./repo",
   outDir: "./out",
-  priorPath: "./prior-findings.json",
   networkRule: "do not use the network",
   validatedBy: "runner",
 } as const;

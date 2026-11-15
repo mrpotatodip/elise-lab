@@ -56,7 +56,7 @@ describe("POST /scans: every new Scan runs the full path", () => {
     ["its own key and no Plan", { ...NO_SPEND, ownKey: true }],
   ])("starts a Scan with a profile and no skill on the full path for %s, stored as full", async (_name, account) => {
     spend = account;
-    const { env, created, createdFull } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const res = await post(env, { repo: repoOf("a"), profile: "standard" });
     const queued = QueuedSchema.parse(await res.json()).data;
 
@@ -64,7 +64,6 @@ describe("POST /scans: every new Scan runs the full path", () => {
     expect(queued).toMatchObject({ skill: "full", profile: "standard", maxBudgetUsd: 12 });
     expect(store.rows.get(queued.scanId)?.skill).toBe("full");
     expect(createdFull).toHaveLength(1);
-    expect(created).toHaveLength(0);
   });
 
   it("uses quick when the request names no profile", async () => {
@@ -75,21 +74,21 @@ describe("POST /scans: every new Scan runs the full path", () => {
   });
 
   it.each(["lite", "full"])("accepts skill %s and ignores it", async (skill) => {
-    const { env, created, createdFull } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const res = await post(env, { repo: repoOf("a"), skill, profile: "deep" });
 
     expect(QueuedSchema.parse(await res.json()).data).toMatchObject({ skill: "full", profile: "deep", maxBudgetUsd: 18 });
-    expect({ lite: created.length, full: createdFull.length }).toEqual({ lite: 0, full: 1 });
+    expect(createdFull).toHaveLength(1);
   });
 
   it("refuses an Account with no Plan and no key of its own, also when the request says lite", async () => {
     spend = NO_SPEND;
-    const { env, created, createdFull } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const res = await post(env, { repo: repoOf("a"), skill: "lite" });
 
     expect(res.status).toBe(429);
     expect(ErrorSchema.parse(await res.json()).error.code).toBe("NO_ACTIVE_PLAN");
-    expect(created.length + createdFull.length).toBe(0);
+    expect(createdFull).toHaveLength(0);
   });
 
   it("still reads an old row stored with skill lite", async () => {
