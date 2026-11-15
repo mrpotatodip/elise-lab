@@ -1,8 +1,16 @@
 export type CrossAccountCase =
-  | { kind: "run"; path: string; expect: "not-found" | "empty" }
+  | { kind: "run"; path: string; method?: string; body?: unknown; expect: "not-found" | "empty" }
   | { kind: "pending"; ticket: number };
 
 const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket });
+
+// -----
+// The repo and fingerprint of the finding the guard test
+// seeds for "another" Account: the case names them as one
+// Account that is not its owner.
+// -----
+const OTHER_REPO = "https://github.com/octocat/Hello-World";
+const OTHER_FINGERPRINT = "b".repeat(64);
 
 // -----
 // Routes that name no Account of their own: sign-in, the
@@ -33,6 +41,14 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 // -----
 export const CROSS_ACCOUNT_CASES = {
   "GET /findings": { kind: "run", path: "/findings?scanId=theirs", expect: "empty" },
+  "GET /findings/comments": { kind: "run", path: `/findings/comments?repo=${OTHER_REPO}&fingerprint=${OTHER_FINGERPRINT}`, expect: "empty" },
+  "POST /findings/comments": {
+    kind: "run",
+    path: "/findings/comments",
+    method: "POST",
+    body: { repo: OTHER_REPO, fingerprint: OTHER_FINGERPRINT, body: "Not mine to write" },
+    expect: "not-found",
+  },
   "PUT /findings/triage": pending(74),
   "GET /repos": pending(75),
   "POST /repos": pending(75),

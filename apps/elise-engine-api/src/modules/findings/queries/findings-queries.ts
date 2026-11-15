@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-
 import { Effect } from "effect";
 import type { Finding, FindingsQuery, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepos, scans, type TFindingTriage } from "@repo/db-elise/schema";
-import type { AppDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, PoolDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { canonicalRepo } from "#/modules/scan-ledger";
@@ -103,7 +103,7 @@ export const listFindingsEffect = (db: AppDbType, tenantId: string, query: Findi
 // account has no such problem in that repo. The repo may
 // be given in any spelling.
 // -----
-export const findingRepoIdEffect = (db: DbConnectType, tenantId: string, repoUrl: string, fingerprint: string): Effect.Effect<string | null, DbError> =>
+export const findingRepoIdEffect = (db: Pick<AppDbType, "select">, tenantId: string, repoUrl: string, fingerprint: string): Effect.Effect<string | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db

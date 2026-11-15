@@ -41,7 +41,10 @@ export const ACCESS_CATALOGUE = [
       {
         key: "findings",
         label: "Findings",
-        children: [{ key: "accepted_risk", label: "Accepted risk", actions: ["update"] }],
+        children: [
+          { key: "accepted_risk", label: "Accepted risk", actions: ["update"] },
+          { key: "comments", label: "Finding comment", actions: ["create"] },
+        ],
       },
       {
         key: "usage",
@@ -175,6 +178,7 @@ const WORKSPACE_ADMIN_POWERS = TENANT_POWERS.filter((power) => !OWNER_ONLY.some(
 const WORKSPACE_MEMBER_READS = TENANT_READS.filter((power) => !power.startsWith("company:team:"));
 
 const WORKSPACE_MEMBER_EXTRA = [
+  "company:findings:comments:create",
   "company:unanswered:questions:dismiss",
   "company:assistant:threads:create",
   "company:assistant:threads:update",

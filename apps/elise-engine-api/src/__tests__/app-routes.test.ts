@@ -304,6 +304,8 @@ describe("watcher session", () => {
     { method: "GET", path: "/usage" },
     { method: "GET", path: "/files" },
     { method: "GET", path: "/findings" },
+    { method: "GET", path: "/findings/comments" },
+    { method: "POST", path: "/findings/comments" },
     { method: "GET", path: "/github/installations" },
     { method: "GET", path: `/repos/${REPO_ID}` },
     { method: "GET", path: `/repos/${REPO_ID}/verdict` },

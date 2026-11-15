@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { scanFindings, scans } from "@repo/db-elise/schema";
+import { scanFindingComments, scanFindings, scans } from "@repo/db-elise/schema";
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
@@ -13,7 +13,7 @@ const EnvelopeSchema = z.object({ data: z.record(z.string(), z.unknown()).nullab
 let test: TestDb;
 let tenantId: string;
 
-const app = tenantRouteApp(() => test);
+const app = tenantRouteApp(() => test, { sessionUserId: async () => "guard-test-user" });
 
 const mountedRoutes = [...new Set(app.routes.filter((route) => route.method !== "ALL").map((route) => `${route.method} ${route.path}`))];
 const tenantRoutes = mountedRoutes.filter((route) => !NOT_TENANT_ROUTES.includes(route));
@@ -35,9 +35,11 @@ beforeAll(async () => {
   test = await openTestDb();
   tenantId = (await seedTenant(test, "acme")).tenantId;
   const otherTenantId = (await seedTenant(test, "other")).tenantId;
+  await seedRepo(test, tenantId);
   const otherRepoId = await seedRepo(test, otherTenantId);
   await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"));
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
+  await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
 });
 
 afterAll(async () => {
@@ -57,8 +59,8 @@ describe("every tenant route has a cross-account case", () => {
     expect(NOT_TENANT_ROUTES.filter((route) => !mountedRoutes.includes(route))).toEqual([]);
   });
 
-  it.each(runCases)("$route answers one Account with nothing of another's", async ({ path, expect: outcome }) => {
-    const res = await callAs(app, tenantId, path);
+  it.each(runCases)("$route answers one Account with nothing of another's", async ({ path, method, body, expect: outcome }) => {
+    const res = await callAs(app, tenantId, path, { method, body });
     const { data } = EnvelopeSchema.parse(await res.json());
     const lists = Object.values(data ?? {}).filter(Array.isArray);
     expect(outcome === "not-found" ? [res.status, 0] : [res.status, lists.flat().length]).toEqual(outcome === "not-found" ? [404, 0] : [200, 0]);

@@ -1,0 +1,18 @@
+@baseUrl = http://localhost:8787
+@account = 0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4
+
+# The thread of one finding: the latest 200 events, oldest first.
+# A login needs the Dashboard Power; the service token can read.
+GET {{baseUrl}}/findings/comments?repo=https://github.com/octocat/Hello-World&fingerprint=<64 hex characters>
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+
+###
+
+# Write a comment. This needs the session of a login whose Role holds company:findings:comments:create; the service token is refused.
+POST {{baseUrl}}/findings/comments
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "repo": "https://github.com/octocat/Hello-World", "fingerprint": "<64 hex characters>", "body": "Fixed in the next release." }

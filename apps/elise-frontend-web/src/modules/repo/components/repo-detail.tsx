@@ -16,6 +16,7 @@ import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
+import { FindingCommentThread } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup } from "#/modules/finding";
 import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
@@ -318,6 +319,7 @@ function RepoFindings({ repoId, branch, history }: { repoId: string; branch: str
         onSelect={setSelected}
         status={selectedFinding && <FindingStatusBanner state={selectedFinding.state} triage={selectedFinding.triage} fixedOn={fixedOnOf(selectedFinding, history)} />}
         facts={selectedFinding && <RepoFindingFacts finding={selectedFinding} history={history} />}
+        discussion={selectedFinding && <FindingCommentThread key={selectedFinding.fingerprint} repo={selectedFinding.repo} fingerprint={selectedFinding.fingerprint} />}
         decision={
           selectedFinding &&
           (selectedFinding.state === "fixed_by_code" ? (
