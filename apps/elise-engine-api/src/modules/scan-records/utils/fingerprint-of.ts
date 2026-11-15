@@ -1,5 +1,8 @@
-export async function fingerprintOf(problemClass: string, file: string | null, title: string): Promise<string> {
-  const text = `${problemClass}|${file ?? ""}|${title.trim().toLowerCase().replace(/\s+/g, " ")}`;
+export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function fingerprintOf(problemClass: string, file: string | null, title: string): Promise<string> {
+  return sha256Hex(`${problemClass}|${file ?? ""}|${title.trim().toLowerCase().replace(/\s+/g, " ")}`);
 }

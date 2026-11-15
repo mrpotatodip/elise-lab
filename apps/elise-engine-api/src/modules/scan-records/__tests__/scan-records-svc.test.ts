@@ -96,13 +96,6 @@ describe("buildScanRecordSvc", () => {
     expect(record.findings).toEqual([]);
   });
 
-  it("records no findings for the full skill, whose findings.json has another shape", async () => {
-    const full = { ...params, options: { ...params.options, skill: "full" as const } };
-    const record = await Effect.runPromise(buildScanRecordSvc(reportsWith(findingsJson), full, REPO_ID, BRANCH, "succeeded", null, null, NO_HISTORY));
-
-    expect(record.findings).toEqual([]);
-  });
-
   it("records no findings when findings.json is missing", async () => {
     const record = await Effect.runPromise(buildScanRecordSvc(reportsWith(), params, REPO_ID, BRANCH, "succeeded", null, null, NO_HISTORY));
 
@@ -166,6 +159,138 @@ describe("a scan with no tracked branch", () => {
     expect(record.findings.every((row) => row.origin === "new")).toBe(true);
     expect(record.history).toEqual([]);
     expect(record.scan).toMatchObject({ ref: "v1.2.0", branch: null, branchId: null, untrackedReason: NO_BRANCH.reason, priorsGiven: null, priorsCarried: null });
+  });
+});
+
+const fullParams: ScanParams = { ...params, options: { ...params.options, skill: "full" } };
+
+const evidence = (file: string, line: number, description: string) => ({ file, line, description });
+
+const nestedFindings = JSON.stringify([
+  {
+    verdict: "confirmed",
+    fingerprint: "authz/user-route-missing-owner-check",
+    title: "Missing owner check",
+    description: "A user reads tenant B data",
+    severity: { likelihood: { score: "high", reason: "r" }, impact: { score: "critical", reason: "r" }, overall_severity: "critical" },
+    evidence: [evidence("src/routes/user.ts", 42, "the query has no tenant filter"), evidence("src/db/user.ts", 7, "the helper takes no tenant")],
+    remediation: { strategy: "add the tenant filter", code_changes: [] },
+  },
+  {
+    verdict: "needs_validation",
+    fingerprint: "config/proxy-header-strip",
+    title: "Proxy may strip the header",
+    description: "The header may be lost upstream",
+    evidence: [evidence("infra/proxy.conf", 3, "the proxy rewrites headers")],
+    validation_plan: { local: "run the proxy with the sample config", deployment: "send one request through staging" },
+  },
+  { verdict: "rejected", fingerprint: "xss/fake", title: "Not a problem", description: "d", evidence: [evidence("src/a.ts", 1, "e")], reason: "escaped" },
+]);
+
+const fullReports = (files: Record<string, string>) => {
+  const bindings = fakeBindings();
+  for (const [name, text] of Object.entries(files)) bindings.store.set(`accounts/${ACCOUNT}/scans/scan-1/${name}`, text);
+  return bindings.env.REPORTS;
+};
+
+const recordFull = (files: Record<string, string>, status: "succeeded" | "failed" = "succeeded") =>
+  Effect.runPromise(buildScanRecordSvc(fullReports(files), fullParams, REPO_ID, BRANCH, status, null, null, NO_HISTORY));
+
+describe("a profile scan (the full skill)", () => {
+  it("records its confirmed and needs_validation findings from the nested shape, and leaves the rejected out", async () => {
+    const record = await recordFull({ "findings.json": nestedFindings });
+
+    expect(record.findings).toHaveLength(2);
+    expect(record.findings[0]).toMatchObject({
+      scanId: "scan-1",
+      tenantId: ACCOUNT,
+      findingId: "authz/user-route-missing-owner-check",
+      fingerprint: "461bd73c626a01a59225326dcbd7803335c647e0b3fc885b791953dfa82864c6",
+      status: "confirmed",
+      severity: "critical",
+      title: "Missing owner check",
+      class: "full-audit",
+      file: "src/routes/user.ts",
+      line: 42,
+      actor: null,
+      impact: "A user reads tenant B data",
+      evidence: "the query has no tenant filter\nthe helper takes no tenant",
+      fix: "add the tenant filter",
+      needs: null,
+    });
+    expect(record.findings[1]).toMatchObject({
+      findingId: "config/proxy-header-strip",
+      fingerprint: "7e3b3315649d3243dc252abc905e4e7578a6ac2ee757172d073e6e1641bc913c",
+      status: "needs_validation",
+      severity: null,
+      file: "infra/proxy.conf",
+      line: 3,
+      fix: null,
+      needs: "Local: run the proxy with the sample config\nDeployment: send one request through staging",
+    });
+  });
+
+  it("writes no History row and counts no priors", async () => {
+    const record = await recordFull({ "findings.json": nestedFindings });
+
+    expect(record.history).toEqual([]);
+    expect(record.scan).toMatchObject({ priorsGiven: null, priorsCarried: null, priorsClosed: null, priorsUnchecked: null });
+  });
+
+  it("records no rows for a scan that found nothing, and says it was not partial", async () => {
+    const record = await recordFull({ "findings.json": "[]", "REPORT.md": "# Report\nNothing found." });
+
+    expect(record.findings).toEqual([]);
+    expect(record.scan.partial).toBe(false);
+  });
+
+  it("says it was not partial when its output files are missing", async () => {
+    const record = await recordFull({});
+
+    expect(record.findings).toEqual([]);
+    expect(record.scan.partial).toBe(false);
+  });
+
+  it("fails with ParseError when a confirmed record has no severity", async () => {
+    const bad = JSON.stringify([{ verdict: "confirmed", fingerprint: "a", title: "t", description: "d", evidence: [evidence("a.ts", 1, "e")] }]);
+    const error = await Effect.runPromise(Effect.flip(buildScanRecordSvc(fullReports({ "findings.json": bad }), fullParams, REPO_ID, BRANCH, "succeeded", null, null, NO_HISTORY)));
+
+    expect(error._tag).toBe("ParseError");
+  });
+
+  it("leaves the partial column null for a scan that did not succeed", async () => {
+    const record = await recordFull({ "findings.json": nestedFindings, "REPORT.md": "PARTIAL: money ran out; 2 units were not covered." }, "failed");
+
+    expect(record.findings).toEqual([]);
+    expect(record.scan.partial).toBeNull();
+  });
+});
+
+const ledger = (...units: Array<{ status: string; unresolved: string[] }>) => JSON.stringify(units);
+
+describe("the partial rule", () => {  it.each([
+    ["the Report starts with PARTIAL:", { "REPORT.md": "PARTIAL: money ran out; 3 units were not covered.\n\n- unit-a" }, true],
+    ["a unit is deferred for money_exhausted", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "covered", unresolved: [] }, { status: "deferred", unresolved: ["money_exhausted"] }) }, true],
+    ["the Report is clean and the ledger is complete", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "covered", unresolved: [] }) }, false],
+    ["a quick Scan defers a unit for its own profile", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "deferred", unresolved: ["quick_profile_final_critic"] }) }, false],
+    ["PARTIAL: is not on the first line", { "REPORT.md": "# Report\nPARTIAL: later" }, false],
+    ["money_exhausted is on a unit that is not deferred", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "candidate", unresolved: ["money_exhausted"] }) }, false],
+  ])("a succeeded scan is partial when %s: %j", async (_name, files, expected) => {
+    const record = await recordFull({ "findings.json": "[]", ...files });
+
+    expect(record.scan.partial).toBe(expected);
+  });
+
+  it("is not partial when the ledger cannot be read", async () => {
+    const record = await recordFull({ "findings.json": "[]", "REPORT.md": "# Report", "coverage-ledger.json": "{ not json" });
+
+    expect(record.scan.partial).toBe(false);
+  });
+
+  it("leaves the column null for a lite scan, as before", async () => {
+    const record = await Effect.runPromise(buildScanRecordSvc(reportsWith(findingsJson), params, REPO_ID, BRANCH, "succeeded", null, null, NO_HISTORY));
+
+    expect(record.scan.partial).toBeNull();
   });
 });
 
