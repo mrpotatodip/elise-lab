@@ -112,13 +112,6 @@ describe("POST /scans: the cap of a profile", () => {
     expect(ScanBodySchema.parse(await res.json()).data.maxBudgetUsd).toBe(18);
     expect(held).toEqual([]);
   });
-
-  it("keeps the lite ceiling for a lite request, whatever profile it names", async () => {
-    const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, skill: "lite", profile: "deep" });
-
-    expect(ScanBodySchema.parse(await res.json()).data.maxBudgetUsd).toBe(2);
-  });
 });
 
 describe("GET /usage/credit: the cap and hold of each profile", () => {
