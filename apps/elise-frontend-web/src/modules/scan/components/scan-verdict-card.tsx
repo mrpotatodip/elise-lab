@@ -4,6 +4,7 @@ import { useTable } from "@tanstack/react-table";
 import { ChevronRight, ChevronUp, CircleCheck, CircleDashed, CircleHelp, CircleX, ExternalLink, OctagonX } from "lucide-react";
 import { cn } from "#/lib/utils";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
+import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
 import { Skeleton } from "#/components/ui/skeleton";
@@ -16,9 +17,9 @@ import { scanPlural } from "../utils";
 import { ScanSeverityBadge } from "./scan-severity-badge";
 
 export const VERDICT_COPY = {
-  pass: { title: "Passed the scan policy", note: "Scanned enough times and nothing open is over the limits. An AI audit can miss problems, so this is advice and not proof that the commit is safe.", tone: "text-status-success", Icon: CircleCheck },
-  fail: { title: "Do not ship yet", note: "Trusted scans left problems that block this commit. You can fix them, or an account admin can accept the risk with a note.", tone: "text-status-danger", Icon: OctagonX },
-  cannot_tell: { title: "Cannot tell yet", note: "This is not a failure. This commit needs more scans before the answer can be yes or no.", tone: "text-status-warning", Icon: CircleHelp },
+  pass: { title: "Passed the scan policy", note: "Scanned enough times and nothing open is over the limits. An AI audit can miss problems, so this is advice and not proof that the commit is safe.", variant: "success", Icon: CircleCheck },
+  fail: { title: "Do not ship yet", note: "Trusted scans left problems that block this commit. You can fix them, or an account admin can accept the risk with a note.", variant: "destructive", Icon: OctagonX },
+  cannot_tell: { title: "Cannot tell yet", note: "This is not a failure. This commit needs more scans before the answer can be yes or no.", variant: "warning", Icon: CircleHelp },
 } as const;
 
 // -----
@@ -291,6 +292,7 @@ function OpenFindingsLink({ count, href, older, oneOffHint }: { count: number; h
 }
 
 function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFindings = false, findingsHref }: VerdictBodyProps) {
+  const copy = VERDICT_COPY[verdict.verdict];
   const { scans } = verdict;
   const missing = Math.max(0, scans.required - scans.counted);
   const needsScan = missing > 0;
@@ -300,6 +302,13 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
   const oneOffHint = oneOff === 0 ? "" : ` ${oneOff === 1 ? "1 came from a one-off scan of this commit and is" : `${oneOff} came from a one-off scan of this commit and are`} not in the branch's findings below.`;
   return (
     <>
+      <Alert variant={copy.variant} className="[&>svg]:mt-1 [&>svg]:size-5">
+        <copy.Icon />
+        <div className="grid gap-1.5">
+          <AlertDescription className="text-xl font-semibold leading-tight">{copy.title}</AlertDescription>
+          <AlertDescription className="max-w-copy text-pretty text-foreground xl:max-w-4xl">{copy.note}</AlertDescription>
+        </div>
+      </Alert>
       {repoUrl && (
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg border bg-muted/50 p-4">
           <div className="grid min-w-0 flex-1 basis-64 gap-1">
@@ -374,24 +383,12 @@ function CommitChip({ commit, repoUrl }: { commit: string; repoUrl?: string }) {
 export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan", branchOpen, Decision, compactFindings = false, findingsHref }: ScanVerdictCardProps) {
   const { data, isPending, error } = useQuery(verdictQuery(repoId, commit));
   const nextSteps = data && verdictNextSteps(data);
-  const copy = data && VERDICT_COPY[data.verdict];
 
   return (
     <Card>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-6">
         <div className="grid gap-1.5">
-          {copy ? (
-            <>
-              <p className="text-sm text-muted-foreground">Ready to ship?</p>
-              <CardTitle className={cn("flex items-center gap-2 text-xl leading-tight", copy.tone)}>
-                <copy.Icon aria-hidden="true" className="size-5 shrink-0" />
-                {copy.title}
-              </CardTitle>
-              <p className={cn("max-w-copy text-pretty text-sm leading-relaxed xl:max-w-4xl", copy.tone)}>{copy.note}</p>
-            </>
-          ) : (
-            <CardTitle>Ready to ship?</CardTitle>
-          )}
+          <CardTitle>Ready to ship?</CardTitle>
           {nextSteps && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{nextSteps}</p>}
           {scope === "scan" && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The answer belongs to the commit, not to this scan.</p>}
           {found === 0 && data && data.open.length > 0 && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">This scan found nothing. The open problems below come from other scans of the same commit.</p>}
