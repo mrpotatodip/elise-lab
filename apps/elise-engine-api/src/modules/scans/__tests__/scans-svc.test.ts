@@ -41,7 +41,7 @@ describe("createScanSvc", () => {
     ["full", { lite: 0, full: 1 }],
   ] as const)("starts a %s scan on the workflow of its path and no other", async (skill, expected) => {
     const { env, created, createdFull } = fakeBindings();
-    await Effect.runPromise(createScanSvc(env, repo, "acme", { ...input, skill }, NO_SPEND));
+    await Effect.runPromise(createScanSvc(env, repo, "acme", { ...input, skill }, OWN));
 
     expect({ lite: created.length, full: createdFull.length }).toEqual(expected);
   });
@@ -125,9 +125,9 @@ describe("createScanSvc", () => {
 
   describe("the limits of each path", () => {
     const start =(env: ReturnType<typeof fakeBindings>["env"], account: string, name: string, skill: "lite" | "full") =>
-      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, { ...repoOf(name), skill }, NO_SPEND)));
+      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, { ...repoOf(name), skill }, OWN)));
     const startOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string, skill: "lite" | "full") =>
-      Effect.runPromise(createScanSvc(env, repo, account, { ...repoOf(name), skill }, NO_SPEND));
+      Effect.runPromise(createScanSvc(env, repo, account, { ...repoOf(name), skill }, OWN));
 
     it("counts the lite and the full scans of one account on their own", async () => {
       const { env } = fakeBindings({ MAX_ACTIVE_SCANS: "1", MAX_ACTIVE_FULL_SCANS: "1" });
@@ -386,6 +386,13 @@ describe("createScanSvc: a Runner", () => {
     expect(await outcome(spend, connected)).toBe(expected);
   });
 
+  it("never refuses a full scan on a runner for lack of a plan", async () => {
+    const { env, createdFull } = fakeBindings();
+    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, skill: "full" }, NO_SPEND, undefined, hold, connected));
+
+    expect(createdFull).toHaveLength(1);
+  });
+
   it("gives a scan on a runner the safety cap by default and refuses a limit above it", async () => {
     const { env, created } = fakeBindings();
     await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, NO_SPEND, undefined, hold, connected));
@@ -482,7 +489,7 @@ describe("detailScanSvc", () => {
       SCAN_WORKFLOW: { create: async () => undefined, get: async () => ({ status: async () => ({ status: "errored", error: { name: "Error", message: "boom" } }) }) } as never,
       SCAN_WORKFLOW_FULL: { create: async () => undefined, get: down } as never,
     });
-    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", { ...input, skill: "full" }, NO_SPEND));
+    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", { ...input, skill: "full" }, OWN));
     const status = await Effect.runPromise(detailScanSvc(env, repo, "acme", queued.scanId));
 
     expect(status).toMatchObject({ status: "failed", error: "boom" });

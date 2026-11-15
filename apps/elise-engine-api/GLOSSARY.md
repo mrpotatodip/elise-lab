@@ -143,7 +143,7 @@ The most dollars the agent may spend in one scan (`--max-budget-usd`). The ceili
 _Avoid_: Limit, quota
 
 **Monthly budget**:
-An optional guard on the dollars an Account may spend on scans in a UTC calendar month: `tenants.monthly_scan_budget_usd`, or `MONTHLY_BUDGET_USD` when the Account has no Plan and no own key. On a Plan it applies only once an admin with the Power `company:usage:budget:update` sets it, and it counts in credit dollars (cost times the Plan's markup). A new scan is refused with `MONTHLY_BUDGET_EXCEEDED` when spent plus the cap of running scans plus its own cap would pass it.
+An optional guard on the dollars an Account may spend on scans in a UTC calendar month: `tenants.monthly_scan_budget_usd`, or `MONTHLY_BUDGET_USD` when the Account has no Plan and no own key. On a Plan it applies only once an admin with the Power `company:usage:budget:update` sets it, and it counts in credit dollars (cost times the Plan's markup). A new scan is refused with `MONTHLY_BUDGET_EXCEEDED` when spent plus the cap of running scans plus its own cap would pass it. For a full Scan the refusal names the biggest smaller profile whose cap would fit, or says the budget is too low for any profile and what is left.
 _Avoid_: Quota
 
 **Budget allowance**:
@@ -151,7 +151,7 @@ The most an admin may set as the Monthly budget: `tenants.monthly_scan_budget_al
 _Avoid_: Ceiling (that is the Budget cap's `MAX_BUDGET_USD`), limit
 
 **Plan**:
-What an Account pays for: Pro (`pro`, $49 a month, $49 of Included credit) or Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month), a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap (5). The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
+What an Account pays for: Pro (`pro`, $49 a month, $49 of Included credit) or Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month), a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap (5). The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
 _Avoid_: Tier, subscription (for the Plan itself)
 
 **Included credit**:
