@@ -53,13 +53,16 @@ export const scanRowToStatus = (row: ScanRow, artifacts: ScanArtifact[], summary
 type FindingCount = { status: FindingStatusValue; severity: FindingSeverityValue | null; origin: FindingOriginValue; total: number };
 
 // -----
-// Counts only for a succeeded scan of the skill whose
-// findings are recorded: for any other the findings table
-// is empty because nothing was read, not because nothing
-// was found. A clean lite scan has all zeros.
+// Counts only for a succeeded scan whose findings are
+// recorded: a lite scan, or a full scan whose partial column
+// is set (every full scan recorded from the profile era on).
+// For any other the findings table is empty because nothing
+// was read, not because nothing was found. A clean scan has
+// all zeros.
 // -----
 export const summaryOf = (row: ScanRow, counts: FindingCount[]): ScanSummary | null => {
-  if (row.status !== "succeeded" || row.skill !== "lite") return null;
+  const recorded = row.skill === "lite" || (row.skill === "full" && row.partial !== null);
+  if (row.status !== "succeeded" || !recorded) return null;
   const recheck =
     row.priorsGiven === null
       ? null

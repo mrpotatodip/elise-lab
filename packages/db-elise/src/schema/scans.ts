@@ -125,6 +125,8 @@ export const scans = pgTable(
     priorsCarried: integer("priors_carried"),
     priorsClosed: integer("priors_closed"),
     priorsUnchecked: integer("priors_unchecked"),
+    // Set with the findings of a succeeded full-skill Scan: true when it ran out of money (a Report that starts with PARTIAL:, or a unit deferred as money_exhausted). Null on a Scan recorded before this column, a lite Scan and a Scan that did not succeed.
+    partial: boolean("partial"),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),
