@@ -291,13 +291,33 @@ function OpenFindingsLink({ count, href, older, oneOffHint }: { count: number; h
   );
 }
 
-function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFindings = false, findingsHref }: VerdictBodyProps) {
-  const copy = VERDICT_COPY[verdict.verdict];
+// -----
+// The way to ask for another scan of this exact commit, next to the commit
+// chip. With scans still missing, one click runs the missing scan with the
+// settings of the last one, and the other button opens the options.
+// -----
+function VerdictRescan({ verdict, repoId, repoUrl }: { verdict: Verdict; repoId: string; repoUrl: string }) {
   const { scans } = verdict;
-  const missing = Math.max(0, scans.required - scans.counted);
-  const needsScan = missing > 0;
+  const needsScan = scans.required - scans.counted > 0;
   const { data: list } = useQuery(scansQuery());
   const last = list?.scans.find((scan) => scan.scanId === scans.ids[0]);
+  return (
+    <div className="flex flex-wrap items-start gap-3">
+      {needsScan && last && <ScanVerdictRun repoId={repoId} repoUrl={repoUrl} commit={verdict.commit} last={last} />}
+      <ScanNewDialog
+        label={needsScan && last ? "Choose options" : "Run another scan of this commit"}
+        size="sm"
+        variant={needsScan && !last ? "default" : "outline"}
+        repo={repoUrl}
+        startRef={verdict.commit}
+        startOptions={last && { model: last.model === "claude-opus-5-5" ? undefined : last.model, effort: last.effort, skill: last.skill, profile: last.profile }}
+      />
+    </div>
+  );
+}
+
+function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFindings = false, findingsHref }: VerdictBodyProps) {
+  const copy = VERDICT_COPY[verdict.verdict];
   const oneOff = branchOpen === undefined ? 0 : Math.max(0, verdict.open.length - branchOpen);
   const oneOffHint = oneOff === 0 ? "" : ` ${oneOff === 1 ? "1 came from a one-off scan of this commit and is" : `${oneOff} came from a one-off scan of this commit and are`} not in the branch's findings below.`;
   return (
@@ -309,25 +329,6 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
           <AlertDescription className="max-w-copy text-pretty text-foreground xl:max-w-4xl">{copy.note}</AlertDescription>
         </div>
       </Alert>
-      {repoUrl && (
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg border bg-muted/50 p-4">
-          <div className="grid min-w-0 flex-1 basis-64 gap-1">
-            <p className="text-sm font-medium">{needsScan ? `Next step: scan this commit ${missing === 1 ? "once more" : `${missing} more times`}` : "Want another look at this exact commit?"}</p>
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Scans exactly {verdict.commit.slice(0, 7)}, even if the branch has moved on. The worst result counts.</p>
-          </div>
-          <div className="flex flex-wrap items-start gap-3">
-            {needsScan && last && <ScanVerdictRun repoId={repoId} repoUrl={repoUrl} commit={verdict.commit} last={last} />}
-            <ScanNewDialog
-              label={needsScan && last ? "Choose options" : "Run another scan of this commit"}
-              size="default"
-              variant={needsScan && !last ? "default" : "outline"}
-              repo={repoUrl}
-              startRef={verdict.commit}
-              startOptions={last && { model: last.model === "claude-opus-5-5" ? undefined : last.model, effort: last.effort, skill: last.skill, profile: last.profile }}
-            />
-          </div>
-        </div>
-      )}
       <VerdictChecklist verdict={verdict} />
       <div className="grid gap-6">
         {findingsHref ? (
@@ -393,7 +394,10 @@ export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan"
           {scope === "scan" && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The answer belongs to the commit, not to this scan.</p>}
           {found === 0 && data && data.open.length > 0 && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">This scan found nothing. The open problems below come from other scans of the same commit.</p>}
         </div>
-        <CommitChip commit={commit} repoUrl={repoUrl} />
+        <div className="flex flex-wrap items-start gap-3">
+          <CommitChip commit={commit} repoUrl={repoUrl} />
+          {data && repoUrl && <VerdictRescan verdict={data} repoId={repoId} repoUrl={repoUrl} />}
+        </div>
       </CardHeader>
       <CardContent className="grid gap-4">
         {isPending ? <Skeleton className="h-16" /> : error ? <p className="text-sm text-destructive">We could not load the verdict: {error.message}. Refresh to try again.</p> : <VerdictBody verdict={data} repoId={repoId} repoUrl={repoUrl} branchOpen={branchOpen} Decision={Decision} compactFindings={compactFindings} findingsHref={findingsHref} />}
