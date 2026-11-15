@@ -279,7 +279,7 @@ function OpenFindingsLink({ count, href, older, oneOffHint }: { count: number; h
       <h3 id="verdict-open-heading" className="text-[15px] font-semibold">
         {scanPlural(count, "problem", "problems")} still open on this commit
       </h3>
-      <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+      <p className="max-w-copy text-sm leading-relaxed text-muted-foreground xl:max-w-3xl">
         These count against the commit. Read each one and record your decision in{" "}
         <a href={href} className="rounded-sm font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Findings on this branch
