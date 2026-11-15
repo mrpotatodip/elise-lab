@@ -349,7 +349,7 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
         />
       </div>
       <div className="border-t pt-3">
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground xl:max-w-3xl">
           <span className="font-medium text-foreground">Advice, not a guarantee.</span> This answer comes from an AI review of the code. It can miss a problem, and a scanned repository can try to steer it. Do not use it as your only release check.
         </p>
       </div>
