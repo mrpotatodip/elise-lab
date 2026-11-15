@@ -38,7 +38,7 @@ export function ScanVerdictRun({ repoId, repoUrl, commit, last }: ScanVerdictRun
 
   return (
     <div className="grid justify-items-start gap-1.5">
-      <Button disabled={start.isPending || reason !== null} onClick={() => start.mutate({ repo: repoUrl, ref: commit, model: last.model === "claude-opus-5-5" ? "claude-sonnet-5-5" : last.model, effort: last.effort, skill: "lite", profile: last.profile })}>
+      <Button disabled={start.isPending || reason !== null} onClick={() => start.mutate({ repo: repoUrl, ref: commit, model: last.model === "claude-opus-5-5" ? "claude-sonnet-5-5" : last.model, effort: last.effort, profile: last.profile })}>
         <Play className="size-3.5" />
         {start.isPending ? "Starting…" : "Run the missing scan"}
       </Button>
