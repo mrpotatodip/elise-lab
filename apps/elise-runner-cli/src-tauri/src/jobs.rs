@@ -20,12 +20,16 @@ const CLONE_TIMEOUT: Duration = Duration::from_secs(300);
 // A job with one prompt (an older engine) is one run of the agent under this limit.
 const AGENT_TIMEOUT: Duration = Duration::from_secs(40 * 60);
 // The four Phases in order, each with the time slot the cloud gives it, in minutes: 90 in all. The
-// clone and the validators are outside these 90 minutes.
+// clone, the validators and the repair run are outside these 90 minutes.
 const PHASES: [(&str, u64); 4] = [("recon", 10), ("hunt", 45), ("check", 25), ("report", 10)];
 // What a minute of a Phase's slot is. A test shortens it to outrun a Phase without waiting.
 const MINUTE: Duration = Duration::from_secs(60);
 // The Phase after which the validators run.
 const VALIDATED_AFTER: &str = "check";
+// The one repair run a failed validation may start, and its time slot in minutes. Like the clone and
+// the validators it is outside the 90 minutes of the Phases.
+const REPAIR: &str = "repair";
+const REPAIR_MINUTES: u64 = 5;
 const VALIDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const REPORT_TRIES: u32 = 3;
 const ERROR_MAX: usize = 3800;
@@ -394,8 +398,8 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Resul
 // server meter and the agent is told nothing about money, so the limit alone stops it, and what it
 // had not reached is never recorded. This app never makes a Phased Scan a Partial Scan: a Phase with
 // no money left does not start, and a Phase the limit stops ends the Scan, whatever it had written.
-// The validators run once, after the check Phase. The files of the Phases that ended stay in the work
-// folder when a later one fails.
+// The validators run after the check Phase, and when they fail the agent gets one repair run (`repair`).
+// The files of the Phases that ended stay in the work folder when a later one fails.
 // -----
 async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
     let names: Vec<&str> = job.phase_prompts.iter().map(|p| p.phase.as_str()).collect();
@@ -420,25 +424,75 @@ async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent
             return Err(phase_cap_message(phase, cap));
         }
         let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32)).await?;
-        // A Phase that failed still spent what its result says.
-        if let Some(result) = &run.result {
-            spent.add(result);
-        }
-        if run.end? == AgentEnd::CapReached {
-            return Err(phase_cap_message(phase, cap));
-        }
-        let Some(result) = &run.result else {
-            return Err(format!("The {phase} phase ended without reporting its result, so this runner cannot tell what is left of the Budget cap (${cap}). Agent output: {}", tail(run.stdout.trim(), 1500)));
-        };
-        // A cost that is missing or not a number of dollars would leave the pool as it was.
-        if cost_of(result).is_none() {
-            return Err(format!("The {phase} phase's result has no usable total_cost_usd, so this runner cannot tell what is left of the Budget cap (${cap}) and stopped the audit."));
-        }
+        settle(run, spent, phase, cap)?;
         if phase == VALIDATED_AFTER {
-            validate_full(tools, work).await.map_err(|error| format!("The {phase} phase left files that did not pass the check. {error}"))?;
+            if let Err(error) = validate_full(tools, work).await {
+                repair(tools, job, work, spent, minute, &error).await?;
+            }
         }
     }
     Ok(())
+}
+
+// What a run of the agent leaves in the pool and whether the Scan may go on: the cost its result
+// reports is spent even when the run failed, a run the limit stopped or that reported no usable
+// cost ends the Scan. `phase` is a Phase or `repair`.
+fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(), String> {
+    if let Some(result) = &run.result {
+        spent.add(result);
+    }
+    if run.end? == AgentEnd::CapReached {
+        return Err(phase_cap_message(phase, cap));
+    }
+    let name = capitalized(&run_label(phase));
+    let Some(result) = &run.result else {
+        return Err(format!("{name} ended without reporting its result, so this runner cannot tell what is left of the Budget cap (${cap}). Agent output: {}", tail(run.stdout.trim(), 1500)));
+    };
+    // A cost that is missing or not a number of dollars would leave the pool as it was.
+    if cost_of(result).is_none() {
+        return Err(format!("{name}'s result has no usable total_cost_usd, so this runner cannot tell what is left of the Budget cap (${cap}) and stopped the audit."));
+    }
+    Ok(())
+}
+
+// -----
+// The validators failed on what the check Phase left. The agent gets one more run, short, on a prompt
+// this app builds from the validator's own words: fix what is named, in the files named, and stop.
+// It runs like any Phase (the same permissions, what is left of the pool as its budget, its own
+// log) and its usage joins the sum. A pool with nothing left starts no run and ends the Scan with
+// the cap error. Any other way this goes wrong, the run failing or the validators failing again,
+// ends the Scan as a failed validation did before: with the check Phase's error. One repair at most.
+// -----
+async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, error: &str) -> Result<(), String> {
+    let cap = budget_for(job);
+    let left = money(cap - spent.cost);
+    if left <= 0.0 {
+        return Err(phase_cap_message(REPAIR, cap));
+    }
+    let failed = format!("The {VALIDATED_AFTER} phase left files that did not pass the check. {error}");
+    let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32)).await.map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
+    settle(run, spent, REPAIR, cap).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
+    validate_full(tools, work).await.map_err(|again| format!("The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {again}"))
+}
+
+// The repair run's whole prompt: no skill, no earlier files to read, only what the validator said.
+// It is one paragraph, and the validator's words are the only part that is not ours.
+fn repair_prompt(error: &str) -> String {
+    format!("A check of the files you wrote in ./out failed. Fix only the errors it names, in the file or files it names, in ./out. Change nothing else, do not start any other work, and do not run the check or any node command: the app that started you runs it again when you stop. The check said: {}", error.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
+// The words for a run in an error: a Phase, or the repair run.
+fn run_label(phase: &str) -> String {
+    if phase == REPAIR {
+        "the repair run".to_string()
+    } else {
+        format!("the {phase} phase")
+    }
+}
+
+fn capitalized(text: &str) -> String {
+    let mut chars = text.chars();
+    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
 // Money to the tenth of a thousandth of a cent, so that `18 - 3.94` is `14.06`, not `14.059999999999999`.
@@ -449,7 +503,7 @@ fn money(usd: f64) -> f64 {
 // The Scan's error when the pool is spent, naming the Phase that did not start or was stopped. The
 // engine ends the Scan as failed with this sentence; nothing of the Scan is stored.
 fn phase_cap_message(phase: &str, cap: f64) -> String {
-    format!("The Budget cap was reached (${cap}) during the {phase} phase, so the audit stopped there and nothing is sent. The work folder holds what the earlier phases wrote. Start the scan again with a profile that has a larger cap, or on a smaller repository.")
+    format!("The Budget cap was reached (${cap}) during {}, so the audit stopped there and nothing is sent. The work folder holds what the earlier phases wrote. Start the scan again with a profile that has a larger cap, or on a smaller repository.", run_label(phase))
 }
 
 // What a result says its run cost, when that is a number the pool can use: finite and not below zero.
@@ -720,7 +774,7 @@ struct AgentRun {
 // limit or failed is `Ok` with its `end` an `Err` and whatever result it left, so its spend counts.
 async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_usd: f64, phase: Option<&str>, limit: Duration) -> Result<AgentRun, String> {
     let named = |what: &str| match phase {
-        Some(phase) => format!("The {phase} phase {what}"),
+        Some(phase) => format!("{} {what}", capitalized(&run_label(phase))),
         None => format!("The audit {what}"),
     };
     let claude = tools.claude.as_ref().ok_or("Claude Code is not installed on this computer, or this app cannot find it. Install it from https://claude.com/claude-code and sign in, then start the scan again.")?;
@@ -770,7 +824,7 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
             let stderr = fs::read_to_string(work.join(&err_name)).unwrap_or_default();
             let said = format!("claude exited {}: {} {}", status.code().unwrap_or(-1), tail(stderr.trim(), 1500), tail(stdout.trim(), 1500));
             Err(match phase {
-                Some(phase) => format!("The {phase} phase failed: {said}"),
+                Some(phase) => format!("{} failed: {said}", capitalized(&run_label(phase))),
                 None => said,
             })
         }
@@ -1106,6 +1160,9 @@ mod tests {
     // given: `phase=hunt` says which files it writes, `cost=4` what its result reports, `stop=limit`
     // that its limit stopped it and `stop=crash` that it failed. It records every call in
     // `calls.txt` (the budget it was given, then the prompt) and `args.txt` (all its arguments).
+    // The app builds the repair run's prompt itself, so a test says what that run does in a
+    // `repair.txt` it writes into the work folder: the stub reads it as if it were part of the
+    // prompt, and `nofix=1` leaves the invalid file as it was.
     // -----
     const STUB_CLAUDE: &str = r#"#!/bin/sh
 for a in "$@"; do prompt="$a"; done
@@ -1116,6 +1173,11 @@ for a in "$@"; do
 done
 printf '%s|%s\n' "$budget" "$prompt" >> calls.txt
 printf '%s\n' "$*" >> args.txt
+case "$prompt" in
+  *"Fix only"*)
+    prompt="$prompt $(cat repair.txt 2>/dev/null)"
+    case "$prompt" in *"nofix=1"*) ;; *) echo '{"findings":[]}' > out/findings.json ;; esac ;;
+esac
 cost=$(printf '%s' "$prompt" | sed -n 's/.*[^o]cost=\(-\{0,1\}[0-9.]*\).*/\1/p')
 case "$prompt" in
   *"stop=crash"*) echo "the agent said: boom" >&2; exit 2 ;;
@@ -1407,23 +1469,61 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let _ = fs::remove_dir_all(&stage.root);
     }
 
-    // The validators run in the app once, on what the check Phase left, before the report is written.
+    // The validators run in the app on what the check Phase left, before the report is written. When
+    // they pass the first time there is no repair run: the four Phases are the four runs.
     #[cfg(unix)]
     #[test]
-    fn the_validators_run_once_after_the_check_phase() {
+    fn the_validators_run_once_after_the_check_phase_and_start_no_repair_when_they_pass() {
         let stage = stage("validators");
 
         let report = scan(&stage, &plain_job());
 
         assert_eq!(report.state, "succeeded", "{:?}", report.error);
         assert_eq!(lines_of(stage.work.join("validated.txt")), ["validate-findings.cjs findings.json |", "validate-coverage-ledger.cjs coverage-ledger.json |"]);
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 4);
+        assert!(!stage.work.join("agent-repair.log").exists());
         let _ = fs::remove_dir_all(&stage.root);
     }
 
+    // The check Phase leaves an invalid file, and the app asks the agent once to fix what the validator
+    // named, from what is left of the pool, then runs the validators again and goes on to the report.
     #[cfg(unix)]
     #[test]
-    fn a_validator_failure_names_the_check_phase_and_stops_before_the_report() {
+    fn a_repair_run_fixes_what_the_validator_named_and_its_usage_is_summed_in() {
+        let stage = stage("repair");
+        fs::write(stage.work.join("repair.txt"), "cost=1").unwrap();
+        let job = phased_job(["phase=recon cost=1.5", "phase=hunt cost=4", "phase=check invalid=1 cost=2.5", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let calls = lines_of(stage.work.join("calls.txt"));
+        assert_eq!(calls.len(), 5);
+        assert!(calls[3].starts_with("4|"), "{}", calls[3]);
+        assert!(calls[3].contains("findings.json") && calls[3].contains("the file is not valid") && calls[3].contains("./out"), "{}", calls[3]);
+        assert!(calls[4].starts_with("3|phase=report"), "{}", calls[4]);
+        assert!(stage.work.join("agent-repair.log").is_file());
+        assert_eq!(lines_of(stage.work.join("validated.txt")).len(), 3, "the first validator failed, then both passed");
+        for run in lines_of(stage.work.join("args.txt")) {
+            assert!(run.contains(&format!("--allowedTools {ALLOWED_TOOLS} --")) && run.contains("--permission-mode acceptEdits"), "{run}");
+            assert!(!run.contains("dangerously") && !run.contains("--bare"), "{run}");
+        }
+        let sum = last_json(report.agent_log.as_deref().unwrap());
+        assert_eq!(sum["total_cost_usd"], 10.0);
+        assert_eq!(sum["num_turns"], 15);
+        assert_eq!(sum["duration_ms"], 5000);
+        assert_eq!(sum["usage"]["input_tokens"], 50);
+        assert_eq!(sum["usage"]["cache_creation_input_tokens"], 200);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // A validator that fails after the repair too ends the Scan as it did before, and there is no
+    // second repair.
+    #[cfg(unix)]
+    #[test]
+    fn a_validator_that_fails_after_the_repair_names_the_check_phase_and_stops_before_the_report() {
         let stage = stage("invalid");
+        fs::write(stage.work.join("repair.txt"), "nofix=1 cost=1").unwrap();
         let job = phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check invalid=1 cost=1", "phase=report cost=1"]);
 
         let report = scan(&stage, &job);
@@ -1431,8 +1531,46 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert_eq!(report.state, "failed");
         let said = report.error.unwrap();
         assert!(said.contains("check phase") && said.contains("findings.json") && said.contains("the file is not valid"), "{said}");
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 4, "one repair run and no more");
+        assert!(stage.work.join("out/recon.md").is_file());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // With nothing left in the pool the repair run does not start: the error is the cap one.
+    #[cfg(unix)]
+    #[test]
+    fn a_spent_pool_starts_no_repair_run() {
+        let stage = stage("repair-spent");
+        let job = Job { profile_cap_usd: Some(5.0), ..phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check invalid=1 cost=3", "phase=report cost=1"]) };
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.unwrap();
+        assert!(said.contains("cap was reached") && said.contains("$5") && said.contains("repair"), "{said}");
         assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 3);
         let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // A repair run that crashes or is stopped by the limit ends the Scan with the check's error, and
+    // says which run failed. What it spent still counts.
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_repair_run_ends_the_scan_with_the_checks_error_and_still_counts_its_cost() {
+        for (repair, why, spent) in [("stop=crash", "the agent said: boom", 3.0), ("stop=limit cost=2", "cap was reached", 5.0)] {
+            let stage = stage("repair-fail");
+            fs::write(stage.work.join("repair.txt"), repair).unwrap();
+            let job = phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check invalid=1 cost=1", "phase=report cost=1"]);
+
+            let report = scan(&stage, &job);
+
+            assert_eq!(report.state, "failed");
+            let said = report.error.clone().unwrap();
+            assert!(said.contains("check phase") && said.contains("the file is not valid") && said.contains("repair run") && said.contains(why), "{said}");
+            assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 4);
+            assert_eq!(last_json(report.agent_log.as_deref().unwrap())["total_cost_usd"], spent);
+            let _ = fs::remove_dir_all(&stage.root);
+        }
     }
 
     // An older engine sends one prompt: one run, under the old limit, checked after it as before.
@@ -1491,6 +1629,8 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert_eq!(slots, [("recon", 10), ("hunt", 45), ("check", 25), ("report", 10)]);
         assert_eq!(slots.iter().map(|(_, minutes)| minutes).sum::<u64>(), 90);
         assert_eq!(AGENT_TIMEOUT, Duration::from_secs(40 * 60));
+        // The repair run's 5 minutes are extra: they are not one of the 90.
+        assert_eq!(REPAIR_MINUTES, 5);
     }
 
     #[cfg(unix)]

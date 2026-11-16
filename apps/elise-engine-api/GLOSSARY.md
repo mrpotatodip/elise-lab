@@ -59,7 +59,7 @@ Where a running Scan is: `cloning`, `auditing` or `saving`. It is null when the 
 _Avoid_: Phase (a Phase is one of recon, hunt, check or report)
 
 **Phase**:
-One of the four runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. In the cloud each is a Detached run; on a Runner each is a run of `claude` that the app starts. A Runner Scan has Phases too, on the Phase prompts the engine puts in its job (`phasePrompts`). They share the one Pool, and no Phase has a share of its own. Each has its own time slot (10, 45, 25 and 10 minutes). Only a full Scan has Phases; a lite Scan is one run, and so is a Runner Scan whose job carries no Phase prompts (an older engine). ADR 0006 holds the rules.
+One of the four runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. In the cloud each is a Detached run; on a Runner each is a run of `claude` that the app starts. A Runner Scan has Phases too, on the Phase prompts the engine puts in its job (`phasePrompts`). They share the one Pool, and no Phase has a share of its own. Each has its own time slot (10, 45, 25 and 10 minutes). The one repair run that a Runner starts when the validators fail after `check` is not a Phase: it has a 5-minute slot of its own and spends from the same Pool. Only a full Scan has Phases; a lite Scan is one run, and so is a Runner Scan whose job carries no Phase prompts (an older engine). ADR 0006 holds the rules.
 _Avoid_: Step (that is cloning, auditing or saving), stage
 
 **Runner**:

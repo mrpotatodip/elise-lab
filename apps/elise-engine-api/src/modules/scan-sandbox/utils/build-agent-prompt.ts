@@ -51,10 +51,11 @@ ${network} and dependencies must not be installed. Finish by producing ${SCAN_RE
 // reach as deferred in the coverage ledger, as the skill allows, and never
 // stops mid-phase with nothing written.
 // -----
+const LEDGER_PATHS = "In the ledger, write a directory path without a slash at the end.";
 const PHASE_HANDOFF = {
-  recon: "This is the first run. Set the run up as the skill says and write run-metadata.json, architecture.md and the initial coverage-ledger.json.",
-  hunt: "An earlier run did the reconnaissance. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not redo reconnaissance. Write the candidates and the updated ledger.",
-  check: "Earlier runs did the reconnaissance and the hunting. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not hunt again. Validate the candidates the hunt left, and write findings.json and the final ledger.",
+  recon: `This is the first run. Set the run up as the skill says and write run-metadata.json, architecture.md and the initial coverage-ledger.json. ${LEDGER_PATHS}`,
+  hunt: `An earlier run did the reconnaissance. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not redo reconnaissance. Write the candidates and the updated ledger. ${LEDGER_PATHS}`,
+  check: `Earlier runs did the reconnaissance and the hunting. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not hunt again. Validate the candidates the hunt left, and write findings.json and the final ledger. ${LEDGER_PATHS}`,
   report: "Earlier runs did everything but the report. Read run-metadata.json, coverage-ledger.json and findings.json in the output directory first. Do not hunt or validate again. Write the report files from the final records only.",
 } satisfies Record<FullPhase, string>;
 const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
