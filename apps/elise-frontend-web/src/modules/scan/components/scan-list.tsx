@@ -16,6 +16,7 @@ import type { ScanState, ScanStatus } from "../schemas";
 import { scanCost, scanPlural } from "../utils";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanOrigin } from "./scan-origin";
+import { ScanProfileBadge } from "./scan-profile-badge";
 import { ScanRepoLink } from "./scan-repo-link";
 import { ScanSeverityDots } from "./scan-severity-dots";
 import { ScanStatusBadge } from "./scan-status-badge";
@@ -70,7 +71,16 @@ const columns = column.columns([
       </>
     ),
   }),
-  column.display({ id: "status", header: "Status", cell: ({ row }) => <ScanStatusBadge status={row.original.status} /> }),
+  column.display({
+    id: "status",
+    header: "Status",
+    cell: ({ row }) => (
+      <span className="flex flex-col items-start gap-1">
+        <ScanStatusBadge status={row.original.status} />
+        <ScanProfileBadge scan={row.original} />
+      </span>
+    ),
+  }),
   column.display({ id: "findings", header: "Findings", cell: ({ row }) => <FindingsCell scan={row.original} /> }),
   column.display({
     id: "review",
