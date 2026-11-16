@@ -59,8 +59,12 @@ Where a running Scan is: `cloning`, `auditing` or `saving`. It is null when the 
 _Avoid_: Phase (a Phase is one of recon, hunt, check or report)
 
 **Phase**:
-One of the four Detached runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. They share the one pool of the Scan's Budget cap, and no Phase has a share of its own. Each has its own time limit. Only a full Scan has Phases; a lite Scan is one run. ADR 0006 holds the rules.
+One of the four runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. In the cloud each is a Detached run; on a Runner each is a run of `claude` that the app starts. A Runner Scan has Phases too, on the Phase prompts the engine puts in its job (`phasePrompts`). They share the one Pool, and no Phase has a share of its own. Each has its own time slot (10, 45, 25 and 10 minutes). Only a full Scan has Phases; a lite Scan is one run, and so is a Runner Scan whose job carries no Phase prompts (an older engine). ADR 0006 holds the rules.
 _Avoid_: Step (that is cloning, auditing or saving), stage
+
+**Runner**:
+The app on a person's computer (`apps/elise-runner-cli`) that claims a Scan and runs it there: it clones the repo, runs `claude` on the person's own login under its own permission rules, and sends back what the agent wrote. A Runner Scan takes no credit. It has no server meter: the app holds the Pool itself, through the agent's own `--max-budget-usd`. ADR 0006 holds the rules.
+_Avoid_: Worker (that is the Cloudflare Worker), agent (that is the program it starts), CLI
 
 **Partial Scan**:
 A profile Scan (any Profile) that ran out of money while the Skill could still write its files, so it ended with a Report that starts `PARTIAL: money ran out;` and a findings file, both naming the units it did not cover. Only money sets the flag: a Scan is partial when the Report's first line is that Skill line, a ledger unit holds `money_exhausted`, or `run-metadata.json` says `incomplete_reason: "money_exhausted"`. Any other first line that starts with `PARTIAL:` (the agent could not verify something, say) does not make a Partial Scan, on a Runner or in the cloud. It is charged only what was metered. It is not a failed Scan. It weighs 0 in a Verdict, and its findings still count as open. A Scan that spends its whole Budget cap with no Report fails instead.
@@ -161,6 +165,10 @@ _Avoid_: Env var (an env var is not always secret)
 **Budget cap**:
 The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`, provisional). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` is the ceiling that guards that table for full Scans. A Runner Scan keeps `RUNNER_MAX_BUDGET_USD` as its own ceiling. ADR 0006 holds the rules.
 _Avoid_: Limit, quota
+
+**Pool**:
+The Budget cap shared by all the Phases of one Scan: no Phase has a share of its own, and nothing moves between Phases. In the cloud the meter holds it. On a Runner the app holds it: each Phase is started with `--max-budget-usd` set to the cap less what the earlier Phases reported in their own results. A Phase that finds the Pool spent does not start, and a Phase the limit stops ends the Scan with the cap-reached error naming that Phase. ADR 0006 holds the rules.
+_Avoid_: Budget (a Budget cap is the whole Pool), share, slice
 
 **Monthly budget**:
 An optional guard on the dollars an Account may spend on scans in a UTC calendar month: `tenants.monthly_scan_budget_usd`. On a Plan it applies only once an admin with the Power `company:usage:budget:update` sets it, and it counts in credit dollars (cost times the Plan's markup). A new scan is refused with `MONTHLY_BUDGET_EXCEEDED` when spent plus the cap of running scans plus its own cap would pass it. For a full Scan the refusal names the biggest smaller profile whose cap would fit, or says the budget is too low for any profile and what is left. The default monthly budget (`MONTHLY_BUDGET_USD`) no longer applies to a new Scan: a Plan Account has only the admin's override, and an Account with no Plan and no key of its own is refused before the budget is read.

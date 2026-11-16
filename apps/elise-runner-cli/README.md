@@ -20,7 +20,11 @@ The page never holds the API token. Rust keeps it in the system keychain and mak
 
 A scan uses your Claude login but not your Claude Code settings. The app writes its own settings file and the audit skill into the scan's work folder and tells `claude` to load only that (`--setting-sources project`), so an allow rule you keep for daily work, such as `curl`, cannot widen what the agent may do. Your `~/.claude` folder is neither read nor changed.
 
-A job says which audit to run (`lite` or `full`). A full job is one run of `claude`, with no Phases, and it stops at the lower of the job's `profileCapUsd` and the Runner's own ceiling through `claude`'s `--max-budget-usd`. A job with no `profileCapUsd` (an older Worker) uses the budget it sends. When the limit is hit and the audit had already written `REPORT.md`, the files are sent and the Scan ends as a Partial Scan; otherwise the Scan ends with an error that says the cap was reached.
+A job says which audit to run (`lite` or `full`). A full job that carries `phasePrompts` runs the four Phases (recon, hunt, check, report) as four runs of `claude`, in order, each on its own prompt and with the cloud's time slot (10, 45, 25 and 10 minutes). They spend one pool: the lower of the job's `profileCapUsd` and the Runner's own ceiling, less what the earlier Phases reported in their results, passed to each run as `--max-budget-usd`. A Phase that finds nothing left does not start, and a Phase the limit stops ends the Scan with an error that names it; the app never makes such a Scan a Partial Scan. A Phase that fails names itself in the error and the work folder stays, with the earlier Phases' files in it. The app runs the audit skill's validators once, after the check Phase. The last line of the log it sends is one object with the cost, turns, duration and token counts summed over the Phases.
+
+A job with no `phasePrompts` (an older engine) is one run of `claude` on the single prompt, for up to 40 minutes. It stops at the same cap through `--max-budget-usd`. A job with no `profileCapUsd` (an older Worker) uses the budget it sends. When the limit is hit and the audit had already written `REPORT.md`, the files are sent and the Scan ends as a Partial Scan; otherwise the Scan ends with an error that says the cap was reached.
+
+The Rust tests (`cargo test` in `src-tauri`) run a Scan after the clone against a stub `claude` and `node`.
 
 The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The activity is `idle`, `running` or `finished`.
 

@@ -17,7 +17,13 @@ use tokio::time::{sleep, timeout};
 
 const POLL_EVERY: Duration = Duration::from_secs(5);
 const CLONE_TIMEOUT: Duration = Duration::from_secs(300);
+// A job with one prompt (an older engine) is one run of the agent under this limit.
 const AGENT_TIMEOUT: Duration = Duration::from_secs(40 * 60);
+// The four Phases in order, each with the time slot the cloud gives it, in minutes: 90 in all. The
+// clone and the validators are outside these 90 minutes.
+const PHASES: [(&str, u64); 4] = [("recon", 10), ("hunt", 45), ("check", 25), ("report", 10)];
+// The Phase after which the validators run.
+const VALIDATED_AFTER: &str = "check";
 const VALIDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const REPORT_TRIES: u32 = 3;
 const ERROR_MAX: usize = 3800;
@@ -148,7 +154,27 @@ struct Job {
     profile_cap_usd: Option<f64>,
     max_budget_usd: f64,
     prompt: String,
+    // The four Phase prompts in order, when the engine builds them. An older engine sends none and
+    // the Scan is one run on `prompt`.
+    #[serde(default)]
+    phase_prompts: Vec<PhasePrompt>,
     priors_json: String,
+}
+
+#[derive(Deserialize)]
+struct PhasePrompt {
+    phase: String,
+    prompt: String,
+}
+
+// Where the programs and the audit skill are: plain values, so a test passes a stub `claude`, a stub
+// `node` and a skills folder. `None` is a program this computer does not have; the Scan says so when
+// it first needs it.
+struct Tools {
+    claude: Option<PathBuf>,
+    node: Option<PathBuf>,
+    // The folder that holds `security-audit` and `security-audit-lite`.
+    skills: PathBuf,
 }
 
 #[derive(Serialize)]
@@ -220,24 +246,15 @@ async fn handle(app: &AppHandle, token: &str, job: Job) {
     set_activity(Activity::Running { repo: label.clone() });
 
     let work = std::env::temp_dir().join(format!("eliselab-runner-{}", job.scan_id));
-    let report = match execute(app, &job, &work).await {
-        Ok(report) => report,
-        Err(error) => Report {
-            state: "failed",
-            error: Some(tail(&error, ERROR_MAX)),
-            checkout: None,
-            agent_log: read_agent_log(&work),
-            files: BTreeMap::new(),
-        },
+    let ended = match find_tools(app) {
+        Ok(tools) => execute(&tools, &job, &work).await,
+        Err(error) => Err(error),
     };
+    let report = ended.unwrap_or_else(|error| failed_report(&work, error));
     let ok = report.state == "succeeded";
     let message = report.error.clone().unwrap_or_default();
     let sent = send_report(token, &job.scan_id, &report).await;
-    // A finished scan cleans up after itself. A failed one keeps its folder, so the agent's
-    // own log can be read.
-    if ok && sent {
-        let _ = fs::remove_dir_all(&work);
-    }
+    tidy(&work, &report, sent);
 
     set_activity(Activity::Finished {
         ok: ok && sent,
@@ -248,6 +265,36 @@ async fn handle(app: &AppHandle, token: &str, job: Job) {
             (false, true) => message,
         },
     });
+}
+
+// What a scan that ended in an error sends: the error, and the agent's log, which carries what the
+// Phases that ran cost.
+fn failed_report(work: &Path, error: String) -> Report {
+    Report {
+        state: "failed",
+        error: Some(tail(&error, ERROR_MAX)),
+        checkout: None,
+        agent_log: read_agent_log(work),
+        files: BTreeMap::new(),
+    }
+}
+
+// A finished scan cleans up after itself. A failed one keeps its folder, so the agent's own log and
+// the files of the Phases that finished can be read.
+fn tidy(work: &Path, report: &Report, sent: bool) {
+    if report.state == "succeeded" && sent {
+        let _ = fs::remove_dir_all(work);
+    }
+}
+
+// Where `claude`, `node` and the bundled skills are on this computer.
+fn find_tools(app: &AppHandle) -> Result<Tools, String> {
+    let skills = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?
+        .join("skills");
+    Ok(Tools { claude: find_claude(), node: find_node(), skills })
 }
 
 async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
@@ -275,7 +322,7 @@ async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
 // One scan from clone to report. Every Err is a sentence that goes to the dashboard as the
 // scan's error, so it says what to do.
 // -----
-async fn execute(app: &AppHandle, job: &Job, work: &Path) -> Result<Report, String> {
+async fn execute(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> {
     if !safe_repo_url(&job.repo) {
         return Err("This runner only clones public https://github.com/owner/name repositories.".into());
     }
@@ -286,11 +333,7 @@ async fn execute(app: &AppHandle, job: &Job, work: &Path) -> Result<Report, Stri
     if !job.scan_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
         return Err("The scan id is not one this runner will use.".into());
     }
-    let skill_dir = match job.skill.as_str() {
-        "lite" => "security-audit-lite",
-        "full" => "security-audit",
-        other => return Err(format!("This runner does not know the \"{other}\" audit.")),
-    };
+    skill_dir_of(job)?;
 
     let _ = fs::remove_dir_all(work);
     fs::create_dir_all(work.join("out")).map_err(|e| format!("Could not make a work folder: {e}"))?;
@@ -299,17 +342,37 @@ async fn execute(app: &AppHandle, job: &Job, work: &Path) -> Result<Report, Stri
     }
 
     clone_repo(work, &job.repo, &git_ref).await?;
-    strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
+    audit(tools, job, work).await
+}
 
-    install_skill(app, skill_dir, work)?;
+fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
+    match job.skill.as_str() {
+        "lite" => Ok("security-audit-lite"),
+        "full" => Ok("security-audit"),
+        other => Err(format!("This runner does not know the \"{other}\" audit.")),
+    }
+}
+
+// -----
+// Everything after the clone: the agent's settings and skill, the run or the four Phases, the
+// validators and the files to send. The work folder holds `repo`, `out` and what the clone left.
+// -----
+async fn audit(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> {
+    strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
+    install_skill(tools, skill_dir_of(job)?, work)?;
     write_agent_settings(work)?;
-    let end = run_agent(work, job).await?;
+
+    if job.skill == "full" && !job.phase_prompts.is_empty() {
+        return run_phases(tools, job, work).await;
+    }
+
+    let end = run_agent(tools, work, job, &job.prompt, budget_for(job), None, AGENT_TIMEOUT).await?.end?;
     // -----
     // A scan whose budget ran out ends as a Partial Scan when the audit had already written its
     // report, with the files it left (the engine reads the report's `PARTIAL:` line). `claude` stops
     // the run the moment its limit is hit and tells the skill nothing, so a report is there only when
     // the skill wrote one before that. Without one the error says the cap was reached, not that a
-    // file is missing.
+    // file is missing. This is the single-prompt path only: a Phased Scan never ends this way.
     // -----
     let capped = end == AgentEnd::CapReached;
     let report = match collect(work) {
@@ -318,9 +381,123 @@ async fn execute(app: &AppHandle, job: &Job, work: &Path) -> Result<Report, Stri
         Err(error) => return Err(error),
     };
     if job.skill == "full" {
-        validate_full(app, work).await.map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
+        validate_full(tools, work).await.map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
     }
     Ok(report)
+}
+
+// -----
+// The four Phases, one run of the agent each, in order, on the prompt the engine built for it. They
+// spend one pool: the cap, less what the Phases before reported in their own results. A Runner has no
+// server meter and the agent is told nothing about money, so the limit alone stops it, and what it
+// had not reached is never recorded. This app never makes a Phased Scan a Partial Scan: a Phase with
+// no money left does not start, and a Phase the limit stops ends the Scan, whatever it had written.
+// The validators run once, after the check Phase. The files of the Phases that ended stay in the work
+// folder when a later one fails.
+// -----
+async fn run_phases(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> {
+    let names: Vec<&str> = job.phase_prompts.iter().map(|p| p.phase.as_str()).collect();
+    if names != PHASES.map(|(phase, _)| phase) {
+        return Err(format!("The job's Phases ({}) are not the four this runner runs: recon, hunt, check and report. Update the Elise Runner app.", names.join(", ")));
+    }
+    let mut spent = Spent::default();
+    let ran = run_each_phase(tools, job, work, &mut spent).await;
+    // The engine reads the last JSON object of the log as the Scan's usage: the sum, a failed Scan's too.
+    if let Some(sum) = spent.sum_line() {
+        append_to_log(work, &format!("{sum}\n"));
+    }
+    ran?;
+    collect(work).map_err(|error| format!("The report phase ended. {error}"))
+}
+
+async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent) -> Result<(), String> {
+    let cap = budget_for(job);
+    for (prompt, (phase, minutes)) in job.phase_prompts.iter().zip(PHASES) {
+        let left = money(cap - spent.cost);
+        if left <= 0.0 {
+            return Err(phase_cap_message(phase, cap));
+        }
+        let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), Duration::from_secs(minutes * 60)).await?;
+        // A Phase that failed still spent what its result says.
+        if let Some(result) = &run.result {
+            spent.add(result);
+        }
+        if run.end? == AgentEnd::CapReached {
+            return Err(phase_cap_message(phase, cap));
+        }
+        if run.result.is_none() {
+            return Err(format!("The {phase} phase ended without reporting its result, so this runner cannot tell what is left of the Budget cap (${cap}). Agent output: {}", tail(run.stdout.trim(), 1500)));
+        }
+        if phase == VALIDATED_AFTER {
+            validate_full(tools, work).await.map_err(|error| format!("The {phase} phase left files that did not pass the check. {error}"))?;
+        }
+    }
+    Ok(())
+}
+
+// Money to the tenth of a thousandth of a cent, so that `18 - 3.94` is `14.06`, not `14.059999999999999`.
+fn money(usd: f64) -> f64 {
+    (usd * 1_000_000.0).round() / 1_000_000.0
+}
+
+// The Scan's error when the pool is spent, naming the Phase that did not start or was stopped. The
+// engine ends the Scan as failed with this sentence; nothing of the Scan is stored.
+fn phase_cap_message(phase: &str, cap: f64) -> String {
+    format!("The Budget cap was reached (${cap}) during the {phase} phase, so the audit stopped there and nothing is sent. The work folder holds what the earlier phases wrote. Start the scan again with a profile that has a larger cap, or on a smaller repository.")
+}
+
+// What the Phases that ran have reported in their own results, added up.
+#[derive(Default)]
+struct Spent {
+    cost: f64,
+    turns: u64,
+    duration_ms: u64,
+    input: u64,
+    output: u64,
+    cache_read: u64,
+    cache_write: u64,
+    last: Option<serde_json::Value>,
+}
+
+impl Spent {
+    fn add(&mut self, result: &serde_json::Value) {
+        let count = |value: &serde_json::Value| value.as_u64().unwrap_or(0);
+        self.cost += result["total_cost_usd"].as_f64().filter(|c| c.is_finite() && *c > 0.0).unwrap_or(0.0);
+        self.turns += count(&result["num_turns"]);
+        self.duration_ms += count(&result["duration_ms"]);
+        self.input += count(&result["usage"]["input_tokens"]);
+        self.output += count(&result["usage"]["output_tokens"]);
+        self.cache_read += count(&result["usage"]["cache_read_input_tokens"]);
+        self.cache_write += count(&result["usage"]["cache_creation_input_tokens"]);
+        self.last = Some(result.clone());
+    }
+
+    // The last Phase's own result with the sums in place of its numbers. None when no Phase reported.
+    fn sum_line(&self) -> Option<String> {
+        let mut sum = self.last.clone()?;
+        sum["total_cost_usd"] = money(self.cost).into();
+        sum["num_turns"] = self.turns.into();
+        sum["duration_ms"] = self.duration_ms.into();
+        if !sum["usage"].is_object() {
+            sum["usage"] = serde_json::json!({});
+        }
+        sum["usage"]["input_tokens"] = self.input.into();
+        sum["usage"]["output_tokens"] = self.output.into();
+        sum["usage"]["cache_read_input_tokens"] = self.cache_read.into();
+        sum["usage"]["cache_creation_input_tokens"] = self.cache_write.into();
+        Some(sum.to_string())
+    }
+}
+
+fn append_to_log(work: &Path, text: &str) {
+    use std::io::Write;
+    let Ok(mut log) = fs::OpenOptions::new().create(true).append(true).open(work.join("agent.log")) else {
+        return;
+    };
+    let _ = log.write_all(text.as_bytes());
+    if !text.ends_with('\n') {
+        let _ = log.write_all(b"\n");
+    }
 }
 
 // -----
@@ -379,13 +556,8 @@ async fn clone_repo(work: &Path, repo: &str, git_ref: &str) -> Result<(), String
 // step has no copy to run here, and `node` is not allowed to the agent anyway; the app runs the
 // full audit's validators itself (`validate_full`). A copy that is already there is replaced.
 // -----
-fn install_skill(app: &AppHandle, skill_dir: &str, work: &Path) -> Result<(), String> {
-    let source = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?
-        .join("skills")
-        .join(skill_dir);
+fn install_skill(tools: &Tools, skill_dir: &str, work: &Path) -> Result<(), String> {
+    let source = tools.skills.join(skill_dir);
     let target = work.join(".claude").join("skills").join(skill_dir);
     let _ = fs::remove_dir_all(&target);
     copy_dir(&source, &target).map_err(|e| format!("Could not install the audit skill from {}: {e}", source.display()))
@@ -411,12 +583,12 @@ fn write_agent_settings(work: &Path) -> Result<(), String> {
 // `--setting-sources project` reads only the work folder's `.claude`. Never `user` or `local`
 // (the person's rules), never `--bare` (it also drops the person's login).
 // -----
-fn agent_args(job: &Job) -> Vec<String> {
+fn agent_args(job: &Job, prompt: &str, budget_usd: f64) -> Vec<String> {
     let mut args: Vec<String> = ["--print", "--output-format", "json", "--no-session-persistence", "--setting-sources", "project"].map(String::from).to_vec();
     args.extend(["--model".to_string(), job.model.clone(), "--effort".to_string(), job.effort.clone()]);
-    args.extend(["--max-budget-usd".to_string(), budget_for(job).to_string()]);
+    args.extend(["--max-budget-usd".to_string(), budget_usd.to_string()]);
     args.extend(["--permission-mode", "acceptEdits", "--allowedTools", ALLOWED_TOOLS, "--"].map(String::from));
-    args.push(job.prompt.clone());
+    args.push(prompt.to_string());
     args
 }
 
@@ -494,20 +666,15 @@ fn find_node() -> Option<PathBuf> {
 // The scripts run from the app's own bundle, not from ~/.claude/skills: the agent has run
 // by now and could have changed a copy there.
 // -----
-async fn validate_full(app: &AppHandle, work: &Path) -> Result<(), String> {
-    let node = find_node().ok_or("Node.js is not installed on this computer, or this app cannot find it. A full audit is checked with Node.js: install it from https://nodejs.org, then start the scan again.")?;
-    let skill = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?
-        .join("skills")
-        .join("security-audit");
+async fn validate_full(tools: &Tools, work: &Path) -> Result<(), String> {
+    let node = tools.node.as_ref().ok_or("Node.js is not installed on this computer, or this app cannot find it. A full audit is checked with Node.js: install it from https://nodejs.org, then start the scan again.")?;
+    let skill = tools.skills.join("security-audit");
     for (script, file) in [("validate-findings.cjs", "findings.json"), ("validate-coverage-ledger.cjs", "coverage-ledger.json")] {
         let path = work.join("out").join(file);
         if !path.is_file() {
             return Err(format!("The audit finished without writing {file}, which a full audit must have."));
         }
-        let mut command = Command::new(&node);
+        let mut command = Command::new(node);
         command
             .arg(skill.join(script))
             .arg(&path)
@@ -528,16 +695,35 @@ async fn validate_full(app: &AppHandle, work: &Path) -> Result<(), String> {
     Ok(())
 }
 
-async fn run_agent(work: &Path, job: &Job) -> Result<AgentEnd, String> {
-    let claude = find_claude().ok_or("Claude Code is not installed on this computer, or this app cannot find it. Install it from https://claude.com/claude-code and sign in, then start the scan again.")?;
+// How one run of the agent ended: Err is a sentence for the dashboard (it names the Phase, when
+// there is one), and the agent's own final JSON result is there whenever it printed one.
+struct AgentRun {
+    end: Result<AgentEnd, String>,
+    result: Option<serde_json::Value>,
+    stdout: String,
+}
+
+// One run of `claude` on one prompt, within `limit`. A Phase writes its own log and error file and
+// adds its output to `agent.log`, the whole Scan's log, which the engine reads the cost from; a
+// single run writes `agent.log` itself. `Err` here is a run that did not start or outran its limit.
+async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_usd: f64, phase: Option<&str>, limit: Duration) -> Result<AgentRun, String> {
+    let named = |what: &str| match phase {
+        Some(phase) => format!("The {phase} phase {what}"),
+        None => format!("The audit {what}"),
+    };
+    let claude = tools.claude.as_ref().ok_or("Claude Code is not installed on this computer, or this app cannot find it. Install it from https://claude.com/claude-code and sign in, then start the scan again.")?;
     let bin_dir = claude.parent().map(Path::to_path_buf).unwrap_or_default();
     let path = format!("{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", bin_dir.display());
 
-    let log = fs::File::create(work.join("agent.log")).map_err(|e| format!("Could not open the agent log: {e}"))?;
-    let err = fs::File::create(work.join("agent.err")).map_err(|e| format!("Could not open the agent log: {e}"))?;
-    let mut command = Command::new(&claude);
+    let (log_name, err_name) = match phase {
+        Some(phase) => (format!("agent-{phase}.log"), format!("agent-{phase}.err")),
+        None => ("agent.log".to_string(), "agent.err".to_string()),
+    };
+    let log = fs::File::create(work.join(&log_name)).map_err(|e| format!("Could not open the agent log: {e}"))?;
+    let err = fs::File::create(work.join(&err_name)).map_err(|e| format!("Could not open the agent log: {e}"))?;
+    let mut command = Command::new(claude);
     command
-        .args(agent_args(job))
+        .args(agent_args(job, prompt, budget_usd))
         .current_dir(work)
         .env("PATH", path)
         // The person's own login does the work. A key in the environment would be used instead.
@@ -549,19 +735,39 @@ async fn run_agent(work: &Path, job: &Job) -> Result<AgentEnd, String> {
         .kill_on_drop(true);
     let mut child = command.spawn().map_err(|e| format!("Could not start Claude Code: {e}"))?;
 
-    let status = match timeout(AGENT_TIMEOUT, child.wait()).await {
+    let status = match timeout(limit, child.wait()).await {
         Ok(status) => status.map_err(|e| format!("Claude Code stopped unexpectedly: {e}"))?,
         Err(_) => {
             let _ = child.kill().await;
-            return Err("The audit ran longer than 40 minutes, so this runner stopped it.".into());
+            if phase.is_some() {
+                append_to_log(work, &fs::read_to_string(work.join(&log_name)).unwrap_or_default());
+            }
+            return Err(named(&format!("ran longer than {} minutes, so this runner stopped it.", limit.as_secs() / 60)));
         }
     };
-    let stdout = fs::read_to_string(work.join("agent.log")).unwrap_or_default();
-    if let Ok(end) = agent_end(status.success(), &stdout, job.skill == "full") {
-        return Ok(end);
+    let stdout = fs::read_to_string(work.join(&log_name)).unwrap_or_default();
+    if phase.is_some() {
+        append_to_log(work, &stdout);
     }
-    let stderr = fs::read_to_string(work.join("agent.err")).unwrap_or_default();
-    Err(format!("claude exited {}: {} {}", status.code().unwrap_or(-1), tail(stderr.trim(), 1500), tail(stdout.trim(), 1500)))
+    let end = match agent_end(status.success(), &stdout, job.skill == "full") {
+        Ok(end) => Ok(end),
+        Err(()) => {
+            let stderr = fs::read_to_string(work.join(&err_name)).unwrap_or_default();
+            let said = format!("claude exited {}: {} {}", status.code().unwrap_or(-1), tail(stderr.trim(), 1500), tail(stdout.trim(), 1500));
+            Err(match phase {
+                Some(phase) => format!("The {phase} phase failed: {said}"),
+                None => said,
+            })
+        }
+    };
+    Ok(AgentRun { end, result: last_result(&stdout), stdout })
+}
+
+// The agent's final JSON result: the log is one object, or has stray lines before it.
+fn last_result(log: &str) -> Option<serde_json::Value> {
+    let log = log.trim();
+    let line = log.lines().rev().find(|line| line.starts_with('{'));
+    serde_json::from_str(log).ok().or_else(|| line.and_then(|line| serde_json::from_str(line).ok())).filter(serde_json::Value::is_object)
 }
 
 // -----
@@ -731,6 +937,7 @@ mod tests {
             profile_cap_usd: None,
             max_budget_usd: 1.0,
             prompt: "Use the security-audit-lite skill".into(),
+            phase_prompts: Vec::new(),
             priors_json: String::new(),
         }
     }
@@ -782,7 +989,8 @@ mod tests {
 
     #[test]
     fn the_agent_is_started_with_that_budget() {
-        let args = agent_args(&full_job(Some(12.0), 50.0));
+        let job = full_job(Some(12.0), 50.0);
+        let args = agent_args(&job, &job.prompt, budget_for(&job));
         let at = args.iter().position(|a| a == "--max-budget-usd").expect("--max-budget-usd must be passed");
 
         assert_eq!(args[at + 1], "12");
@@ -815,7 +1023,7 @@ mod tests {
     // file of theirs, and not `--bare`, which would also drop their login.
     #[test]
     fn agent_loads_only_the_project_settings_source() {
-        let args = agent_args(&test_job());
+        let args = agent_args(&test_job(), &test_job().prompt, 1.0);
         let at = args.iter().position(|a| a == "--setting-sources").expect("--setting-sources must be passed");
         assert_eq!(args[at + 1], "project");
         assert_eq!(args.iter().filter(|a| *a == "--setting-sources").count(), 1);
@@ -826,7 +1034,7 @@ mod tests {
 
     #[test]
     fn agent_grant_is_the_allowed_tools_list_and_nothing_else() {
-        let args = agent_args(&test_job());
+        let args = agent_args(&test_job(), &test_job().prompt, 1.0);
         let at = args.iter().position(|a| a == "--allowedTools").expect("--allowedTools must be passed");
         assert_eq!(args[at + 1], ALLOWED_TOOLS);
         assert_eq!(args.iter().filter(|a| *a == "--allowedTools" || *a == "--allowed-tools").count(), 1);
@@ -872,6 +1080,306 @@ mod tests {
         assert_eq!(budget_of(0.0), BUDGET_CAP_USD);
         assert_eq!(budget_of(-3.0), BUDGET_CAP_USD);
         assert_eq!(budget_of(f64::NAN), BUDGET_CAP_USD);
+    }
+
+    // -----
+    // One Scan from the end of the clone to the report, against a stub `claude` and a stub `node`
+    // that write what the real ones would. The stub reads what it should do from the prompt it is
+    // given: `phase=hunt` says which files it writes, `cost=4` what its result reports, `stop=limit`
+    // that its limit stopped it and `stop=crash` that it failed. It records every call in
+    // `calls.txt` (the budget it was given, then the prompt) and `args.txt` (all its arguments).
+    // -----
+    const STUB_CLAUDE: &str = r#"#!/bin/sh
+for a in "$@"; do prompt="$a"; done
+prev=""; budget=""
+for a in "$@"; do
+  if [ "$prev" = "--max-budget-usd" ]; then budget="$a"; fi
+  prev="$a"
+done
+printf '%s|%s\n' "$budget" "$prompt" >> calls.txt
+printf '%s\n' "$*" >> args.txt
+cost=$(printf '%s' "$prompt" | sed -n 's/.*cost=\([0-9.]*\).*/\1/p')
+case "$prompt" in
+  *"stop=crash"*) echo "the agent said: boom" >&2; exit 2 ;;
+esac
+case "$prompt" in
+  *"phase=recon"*) echo recon > out/recon.md ;;
+  *"phase=hunt"*) echo hunt > out/hunt.md ;;
+  *"phase=check"*) echo '{"findings":[]}' > out/findings.json; echo '{"units":[]}' > out/coverage-ledger.json ;;
+  *"phase=report"*) echo '# Report' > out/REPORT.md ;;
+  *"phase=all"*) echo '{"findings":[]}' > out/findings.json; echo '{"units":[]}' > out/coverage-ledger.json; echo '# Report' > out/REPORT.md ;;
+esac
+case "$prompt" in
+  *"invalid=1"*) echo INVALID > out/findings.json ;;
+esac
+subtype=success; code=0
+case "$prompt" in
+  *"stop=limit"*) subtype=error_max_budget_usd; code=1 ;;
+esac
+printf '{"type":"result","subtype":"%s","is_error":false,"total_cost_usd":%s,"num_turns":3,"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":20,"cache_read_input_tokens":30,"cache_creation_input_tokens":40}}\n' "$subtype" "${cost:-0}"
+exit $code
+"#;
+
+    const STUB_NODE: &str = r#"#!/bin/sh
+{ printf '%s %s |' "$(basename "$1")" "$(basename "$2")"; if [ -f out/REPORT.md ]; then printf ' report-present'; fi; printf '\n'; } >> validated.txt
+if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit 1; fi
+"#;
+
+    struct Stage {
+        root: PathBuf,
+        work: PathBuf,
+        tools: Tools,
+    }
+
+    #[cfg(unix)]
+    fn executable(path: &Path, text: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        fs::write(path, text).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    // The folders a Scan finds after its clone, and the three places a Scan is told about.
+    #[cfg(unix)]
+    fn stage(name: &str) -> Stage {
+        let root = std::env::temp_dir().join(format!("eliselab-phases-test-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let skill = root.join("skills").join("security-audit");
+        fs::create_dir_all(&skill).unwrap();
+        for file in ["SKILL.md", "validate-findings.cjs", "validate-coverage-ledger.cjs"] {
+            fs::write(skill.join(file), "").unwrap();
+        }
+        let bin = root.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        executable(&bin.join("claude"), STUB_CLAUDE);
+        executable(&bin.join("node"), STUB_NODE);
+        let work = root.join("work");
+        fs::create_dir_all(work.join("out")).unwrap();
+        fs::create_dir_all(work.join("repo")).unwrap();
+        let tools = Tools { claude: Some(bin.join("claude")), node: Some(bin.join("node")), skills: root.join("skills") };
+        Stage { root, work, tools }
+    }
+
+    fn phased_job(prompts: [&str; 4]) -> Job {
+        let phases = ["recon", "hunt", "check", "report"];
+        Job {
+            phase_prompts: phases.iter().zip(prompts).map(|(phase, prompt)| PhasePrompt { phase: phase.to_string(), prompt: prompt.to_string() }).collect(),
+            ..full_job(Some(12.0), 50.0)
+        }
+    }
+
+    // The Scan a person would start: a pool of $12 and four Phases that spend 1.5, 4, 2.5 and 1.
+    fn plain_job() -> Job {
+        phased_job(["phase=recon cost=1.5", "phase=hunt cost=4", "phase=check cost=2.5", "phase=report cost=1"])
+    }
+
+    // The seam: what `execute` does after the clone, ending as the dashboard would see it.
+    #[cfg(unix)]
+    fn scan(stage: &Stage, job: &Job) -> Report {
+        match tauri::async_runtime::block_on(audit(&stage.tools, job, &stage.work)) {
+            Ok(report) => report,
+            Err(error) => failed_report(&stage.work, error),
+        }
+    }
+
+    fn lines_of(path: PathBuf) -> Vec<String> {
+        fs::read_to_string(path).unwrap_or_default().lines().map(String::from).collect()
+    }
+
+    fn last_json(log: &str) -> serde_json::Value {
+        serde_json::from_str(log.trim().lines().last().unwrap()).unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn four_phases_run_in_order_each_with_its_own_prompt_and_the_money_left() {
+        let stage = stage("order");
+
+        let report = scan(&stage, &plain_job());
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert_eq!(
+            lines_of(stage.work.join("calls.txt")),
+            ["12|phase=recon cost=1.5", "10.5|phase=hunt cost=4", "6.5|phase=check cost=2.5", "4|phase=report cost=1"]
+        );
+        assert!(report.files.contains_key("REPORT.md"));
+        assert!(report.files.contains_key("hunt.md"));
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // The engine reads the last JSON object of the log as the Scan's usage: it must be the sum.
+    #[cfg(unix)]
+    #[test]
+    fn the_last_line_of_the_log_sums_the_phases() {
+        let stage = stage("sum");
+
+        let report = scan(&stage, &plain_job());
+
+        let sum = last_json(report.agent_log.as_deref().unwrap());
+        assert_eq!(sum["total_cost_usd"], 9.0);
+        assert_eq!(sum["num_turns"], 12);
+        assert_eq!(sum["duration_ms"], 4000);
+        assert_eq!(sum["usage"]["input_tokens"], 40);
+        assert_eq!(sum["usage"]["output_tokens"], 80);
+        assert_eq!(sum["usage"]["cache_read_input_tokens"], 120);
+        assert_eq!(sum["usage"]["cache_creation_input_tokens"], 160);
+        assert_eq!(sum["subtype"], "success");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // The money is the Scan's, not each Phase's: a Phase that finds none left does not start.
+    #[cfg(unix)]
+    #[test]
+    fn a_spent_pool_ends_the_scan_before_the_next_phase_starts() {
+        let stage = stage("spent");
+        let job = Job { profile_cap_usd: Some(5.0), ..phased_job(["phase=recon cost=3", "phase=hunt cost=2", "phase=check cost=1", "phase=report cost=1"]) };
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.unwrap();
+        assert!(said.contains("cap was reached") && said.contains("$5") && said.contains("check phase"), "{said}");
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
+        assert!(stage.work.join("out/hunt.md").is_file());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // A Phase the limit stopped ends the Scan, whatever it had written, and never as a Partial Scan.
+    #[cfg(unix)]
+    #[test]
+    fn a_phase_stopped_by_the_limit_ends_the_scan_with_the_cap_error() {
+        let stage = stage("limit");
+        let job = phased_job(["phase=recon cost=1", "phase=all stop=limit cost=11", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.unwrap();
+        assert!(said.contains("cap was reached") && said.contains("$12") && said.contains("hunt phase"), "{said}");
+        assert!(!said.contains("PARTIAL:"));
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
+        assert!(report.files.is_empty());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_phase_names_itself_and_keeps_the_work_folder_and_earlier_files() {
+        let stage = stage("fail");
+        let job = phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check stop=crash", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.clone().unwrap();
+        assert!(said.contains("check phase") && said.contains("the agent said: boom"), "{said}");
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 3);
+        tidy(&stage.work, &report, true);
+        assert!(stage.work.join("out/recon.md").is_file());
+        assert!(stage.work.join("out/hunt.md").is_file());
+        assert!(report.files.is_empty());
+        // The cost of the Phases that did run still reaches the engine.
+        assert_eq!(last_json(report.agent_log.as_deref().unwrap())["total_cost_usd"], 2.0);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_work_folder_is_removed_when_the_scan_succeeds_and_sent() {
+        let stage = stage("clean");
+        let report = scan(&stage, &plain_job());
+
+        tidy(&stage.work, &report, false);
+        assert!(stage.work.is_dir(), "a report that was not sent keeps its folder");
+        tidy(&stage.work, &report, true);
+
+        assert!(!stage.work.exists());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // The validators run in the app once, on what the check Phase left, before the report is written.
+    #[cfg(unix)]
+    #[test]
+    fn the_validators_run_once_after_the_check_phase() {
+        let stage = stage("validators");
+
+        let report = scan(&stage, &plain_job());
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert_eq!(lines_of(stage.work.join("validated.txt")), ["validate-findings.cjs findings.json |", "validate-coverage-ledger.cjs coverage-ledger.json |"]);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_validator_failure_names_the_check_phase_and_stops_before_the_report() {
+        let stage = stage("invalid");
+        let job = phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check invalid=1 cost=1", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.unwrap();
+        assert!(said.contains("check phase") && said.contains("findings.json") && said.contains("the file is not valid"), "{said}");
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 3);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // An older engine sends one prompt: one run, under the old limit, checked after it as before.
+    #[cfg(unix)]
+    #[test]
+    fn a_job_with_only_the_single_prompt_runs_once() {
+        let stage = stage("single");
+        let job = Job { prompt: "phase=all cost=2".into(), ..full_job(Some(12.0), 50.0) };
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert_eq!(lines_of(stage.work.join("calls.txt")), ["12|phase=all cost=2"]);
+        assert_eq!(lines_of(stage.work.join("validated.txt")), ["validate-findings.cjs findings.json | report-present", "validate-coverage-ledger.cjs coverage-ledger.json | report-present"]);
+        assert_eq!(report.agent_log.unwrap().lines().count(), 1, "the agent's own log, with no summed line");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // The permission model is the one a single run has: deny rules, allowlist and accept-edits mode.
+    #[cfg(unix)]
+    #[test]
+    fn every_phase_runs_under_the_runners_own_permissions() {
+        let stage = stage("permissions");
+
+        scan(&stage, &plain_job());
+
+        let runs = lines_of(stage.work.join("args.txt"));
+        assert_eq!(runs.len(), 4);
+        for run in runs {
+            assert!(run.contains(&format!("--allowedTools {ALLOWED_TOOLS} --")), "{run}");
+            assert!(run.contains("--permission-mode acceptEdits"), "{run}");
+            assert!(run.contains("--setting-sources project"), "{run}");
+            assert!(!run.contains("dangerously") && !run.contains("--bare"), "{run}");
+        }
+        assert_eq!(fs::read_to_string(stage.work.join(".claude/settings.json")).unwrap(), agent_settings_json());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // A job from the engine that knows Phases carries four prompts; one that does not, none.
+    #[test]
+    fn a_job_reads_with_or_without_the_phase_prompts() {
+        let base = r#""scanId":"s1","repo":"https://github.com/o/n","ref":null,"skill":"full","model":"m","effort":"high","maxBudgetUsd":50,"prompt":"p","priorsJson":"""#;
+        let phases = r#","phasePrompts":[{"phase":"recon","prompt":"a"},{"phase":"hunt","prompt":"b"},{"phase":"check","prompt":"c"},{"phase":"report","prompt":"d"}]"#;
+        let old: Job = serde_json::from_str(&format!("{{{base}}}")).unwrap();
+        let new: Job = serde_json::from_str(&format!("{{{base}{phases}}}")).unwrap();
+
+        assert!(old.phase_prompts.is_empty());
+        assert_eq!(new.phase_prompts.iter().map(|p| (p.phase.as_str(), p.prompt.as_str())).collect::<Vec<_>>(), [("recon", "a"), ("hunt", "b"), ("check", "c"), ("report", "d")]);
+    }
+
+    // The cloud's slots: 10, 45, 25 and 10 minutes, 90 in all. A single run keeps its 40.
+    #[test]
+    fn the_phases_have_the_clouds_slots_and_the_single_run_keeps_forty_minutes() {
+        let slots: Vec<(&str, u64)> = PHASES.iter().map(|(phase, minutes)| (*phase, *minutes)).collect();
+
+        assert_eq!(slots, [("recon", 10), ("hunt", 45), ("check", 25), ("report", 10)]);
+        assert_eq!(slots.iter().map(|(_, minutes)| minutes).sum::<u64>(), 90);
+        assert_eq!(AGENT_TIMEOUT, Duration::from_secs(40 * 60));
     }
 
     #[cfg(unix)]
