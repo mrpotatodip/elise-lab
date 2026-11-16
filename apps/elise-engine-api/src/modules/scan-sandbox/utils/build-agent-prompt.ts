@@ -63,8 +63,11 @@ const PHASE_HANDOFF = {
 // A Balanced or Exhaustive Scan is asked for a separate critic and separate
 // verifiers: left alone, an agent may do it all itself, and the profile check
 // then stores the Scan as unmet. The words are the same in the cloud's place
-// and the Runner's. A Focused Scan is not asked, and the prompt cannot force
-// a sub-agent to start. An Exhaustive Scan is asked for more, because its rows
+// and the Runner's. A Focused Scan is asked only for the verifiers (its rows
+// in the profile check, fresh-verifier-per-candidate and not-declared-incomplete,
+// need a check by an agent that is not the unit's owner), never for a critic,
+// and a Focused Scan with no candidate has nothing to verify. The prompt cannot
+// force a sub-agent to start. An Exhaustive Scan is asked for more, because its rows
 // in the profile check are stricter: a critic after every wave until one
 // accepts nothing, and a final verifier that is neither the owner nor a
 // verifier of the unit. The Skill already says how each record is shaped and
@@ -74,7 +77,7 @@ const VERIFY_CANDIDATES =
   "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.";
 
 const SUBAGENT_ASK = {
-  quick: { recon: "", hunt: "", check: "", report: "" },
+  quick: { recon: "", hunt: "", check: VERIFY_CANDIDATES, report: "" },
   standard: {
     recon: "",
     hunt: "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.",

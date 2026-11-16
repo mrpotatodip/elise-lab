@@ -93,10 +93,10 @@ describe("buildAgentPrompt", () => {
   });
 
   it.each([
-    ["recon", "Phase 1 (Reconnaissance)", "This is the first run", { standard: [], deep: [] }],
-    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance", { standard: [CRITIC_SENTENCE], deep: [DEEP_CRITIC_SENTENCE] }],
-    ["check", "Phases 3, 4 and 5", "Do not hunt again", { standard: [VERIFIER_SENTENCE], deep: [VERIFIER_SENTENCE, DEEP_FINAL_SENTENCE] }],
-    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again", { standard: [], deep: [] }],
+    ["recon", "Phase 1 (Reconnaissance)", "This is the first run", { quick: [], standard: [], deep: [] }],
+    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance", { quick: [], standard: [CRITIC_SENTENCE], deep: [DEEP_CRITIC_SENTENCE] }],
+    ["check", "Phases 3, 4 and 5", "Do not hunt again", { quick: [VERIFIER_SENTENCE], standard: [VERIFIER_SENTENCE], deep: [VERIFIER_SENTENCE, DEEP_FINAL_SENTENCE] }],
+    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again", { quick: [], standard: [], deep: [] }],
   ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff, asked) => {
     const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase);
 
@@ -105,12 +105,11 @@ describe("buildAgentPrompt", () => {
     // separate verifiers. An Exhaustive hunt asks for a critic after every wave and
     // another wave while one accepts work, and its check also asks for separate final
     // verifiers. The words are the same in the cloud's place and the Runner's. A
-    // Focused run asks for none, and recon and report never do.
+    // Focused check asks for the per-candidate verifier sentence only: no critic and no
+    // final verifiers, and a Focused hunt never asks. Recon and report never do.
     // -----
     const sentencesOf = (profile: ScanOptions["profile"], place?: typeof RUNNER_PROMPT_PLACE) =>
       ASKED_SENTENCES.filter((sentence) => buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence));
-    const expected = { quick: [], ...asked };
-
     expect({
       cloud: { quick: sentencesOf("quick"), standard: sentencesOf("standard"), deep: sentencesOf("deep") },
       runner: {
@@ -118,7 +117,7 @@ describe("buildAgentPrompt", () => {
         standard: sentencesOf("standard", RUNNER_PROMPT_PLACE),
         deep: sentencesOf("deep", RUNNER_PROMPT_PLACE),
       },
-    }).toEqual({ cloud: expected, runner: expected });
+    }).toEqual({ cloud: asked, runner: asked });
 
     expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
     expect(prompt).toContain(`This run does ${skillPhases}`);
