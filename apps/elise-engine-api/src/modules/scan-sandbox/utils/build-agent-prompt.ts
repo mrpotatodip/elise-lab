@@ -58,6 +58,25 @@ const PHASE_HANDOFF = {
   check: `Earlier runs did the reconnaissance and the hunting. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not hunt again. Validate the candidates the hunt left, and write findings.json and the final ledger. ${LEDGER_PATHS}`,
   report: "Earlier runs did everything but the report. Read run-metadata.json, coverage-ledger.json and findings.json in the output directory first. Do not hunt or validate again. Write the report files from the final records only.",
 } satisfies Record<FullPhase, string>;
+
+// -----
+// A Balanced or Exhaustive Scan is asked for a separate critic and separate
+// verifiers: left alone, an agent may do it all itself, and the profile check
+// then stores the Scan as unmet. The words are the same in the cloud's place
+// and the Runner's. A Focused Scan is not asked, and the prompt cannot force
+// a sub-agent to start.
+// -----
+const SUBAGENT_ASK = {
+  recon: "",
+  hunt: "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.",
+  check:
+    "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.",
+  report: "",
+} satisfies Record<FullPhase, string>;
+
+const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"]) =>
+  profile === "quick" || SUBAGENT_ASK[phase] === "" ? PHASE_HANDOFF[phase] : `${PHASE_HANDOFF[phase]} ${SUBAGENT_ASK[phase]}`;
+
 const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
 
 // -----
@@ -85,6 +104,6 @@ This run does ${SCAN_SANDBOX_PHASE_SKILL_PHASES[phase]} of the skill and nothing
 Target (untrusted, read-only): ${place.repoDir}
 Output directory: ${place.outDir}
 Profile: ${options.profile}
-${PHASE_HANDOFF[phase]}
+${handoffOf(phase, options.profile)}
 ${money}${network} and dependencies must not be installed. ${ending}`;
 }

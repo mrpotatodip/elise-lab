@@ -49,6 +49,10 @@ A Scan that runs out of money while the Skill can still write its files ends wit
 - **The deploy order is a rule for the profile fields.** The engine's job fields (#144), then the Runner app release that runs the full Skill, then the engine that removes the lite path (#141). An old app that claims a full job runs it under the Runner's own ceiling, not the profile cap. The app release must be cut from a commit before #141 removed the lite Skill folder from its bundle, or be built knowing that a lite job can no longer run. For Phases the order does not matter: the job is additive.
 - **A Runner Scan takes no credit** and counts only against `MAX_ACTIVE_SCANS` for its Account, never against the full or global caps.
 
+## Balanced and Exhaustive ask for a separate critic and separate verifiers (#156)
+
+The `standard` and `deep` Phase prompts now ask for sub-agents. The hunt prompt asks for the critic pass to run in a separate sub-agent and be recorded in `critic_passes`; the check prompt asks for each candidate to be verified by a separate sub-agent, whose ID goes in the ledger as the `agent_id` of the check, and says to record `incomplete` with `verification_unavailable` when none can start. `quick` and the recon and report prompts are unchanged. Why: the prompts only stopped forbidding sub-agents, so a Runner agent could do everything itself, and a real Balanced Scan was stored as unmet (`profile_met: none`) with no critic and no fresh verifier. The sentences are the same in the cloud's place and the Runner's (#157), so this also changes cloud Balanced and Exhaustive Scans: each may start more sub-agents and spend more of its cap, and the cap is not raised (#142 measures it). A prompt cannot force a sub-agent to start: an agent that starts none is still stored as unmet, and the profile check stays the only proof.
+
 ## Not built here
 
 - The numbers: the profile caps, `MAX_BUDGET_FULL_USD` and the Verdict weights are guesses until #142 measures real Scans.

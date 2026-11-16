@@ -6,7 +6,11 @@ import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt,
 
 const options: ScanOptions = { skill: "full", model: "claude-haiku-5-5", effort: "low", profile: "quick", maxBudgetUsd: 1 };
 
-const sharedLines = (text: string) => text.split("\n").filter((line) => !/^(Target|Output directory|The money|Do not use the network|There is no network)/.test(line));
+const CRITIC_SENTENCE = "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.";
+const VERIFIER_SENTENCE =
+  "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.";
+
+const sharedLines =(text: string) => text.split("\n").filter((line) => !/^(Target|Output directory|The money|Do not use the network|There is no network)/.test(line));
 
 describe("buildAgentScript", () => {
   it("takes an atomic lock first, so a retry starts no second agent", () => {
@@ -84,12 +88,30 @@ describe("buildAgentPrompt", () => {
   });
 
   it.each([
-    ["recon", "Phase 1 (Reconnaissance)", "This is the first run"],
-    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance"],
-    ["check", "Phases 3, 4 and 5", "Do not hunt again"],
-    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again"],
-  ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff) => {
+    ["recon", "Phase 1 (Reconnaissance)", "This is the first run", []],
+    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance", [CRITIC_SENTENCE]],
+    ["check", "Phases 3, 4 and 5", "Do not hunt again", [VERIFIER_SENTENCE]],
+    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again", []],
+  ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff, asked) => {
     const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase);
+
+    // -----
+    // A Balanced or Exhaustive hunt asks for a separate critic and a check asks for
+    // separate verifiers, the same words in the cloud's place and the Runner's. A
+    // Focused run asks for neither, and recon and report never do.
+    // -----
+    const sentencesOf = (profile: ScanOptions["profile"], place?: typeof RUNNER_PROMPT_PLACE) =>
+      [CRITIC_SENTENCE, VERIFIER_SENTENCE].filter((sentence) => buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence));
+    const expected = { quick: [], standard: asked, deep: asked };
+
+    expect({
+      cloud: { quick: sentencesOf("quick"), standard: sentencesOf("standard"), deep: sentencesOf("deep") },
+      runner: {
+        quick: sentencesOf("quick", RUNNER_PROMPT_PLACE),
+        standard: sentencesOf("standard", RUNNER_PROMPT_PLACE),
+        deep: sentencesOf("deep", RUNNER_PROMPT_PLACE),
+      },
+    }).toEqual({ cloud: expected, runner: expected });
 
     expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
     expect(prompt).toContain(`This run does ${skillPhases}`);
@@ -109,7 +131,8 @@ describe("buildAgentPrompt", () => {
     expect(otherParts.filter(([, part]) => onRunner.includes(part))).toEqual([]);
     expect(onRunner).toContain("so stop when yours is done");
     expect(onRunner).toContain("./repo");
-    expect(onRunner).not.toMatch(/sub-?agent|node command|money|deferred/i);
+    expect(onRunner).not.toMatch(/node command|money|deferred/i);
+    expect(onRunner).not.toMatch(/(do not|never|no|without)\s+(start\s+|use\s+|run\s+|spawn\s+)?sub-?agents?/i);
     expect(sharedLines(onRunner).slice(0, 5)).toEqual(sharedLines(prompt).slice(0, 5));
   });
 
