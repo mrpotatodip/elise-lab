@@ -1,3 +1,4 @@
+import { VERDICT_MIN_SCANS, VERDICT_SCAN_WEIGHTS } from "@repo/contracts/elise";
 import { Effect } from "effect";
 import { scanFindings, scanFindingTriage, scanRepoFindings, scans } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -98,15 +99,24 @@ describe("verdictSvc", () => {
 });
 
 // -----
-// Scans count by weight: quick 1, standard 1, deep 1, an old
-// lite scan 1. Every case has a commit of its own.
+// Scans count by weight. A checked scan weighs the profile it
+// met, an unmet one 0; a scan with no profile_met (an old row,
+// a cloud scan) weighs the profile it asked for, an old lite
+// scan 1. Every case has a commit of its own.
+//
+// "lesser" asked for deep and met quick. With every weight at 1
+// today, it adds the same as a met scan; the expected numbers
+// below come from VERDICT_SCAN_WEIGHTS, so they follow it if a
+// weight changes.
 // -----
-type Kind = "quick" | "standard" | "deep" | "lite" | "old-full" | "partial";
+type Kind = "quick" | "standard" | "deep" | "lite" | "old-full" | "partial" | "lesser" | "unmet";
 
 const kindValues = (kind: Kind): Partial<typeof scans.$inferInsert> => {
   if (kind === "lite") return { skill: "lite", profile: "quick", partial: null };
   if (kind === "old-full") return { skill: "full", profile: "deep", partial: null };
   if (kind === "partial") return { skill: "full", profile: "deep", partial: true };
+  if (kind === "lesser") return { skill: "full", profile: "deep", partial: false, profileMet: "quick" };
+  if (kind === "unmet") return { skill: "full", profile: "deep", partial: false, profileMet: "none" };
   return { skill: "full", profile: kind, partial: false };
 };
 
@@ -129,6 +139,31 @@ describe("verdictSvc: scan weights", () => {
     await seedCase(commit, kinds);
 
     expect(await run(commit)).toMatchObject({ verdict, scans: { required: 1, counted } });
+  });
+
+  it.each<{ name: string; digit: string; kinds: Kind[]; counted: number }>([
+    { name: "a lesser scan weighs the profile it met", digit: "d", kinds: ["lesser"], counted: VERDICT_SCAN_WEIGHTS.quick },
+    { name: "a lesser scan next to a met one adds up as the weights say", digit: "e", kinds: ["lesser", "deep"], counted: VERDICT_SCAN_WEIGHTS.quick + VERDICT_SCAN_WEIGHTS.deep },
+    { name: "an unmet scan next to a met one adds nothing", digit: "f", kinds: ["unmet", "standard"], counted: VERDICT_SCAN_WEIGHTS.standard },
+  ])("$name", async ({ digit, kinds, counted }) => {
+    const commit = digit.repeat(40);
+    await seedCase(commit, kinds);
+
+    expect(await run(commit)).toMatchObject({ verdict: counted >= VERDICT_MIN_SCANS ? "pass" : "cannot_tell", scans: { required: VERDICT_MIN_SCANS, counted } });
+  });
+
+  it("reads an unmet scan alone: cannot tell for want of weight, the scan is listed and its findings are open", async () => {
+    const commit = "0".repeat(40);
+    await seedCase(commit, ["unmet"]);
+    await test.raw.insert(scanFindings).values({ ...found("0000-0", "g", "high"), class: "full-audit" });
+
+    expect(await run(commit)).toMatchObject({
+      verdict: "cannot_tell",
+      reasons: [{ code: "too_few_scans" }, { code: "over_limit" }],
+      scans: { counted: 0, ids: ["0000-0"] },
+      counts: { high: 1 },
+      open: [{ title: "problem g" }],
+    });
   });
 
   it("lets a newer good scan clear an older partial one that left a problem unchecked", async () => {

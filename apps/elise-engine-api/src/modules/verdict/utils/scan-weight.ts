@@ -10,11 +10,18 @@ import type { JudgedScan } from "#/modules/verdict/types";
 // were never recorded, weighs 0), and a partial scan weighs 0
 // so it cannot make a commit pass alone. A name the table
 // does not know weighs 0.
+//
+// A full scan whose profile was checked (profileMet) weighs the
+// profile it met, not the one it asked for, and a scan that met
+// none weighs 0. A scan with no profileMet (a cloud scan, an
+// old row) weighs the profile it asked for. A partial scan
+// weighs 0 before profileMet is looked at.
 // -----
 const PROFILE_WEIGHTS = new Map<string, number>(Object.entries(VERDICT_SCAN_WEIGHTS));
 
-export const scanWeight = ({ skill, profile, partial }: Pick<JudgedScan, "skill" | "profile" | "partial">): number => {
+export const scanWeight = ({ skill, profile, partial, profileMet }: Pick<JudgedScan, "skill" | "profile" | "partial" | "profileMet">): number => {
   if (skill === "lite") return VERDICT_SCAN_WEIGHTS.lite;
   if (partial !== false) return 0;
-  return PROFILE_WEIGHTS.get(profile) ?? 0;
+  if (profileMet === "none") return 0;
+  return PROFILE_WEIGHTS.get(profileMet ?? profile) ?? 0;
 };

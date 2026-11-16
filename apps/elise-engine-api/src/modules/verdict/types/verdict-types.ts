@@ -1,9 +1,11 @@
-import type { FindingSeverityValue, FindingTriageStatusValue } from "@repo/contracts/elise";
+import type { FindingSeverityValue, FindingTriageStatusValue, ProfileMetValue } from "@repo/contracts/elise";
 
 // -----
-// A succeeded scan of the commit, with the three columns its
+// A succeeded scan of the commit, with the four columns its
 // weight is read from (skill, profile, partial: null on a
-// lite scan and on a full scan recorded before the column).
+// lite scan and on a full scan recorded before the column;
+// profileMet: null when the profile was not checked, as on a
+// cloud scan, a partial scan and an old row).
 // The two counts come from the scan's re-check of the
 // History; null means the scan asked about nothing (a scan of
 // a ref, or one from before re-checks).
@@ -14,6 +16,7 @@ export type JudgedScan = {
   skill: string;
   profile: string;
   partial: boolean | null;
+  profileMet: ProfileMetValue | null;
   priorsGiven: number | null;
   priorsUnchecked: number | null;
 };

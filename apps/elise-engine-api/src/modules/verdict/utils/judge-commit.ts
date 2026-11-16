@@ -82,9 +82,11 @@ const overLimit = (counts: ReturnType<typeof emptyCounts>): Reason | null => {
 // is: no database, no clock. The caller gives the succeeded
 // scans of the commit and their findings.
 //
-// A scan is read when it has a weight or is partial: a partial
-// scan adds no weight, but its findings still count as open. An
-// older full scan has neither, so it is not a look at all.
+// A scan is read when it has a weight, is partial, or met no
+// profile: such a scan adds no weight, but it is a look at the
+// commit, so it is listed and its findings still count as open.
+// An older full scan has none of the three, so it is not a look
+// at all.
 //
 // A person's decision counts only where the commit's own
 // scans do not contradict it: a false positive and an
@@ -98,7 +100,7 @@ export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput
   const weighted = weights.filter(({ weight }) => weight > 0);
   const counted = weighted.reduce((sum, { weight }) => sum + weight, 0);
   const window = windowOf(weighted);
-  const read = weights.filter(({ weight, scan }) => weight > 0 || scan.partial === true).map(({ scan }) => scan);
+  const read = weights.filter(({ weight, scan }) => weight > 0 || scan.partial === true || scan.profileMet === "none").map(({ scan }) => scan);
   const decisions = new Map(triage.map((row) => [row.fingerprint, row]));
 
   const open: Verdict["open"] = [];
