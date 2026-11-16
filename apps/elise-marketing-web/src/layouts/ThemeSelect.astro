@@ -1,28 +1,111 @@
 ---
+// The footer's theme picker, the dashboard's ShellThemeSwitch (apps/elise-frontend-web): one button
+// shows the current theme and opens a dialog with a preview tile per theme. Picking a tile applies
+// the theme and closes the dialog. The dialog is the browser's own <dialog>, so it traps focus and
+// closes on Esc. The button's icon and name follow the theme through CSS (global.css), not script.
+import { Check, Leaf, Moon, MoonStar, Palette, Sun, X } from "lucide-react";
 import { THEMES } from "../constants/themes";
+
+const ICONS = { default: Palette, midnight: MoonStar, daylight: Sun, greenfields: Leaf, moonlight: Moon } as const;
 ---
 
-<label class="theme-select">
-  <span class="theme-select__label">Theme</span>
-  <select id="theme-select">
-    {THEMES.map((theme) => <option value={theme.id}>{theme.label}</option>)}
-  </select>
-</label>
+<button type="button" class="theme-trigger" id="theme-trigger" aria-haspopup="dialog">
+  <span class="theme-trigger__icon" aria-hidden="true">
+    {
+      THEMES.map((theme) => {
+        const Icon = ICONS[theme.id];
+        return (
+          <span data-for={theme.id}>
+            <Icon size={16} strokeWidth={1.5} />
+          </span>
+        );
+      })
+    }
+  </span>
+  <span class="theme-trigger__label">Theme</span>
+  <span class="theme-trigger__value" aria-hidden="true">
+    {THEMES.map((theme) => <span data-for={theme.id}>{theme.label}</span>)}
+  </span>
+</button>
+
+<dialog class="theme-dialog" id="theme-dialog" aria-labelledby="theme-dialog-title" aria-describedby="theme-dialog-note">
+  <div class="theme-dialog__head">
+    <h2 id="theme-dialog-title">Theme</h2>
+    <p id="theme-dialog-note">Pick how this page looks. It is saved in this browser.</p>
+  </div>
+  <button type="button" class="theme-dialog__close" id="theme-close" aria-label="Close"><X size={16} aria-hidden="true" /></button>
+  <div class="theme-dialog__body">
+    <fieldset class="theme-tiles">
+      <legend class="sr-only">Theme</legend>
+      {
+        THEMES.map((theme) => {
+          const Icon = ICONS[theme.id];
+          return (
+            <button type="button" class="theme-tile" data-theme-value={theme.id} data-label={theme.label} aria-pressed="false">
+              <span class="theme-tile__preview" data-preview={theme.id} aria-hidden="true">
+                <span class="theme-tile__side" />
+                <span class="theme-tile__main">
+                  <span class="theme-tile__bar" />
+                  <span class="theme-tile__bar theme-tile__bar--short" />
+                </span>
+              </span>
+              <span class="theme-tile__copy">
+                <Icon size={16} strokeWidth={1.5} className="theme-tile__icon" aria-hidden="true" />
+                <span class="theme-tile__text">
+                  <span class="theme-tile__name">{theme.label}</span>
+                  <span class="theme-tile__note">{theme.note}</span>
+                </span>
+                <Check size={16} strokeWidth={2} className="theme-tile__check" aria-hidden="true" />
+              </span>
+            </button>
+          );
+        })
+      }
+    </fieldset>
+  </div>
+</dialog>
 
 <script>
   import { THEME_STORAGE_KEY } from "../constants/themes";
 
-  const select = document.querySelector<HTMLSelectElement>("#theme-select");
-  if (select) {
-    select.value = document.documentElement.dataset.theme ?? "default";
-    select.addEventListener("change", () => {
-      if (select.value === "default") delete document.documentElement.dataset.theme;
-      else document.documentElement.dataset.theme = select.value;
-      try {
-        localStorage.setItem(THEME_STORAGE_KEY, select.value);
-      } catch {
-        // The choice still applies to this page without storage.
-      }
+  const trigger = document.querySelector<HTMLButtonElement>("#theme-trigger");
+  const dialog = document.querySelector<HTMLDialogElement>("#theme-dialog");
+  const tiles = document.querySelectorAll<HTMLButtonElement>(".theme-tile");
+
+  // The tile for the current theme is pressed, and the button says which theme it is.
+  const sync = () => {
+    const current = document.documentElement.dataset.theme ?? "default";
+    tiles.forEach((tile) => {
+      const on = tile.dataset.themeValue === current;
+      tile.setAttribute("aria-pressed", String(on));
+      if (on && trigger) trigger.setAttribute("aria-label", `Theme: ${tile.dataset.label}. Change theme`);
+    });
+  };
+  sync();
+
+  if (trigger && dialog) {
+    trigger.addEventListener("click", () => {
+      sync();
+      dialog.showModal();
+    });
+    // A click on the dimmed area outside the dialog lands on the <dialog> element itself.
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    document.querySelector("#theme-close")?.addEventListener("click", () => dialog.close());
+    tiles.forEach((tile) => {
+      tile.addEventListener("click", () => {
+        const value = tile.dataset.themeValue ?? "default";
+        if (value === "default") delete document.documentElement.dataset.theme;
+        else document.documentElement.dataset.theme = value;
+        try {
+          localStorage.setItem(THEME_STORAGE_KEY, value);
+        } catch {
+          // The choice still applies to this page without storage.
+        }
+        sync();
+        dialog.close();
+      });
     });
   }
 </script>

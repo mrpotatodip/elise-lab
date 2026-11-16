@@ -5,7 +5,7 @@
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: 16px;
-    background: oklch(1 0 0);
+    background: var(--bg-color, var(--background));
     box-shadow: var(--shadow-card);
     font-size: 14px;
     line-height: 20px;
@@ -21,7 +21,7 @@
     aspect-ratio: 3 / 1;
     transform: translateX(-50%);
     pointer-events: none;
-    background: url("/theme-bgs/bg-daylight-3.webp") center / 100% 100% no-repeat;
+    background: var(--sky, none) center / 100% 100% no-repeat;
     -webkit-mask-image:
       linear-gradient(to right, transparent, rgb(0 0 0 / 0.08) 6%, rgb(0 0 0 / 0.3) 13%, rgb(0 0 0 / 0.65) 22%, #000 34%, #000 66%, rgb(0 0 0 / 0.65) 78%, rgb(0 0 0 / 0.3) 87%, rgb(0 0 0 / 0.08) 94%, transparent),
       linear-gradient(to bottom, #000 10%, rgb(0 0 0 / 0.85) 25%, rgb(0 0 0 / 0.55) 45%, rgb(0 0 0 / 0.25) 65%, rgb(0 0 0 / 0.07) 82%, transparent);
@@ -86,7 +86,7 @@
   .sv-page { position: absolute; inset: 0; display: grid; align-content: start; gap: 20px; padding: 32px; overflow: hidden; }
   .sv-back { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted-foreground); }
   .sv-pagehead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
-  .sv-h1 { margin: 0; font-size: 26px; font-weight: 600; line-height: 1; letter-spacing: -0.025em; text-shadow: 0 0 14px oklch(1 0 0 / 0.9), 0 0 3px oklch(1 0 0 / 0.7); }
+  .sv-h1 { margin: 0; font-size: 26px; font-weight: 600; line-height: 1; letter-spacing: -0.025em; text-shadow: var(--halo); }
   .sv-branch { display: flex; align-items: center; gap: 8px; }
   .sv-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); }
   .sv-chip svg, .sv-sq svg { color: var(--muted-foreground); }

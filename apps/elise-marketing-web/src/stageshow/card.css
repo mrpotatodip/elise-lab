@@ -16,7 +16,7 @@
     width: calc(100% - var(--gutter) * 2);
     /* Ends at the stage's foot, where the fade has finished. */
     height: calc(100% - var(--gutter));
-    background: oklch(1 0 0);
+    background: var(--bg-color, var(--background));
     border-radius: 12px;
     box-shadow: var(--ss-shadow-hero);
     --ss-fade: 220px;
@@ -34,7 +34,7 @@
     aspect-ratio: 3 / 1;
     transform: translateX(-50%);
     pointer-events: none;
-    background: url("/theme-bgs/bg-daylight-1.webp") center / 100% 100% no-repeat;
+    background: var(--sky, none) center / 100% 100% no-repeat;
     -webkit-mask-image:
       linear-gradient(to right, transparent, rgb(0 0 0 / 0.08) 6%, rgb(0 0 0 / 0.3) 13%, rgb(0 0 0 / 0.65) 22%, #000 34%, #000 66%, rgb(0 0 0 / 0.65) 78%, rgb(0 0 0 / 0.3) 87%, rgb(0 0 0 / 0.08) 94%, transparent),
       linear-gradient(to bottom, #000 10%, rgb(0 0 0 / 0.85) 25%, rgb(0 0 0 / 0.55) 45%, rgb(0 0 0 / 0.25) 65%, rgb(0 0 0 / 0.07) 82%, transparent);
@@ -117,7 +117,7 @@
   .dash-page[data-active] { opacity: 1; visibility: visible; transition-delay: 0s; }
   .dash-page--flush { padding: 0; }
   .pg-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
-  .pg-head__text { display: grid; gap: 6px; text-shadow: 0 0 14px oklch(1 0 0 / 0.9), 0 0 3px oklch(1 0 0 / 0.7); }
+  .pg-head__text { display: grid; gap: 6px; text-shadow: var(--halo); }
   .pg-head__title { display: flex; align-items: center; gap: 16px; }
   .dash-title { margin: 0; font-size: 26px; font-weight: 600; line-height: 1; letter-spacing: -0.025em; }
   .dash-desc { margin: 0; max-width: 52ch; line-height: 1.625; color: var(--muted-foreground); }
