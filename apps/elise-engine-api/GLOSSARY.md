@@ -113,7 +113,7 @@ The answer to "can this commit ship?": `pass`, `fail` or `cannot_tell`. It belon
 _Avoid_: Acceptance rate, score, safe
 
 **Verdict weight**:
-How much one succeeded Scan adds to the Verdict of its commit: `quick` 0.5, `standard` 1, `deep` 1, and an old `lite` Scan 1 (`VERDICT_SCAN_WEIGHTS`). The weight is read from the Skill first, so a `lite` Scan weighs 1 whatever its Profile. A Partial Scan weighs 0, and so does an older full Scan whose findings were never recorded. A commit has a Verdict when its Scans weigh 1 or more (`VERDICT_MIN_SCANS`).
+How much one succeeded Scan adds to the Verdict of its commit: `quick` 1, `standard` 1, `deep` 1, and an old `lite` Scan 1 (`VERDICT_SCAN_WEIGHTS`; `quick` was 0.5 until 2026-11-16). The weight is read from the Skill first, so a `lite` Scan weighs 1 whatever its Profile. A Partial Scan weighs 0, and so does an older full Scan whose findings were never recorded. A commit has a Verdict when its Scans weigh 1 or more (`VERDICT_MIN_SCANS`).
 _Avoid_: Points, score
 
 **Accepted risk**:

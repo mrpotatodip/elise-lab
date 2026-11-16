@@ -57,7 +57,7 @@ const trustReasons = (read: JudgedScan[], counted: number, window: JudgedScan[])
   if (read.length === 0) return [{ code: "not_scanned", message: "No succeeded scan of this commit that counts" }];
   const reasons: Reason[] = [];
   if (counted < VERDICT_MIN_SCANS) {
-    reasons.push({ code: "too_few_scans", message: `Scans of this commit weigh ${counted} of ${VERDICT_MIN_SCANS}; run another (a quick scan counts half)` });
+    reasons.push({ code: "too_few_scans", message: `Scans of this commit weigh ${counted} of ${VERDICT_MIN_SCANS}; run another` });
   }
   if (window.some((scan) => (scan.priorsUnchecked ?? 0) > 0)) {
     reasons.push({ code: "unchecked_priors", message: "A scan did not check every problem the History had open" });
