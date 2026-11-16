@@ -64,18 +64,33 @@ const PHASE_HANDOFF = {
 // verifiers: left alone, an agent may do it all itself, and the profile check
 // then stores the Scan as unmet. The words are the same in the cloud's place
 // and the Runner's. A Focused Scan is not asked, and the prompt cannot force
-// a sub-agent to start.
+// a sub-agent to start. An Exhaustive Scan is asked for more, because its rows
+// in the profile check are stricter: a critic after every wave until one
+// accepts nothing, and a final verifier that is neither the owner nor a
+// verifier of the unit. The Skill already says how each record is shaped and
+// that the units are split per lifecycle mode, so the prompt does not.
 // -----
+const VERIFY_CANDIDATES =
+  "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.";
+
 const SUBAGENT_ASK = {
-  recon: "",
-  hunt: "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.",
-  check:
-    "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.",
-  report: "",
-} satisfies Record<FullPhase, string>;
+  quick: { recon: "", hunt: "", check: "", report: "" },
+  standard: {
+    recon: "",
+    hunt: "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.",
+    check: VERIFY_CANDIDATES,
+    report: "",
+  },
+  deep: {
+    recon: "",
+    hunt: "After each hunter wave, run the critic pass with a separate sub-agent. Record each in `critic_passes` in run-metadata.json. If a critic pass accepts something, hunt another wave. Stop when a critic pass accepts nothing.",
+    check: `${VERIFY_CANDIDATES} Then verify each final record with another separate sub-agent. It must not be the unit's owner or a verifier that checked the unit. Record each in \`final_verifiers\` in run-metadata.json.`,
+    report: "",
+  },
+} satisfies Record<ScanOptions["profile"], Record<FullPhase, string>>;
 
 const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"]) =>
-  profile === "quick" || SUBAGENT_ASK[phase] === "" ? PHASE_HANDOFF[phase] : `${PHASE_HANDOFF[phase]} ${SUBAGENT_ASK[phase]}`;
+  SUBAGENT_ASK[profile][phase] === "" ? PHASE_HANDOFF[phase] : `${PHASE_HANDOFF[phase]} ${SUBAGENT_ASK[profile][phase]}`;
 
 const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
 

@@ -9,6 +9,11 @@ const options: ScanOptions = { skill: "full", model: "claude-haiku-5-5", effort:
 const CRITIC_SENTENCE = "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.";
 const VERIFIER_SENTENCE =
   "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.";
+const DEEP_CRITIC_SENTENCE =
+  "After each hunter wave, run the critic pass with a separate sub-agent. Record each in `critic_passes` in run-metadata.json. If a critic pass accepts something, hunt another wave. Stop when a critic pass accepts nothing.";
+const DEEP_FINAL_SENTENCE =
+  "Then verify each final record with another separate sub-agent. It must not be the unit's owner or a verifier that checked the unit. Record each in `final_verifiers` in run-metadata.json.";
+const ASKED_SENTENCES = [CRITIC_SENTENCE, VERIFIER_SENTENCE, DEEP_CRITIC_SENTENCE, DEEP_FINAL_SENTENCE];
 
 const sharedLines =(text: string) => text.split("\n").filter((line) => !/^(Target|Output directory|The money|Do not use the network|There is no network)/.test(line));
 
@@ -88,21 +93,23 @@ describe("buildAgentPrompt", () => {
   });
 
   it.each([
-    ["recon", "Phase 1 (Reconnaissance)", "This is the first run", []],
-    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance", [CRITIC_SENTENCE]],
-    ["check", "Phases 3, 4 and 5", "Do not hunt again", [VERIFIER_SENTENCE]],
-    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again", []],
+    ["recon", "Phase 1 (Reconnaissance)", "This is the first run", { standard: [], deep: [] }],
+    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance", { standard: [CRITIC_SENTENCE], deep: [DEEP_CRITIC_SENTENCE] }],
+    ["check", "Phases 3, 4 and 5", "Do not hunt again", { standard: [VERIFIER_SENTENCE], deep: [VERIFIER_SENTENCE, DEEP_FINAL_SENTENCE] }],
+    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again", { standard: [], deep: [] }],
   ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff, asked) => {
     const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase);
 
     // -----
-    // A Balanced or Exhaustive hunt asks for a separate critic and a check asks for
-    // separate verifiers, the same words in the cloud's place and the Runner's. A
-    // Focused run asks for neither, and recon and report never do.
+    // A Balanced hunt asks for a separate critic after the last wave and a check for
+    // separate verifiers. An Exhaustive hunt asks for a critic after every wave and
+    // another wave while one accepts work, and its check also asks for separate final
+    // verifiers. The words are the same in the cloud's place and the Runner's. A
+    // Focused run asks for none, and recon and report never do.
     // -----
     const sentencesOf = (profile: ScanOptions["profile"], place?: typeof RUNNER_PROMPT_PLACE) =>
-      [CRITIC_SENTENCE, VERIFIER_SENTENCE].filter((sentence) => buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence));
-    const expected = { quick: [], standard: asked, deep: asked };
+      ASKED_SENTENCES.filter((sentence) => buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence));
+    const expected = { quick: [], ...asked };
 
     expect({
       cloud: { quick: sentencesOf("quick"), standard: sentencesOf("standard"), deep: sentencesOf("deep") },
