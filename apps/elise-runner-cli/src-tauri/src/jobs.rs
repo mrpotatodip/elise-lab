@@ -387,7 +387,7 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Resul
         Err(error) => return Err(error),
     };
     if job.skill == "full" {
-        validate_full(tools, work).await.map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
+        validate_full(tools, work).await.map_err(CheckFailure::message).map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
     }
     Ok(report)
 }
@@ -398,7 +398,8 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Resul
 // server meter and the agent is told nothing about money, so the limit alone stops it, and what it
 // had not reached is never recorded. This app never makes a Phased Scan a Partial Scan: a Phase with
 // no money left does not start, and a Phase the limit stops ends the Scan, whatever it had written.
-// The validators run after the check Phase, and when they fail the agent gets one repair run (`repair`).
+// The validators run after the check Phase, and when they report errors about the agent's files the
+// agent gets one repair run (`repair`); a failure of the environment ends the Scan without one.
 // The files of the Phases that ended stay in the work folder when a later one fails.
 // -----
 async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
@@ -426,8 +427,10 @@ async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent
         let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32)).await?;
         settle(run, spent, phase, cap)?;
         if phase == VALIDATED_AFTER {
-            if let Err(error) = validate_full(tools, work).await {
-                repair(tools, job, work, spent, minute, &error).await?;
+            match validate_full(tools, work).await {
+                Ok(()) => {}
+                Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, &error).await?,
+                Err(CheckFailure::Environment(error)) => return Err(error),
             }
         }
     }
@@ -472,7 +475,7 @@ async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute
     let failed = format!("The {VALIDATED_AFTER} phase left files that did not pass the check. {error}");
     let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32)).await.map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
     settle(run, spent, REPAIR, cap).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
-    validate_full(tools, work).await.map_err(|again| format!("The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {again}"))
+    validate_full(tools, work).await.map_err(|again| format!("The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}", again.message()))
 }
 
 // The repair run's whole prompt: no skill, no earlier files to read, only what the validator said.
@@ -731,13 +734,17 @@ fn find_node() -> Option<PathBuf> {
 // The scripts run from the app's own bundle, not from ~/.claude/skills: the agent has run
 // by now and could have changed a copy there.
 // -----
-async fn validate_full(tools: &Tools, work: &Path) -> Result<(), String> {
-    let node = tools.node.as_ref().ok_or("Node.js is not installed on this computer, or this app cannot find it. A full audit is checked with Node.js: install it from https://nodejs.org, then start the scan again.")?;
+async fn validate_full(tools: &Tools, work: &Path) -> Result<(), CheckFailure> {
+    use CheckFailure::{Content, Environment};
+    let node = tools.node.as_ref().ok_or_else(|| Environment("Node.js is not installed on this computer, or this app cannot find it. A full audit is checked with Node.js: install it from https://nodejs.org, then start the scan again.".to_string()))?;
     let skill = tools.skills.join("security-audit");
     for (script, file) in [("validate-findings.cjs", "findings.json"), ("validate-coverage-ledger.cjs", "coverage-ledger.json")] {
         let path = work.join("out").join(file);
+        if !skill.join(script).is_file() {
+            return Err(Environment(format!("The audit skill's check ({script}) was not found in {}. Reinstall the Elise Runner app.", skill.display())));
+        }
         if !path.is_file() {
-            return Err(format!("The audit finished without writing {file}, which a full audit must have."));
+            return Err(Environment(format!("The audit finished without writing {file}, which a full audit must have.")));
         }
         let mut command = Command::new(node);
         command
@@ -749,15 +756,32 @@ async fn validate_full(tools: &Tools, work: &Path) -> Result<(), String> {
             .stdin(Stdio::null())
             .kill_on_drop(true);
         let output = match timeout(VALIDATE_TIMEOUT, command.output()).await {
-            Ok(result) => result.map_err(|e| format!("Could not run the check on {file}: {e}"))?,
-            Err(_) => return Err(format!("The check on {file} did not finish in a minute, so this runner stopped it.")),
+            Ok(result) => result.map_err(|e| Environment(format!("Could not run the check on {file}: {e}")))?,
+            Err(_) => return Err(Environment(format!("The check on {file} did not finish in a minute, so this runner stopped it."))),
         };
         if !output.status.success() {
             let said = format!("{} {}", String::from_utf8_lossy(&output.stdout).trim(), String::from_utf8_lossy(&output.stderr).trim());
-            return Err(format!("{file} did not pass the audit skill's own check ({script}). {}", tail(said.trim(), 1500)));
+            return Err(Content(format!("{file} did not pass the audit skill's own check ({script}). {}", tail(said.trim(), 1500))));
         }
     }
     Ok(())
+}
+
+// Why `validate_full` failed. Only `Content`, a validator that ran and reported errors about the
+// agent's files, is something the agent can fix, so only it may start the repair run. `Environment`
+// (no Node.js, a file the audit never wrote, the skill's script missing, a check that could not run or
+// did not finish) ends the Scan at once with its message, and nothing more is spent.
+enum CheckFailure {
+    Environment(String),
+    Content(String),
+}
+
+impl CheckFailure {
+    fn message(self) -> String {
+        match self {
+            CheckFailure::Environment(message) | CheckFailure::Content(message) => message,
+        }
+    }
 }
 
 // How one run of the agent ended: Err is a sentence for the dashboard (it names the Phase, when
@@ -1550,6 +1574,38 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert!(said.contains("cap was reached") && said.contains("$5") && said.contains("repair"), "{said}");
         assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 3);
         let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // The validators can fail for a cause no agent can fix: Node.js is not on this computer, the check
+    // Phase left no findings.json, the audit skill's script is not there. Each ends the Scan at once with
+    // its own error, with no repair run, so nothing more is spent.
+    #[cfg(unix)]
+    #[test]
+    fn a_failure_of_the_environment_ends_the_scan_without_a_repair_run() {
+        let cases = [
+            ("no-node", "Node.js is not installed"),
+            ("no-findings", "without writing findings.json"),
+            ("no-skill", "validate-findings.cjs"),
+        ];
+        for (name, said_part) in cases {
+            let mut stage = stage(name);
+            let mut check = "phase=check cost=1";
+            match name {
+                "no-node" => stage.tools.node = None,
+                "no-findings" => check = "writes-nothing cost=1",
+                _ => fs::remove_file(stage.tools.skills.join("security-audit/validate-findings.cjs")).unwrap(),
+            }
+            let job = phased_job(["phase=recon cost=1", "phase=hunt cost=1", check, "phase=report cost=1"]);
+
+            let report = scan(&stage, &job);
+
+            assert_eq!(report.state, "failed", "{name}");
+            let said = report.error.unwrap();
+            assert!(said.contains(said_part) && !said.contains("repair"), "{name}: {said}");
+            assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 3, "{name}: the three Phases ran, no repair run and no report Phase");
+            assert!(!stage.work.join("agent-repair.log").exists(), "{name}");
+            let _ = fs::remove_dir_all(&stage.root);
+        }
     }
 
     // A repair run that crashes or is stopped by the limit ends the Scan with the check's error, and

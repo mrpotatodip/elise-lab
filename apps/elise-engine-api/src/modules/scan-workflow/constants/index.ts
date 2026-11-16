@@ -14,10 +14,13 @@ export const SCAN_WORKFLOW_FULL_MAX_POLLS = 540;
 // -----
 // A Scan on a Runner waits longer: the Runner app's 90 minutes of
 // Phases, plus up to RUNNER_JOB_QUEUE_TIMEOUT_MS before the app claims
-// the job, plus 15 minutes for the clone and the validators, which the
-// 90 minutes leave out. Only the Runner path reads it.
+// the job, plus 20 minutes for the clone (5), the validators (about 4
+// over two rounds) and the repair run (5), which the 90 minutes leave
+// out: the app can use about 14 of them, and the rest is a cushion. The
+// total, 120 minutes, stays inside SCANS_ACTIVE_FULL_WINDOW_MS (130).
+// Only the Runner path reads it.
 // -----
-export const SCAN_WORKFLOW_RUNNER_CLONE_AND_VALIDATE_MINUTES = 15;
+export const SCAN_WORKFLOW_RUNNER_CLONE_AND_VALIDATE_MINUTES = 20;
 export const SCAN_WORKFLOW_RUNNER_MAX_POLLS = Math.ceil(
   (SCAN_WORKFLOW_FULL_MAX_POLLS * SCAN_WORKFLOW_POLL_SECONDS * 1000 + RUNNER_JOB_QUEUE_TIMEOUT_MS + SCAN_WORKFLOW_RUNNER_CLONE_AND_VALIDATE_MINUTES * 60 * 1000) /
     (SCAN_WORKFLOW_POLL_SECONDS * 1000),
