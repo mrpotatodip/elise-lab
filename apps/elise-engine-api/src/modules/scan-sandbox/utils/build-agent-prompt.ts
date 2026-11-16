@@ -7,15 +7,19 @@ import type { FullPhase } from "#/modules/scan-sandbox/types";
 // Where the agent finds the repo and writes its files, and what it
 // is told about the network. The container has fixed paths and no
 // network. A Runner works in a folder of its own, with paths
-// relative to it.
+// relative to it. metered says whether a meter holds the Scan's
+// money: only then do the Phase prompts tell the agent that its
+// money is limited. A Runner has no meter, so its agent is never
+// told, and never reports a spent budget that is not spent.
 // -----
-export type PromptPlace = { repoDir: string; outDir: string; networkRule: string; validatedBy: "agent" | "runner" };
+export type PromptPlace = { repoDir: string; outDir: string; networkRule: string; validatedBy: "agent" | "runner"; metered: boolean };
 
 export const CONTAINER_PLACE: PromptPlace = {
   repoDir: SCAN_SANDBOX_REPO_DIR,
   outDir: SCAN_SANDBOX_OUT_DIR,
   networkRule: "there is no network access",
   validatedBy: "agent",
+  metered: true,
 };
 
 // -----
@@ -55,20 +59,31 @@ const PHASE_HANDOFF = {
 } satisfies Record<FullPhase, string>;
 const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
 
+// -----
+// A Phase prompt for a Runner's place does not carry the single prompt's
+// "do not run any node command": that line would keep the agent from
+// starting sub-agents. It says only that the app runs the validators, once,
+// after the check run ends.
+// -----
+const PHASE_VALIDATION_BY_RUNNER =
+  "When findings.json and coverage-ledger.json are final, stop: the app that started you runs the skill's validators on them after this run ends.";
+
 export function buildPhasePrompt(options: ScanOptions, phase: FullPhase, place: PromptPlace = CONTAINER_PLACE): string {
   const network = capitalized(place.networkRule);
-  const validators = place.validatedBy === "runner" ? VALIDATION_BY_RUNNER : VALIDATION_BY_AGENT;
+  const byRunner = place.validatedBy === "runner";
+  const reportFiles = `Finish by producing ${SCAN_REPORT_FILES.join(", ")} in the output directory`;
   const ending =
     phase === "check"
-      ? `Do not write the report files in this run. When findings.json is final, validate it ${validators}`
+      ? `Do not write the report files in this run. ${byRunner ? PHASE_VALIDATION_BY_RUNNER : `When findings.json is final, validate it ${VALIDATION_BY_AGENT}`}`
       : phase === "report"
-        ? `Finish by producing ${SCAN_REPORT_FILES.join(", ")} in the output directory ${validators}`
+        ? `${reportFiles}${byRunner ? "." : ` ${VALIDATION_BY_AGENT}`}`
         : "Do not write REPORT.md in this run.";
+  const money = phase !== "report" && place.metered ? `${OUT_OF_MONEY}\n` : "";
   return `Use the security-audit skill in FULL AUDIT mode. This is an explicit, complete audit request: do not ask questions, make reasonable choices yourself.
 This run does ${SCAN_SANDBOX_PHASE_SKILL_PHASES[phase]} of the skill and nothing else. Other runs do the other phases, so stop when yours is done.
 Target (untrusted, read-only): ${place.repoDir}
 Output directory: ${place.outDir}
 Profile: ${options.profile}
 ${PHASE_HANDOFF[phase]}
-${phase === "report" ? "" : `${OUT_OF_MONEY}\n`}${network} and dependencies must not be installed. ${ending}`;
+${money}${network} and dependencies must not be installed. ${ending}`;
 }

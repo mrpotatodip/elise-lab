@@ -4,12 +4,14 @@ import { eq } from "drizzle-orm";
 import { authUser, scanRunnerJobs, scans } from "@repo/db-elise";
 import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/elise";
 import { SCAN_PROFILE_CAPS_USD } from "#/constants";
-import { RUNNER_MAX_BUDGET_USD } from "#/modules/runners/constants";
+import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
 import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
+import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox/constants";
+import { buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox/utils";
 import { monthSpendEffect } from "#/modules/usage";
 import { claimRunnerJobEffect, createRunnerEffect, claimPairingEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
 
@@ -98,6 +100,18 @@ describe("claiming a job", () => {
     const claimed = await run(claimJobSvc(test.http, runnerId));
 
     expect(claimed).toMatchObject({ profile: "deep", profileCapUsd: SCAN_PROFILE_CAPS_USD.deep, maxBudgetUsd: RUNNER_MAX_BUDGET_USD });
+  });
+
+  it("hands over the single prompt as it was and the four Phase prompts in order, built for the Scan's profile and the Runner's place", async () => {
+    const options: ScanOptions = { ...OPTIONS, skill: "full", profile: "deep" };
+    await queue(await newScan(), {}, NOW, options);
+    const claimed = await run(claimJobSvc(test.http, runnerId));
+
+    expect(claimed?.prompt).toBe(buildAgentPrompt(options, RUNNER_PROMPT_PLACE));
+    expect(claimed?.phasePrompts?.map((entry) => entry.phase)).toEqual(["recon", "hunt", "check", "report"]);
+    expect(claimed?.phasePrompts?.map((entry) => entry.prompt)).toEqual(SCAN_SANDBOX_FULL_PHASES.map((phase) => buildPhasePrompt(options, phase, RUNNER_PROMPT_PLACE)));
+    expect(claimed?.phasePrompts?.every((entry) => entry.prompt.includes("Profile: deep") && entry.prompt.includes("./repo"))).toBe(true);
+    expect(RunnerJobSchema.parse(claimed).phasePrompts).toHaveLength(4);
   });
 
   it("still parses a job from before profiles, with no profile or cap", () => {

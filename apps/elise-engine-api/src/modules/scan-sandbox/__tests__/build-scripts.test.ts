@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ScanOptions } from "#/schemas";
-import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox/constants";
+import { RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
+import { SCAN_SANDBOX_FULL_PHASES, SCAN_SANDBOX_PHASE_SKILL_PHASES } from "#/modules/scan-sandbox/constants";
 import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt, phaseAgentFiles } from "#/modules/scan-sandbox/utils";
 
 const options: ScanOptions = { skill: "full", model: "claude-haiku-5-5", effort: "low", profile: "quick", maxBudgetUsd: 1 };
+
+const sharedLines = (text: string) => text.split("\n").filter((line) => !/^(Target|Output directory|The money|Do not use the network|There is no network)/.test(line));
 
 describe("buildAgentScript", () => {
   it("takes an atomic lock first, so a retry starts no second agent", () => {
@@ -92,6 +95,22 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain(`This run does ${skillPhases}`);
     expect(prompt).toContain(handoff);
     expect(prompt).toContain("Profile: deep");
+
+    // -----
+    // The same Phase for a Runner's place: it does only its own part, tells the agent to
+    // stop, forbids neither sub-agents nor node commands, carries no money sentence, and
+    // differs from the cloud's only in the paths, the network rule, who runs the validators
+    // and that sentence.
+    // -----
+    const onRunner = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PROMPT_PLACE);
+    const otherParts = Object.entries(SCAN_SANDBOX_PHASE_SKILL_PHASES).filter(([other]) => other !== phase);
+
+    expect(onRunner).toContain(`This run does ${skillPhases}`);
+    expect(otherParts.filter(([, part]) => onRunner.includes(part))).toEqual([]);
+    expect(onRunner).toContain("so stop when yours is done");
+    expect(onRunner).toContain("./repo");
+    expect(onRunner).not.toMatch(/sub-?agent|node command|money|deferred/i);
+    expect(sharedLines(onRunner).slice(0, 5)).toEqual(sharedLines(prompt).slice(0, 5));
   });
 
   it("has only the check and report runs validate, and only the report run write the report files", () => {
@@ -113,7 +132,7 @@ describe("buildAgentPrompt", () => {
 
   it("has the agent run the validators in the container and the app run them on a Runner", () => {
     const full: ScanOptions = { ...options, skill: "full" };
-    const onRunner = buildAgentPrompt(full, { repoDir: "./repo", outDir: "./out", networkRule: "do not use the network", validatedBy: "runner" });
+    const onRunner = buildAgentPrompt(full, RUNNER_PROMPT_PLACE);
 
     expect(buildAgentPrompt(full)).toContain("run the skill's validators");
     expect(onRunner).toContain("Do not run the validators or any node command");

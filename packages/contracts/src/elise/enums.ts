@@ -97,4 +97,11 @@ export type CreditEntryKindValue = (typeof CREDIT_ENTRY_KIND_VALUES)[number];
 // -----
 export const SCAN_STEP_VALUES = ["cloning", "auditing", "saving"] as const;
 
+// -----
+// The four Phases of a full audit, in the order they run. Not a database
+// enum: only the Runner job's phasePrompts carry them.
+// -----
+export const RUNNER_JOB_PHASE_VALUES = ["recon", "hunt", "check", "report"] as const;
+
 export type ScanStepValue = (typeof SCAN_STEP_VALUES)[number];
+export type RunnerJobPhaseValue = (typeof RUNNER_JOB_PHASE_VALUES)[number];
