@@ -1,0 +1,109 @@
+import type { ProfileCheckLeftOut, ProfileCheckRow } from "./dto";
+
+// -----
+// What each profile requires of a Runner Scan, read from the
+// files the agent wrote. A profile requires its own rows and
+// those of every smaller profile. Every row names the file
+// and the field it reads; needsSkillChange is true when the
+// Skill (skills/security-audit) had to start recording the
+// fact, so a Scan from an app built before that change does
+// not show it and fails the row.
+//
+// A unit's owner is its `agent_id`; a check's agent is the
+// `agent_id` inside `local_checks`. A candidate unit is one
+// with status `candidate`, or one that holds a fingerprint of
+// findings.json in `result_fingerprints` or `unresolved`.
+// -----
+export const PROFILE_CHECK_ROWS: readonly ProfileCheckRow[] = [
+  {
+    id: "hunter-wave",
+    profile: "quick",
+    requirement: "One hunter wave ran: a unit with an owner is covered, blocked or a candidate, with a wave of 1 or more",
+    file: "coverage-ledger.json",
+    field: "wave, agent_id and status of each unit",
+    needsSkillChange: false,
+  },
+  {
+    id: "fresh-verifier-per-candidate",
+    profile: "quick",
+    requirement: "Every candidate unit has a check by an agent that is not the unit's owner, and every finding record sits on such a unit",
+    file: "coverage-ledger.json",
+    field: "local_checks[].agent_id against agent_id, result_fingerprints and unresolved; fingerprint in findings.json",
+    needsSkillChange: false,
+  },
+  {
+    id: "final-critic-pass",
+    profile: "quick",
+    requirement: "One final critic pass ran (a unit deferred as quick_profile_final_critic is the critic's own output and counts)",
+    file: "run-metadata.json",
+    field: "critic_passes[], or unresolved of a deferred unit in coverage-ledger.json",
+    needsSkillChange: true,
+  },
+  {
+    id: "not-declared-incomplete",
+    profile: "quick",
+    requirement: "The run does not say its verification was unavailable",
+    file: "run-metadata.json",
+    field: "run_status is not incomplete (incomplete_reason verification_unavailable)",
+    needsSkillChange: true,
+  },
+  {
+    id: "units-not-coarsened",
+    profile: "standard",
+    requirement: "Units are not coarsened to the Focused profile's one all-in-scope subsystem",
+    file: "coverage-ledger.json",
+    field: "canonical_refs.subsystem of each unit",
+    needsSkillChange: false,
+  },
+  {
+    id: "final-records-fresh-verifier",
+    profile: "standard",
+    requirement: "Each confirmed or needs_validation record was verified in the final pass by an agent that is not the owner of its unit",
+    file: "run-metadata.json",
+    field: "final_verifiers[].fingerprint and agent_id, against agent_id in coverage-ledger.json",
+    needsSkillChange: true,
+  },
+  {
+    id: "units-per-lifecycle-mode",
+    profile: "deep",
+    requirement: "Units are split per subsystem and lifecycle mode: at least one unit names a lifecycle mode",
+    file: "coverage-ledger.json",
+    field: "canonical_refs.lifecycle of each unit",
+    needsSkillChange: false,
+  },
+  {
+    id: "critic-waves-to-clean",
+    profile: "deep",
+    requirement: "Critic waves ran until one accepted nothing, and each wave that accepted work was followed by a later hunter wave",
+    file: "run-metadata.json",
+    field: "critic_passes[].wave and accepted, against wave in coverage-ledger.json",
+    needsSkillChange: true,
+  },
+  {
+    id: "final-records-separate-verifier",
+    profile: "deep",
+    requirement: "The final verifier of each confirmed or needs_validation record is not the owner or a validation verifier of its unit",
+    file: "run-metadata.json",
+    field: "final_verifiers[].agent_id, against every local_checks[].agent_id in coverage-ledger.json",
+    needsSkillChange: true,
+  },
+];
+
+// -----
+// Requirements of the Skill that no file shows, so the table
+// leaves them out and the check never reads them.
+// -----
+export const PROFILE_CHECK_LEFT_OUT: readonly ProfileCheckLeftOut[] = [
+  {
+    requirement: "The Skill's six phases each ran",
+    why: "The metadata records completed phases in a different shape on each run (a list, a number, a name), and a skipped phase writes nothing to say so",
+  },
+  {
+    requirement: "An independent second pass for units covered in a prior run (Exhaustive)",
+    why: "A Runner Scan has no prior run to read, so the Skill never asks for it there",
+  },
+  {
+    requirement: "A hunter, verifier or critic was a fresh sub-agent and not the parent under another name",
+    why: "No file proves it: the check reads the agent ids the agent chose",
+  },
+];
