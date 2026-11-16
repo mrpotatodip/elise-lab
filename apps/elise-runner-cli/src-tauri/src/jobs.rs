@@ -22,6 +22,8 @@ const AGENT_TIMEOUT: Duration = Duration::from_secs(40 * 60);
 // The four Phases in order, each with the time slot the cloud gives it, in minutes: 90 in all. The
 // clone and the validators are outside these 90 minutes.
 const PHASES: [(&str, u64); 4] = [("recon", 10), ("hunt", 45), ("check", 25), ("report", 10)];
+// What a minute of a Phase's slot is. A test shortens it to outrun a Phase without waiting.
+const MINUTE: Duration = Duration::from_secs(60);
 // The Phase after which the validators run.
 const VALIDATED_AFTER: &str = "check";
 const VALIDATE_TIMEOUT: Duration = Duration::from_secs(60);
@@ -342,7 +344,7 @@ async fn execute(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String
     }
 
     clone_repo(work, &job.repo, &git_ref).await?;
-    audit(tools, job, work).await
+    audit(tools, job, work, MINUTE).await
 }
 
 fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
@@ -357,13 +359,13 @@ fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
 // Everything after the clone: the agent's settings and skill, the run or the four Phases, the
 // validators and the files to send. The work folder holds `repo`, `out` and what the clone left.
 // -----
-async fn audit(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> {
+async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
     strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
     install_skill(tools, skill_dir_of(job)?, work)?;
     write_agent_settings(work)?;
 
     if job.skill == "full" && !job.phase_prompts.is_empty() {
-        return run_phases(tools, job, work).await;
+        return run_phases(tools, job, work, minute).await;
     }
 
     let end = run_agent(tools, work, job, &job.prompt, budget_for(job), None, AGENT_TIMEOUT).await?.end?;
@@ -395,13 +397,13 @@ async fn audit(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> 
 // The validators run once, after the check Phase. The files of the Phases that ended stay in the work
 // folder when a later one fails.
 // -----
-async fn run_phases(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> {
+async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
     let names: Vec<&str> = job.phase_prompts.iter().map(|p| p.phase.as_str()).collect();
     if names != PHASES.map(|(phase, _)| phase) {
         return Err(format!("The job's Phases ({}) are not the four this runner runs: recon, hunt, check and report. Update the Elise Runner app.", names.join(", ")));
     }
     let mut spent = Spent::default();
-    let ran = run_each_phase(tools, job, work, &mut spent).await;
+    let ran = run_each_phase(tools, job, work, &mut spent, minute).await;
     // The engine reads the last JSON object of the log as the Scan's usage: the sum, a failed Scan's too.
     if let Some(sum) = spent.sum_line() {
         append_to_log(work, &format!("{sum}\n"));
@@ -410,14 +412,14 @@ async fn run_phases(tools: &Tools, job: &Job, work: &Path) -> Result<Report, Str
     collect(work).map_err(|error| format!("The report phase ended. {error}"))
 }
 
-async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent) -> Result<(), String> {
+async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration) -> Result<(), String> {
     let cap = budget_for(job);
     for (prompt, (phase, minutes)) in job.phase_prompts.iter().zip(PHASES) {
         let left = money(cap - spent.cost);
         if left <= 0.0 {
             return Err(phase_cap_message(phase, cap));
         }
-        let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), Duration::from_secs(minutes * 60)).await?;
+        let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32)).await?;
         // A Phase that failed still spent what its result says.
         if let Some(result) = &run.result {
             spent.add(result);
@@ -425,8 +427,12 @@ async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent
         if run.end? == AgentEnd::CapReached {
             return Err(phase_cap_message(phase, cap));
         }
-        if run.result.is_none() {
+        let Some(result) = &run.result else {
             return Err(format!("The {phase} phase ended without reporting its result, so this runner cannot tell what is left of the Budget cap (${cap}). Agent output: {}", tail(run.stdout.trim(), 1500)));
+        };
+        // A cost that is missing or not a number of dollars would leave the pool as it was.
+        if cost_of(result).is_none() {
+            return Err(format!("The {phase} phase's result has no usable total_cost_usd, so this runner cannot tell what is left of the Budget cap (${cap}) and stopped the audit."));
         }
         if phase == VALIDATED_AFTER {
             validate_full(tools, work).await.map_err(|error| format!("The {phase} phase left files that did not pass the check. {error}"))?;
@@ -446,6 +452,11 @@ fn phase_cap_message(phase: &str, cap: f64) -> String {
     format!("The Budget cap was reached (${cap}) during the {phase} phase, so the audit stopped there and nothing is sent. The work folder holds what the earlier phases wrote. Start the scan again with a profile that has a larger cap, or on a smaller repository.")
 }
 
+// What a result says its run cost, when that is a number the pool can use: finite and not below zero.
+fn cost_of(result: &serde_json::Value) -> Option<f64> {
+    result["total_cost_usd"].as_f64().filter(|cost| cost.is_finite() && *cost >= 0.0)
+}
+
 // What the Phases that ran have reported in their own results, added up.
 #[derive(Default)]
 struct Spent {
@@ -462,7 +473,7 @@ struct Spent {
 impl Spent {
     fn add(&mut self, result: &serde_json::Value) {
         let count = |value: &serde_json::Value| value.as_u64().unwrap_or(0);
-        self.cost += result["total_cost_usd"].as_f64().filter(|c| c.is_finite() && *c > 0.0).unwrap_or(0.0);
+        self.cost += cost_of(result).unwrap_or(0.0);
         self.turns += count(&result["num_turns"]);
         self.duration_ms += count(&result["duration_ms"]);
         self.input += count(&result["usage"]["input_tokens"]);
@@ -705,7 +716,8 @@ struct AgentRun {
 
 // One run of `claude` on one prompt, within `limit`. A Phase writes its own log and error file and
 // adds its output to `agent.log`, the whole Scan's log, which the engine reads the cost from; a
-// single run writes `agent.log` itself. `Err` here is a run that did not start or outran its limit.
+// single run writes `agent.log` itself. `Err` here is a run that did not start; one that outran its
+// limit or failed is `Ok` with its `end` an `Err` and whatever result it left, so its spend counts.
 async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_usd: f64, phase: Option<&str>, limit: Duration) -> Result<AgentRun, String> {
     let named = |what: &str| match phase {
         Some(phase) => format!("The {phase} phase {what}"),
@@ -739,10 +751,13 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
         Ok(status) => status.map_err(|e| format!("Claude Code stopped unexpectedly: {e}"))?,
         Err(_) => {
             let _ = child.kill().await;
+            // What the killed run left in its log still says what it spent.
+            let stdout = fs::read_to_string(work.join(&log_name)).unwrap_or_default();
             if phase.is_some() {
-                append_to_log(work, &fs::read_to_string(work.join(&log_name)).unwrap_or_default());
+                append_to_log(work, &stdout);
             }
-            return Err(named(&format!("ran longer than {} minutes, so this runner stopped it.", limit.as_secs() / 60)));
+            let end = Err(named(&format!("ran longer than {} minutes, so this runner stopped it.", limit.as_secs() / 60)));
+            return Ok(AgentRun { end, result: last_result(&stdout), stdout });
         }
     };
     let stdout = fs::read_to_string(work.join(&log_name)).unwrap_or_default();
@@ -764,10 +779,13 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
 }
 
 // The agent's final JSON result: the log is one object, or has stray lines before it.
+// A line the run was cut off in the middle of does not parse and is passed over; so is any object
+// that is not a result, whatever text it holds.
 fn last_result(log: &str) -> Option<serde_json::Value> {
     let log = log.trim();
-    let line = log.lines().rev().find(|line| line.starts_with('{'));
-    serde_json::from_str(log).ok().or_else(|| line.and_then(|line| serde_json::from_str(line).ok())).filter(serde_json::Value::is_object)
+    let whole = serde_json::from_str::<serde_json::Value>(log).ok();
+    let lines = log.lines().rev().filter(|line| line.starts_with('{')).filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok());
+    whole.into_iter().chain(lines).find(|object| object["type"] == "result")
 }
 
 // -----
@@ -782,7 +800,7 @@ enum AgentEnd {
 }
 
 fn agent_end(success: bool, log: &str, full: bool) -> Result<AgentEnd, ()> {
-    if full && log.contains("\"subtype\":\"error_max_budget_usd\"") {
+    if full && last_result(log).is_some_and(|result| result["subtype"] == "error_max_budget_usd") {
         return Ok(AgentEnd::CapReached);
     }
     if success {
@@ -1098,7 +1116,7 @@ for a in "$@"; do
 done
 printf '%s|%s\n' "$budget" "$prompt" >> calls.txt
 printf '%s\n' "$*" >> args.txt
-cost=$(printf '%s' "$prompt" | sed -n 's/.*cost=\([0-9.]*\).*/\1/p')
+cost=$(printf '%s' "$prompt" | sed -n 's/.*[^o]cost=\(-\{0,1\}[0-9.]*\).*/\1/p')
 case "$prompt" in
   *"stop=crash"*) echo "the agent said: boom" >&2; exit 2 ;;
 esac
@@ -1116,7 +1134,14 @@ subtype=success; code=0
 case "$prompt" in
   *"stop=limit"*) subtype=error_max_budget_usd; code=1 ;;
 esac
-printf '{"type":"result","subtype":"%s","is_error":false,"total_cost_usd":%s,"num_turns":3,"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":20,"cache_read_input_tokens":30,"cache_creation_input_tokens":40}}\n' "$subtype" "${cost:-0}"
+spend="\"total_cost_usd\":${cost:-0},"
+case "$prompt" in
+  *"nocost=1"*) spend="" ;;
+esac
+printf '{"type":"result","subtype":"%s","is_error":false,%s"num_turns":3,"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":20,"cache_read_input_tokens":30,"cache_creation_input_tokens":40}}\n' "$subtype" "$spend"
+case "$prompt" in
+  *"stop=hang"*) printf '{"type":"res'; exec sleep 30 ;;
+esac
 exit $code
 "#;
 
@@ -1175,7 +1200,13 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     // The seam: what `execute` does after the clone, ending as the dashboard would see it.
     #[cfg(unix)]
     fn scan(stage: &Stage, job: &Job) -> Report {
-        match tauri::async_runtime::block_on(audit(&stage.tools, job, &stage.work)) {
+        scan_in(stage, job, MINUTE)
+    }
+
+    // The same, with a minute of a Phase's slot as short as a test needs.
+    #[cfg(unix)]
+    fn scan_in(stage: &Stage, job: &Job, minute: Duration) -> Report {
+        match tauri::async_runtime::block_on(audit(&stage.tools, job, &stage.work, minute)) {
             Ok(report) => report,
             Err(error) => failed_report(&stage.work, error),
         }
@@ -1280,6 +1311,86 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         // The cost of the Phases that did run still reaches the engine.
         assert_eq!(last_json(report.agent_log.as_deref().unwrap())["total_cost_usd"], 2.0);
         let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // A Phase that outran its slot was killed, but the result it had printed is still what it spent.
+    // The line the kill cut short is ignored, and the failed Scan still sends the sum.
+    #[cfg(unix)]
+    #[test]
+    fn a_phase_that_times_out_still_counts_what_its_log_says_it_spent() {
+        let stage = stage("timeout");
+        let job = phased_job(["phase=recon cost=1", "phase=hunt stop=hang cost=3", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan_in(&stage, &job, Duration::from_millis(100));
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.clone().unwrap();
+        assert!(said.contains("hunt phase") && said.contains("ran longer than"), "{said}");
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
+        let sum = last_json(report.agent_log.as_deref().unwrap());
+        assert_eq!(sum["total_cost_usd"], 4.0);
+        assert_eq!(sum["num_turns"], 6);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // A result with no cost it can add up leaves the pool untracked: the Phase fails rather than
+    // counting as free and handing the next Phase the whole cap.
+    #[cfg(unix)]
+    #[test]
+    fn a_phase_whose_result_has_no_usable_cost_fails_naming_itself() {
+        for (hunt, why) in [("phase=hunt nocost=1", "missing"), ("phase=hunt cost=-2", "negative")] {
+            let stage = stage("nocost");
+            let job = phased_job(["phase=recon cost=1", hunt, "phase=check cost=1", "phase=report cost=1"]);
+
+            let report = scan(&stage, &job);
+
+            assert_eq!(report.state, "failed", "{why}");
+            let said = report.error.clone().unwrap();
+            assert!(said.contains("hunt phase") && said.contains("cost"), "{why}: {said}");
+            assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2, "{why}");
+            assert_eq!(last_json(report.agent_log.as_deref().unwrap())["total_cost_usd"], 1.0, "{why}");
+            let _ = fs::remove_dir_all(&stage.root);
+        }
+    }
+
+    #[test]
+    fn a_cost_counts_only_when_it_is_a_finite_number_of_dollars_not_below_zero() {
+        let cost = |text: &str| cost_of(&serde_json::from_str(text).unwrap());
+
+        assert_eq!(cost(r#"{"total_cost_usd":2.5}"#), Some(2.5));
+        assert_eq!(cost(r#"{"total_cost_usd":0}"#), Some(0.0));
+        assert_eq!(cost(r#"{}"#), None);
+        assert_eq!(cost(r#"{"total_cost_usd":-1}"#), None);
+        assert_eq!(cost(r#"{"total_cost_usd":"3"}"#), None);
+        assert_eq!(cost(r#"{"total_cost_usd":null}"#), None);
+    }
+
+    // The result is the log's last whole result object: a line the kill cut short, or a stray line
+    // before it, does not hide it.
+    #[test]
+    fn the_result_is_found_past_a_cut_short_last_line() {
+        let result = r#"{"type":"result","subtype":"success","total_cost_usd":1.5}"#;
+
+        assert_eq!(last_result(&format!("{result}\n{{\"type\":\"res")).unwrap()["total_cost_usd"], 1.5);
+        assert_eq!(last_result(&format!("noise\n{result}\n")).unwrap()["total_cost_usd"], 1.5);
+        assert_eq!(last_result(result).unwrap()["subtype"], "success");
+        assert!(last_result("{\"type\":\"res").is_none());
+    }
+
+    // The cap is the result object's own word. Text a repository made the agent print is not it.
+    #[test]
+    fn a_cap_is_read_from_the_result_object_and_not_from_echoed_text() {
+        let echoed = r#"{"type":"assistant","text":"the file says \"subtype\":\"error_max_budget_usd\""}"#;
+        let loose = r#"{"type":"assistant","subtype":"error_max_budget_usd"}"#;
+        let plain = r#"README: {"type":"result","subtype":"error_max_budget_usd"} is what the cap looks like"#;
+        let fine = r#"{"type":"result","subtype":"success","is_error":false}"#;
+        let capped = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true}"#;
+
+        for noise in [echoed, loose, plain] {
+            assert_eq!(agent_end(true, &format!("{noise}\n{fine}"), true), Ok(AgentEnd::Finished), "{noise}");
+            assert_eq!(agent_end(false, &format!("{noise}\n{fine}"), true), Err(()), "{noise}");
+        }
+        assert_eq!(agent_end(false, &format!("{echoed}\n{capped}"), true), Ok(AgentEnd::CapReached));
     }
 
     #[cfg(unix)]

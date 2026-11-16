@@ -129,7 +129,7 @@ export const RunnerJobReportedSchema = z.object({
   accepted: z.literal(true),
 });
 
-export type CreateRunnerBody =z.infer<typeof CreateRunnerBodySchema>;
+export type CreateRunnerBody = z.infer<typeof CreateRunnerBodySchema>;
 export type EnrollRunnerBody = z.infer<typeof EnrollRunnerBodySchema>;
 export type CreatedRunner = z.infer<typeof CreatedRunnerSchema>;
 export type RunnerIdentity = z.infer<typeof RunnerIdentitySchema>;
@@ -138,5 +138,5 @@ export type RunnerState = z.infer<typeof RunnerStateSchema>;
 export type Runner = z.infer<typeof RunnerSchema>;
 export type Runners = z.infer<typeof RunnersSchema>;
 export type RunnerPhasePrompt = z.infer<typeof RunnerPhasePromptSchema>;
-export type RunnerJob =z.infer<typeof RunnerJobSchema>;
+export type RunnerJob = z.infer<typeof RunnerJobSchema>;
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;
