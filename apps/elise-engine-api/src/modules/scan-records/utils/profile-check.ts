@@ -5,6 +5,7 @@ import {
   SCAN_PROFILES,
   type ProfileCheck,
   type ProfileCheckRowId,
+  type ProfileMetValue,
 } from "@repo/contracts/elise";
 import {
   ProfileCheckFindingsTextSchema,
@@ -135,4 +136,15 @@ export const checkRunnerProfile = (asked: Profile, files: ProfileCheckFiles): Pr
   if (reached >= askedIndex) return { result: "met" };
   const lesser = SCAN_PROFILES[reached];
   return lesser === undefined ? { result: "unmet" } : { result: "lesser", profile: lesser };
+};
+
+// -----
+// What the scans row keeps of a profile check: the profile met
+// (the asked one for met, the smaller one for lesser), none for
+// unmet, null for a Scan that was not checked.
+// -----
+export const profileMetOf = (asked: Profile, check: ProfileCheck | null): ProfileMetValue | null => {
+  if (check === null) return null;
+  if (check.result === "met") return asked;
+  return check.result === "lesser" ? check.profile : "none";
 };

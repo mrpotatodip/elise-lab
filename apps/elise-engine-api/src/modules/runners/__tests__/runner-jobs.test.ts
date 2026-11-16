@@ -10,6 +10,10 @@ import type { ScanOptions, ScanParams } from "#/schemas";
 import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
+import { buildScanRecordSvc } from "#/modules/scan-records";
+import { writeScanRecordEffect } from "#/modules/scan-records/queries";
+import { saveScanFilesEffect } from "#/modules/scan-store";
+import { fakeBindings } from "#/__tests__/fake-bindings";
 import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox/constants";
 import { buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox/utils";
 import { monthSpendEffect } from "#/modules/usage";
@@ -293,5 +297,58 @@ describe("the runner as a sandbox", () => {
     await runnerSandbox(test.http, paramsFor(scanId), runnerId, () => NOW).destroy();
 
     expect((await jobOf(scanId)).state).toBe("succeeded");
+  });
+});
+
+// -----
+// A Runner's result, from the route's service to the Scan the API
+// shows: what the Workflow does with it (read the files, keep them,
+// record the Scan) and the row and the response that carry the
+// profile met. The route itself opens its own database connection
+// and the record step takes no AppDeps, so neither can use the
+// shared testDeps fixture: this follows the record-step tests and
+// runs on pglite with every migration.
+// -----
+type LedgerUnit = { status: string; agent_id: string | null; unresolved: string[] };
+const ledgerUnit = (over: Partial<LedgerUnit>) => ({ status: "covered", agent_id: "hunter-inline", wave: 1, attempts: [], local_checks: [], result_fingerprints: [], unresolved: [], ...over });
+
+describe("the profile met after a Runner's result", () => {
+  const FULL_OPTIONS: ScanOptions = { ...OPTIONS, skill: "full", profile: "deep" };
+  const FOCUSED_FILES = {
+    "REPORT.md": "# Report",
+    "findings.json": "[]",
+    "coverage-ledger.json": JSON.stringify([ledgerUnit({}), ledgerUnit({ status: "deferred", agent_id: null, unresolved: ["quick_profile_final_critic"] })]),
+    "run-metadata.json": JSON.stringify({ run_id: "run-1", profile: "quick", run_status: "complete" }),
+  };
+
+  const recordedAfterResult = async (files: Record<string, string>) => {
+    const scanId = await newScan();
+    await test.raw.update(scans).set({ skill: "full", profile: "deep" }).where(eq(scans.id, scanId));
+    const params = paramsFor(scanId, { options: FULL_OPTIONS });
+    await runnerSandbox(test.http, params, runnerId, () => NOW).launchAgent(FULL_OPTIONS, []);
+    await run(claimRunnerJobEffect(test.http, runnerId, NOW));
+    await report(scanId, { state: "succeeded", files });
+
+    const bindings = fakeBindings();
+    await run(saveScanFilesEffect(bindings.env.REPORTS, tenantId, scanId, await runnerSandbox(test.http, params, runnerId).readFiles()));
+    const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { id: null, name: null, reason: null }, "succeeded", null, null, { history: new Map(), triage: new Map(), given: [] }));
+    await run(writeScanRecordEffect(test.http, record));
+    return scanId;
+  };
+
+  it("keeps what the Scan met on its row and shows it on the Scan, an Exhaustive Scan whose files show Balanced work reading standard", async () => {
+    const scanId = await recordedAfterResult(FOCUSED_FILES);
+
+    expect((await test.raw.select({ profileMet: scans.profileMet }).from(scans).where(eq(scans.id, scanId)))[0].profileMet).toBe("standard");
+    expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({ profile: "deep", profileMet: "standard" });
+  });
+
+  it("keeps none on the row of a result that wrote no ledger, and null on the Scan of an old row", async () => {
+    const { "coverage-ledger.json": _ledger, ...noLedger } = FOCUSED_FILES;
+    const scanId = await recordedAfterResult(noLedger);
+    const old = await newScan();
+
+    expect((await run(neonScanRepo(test.http).get(tenantId, scanId)))?.profileMet).toBe("none");
+    expect((await run(neonScanRepo(test.http).get(tenantId, old)))?.profileMet).toBeNull();
   });
 });

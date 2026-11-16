@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SCAN_RECORDED_MODELS, SCAN_STEP_VALUES, ScanArtifactSchema, ScanRunnerSchema, ScanSummarySchema, ScanUsageSchema } from "@repo/contracts/elise";
+import { PROFILE_MET_VALUES, SCAN_RECORDED_MODELS, SCAN_STEP_VALUES, ScanArtifactSchema, ScanRunnerSchema, ScanSummarySchema, ScanUsageSchema } from "@repo/contracts/elise";
 import { ScanOptionsSchema } from "./scan-options-schema";
 
 export const ScanStateSchema = z.enum(["queued", "running", "succeeded", "failed"]);
@@ -16,6 +16,11 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   branch: z.string().nullish().meta({ example: "main", description: "The name of the branch the scan read, when it is known. Null for a tag, a commit or a detached HEAD." }),
   branchId: z.uuid().nullish().meta({ description: "The tracked branch the scan belongs to. Null for a one-off scan, which has no History." }),
   untrackedReason: z.string().nullish().meta({ example: "the repo already tracks 25 branches", description: "Why a finished scan has no branch, so no History. Null when it has one." }),
+  profileMet: z.enum(PROFILE_MET_VALUES).nullish().meta({
+    example: "quick",
+    description:
+      "The profile a succeeded Runner Scan met, from the files its agent wrote (the agent's own account of what it did): quick, standard or deep, or none when it met no profile. Equal to profile when the Scan did the work asked for, smaller when it did less. Null when the Scan was not checked: a cloud Scan, a Partial Scan, a Scan that did not succeed, or a Scan stored before this field.",
+  }),
   status: ScanStateSchema.meta({ example: "succeeded" }),
   createdAt: z.string().meta({ example: "2026-11-07T02:45:14.278Z" }),
   updatedAt: z.string(),

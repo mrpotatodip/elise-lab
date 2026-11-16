@@ -8,6 +8,12 @@ export const SCAN_RECORDED_MODELS =[...SCAN_MODELS, "claude-opus-5-5"] as const;
 export const SCAN_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export const SCAN_SKILLS = ["lite", "full"] as const;
 export const SCAN_PROFILES = ["quick", "standard", "deep"] as const;
+// -----
+// What a Profile check says a Runner Scan met: a profile, or none
+// of them. Stored as text, so it is not a database enum.
+// -----
+export const PROFILE_MET_VALUES = [...SCAN_PROFILES, "none"] as const;
+export type ProfileMetValue = (typeof PROFILE_MET_VALUES)[number];
 
 // -----
 // Responses: what GET /scans and GET /scans/:scanId answer
@@ -103,6 +109,7 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   branch: z.string().nullish(),
   branchId: z.uuid().nullish(),
   untrackedReason: z.string().nullish(),
+  profileMet: z.enum(PROFILE_MET_VALUES).nullish(),
   status: ScanStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
