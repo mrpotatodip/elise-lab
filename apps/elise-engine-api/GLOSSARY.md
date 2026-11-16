@@ -63,7 +63,7 @@ One of the four Detached runs of a full Scan, in order: `recon`, `hunt`, `check`
 _Avoid_: Step (that is cloning, auditing or saving), stage
 
 **Partial Scan**:
-A profile Scan (any Profile) that ran out of money while the Skill could still write its files, so it ended with a Report that starts `PARTIAL:` and a findings file, both naming the units it did not cover. It is charged only what was metered. It is not a failed Scan. It weighs 0 in a Verdict, and its findings still count as open. A Scan that spends its whole Budget cap with no Report fails instead.
+A profile Scan (any Profile) that ran out of money while the Skill could still write its files, so it ended with a Report that starts `PARTIAL: money ran out;` and a findings file, both naming the units it did not cover. Only money sets the flag: a Scan is partial when the Report's first line is that Skill line, a ledger unit holds `money_exhausted`, or `run-metadata.json` says `incomplete_reason: "money_exhausted"`. Any other first line that starts with `PARTIAL:` (the agent could not verify something, say) does not make a Partial Scan, on a Runner or in the cloud. It is charged only what was metered. It is not a failed Scan. It weighs 0 in a Verdict, and its findings still count as open. A Scan that spends its whole Budget cap with no Report fails instead.
 _Avoid_: Incomplete, failed Scan
 
 **Full worker**:

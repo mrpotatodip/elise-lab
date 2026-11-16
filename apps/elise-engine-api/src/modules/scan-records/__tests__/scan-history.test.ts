@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
-import { scanFindings, scanRepoFindings } from "@repo/db-elise/schema";
+import { scanFindings, scanRepoFindings, scans } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
@@ -206,5 +206,32 @@ describe("a branch other than the default", () => {
     const mainPriors = await run(listPriorsEffect(test.http, tenantId, main.id ?? "", 50));
 
     expect(mainPriors.map((prior) => prior.title)).not.toContain("Release only issue (reworded)");
+  });
+});
+
+// -----
+// A Runner Scan is recorded like a cloud one: the files the agent
+// wrote are read from the bucket and the partial flag lands on the
+// scans row. Only money sets it.
+// -----
+describe("the partial flag on a Runner scan's row", () => {
+  const RUNNER_ID = "3f2a9c1e-5b7d-4e86-9a0c-1d2e3f4a5b6c";
+
+  const recordRunnerScan = async (scanId: string, files: Record<string, string>) => {
+    const params: ScanParams = { scanId, accountId: tenantId, repo: REPO, options: { ...options, skill: "full" }, runnerId: RUNNER_ID, createdAt: new Date().toISOString() };
+    await run(neonScanRepo(test.http).create(params, repoId, Date.now()));
+    const bindings = fakeBindings();
+    for (const [name, text] of Object.entries(files)) bindings.store.set(`accounts/${tenantId}/scans/${scanId}/${name}`, text);
+    const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { id: null, name: null, reason: null }, "succeeded", null, null, { history: new Map(), triage: new Map(), given: [] }));
+    await run(writeScanRecordEffect(test.http, record));
+    return (await test.raw.select({ partial: scans.partial }).from(scans).where(eq(scans.id, scanId)))[0].partial;
+  };
+
+  it.each([
+    ["a PARTIAL: line for something the agent could not verify", "runner-partial-other", { "findings.json": "[]", "REPORT.md": "PARTIAL: I could not verify." }, false],
+    ["a PARTIAL: money ran out; line", "runner-partial-money", { "findings.json": "[]", "REPORT.md": "PARTIAL: money ran out; 2 units were not covered." }, true],
+    ["incomplete_reason money_exhausted in run-metadata.json", "runner-partial-metadata", { "findings.json": "[]", "REPORT.md": "# Report", "run-metadata.json": JSON.stringify({ run_status: "incomplete", incomplete_reason: "money_exhausted" }) }, true],
+  ])("stores partial for %s", async (_name, scanId, files, expected) => {
+    expect(await recordRunnerScan(scanId, files)).toBe(expected);
   });
 });

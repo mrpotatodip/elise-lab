@@ -6,6 +6,7 @@ import { readScanFileEffect, scanKey } from "#/modules/scan-store";
 import {
   SCAN_RECORDS_FINDINGS_FILE,
   SCAN_RECORDS_LEDGER_FILE,
+  SCAN_RECORDS_METADATA_FILE,
   SCAN_RECORDS_PROFILE_SKILL,
   SCAN_RECORDS_RECHECK_FILE,
   SCAN_RECORDS_RECORDED_SKILL,
@@ -57,7 +58,8 @@ const readProfileScan = (reports: R2Bucket, params: ScanParams): Effect.Effect<{
     const findings = yield* Effect.tryPromise({ try: () => Promise.all([...kept.values()].map((record) => fullFindingRowOf(record, params))), catch: toExternalError });
     const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE);
     const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE);
-    return { findings, partial: isPartialScan(report, ledger) };
+    const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE);
+    return { findings, partial: isPartialScan(report, ledger, metadata) };
   });
 
 // -----

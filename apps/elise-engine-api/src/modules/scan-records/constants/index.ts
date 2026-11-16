@@ -11,6 +11,7 @@ export const SCAN_RECORDS_PROFILE_SKILL = "full";
 export const SCAN_RECORDS_FULL_CLASS = "full-audit";
 export const SCAN_RECORDS_REPORT_FILE = "REPORT.md";
 export const SCAN_RECORDS_LEDGER_FILE = "coverage-ledger.json";
+export const SCAN_RECORDS_METADATA_FILE = "run-metadata.json";
 export const SCAN_RECORDS_RECHECK_FILE = "recheck.json";
 export const SCAN_RECORDS_PRIOR_FILE = "prior-findings.json";
 
