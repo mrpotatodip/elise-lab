@@ -29,7 +29,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
       <div class="hero">
         <h1>Security agents that read your code before an attacker does.</h1>
         <div class="hero-row">
-          <p class="lede">{LEDE.start}<a href={CLOUDFLARE_SKILL_URL} rel="noopener">{LEDE.link}</a>{LEDE.end}</p>
+          <p class="lede">{LEDE.start}<a href={CLOUDFLARE_SKILL_URL} rel="noopener">{LEDE.link}</a>{LEDE.middle}<a href="#what-to-know">{LEDE.rulesLink}</a>{LEDE.end}</p>
           <div class="hero-cta">
             <div class="actions">
               <a class="button lg" href={SITE.appUrl}>Audit a repository</a>
@@ -40,12 +40,12 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         </div>
       </div>
 
-      <figure class="showcase">
+      <figure class="showcase" aria-labelledby="showcase-caption">
         <div class="frame frame--tour" role="img" aria-label={PICTURE_LABELS.tour}>
           <div aria-hidden="true"><ScansCard client:idle /></div>
         </div>
         <figcaption>
-          <span>{SHOWCASE_CAPTION}</span>
+          <span id="showcase-caption">{SHOWCASE_CAPTION}</span>
           <button type="button" class="button outline" id="motion-toggle">Pause animations</button>
         </figcaption>
       </figure>
@@ -100,7 +100,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
           }
         </div>
         <div class="plans-action">
-          <a class="button outline" href={SITE.appUrl}>{PRICING.action}</a>
+          <a class="button outline" href={SITE.signUpUrl}>{PRICING.action}</a>
           <p class="hint">{PRICING.actionHint}</p>
         </div>
       </section>
@@ -112,7 +112,10 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
             FACTS.map((fact) => (
               <div>
                 <h3>{fact.title}</h3>
-                <p>{fact.text}</p>
+                <p>
+                  {fact.text}
+                  {"more" in fact && <> <a href={fact.more.href}>{fact.more.label}</a></>}
+                </p>
               </div>
             ))
           }
@@ -121,7 +124,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
 
       <section class="closing" aria-labelledby="cta-heading">
         <h2 id="cta-heading">{CLOSING.title}</h2>
-        <p>{CLOSING.text}</p>
+        <p><a href={SITE.signUpUrl}>{CLOSING.signUp}</a>{CLOSING.text} <a href="#pricing">{CLOSING.link}</a></p>
         <a class="button lg" href={SITE.appUrl}>Audit a repository</a>
         <p class="hint">{CLOSING.hint}</p>
       </section>
@@ -135,7 +138,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         <a href="#how-it-works">How it works</a>
         <a href="#pricing">Pricing</a>
         <a href="#what-to-know">What to know</a>
-        <a href={CLOUDFLARE_SKILL_URL} rel="noopener">Cloudflare's security-audit method</a>
+        <a href={CLOUDFLARE_SKILL_URL} rel="noopener">Cloudflare's open-source security-audit method</a>
         <a href={SITE.appUrl}>Sign in</a>
       </nav>
       <ThemeSelect />

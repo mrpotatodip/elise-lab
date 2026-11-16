@@ -1,9 +1,12 @@
-// The stage kit's tokens, mapped onto the dashboard's Daylight tokens (daylight.css, set on
-// `.dl`), so the kit's parts (buttons, checks, fields) look like the dashboard's.
+// The stage kit's tokens, mapped onto the page's theme tokens (tokens.css), so the kit's parts
+// (buttons, checks, fields, the browser bar) follow the theme the way the dashboard's do.
 export const DASHBOARD_LOOK = {
   "--ss-accent": "var(--primary)",
   "--ss-accent-soft": "var(--accent)",
-  "--ss-surface": "oklch(1 0 0)",
+  "--ss-surface": "var(--popover)",
+  // The browser bar and its address field.
+  "--ss-chrome": "var(--popover)",
+  "--ss-ink-1": "var(--accent)",
   "--ss-text-strong": "var(--foreground)",
   "--ss-text": "var(--muted-foreground)",
   "--ss-text-faint": "var(--muted-foreground)",
