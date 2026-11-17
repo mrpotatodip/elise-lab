@@ -1,5 +1,5 @@
 import { useRouteContext } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { hasAccessPower } from "@repo/contracts/elise";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
@@ -30,12 +30,16 @@ type EditableCommentProps = {
 
 function EditableComment({ event, canEdit, canDelete, editPending, onEdit, onDelete }: EditableCommentProps) {
   const [editing, setEditing] = useState(false);
-  const editButton = useRef<HTMLButtonElement>(null);
-  const wasEditing = useRef(false);
-  useEffect(() => {
-    if (wasEditing.current && !editing) editButton.current?.focus();
-    wasEditing.current = editing;
-  }, [editing]);
+  const restoreFocus = useRef(false);
+  const focusEditButton = useCallback((button: HTMLButtonElement | null) => {
+    if (button === null || !restoreFocus.current) return;
+    restoreFocus.current = false;
+    button.focus();
+  }, []);
+  const stopEditing = () => {
+    restoreFocus.current = true;
+    setEditing(false);
+  };
   const markers =
     event.editedAt && event.deletedAt === null ? (
       <span className="text-muted-foreground">
@@ -48,7 +52,7 @@ function EditableComment({ event, canEdit, canDelete, editPending, onEdit, onDel
     showEdit || showDelete ? (
       <>
         {showEdit && (
-          <Button ref={editButton} type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
+          <Button ref={focusEditButton} type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
             Edit
           </Button>
         )}
@@ -57,7 +61,7 @@ function EditableComment({ event, canEdit, canDelete, editPending, onEdit, onDel
     ) : undefined;
   const editor =
     editing && event.body !== null ? (
-      <FindingCommentEditForm commentId={event.id} initialBody={event.body} pending={editPending} onSave={(body) => onEdit(event.id, body)} onCancel={() => setEditing(false)} />
+      <FindingCommentEditForm commentId={event.id} initialBody={event.body} pending={editPending} onSave={(body) => onEdit(event.id, body)} onCancel={stopEditing} />
     ) : undefined;
   return <FindingCommentItem comment={event} markers={markers} actions={actions} editor={editor} />;
 }

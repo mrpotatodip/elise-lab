@@ -12,6 +12,18 @@ const forbidModules = (files: string, modules: readonly string[], message: strin
   },
 });
 
+// -----
+// No React effect hooks (React 6.1). A file that really syncs with something outside React,
+// with no value to read, is listed here with what it syncs with. The last two are
+// still to be rewritten: shrink this list, never grow it without a reason in review.
+// -----
+const EFFECT_FILES = [
+  "src/lib/use-window-event.ts", // a window event listener
+  "src/modules/shell/hooks/use-sky-rotation.ts", // a DOM animation, an idle timer and input listeners
+  "src/modules/scan/hooks/use-refresh-on-finish.ts", // to move into the scan status query
+  "src/modules/team/components/team-invite-invalid.tsx", // to move into the route's head
+];
+
 export default defineConfig({
   ignorePatterns: ["tools/oxlint/anti-slop/**", "src/routeTree.gen.ts", "worker-configuration.d.ts"],
   plugins: ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "react-perf", "vitest"],
@@ -27,6 +39,10 @@ export default defineConfig({
     forbidModules("src/modules/scan/**", ["repo", "finding", "team", "summary"], "The scan module sits below repo and finding. Take their parts as props or slots from the route that composes them."),
     forbidModules("src/modules/usage/**", ["scan", "repo", "finding", "team", "summary"], "The usage module sits below the screens that show it."),
     forbidModules("src/modules/finding/**", ["repo", "summary"], "The finding module sits below repo."),
+    {
+      files: EFFECT_FILES,
+      rules: { "anti-slop/no-use-effect": "off" },
+    },
     {
       files: ["**/__tests__/**"],
       rules: {
@@ -57,6 +73,7 @@ export default defineConfig({
     "anti-slop/no-unknown-type-aliases": "error",
     "anti-slop/no-unlisted-comments": "error",
     "anti-slop/no-unsafe-dictionary-type": "error",
+    "anti-slop/no-use-effect": "error",
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
   },
