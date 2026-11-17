@@ -3,15 +3,16 @@ import { Button } from "#/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
 
 type FindingCommentDeleteDialogProps = {
-  pending: boolean;
-  onConfirm: () => Promise<void>;
+  onConfirm: () => void;
 };
 
 // -----
 // Asks before it deletes: the text cannot be brought back, and a
-// "deleted" note stays in its place for everyone.
+// "deleted" note stays in its place for everyone. It closes at once;
+// the thread already shows the note and puts the comment back if the
+// delete fails.
 // -----
-export function FindingCommentDeleteDialog({ pending, onConfirm }: FindingCommentDeleteDialogProps) {
+export function FindingCommentDeleteDialog({ onConfirm }: FindingCommentDeleteDialogProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -26,14 +27,12 @@ export function FindingCommentDeleteDialog({ pending, onConfirm }: FindingCommen
           <DialogClose render={<Button variant="outline" />}>Keep it</DialogClose>
           <Button
             variant="destructive"
-            disabled={pending}
             onClick={() => {
-              onConfirm()
-                .then(() => setOpen(false))
-                .catch(() => undefined);
+              setOpen(false);
+              onConfirm();
             }}
           >
-            {pending ? "Deleting" : "Delete comment"}
+            Delete comment
           </Button>
         </DialogFooter>
       </DialogContent>

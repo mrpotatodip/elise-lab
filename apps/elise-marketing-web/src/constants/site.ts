@@ -4,6 +4,8 @@ export const SITE = {
   // The meta description: short, and plain text.
   description: "Agent security audits for your GitHub repositories. A full audit runs Cloudflare's open-source security-audit skill, and every finding is checked independently.",
   appUrl: "https://app.eliselab.com",
+  // The app's own sign-up page (route /signup). appUrl lands on the sign-in page.
+  signUpUrl: "https://app.eliselab.com/signup",
 } as const;
 
 // The Full audit runs this skill as published (the engine pins it in skills-lock.json). The Quick
@@ -13,22 +15,24 @@ export const CLOUDFLARE_SKILL_URL = "https://github.com/cloudflare/security-audi
 // The hero paragraph. It follows the headline ("Security agents that read your code before an
 // attacker does") with how it works, what you get and why to trust it.
 export const LEDE = {
-  start: "For teams that keep their code on GitHub. Point Elise at a repository, the folder that holds your code on GitHub, and get a report with a fix beside every finding. A full audit has AI agents work through ",
+  start: "For teams that keep their code on GitHub. Point Elise at a repository and get a report with a fix beside every finding. A full audit runs AI agents through ",
   link: "Cloudflare's open-source security-audit method",
-  end: ", and every finding is checked independently. Each commit, one saved change to your code, gets a pass or a fail, explained under What to know.",
+  middle: ", and every finding is checked independently. Once a commit has enough scans, it gets a pass or a fail. ",
+  rulesLink: "What to know",
+  end: " has the rules.",
 } as const;
 
 // Under the hero buttons: where they lead, before anyone clicks.
-export const HERO_HINT = "Audit a repository opens the Elise app, where you sign in or create an account.";
+export const HERO_HINT = "Audit a repository opens Elise, where you sign in or create an account.";
 
 export const SHOWCASE_CAPTION = "An example account. Every repository and finding is made up.";
 
 // What a screen reader gets for each picture of the dashboard. The pictures themselves are hidden from it.
 export const PICTURE_LABELS = {
-  tour: "A tour of the Elise dashboard. A scan finishes and its first finding opens, a commit gets its answer, then the overview, the reports and the GitHub connection. Every name and number in it is made up.",
-  connect: "The Start a security audit dialog. A GitHub link is pasted, the repository and a quick review are chosen, and the audit is started.",
-  audit: "A scan page while the audit runs. It steps through cloning, reading the code and saving the report, then shows Succeeded.",
-  report: "The finished report: four summary figures, then four findings with their severity, file and status.",
+  tour: "A tour of the Elise dashboard. A scan finishes and opens its first finding. A commit gets its answer. Then the overview, the reports and the GitHub connection. Every name and number is made up.",
+  connect: "The Start a security audit dialog. Someone pastes a GitHub link, picks a repository and a quick review, then starts the audit.",
+  audit: "A scan page during an audit. It steps through cloning, reading the code and saving the report, then shows Succeeded.",
+  report: "The finished report. Four summary figures sit above four findings, each with a severity, file and status.",
 } as const;
 
 // Each step is a lead sentence and three short points, in plain technical English: one idea per
@@ -36,29 +40,29 @@ export const PICTURE_LABELS = {
 export const STEPS = [
   {
     title: "Connect a repository",
-    text: "Paste a GitHub link in the Start a security audit dialog. Elise takes the repository from the link.",
+    text: "Paste a GitHub URL into the Start a security audit dialog. Elise resolves the repository from it.",
     points: [
-      "A public repository needs no connection. Paste the link and start.",
-      "For a private repository, connect your GitHub account first. Elise can read the repositories you choose. It cannot write to them.",
-      "Choose a quick review or a full audit. A quick review is one agent and is fast. A full audit uses several agents and takes longer.",
+      "A public repository needs no connection. Paste the URL and start.",
+      "For a private repository, connect your GitHub account first. Elise gets read access to the repositories you choose and no write access.",
+      "Pick a quick review or a full audit. A quick review is one agent and finishes fast. A full audit runs several agents and takes longer.",
     ],
   },
   {
     title: "Elise audits the code",
-    text: "Elise copies the repository into a temporary workspace that exists for this one scan. Agents read the code there.",
+    text: "Elise clones the repository into an isolated sandbox made for that one scan. The agents read the code there.",
     points: [
-      "The scan page shows where the scan is: cloning, reading the code, then saving the report.",
-      "While it runs, the workspace can contact only GitHub, to read your code, and the AI service that does the review. It holds no passwords or keys of its own.",
-      "On a branch that Elise has scanned before, the agents re-check the earlier problems first. Then they look for new ones. A branch is a separate line of work in your repository.",
+      "The scan page shows each phase as it runs: cloning, reading the code, saving the report. Succeeded means the scan finished. It does not mean the code is safe.",
+      "The sandbox can reach only GitHub, to clone, and the model provider that does the review. It holds no passwords or keys of its own.",
+      "On a branch Elise has scanned before, the agents re-check the earlier findings first, then look for new ones.",
     ],
   },
   {
     title: "Read the report",
     text: "The report opens with four summary figures. A list of findings follows.",
     points: [
-      "Each finding names its file, says what it means and gives a fix.",
-      "A finding is rated Critical, High, Medium, Low or Informational. Informational is a note, not a problem. A finding that no one has rated shows as Unrated.",
-      "If an agent could not confirm a finding, the report says it needs validation, so a person can check it. The report stays on the Files page of the Elise app.",
+      "Each finding names its file, explains the issue and gives a fix.",
+      "Severity is Critical, High, Medium, Low or Informational. Informational is a note, not a defect. A finding nobody has rated yet shows as Unrated.",
+      "If an agent could not confirm a finding, the report marks it as needing validation so a person can check it. The report stays on the Files page in Elise.",
     ],
   },
 ] as const;
@@ -69,33 +73,33 @@ export const STEPS = [
 // are not claimed: the app cannot take a card yet. The 30-day credit expiry after a cancel is the
 // agreed design, not yet enforced: it needs Stripe. Update this when the plans table changes.
 export const PRICING = {
-  note: "You can create an account in the Elise app and run a scan today. Paid plans open for sign-up soon. Until then there is no card checkout and no free trial.",
+  note: "Paid plans open for sign-up soon. Until then, create an account and run a scan in Elise. There is no card checkout yet and no free trial.",
   action: "Create an account",
-  actionHint: "Create an account opens the Elise app.",
+  actionHint: "Create an account opens the sign-up page in Elise.",
   plans: [
     {
       name: "Pro",
       price: "$49",
-      summary: "Scans run on our key and take credit from your balance.",
+      summary: "Scans run on our model key and spend credit from your balance.",
       points: [
-        "$49 of credit is added each month.",
-        "A scan takes credit based on what it cost to run, and no scan takes more than about $3. A failed scan takes only what it used before it failed. You can start a new scan afterwards.",
-        "To start a scan you need about $3 of credit free. A running scan holds that much and gives back what it did not use.",
-        "When the credit runs out, scans stop. Elise does not bill you for going over.",
+        "$49 of credit arrives each month.",
+        "A scan spends credit based on what it cost to run, never more than about $3. A failed scan spends only what it used before it failed.",
+        "A scan needs about $3 of credit free to start. It holds that amount while it runs and releases what it did not use.",
+        "At zero credit, scans stop until the next $49 arrives. Elise never bills you for going over.",
         "Unused credit carries over, up to $100.",
         "If you cancel, your credit stays usable for 30 days, then expires.",
-        "Up to 5 people.",
+        "Up to 5 members per account.",
       ],
     },
     {
       name: "Bring your own key",
       price: "$19",
-      summary: "Scans run on your own key, an access code from the AI service, so they use no credit.",
+      summary: "Scans run on your own model provider API key and use no credit.",
       points: [
-        "Add your key under Settings in the Elise app before the first scan. Scans do not run without it.",
-        "The AI service bills the use on your key, not Elise.",
-        "300 scans a month. At 300, scans stop until the 1st of the next month, UTC.",
-        "Up to 5 people.",
+        "Add your key under Settings in Elise before your first scan. Scans do not run without it.",
+        "The provider bills that key directly. Elise does not.",
+        "300 scans a month. Past that, scans stop until the 1st of the next month in UTC, the server's time zone.",
+        "Up to 5 members per account.",
       ],
     },
   ],
@@ -105,9 +109,9 @@ export const PRICING = {
 // New scan dialog). Nothing here promises more than the product says.
 export const FACTS = [
   { title: "It reads your code and never changes it", text: "Elise can read the repositories you choose and cannot write to them. Public repositories need no connection. Private ones need GitHub connected." },
-  { title: "What a pass or a fail means", text: "A commit passes when it has been scanned at least twice and earlier problems were re-checked. It also needs no open Critical or High finding, and no more than 3 open Medium ones. A fail says \"Do not ship yet\" and lists what blocks the commit. With too few scans you get \"not enough scans\", not a guess. Either answer is advice, not proof, because an agent can miss a problem." },
-  { title: "How serious a finding is", text: "Critical is the worst rating: an attacker could use it to do serious harm. High is nearly as bad. Fix both before shipping. Medium is worth fixing, and a few can ship. Low is minor and does not block shipping. A finding no one has rated yet shows as Unrated until a person decides." },
-  { title: "What it costs", text: "Each audit stops at its own spend limit. On Pro, a scan takes credit from your balance, and no scan takes more than about $3. On Bring your own key, your own key pays for it. A quick review is one agent's fast first look. A full audit sends several agents through Cloudflare's open-source method and takes longer. The plans are under Pricing." },
+  { title: "What a pass or a fail means", text: "A commit passes when it has been scanned at least twice, Elise re-checked the earlier findings, no Critical or High finding is open and no more than 3 Medium ones are. A fail says \"Do not ship yet\" and lists what blocks the commit. With too few scans, Elise says \"not enough scans\" instead of guessing. Scan the commit again to get an answer. Pass or fail, treat it as advice. An agent can miss a vulnerability." },
+  { title: "What the severities mean", text: "Critical is the worst rating. An attacker could do serious harm with it. High is nearly as bad. Fix both before shipping. Medium is worth fixing, and a few can ship. Low is minor and does not block shipping. Unrated means nobody has rated the finding yet." },
+  { title: "What it costs", text: "Each audit stops at its own spend limit. On Pro, a scan spends credit from your balance, and none spends more than about $3. On Bring your own key, your provider key pays. A quick review is one agent's fast first pass. A full audit runs several agents through Cloudflare's open-source security-audit method and takes longer.", more: { href: "#pricing", label: "See the plans under Pricing." } },
 ] as const;
 
 // Under "How it works": the pictures are real screens with made-up data.
@@ -115,6 +119,8 @@ export const STEPS_NOTE = "The pictures are Elise's own screens. The repositorie
 
 export const CLOSING = {
   title: "Audit your first repository",
-  text: "Create an account in the Elise app, then paste a GitHub link. That is the address of your repository on github.com. You can run a scan today. Paid plans open for sign-up soon: see Pricing.",
-  hint: "Audit a repository opens the Elise app.",
+  signUp: "Create an account",
+  text: " in Elise, then paste a GitHub URL. You can run a scan today. Paid plans open for sign-up soon.",
+  link: "See the plans under Pricing.",
+  hint: "Audit a repository opens Elise.",
 } as const;

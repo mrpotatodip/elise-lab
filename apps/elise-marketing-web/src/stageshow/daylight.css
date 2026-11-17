@@ -1,60 +1,16 @@
-/* The dashboard's Daylight theme, scoped to the pictures of it. The values are copied from
-   apps/elise-frontend-web/src/styles/globals.css (the :root block and the Daylight block), set
-   on `.dl` so a picture keeps its own look whatever theme the page is in. Change them in the
-   dashboard first. */
+/* The pictures of the dashboard follow the page's theme. `.dl` sets no colours: every picture reads
+   the same tokens as the page (tokens.css, themes.css), so a theme change repaints them: surfaces,
+   status and severity colours, the sky (`--sky`, none in Default and Midnight) and the glass. */
 .dl {
-  --background: oklch(0.985 0.002 258 / 0.12);
-  --foreground: oklch(0.15 0.012 258);
-  --sidebar: oklch(0.99 0.002 258 / 0.42);
-  --card: oklch(1 0 0 / 0.74);
-  --card-foreground: oklch(0.18 0.012 258);
-  --popover: oklch(1 0 0 / 0.9);
-  --primary: oklch(0.22 0.012 258);
-  --primary-foreground: oklch(0.99 0.002 258);
-  --primary-ink: oklch(0.25 0.012 258);
-  --secondary: oklch(0.935 0.004 258);
-  --secondary-foreground: oklch(0.22 0.012 258);
-  --muted: oklch(0.965 0.003 258 / 0.45);
-  --muted-foreground: oklch(0.34 0.012 258);
-  --accent: oklch(0 0 0 / 0.06);
-  --accent-foreground: oklch(0.16 0.012 258);
-  --border: oklch(0 0 0 / 0.14);
-  --input: oklch(0 0 0 / 0.26);
-  --ring: oklch(0.3 0.015 258 / 0.6);
-
-  --status-success: oklch(0.4 0.12 155);
-  --status-success-soft: oklch(0.55 0.14 155 / 0.13);
-  --status-danger: oklch(0.44 0.18 27);
-  --status-danger-soft: oklch(0.58 0.2 27 / 0.12);
-  --status-warning: oklch(0.4 0.1 70);
-  --status-warning-soft: oklch(0.72 0.15 80 / 0.2);
-  --status-info: oklch(0.41 0.14 245);
-  --status-info-soft: oklch(0.6 0.14 245 / 0.13);
-  --status-neutral: oklch(0.38 0.012 258);
-  --status-neutral-soft: oklch(0.5 0.012 258 / 0.12);
-
-  --severity-critical: oklch(0.44 0.2 25);
-  --severity-high: oklch(0.44 0.14 48);
-  --severity-medium: oklch(0.42 0.1 80);
-  --severity-low: oklch(0.42 0.14 245);
-
-  --mark-info: oklch(0.6 0.15 245);
-  --mark-critical: oklch(0.55 0.21 20);
-  --mark-high: oklch(0.6 0.19 42);
-  --mark-medium: oklch(0.66 0.14 72);
-  --mark-low: oklch(0.6 0.15 245);
-
-  --shadow-card:
-    inset 0 1px 0 oklch(1 0 0 / 0.9), 0 1px 2px oklch(0 0 0 / 0.06),
-    0 10px 24px -14px oklch(0 0 0 / 0.14);
-  --shadow-control: 0 1px 1px oklch(0 0 0 / 0.05);
-  --shadow-primary:
-    inset 0 1px 0 oklch(1 0 0 / 0.16), 0 1px 2px oklch(0 0 0 / 0.3),
-    0 6px 14px -6px oklch(0 0 0 / 0.4);
-
   color: var(--foreground);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  color-scheme: light;
+}
+
+/* The cursor is drawn dark on a light surface; on the two dark themes it is light, as the stage
+   kit does for its own dark look. */
+:root[data-theme="moonlight"] .dl .ss-cursor__arrow,
+:root[data-theme="midnight"] .dl .ss-cursor__arrow {
+  --ss-cursor-ink: #fff;
 }
 
 /* The dashboard's Badge: a bordered pill with a soft fill. */

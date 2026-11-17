@@ -1,10 +1,11 @@
 import { useId, useState, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
-import { ChevronRight, ChevronUp, CircleCheck, CircleDashed, CircleHelp, CircleX, ExternalLink, OctagonX } from "lucide-react";
+import { ChevronRight, ChevronUp, CircleCheck, CircleDashed, CircleHelp, CircleX, OctagonX } from "lucide-react";
 import { cn } from "#/lib/utils";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { Alert, AlertDescription } from "#/components/ui/alert";
+import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
 import { Skeleton } from "#/components/ui/skeleton";
@@ -13,12 +14,12 @@ import type { Finding, Verdict, VerdictFinding } from "../schemas";
 import { ScanFindingSheet } from "./scan-finding-sheet";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanVerdictRun } from "./scan-verdict-run";
-import { scanPlural, verdictScansToRun } from "../utils";
+import { openProblemsSummary, scanPlural, verdictBlockers, verdictScansToRun } from "../utils";
 import { ScanSeverityBadge } from "./scan-severity-badge";
 
 export const VERDICT_COPY = {
   pass: { title: "Passed the scan policy", note: "Scanned enough times and nothing open is over the limits. An AI audit can miss problems, so this is advice and not proof that the commit is safe.", variant: "success", Icon: CircleCheck },
-  fail: { title: "Do not ship yet", note: "Trusted scans left problems that block this commit. You can fix them, or an account admin can accept the risk with a note.", variant: "destructive", Icon: OctagonX },
+  fail: { title: "Do not ship yet", note: "Some open problems block this commit. Decide on each one, or an account admin can accept the risk with a note.", variant: "destructive", Icon: OctagonX },
   cannot_tell: { title: "Cannot tell yet", note: "This is not a failure. This commit needs more scans before the answer can be yes or no.", variant: "warning", Icon: CircleHelp },
 } as const;
 
@@ -101,7 +102,8 @@ const decidingColumns = column.columns([
     meta: { head: "w-56", cell: "align-top" },
     cell: ({ row }) => {
       const { finding, decide } = row.original;
-      return decide ? <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={finding} /> : null;
+      if (!decide) return null;
+      return <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={finding} />;
     },
   }),
 ]);
@@ -156,10 +158,10 @@ function FindingRows({ title, hint, findings, decide, collapsed = false }: Findi
           onSelect={setSelected}
           decision={
             selectedFinding && (
-              <>
+              <div className="flex items-center gap-3">
                 <span className="text-sm font-medium">Your decision</span>
                 <decide.Control repoId={decide.repoId} repoUrl={decide.repoUrl} finding={selectedFinding} />
-              </>
+              </div>
             )
           }
         />
@@ -199,7 +201,7 @@ function verdictChecks(verdict: Verdict): Check[] {
       state: historyReason ? "fail" : scans.counted === 0 ? "wait" : "ok",
     },
     {
-      label: "Nothing open over the limits",
+      label: "Nothing open blocks this commit",
       detail: `${over.length > 0 ? `${over.join(", ")}.` : openTotal === 0 ? "Nothing is open." : `${openTotal} open, all within the limits.`} Allowed: ${limits.critical} critical, ${limits.high} high, up to ${limits.medium} medium.`,
       state: over.length > 0 ? "fail" : "ok",
     },
@@ -237,8 +239,8 @@ function VerdictChecklist({ verdict }: { verdict: Verdict }) {
     <details className="group rounded-lg border">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-        <span className="text-[15px] font-semibold">How this is decided</span>
-        <span className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+        <span className="text-[15px] font-semibold">Why this answer?</span>
+        <span className="max-w-copy text-sm leading-relaxed text-foreground">
           {checks.length - unmet.length} of {checks.length} checks met{unmet.length > 0 ? `. Not met: ${unmet.map((check) => check.label.toLowerCase()).join(", ")}.` : "."}
         </span>
       </summary>
@@ -264,15 +266,62 @@ function VerdictChecklist({ verdict }: { verdict: Verdict }) {
   );
 }
 
-type VerdictBodyProps = { verdict: Verdict; repoId: string; repoUrl?: string; branchOpen?: number; Decision?: DecideFinding; compactFindings?: boolean };
+type VerdictBodyProps = { verdict: Verdict; repoId: string; repoUrl?: string; branchOpen?: number; Decision?: DecideFinding; compactFindings?: boolean; findingsHref?: string };
 
-function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFindings = false }: VerdictBodyProps) {
-  const copy = VERDICT_COPY[verdict.verdict];
+// -----
+// For a screen with one list of findings of its own, the open problems are
+// not listed again: the card gives the count and a link to that list.
+// -----
+function OpenFindingsLink({ count, blocking, href, older, oneOffHint }: { count: number; blocking: number; href: string; older: number; oneOffHint: string }) {
+  if (count === 0) return null;
+  const olderHint = older === 0 ? "" : ` The list also holds ${older === 1 ? "1 older finding that is" : `${older} older findings that are`} still open on this branch.`;
+  return (
+    <section aria-labelledby="verdict-open-heading" className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      <div className="grid min-w-0 flex-1 basis-80 gap-1.5">
+        <h3 id="verdict-open-heading" className="text-[15px] font-semibold">
+          {scanPlural(count, "problem", "problems")} still open on this commit
+        </h3>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground xl:max-w-3xl">
+          {openProblemsSummary(count, blocking)}
+          {olderHint}
+          {oneOffHint}
+        </p>
+      </div>
+      <Button variant="outline" nativeButton={false} render={<a href={href} aria-label={`Review ${scanPlural(count, "problem", "problems")} in Findings on this branch`} />}>
+        Review {scanPlural(count, "problem", "problems")}
+      </Button>
+    </section>
+  );
+}
+
+// -----
+// The buttons for the scans a verdict still lacks, in the card header. One
+// click runs the missing scan with the settings of the last one, and the
+// other opens the options. A verdict with every scan it needs has no button.
+// -----
+function VerdictRescan({ verdict, repoId, repoUrl }: { verdict: Verdict; repoId: string; repoUrl: string }) {
   const { scans } = verdict;
-  const missing = Math.max(0, scans.required - scans.counted);
-  const needsScan = missing > 0;
+  const needsScan = scans.required - scans.counted > 0;
   const { data: list } = useQuery(scansQuery());
   const last = list?.scans.find((scan) => scan.scanId === scans.ids[0]);
+  if (!needsScan) return null;
+  return (
+    <div className="flex flex-wrap items-start gap-3">
+      {last && <ScanVerdictRun repoId={repoId} repoUrl={repoUrl} commit={verdict.commit} last={last} />}
+      <ScanNewDialog
+        label={last ? "Choose options" : "Run the missing scan"}
+        size="sm"
+        variant={last ? "outline" : "default"}
+        repo={repoUrl}
+        startRef={verdict.commit}
+        startOptions={last && { model: last.model === "claude-opus-5-5" ? undefined : last.model, effort: last.effort, profile: last.profile }}
+      />
+    </div>
+  );
+}
+
+function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFindings = false, findingsHref }: VerdictBodyProps) {
+  const copy = VERDICT_COPY[verdict.verdict];
   const oneOff = branchOpen === undefined ? 0 : Math.max(0, verdict.open.length - branchOpen);
   const oneOffHint = oneOff === 0 ? "" : ` ${oneOff === 1 ? "1 came from a one-off scan of this commit and is" : `${oneOff} came from a one-off scan of this commit and are`} not in the branch's findings below.`;
   return (
@@ -281,37 +330,23 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
         <copy.Icon />
         <div className="grid gap-1.5">
           <AlertDescription className="text-xl font-semibold leading-tight">{copy.title}</AlertDescription>
-          <AlertDescription className="max-w-copy text-foreground">{copy.note}</AlertDescription>
+          <AlertDescription className="max-w-copy text-pretty text-foreground xl:max-w-4xl">{copy.note}</AlertDescription>
+          {verdict.verdict !== "pass" && <AlertDescription className="max-w-copy text-pretty font-medium text-foreground xl:max-w-4xl">{verdictNextSteps(verdict)}</AlertDescription>}
         </div>
       </Alert>
-      {repoUrl && (
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg border bg-muted/50 p-4">
-          <div className="grid min-w-0 flex-1 basis-64 gap-1">
-            <p className="text-sm font-medium">{needsScan ? `Next step: scan this commit ${verdictScansToRun(missing) === 1 ? "once more" : `${verdictScansToRun(missing)} more times`}` : "Want another look at this exact commit?"}</p>
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Scans exactly {verdict.commit.slice(0, 7)}, even if the branch has moved on. The worst result counts.</p>
-          </div>
-          <div className="flex flex-wrap items-start gap-3">
-            {needsScan && last && <ScanVerdictRun repoId={repoId} repoUrl={repoUrl} commit={verdict.commit} last={last} />}
-            <ScanNewDialog
-              label={needsScan && last ? "Choose options" : "Run another scan of this commit"}
-              size="default"
-              variant={needsScan && !last ? "default" : "outline"}
-              repo={repoUrl}
-              startRef={verdict.commit}
-              startOptions={last && { model: last.model === "claude-opus-5-5" ? undefined : last.model, effort: last.effort, profile: last.profile }}
-            />
-          </div>
-        </div>
-      )}
       <VerdictChecklist verdict={verdict} />
       <div className="grid gap-6">
-        <FindingRows
-          title={`${scanPlural(verdict.open.length, "problem", "problems")} still open on this commit`}
-          hint={`These count against the commit. Select one to read the impact and the fix, then record your decision.${oneOffHint}`}
-          findings={verdict.open}
-          decide={Decision && repoUrl ? { Control: Decision, repoId, repoUrl } : undefined}
-          collapsed={compactFindings}
-        />
+        {findingsHref ? (
+          <OpenFindingsLink count={verdict.open.length} blocking={verdictBlockers(verdict).size} href={findingsHref} older={branchOpen === undefined ? 0 : Math.max(0, branchOpen - verdict.open.length)} oneOffHint={oneOffHint} />
+        ) : (
+          <FindingRows
+            title={`${scanPlural(verdict.open.length, "problem", "problems")} still open on this commit`}
+            hint={`These count against the commit. Select one to read the impact and the fix, then record your decision.${oneOffHint}`}
+            findings={verdict.open}
+            decide={Decision && repoUrl ? { Control: Decision, repoId, repoUrl } : undefined}
+            collapsed={compactFindings}
+          />
+        )}
         <FindingRows title={scanPlural(verdict.accepted.length, "accepted risk", "accepted risks")} hint="An account admin chose to ship with these until the date shown. After that they block again." findings={verdict.accepted} />
         <FindingRows
           title={`${scanPlural(verdict.dismissed.length, "finding", "findings")} dismissed as ${verdict.dismissed.length === 1 ? "a false positive" : "false positives"}`}
@@ -319,60 +354,30 @@ function VerdictBody({ verdict, repoId, repoUrl, branchOpen, Decision, compactFi
           findings={verdict.dismissed}
         />
       </div>
-      <div className="border-t pt-3">
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-          <span className="font-medium text-foreground">Advice, not a guarantee.</span> This answer comes from an AI review of the code. It can miss a problem, and a scanned repository can try to steer it. Do not use it as your only release check.
-        </p>
-      </div>
     </>
   );
 }
 
-type ScanVerdictCardProps = { repoId: string; commit: string; repoUrl?: string; found?: number; scope?: "scan" | "branch"; branchOpen?: number; Decision?: DecideFinding; compactFindings?: boolean };
+type ScanVerdictCardProps = { repoId: string; commit: string; repoUrl?: string; found?: number; scope?: "scan" | "branch"; branchOpen?: number; Decision?: DecideFinding; compactFindings?: boolean; findingsHref?: string };
 
-const CHIP_CLASS = "inline-flex min-h-6 items-center gap-1.5 rounded-md border bg-background px-2 py-0.5 text-sm";
-
-function CommitChip({ commit, repoUrl }: { commit: string; repoUrl?: string }) {
-  const short = commit.slice(0, 7);
-  const label = (
-    <>
-      <span className="text-muted-foreground">Commit</span>
-      <span className="font-mono">{short}</span>
-    </>
-  );
-  if (!repoUrl) return <span className={CHIP_CLASS} title="The exact commit this answer is for">{label}</span>;
-  return (
-    <a
-      href={`${repoUrl.replace(/\.git$/, "").replace(/\/$/, "")}/commit/${commit}`}
-      target="_blank"
-      rel="noreferrer"
-      title="The exact commit this answer is for. Open it on GitHub."
-      aria-label={`Open commit ${short} on GitHub`}
-      className={`${CHIP_CLASS} transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-    >
-      {label}
-      <ExternalLink aria-hidden="true" className="size-3 text-muted-foreground" />
-    </a>
-  );
-}
-
-export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan", branchOpen, Decision, compactFindings = false }: ScanVerdictCardProps) {
+export function ScanVerdictCard({ repoId, commit, repoUrl, found, scope = "scan", branchOpen, Decision, compactFindings = false, findingsHref }: ScanVerdictCardProps) {
   const { data, isPending, error } = useQuery(verdictQuery(repoId, commit));
-  const nextSteps = data && verdictNextSteps(data);
 
   return (
     <Card>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-6">
         <div className="grid gap-1.5">
           <CardTitle>Ready to ship?</CardTitle>
-          {nextSteps && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{nextSteps}</p>}
+          <p className="text-sm text-muted-foreground">
+            Commit <span className="font-mono">{commit.slice(0, 7)}</span>
+          </p>
           {scope === "scan" && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The answer belongs to the commit, not to this scan.</p>}
           {found === 0 && data && data.open.length > 0 && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">This scan found nothing. The open problems below come from other scans of the same commit.</p>}
         </div>
-        <CommitChip commit={commit} repoUrl={repoUrl} />
+        {data && repoUrl && <VerdictRescan verdict={data} repoId={repoId} repoUrl={repoUrl} />}
       </CardHeader>
       <CardContent className="grid gap-4">
-        {isPending ? <Skeleton className="h-16" /> : error ? <p className="text-sm text-destructive">We could not load the verdict: {error.message}. Refresh to try again.</p> : <VerdictBody verdict={data} repoId={repoId} repoUrl={repoUrl} branchOpen={branchOpen} Decision={Decision} compactFindings={compactFindings} />}
+        {isPending ? <Skeleton className="h-16" /> : error ? <p className="text-sm text-destructive">We could not load the verdict: {error.message}. Refresh to try again.</p> : <VerdictBody verdict={data} repoId={repoId} repoUrl={repoUrl} branchOpen={branchOpen} Decision={Decision} compactFindings={compactFindings} findingsHref={findingsHref} />}
       </CardContent>
     </Card>
   );

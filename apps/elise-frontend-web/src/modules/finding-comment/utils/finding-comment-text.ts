@@ -52,6 +52,20 @@ export function commentSegments(body: string): CommentSegment[] {
   return segments;
 }
 
+const NUMBER = new Intl.NumberFormat("en");
+
+// -----
+// The live count under a box: "0 of 4,000 characters".
+// -----
+export const commentCountText = (length: number, max: number): string => `${NUMBER.format(length)} of ${NUMBER.format(max)} characters`;
+
+// -----
+// A time in full for a tooltip: date, year, time and zone.
+// timeZone undefined means the viewer's own.
+// -----
+export const commentTimeTitle = (value: string, timeZone: string | undefined): string =>
+  new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "long", timeZone }).format(new Date(value));
+
 export const COMMENT_AUTHOR_FALLBACK = "a team member";
 
 export const commentAuthorLabel = (authorName: string | null) => authorName ?? COMMENT_AUTHOR_FALLBACK;

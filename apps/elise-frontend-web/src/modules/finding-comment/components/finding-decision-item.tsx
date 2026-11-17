@@ -1,6 +1,6 @@
-import { ScanTime } from "#/modules/scan";
 import type { FindingDecision } from "../schemas";
 import { commentAuthorLabel, decisionText } from "../utils";
+import { FindingCommentTime } from "./finding-comment-time";
 
 // -----
 // One triage decision in the thread: a single line, "Alex marked
@@ -14,7 +14,7 @@ export function FindingDecisionItem({ decision }: { decision: FindingDecision })
         <span>
           <span className="font-medium">{commentAuthorLabel(decision.actorName)}</span> {decisionText(decision)}
         </span>
-        <ScanTime value={decision.createdAt} />
+        <FindingCommentTime value={decision.createdAt} />
       </p>
       {decision.status === "accepted_risk" && decision.note && <p className="text-muted-foreground">{decision.note}</p>}
     </li>

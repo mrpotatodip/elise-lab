@@ -1,12 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
-import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "#/components/ui/sheet";
-import { SCAN_FINDING_STATE_COPY } from "../constants";
+import { Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader } from "#/components/ui/sheet";
 import type { Finding } from "../schemas";
 import { ScanFindingDetail } from "./scan-finding-detail";
-import { ScanSeverityBadge } from "./scan-severity-badge";
+import { ScanFindingHeader } from "./scan-finding-header";
 
 type ScanFindingSheetProps = {
   findings: readonly Finding[];
@@ -15,7 +13,7 @@ type ScanFindingSheetProps = {
   status?: ReactNode;
   facts?: ReactNode;
   decision?: ReactNode;
-  discussion?: ReactNode;
+  decisionHint?: ReactNode;
 };
 
 // -----
@@ -24,7 +22,7 @@ type ScanFindingSheetProps = {
 // without going back to the list. The list keeps the selection, so closing
 // the panel leaves the reviewer where they were.
 // -----
-export function ScanFindingSheet({ findings, selected, onSelect, status, facts, decision, discussion }: ScanFindingSheetProps) {
+export function ScanFindingSheet({ findings, selected, onSelect, status, facts, decision, decisionHint }: ScanFindingSheetProps) {
   const [closing, setClosing] = useState(false);
   const finding = selected === undefined ? undefined : findings[selected];
   const hasPrevious = selected !== undefined && selected > 0;
@@ -55,18 +53,7 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
         {finding && selected !== undefined && (
           <>
             <SheetHeader>
-              <div className="flex flex-wrap items-center gap-2">
-                <ScanSeverityBadge severity={finding.severity} />
-                <Badge variant={finding.state === "confirmed" ? "success" : finding.state === "needs_validation" ? "warning" : "neutral"}>{SCAN_FINDING_STATE_COPY[finding.state].label}</Badge>
-                <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                  {selected + 1} of {findings.length}
-                </span>
-              </div>
-              <SheetTitle>{finding.title}</SheetTitle>
-              <SheetDescription render={<div />}>
-                {finding.place ? <span className="font-mono text-xs [overflow-wrap:anywhere]">{`${finding.place.file}:${finding.place.line}`}</span> : "No file was recorded for this finding."}
-                {finding.state !== "confirmed" && <span className="mt-2 block">{SCAN_FINDING_STATE_COPY[finding.state].note}</span>}
-              </SheetDescription>
+              <ScanFindingHeader finding={finding} aside={`${selected + 1} of ${findings.length}`} />
             </SheetHeader>
             <SheetBody className="grid content-start gap-8">
               {status}
@@ -80,7 +67,6 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
                   {facts}
                 </dl>
               )}
-              {discussion}
             </SheetBody>
             <SheetFooter>
               <div className="flex items-center gap-3">{decision}</div>
@@ -95,6 +81,7 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
                   <ArrowRight aria-hidden="true" />
                 </Button>
               </div>
+              {decisionHint && <div className="basis-full">{decisionHint}</div>}
             </SheetFooter>
           </>
         )}

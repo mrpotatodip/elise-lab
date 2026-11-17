@@ -2,12 +2,13 @@
 // skies of the three picture themes. To add a sky, drop the file in public/theme-bgs
 // and add its name here; the random pick in Base.astro reads this list.
 
+// `note` is the one line under a theme's name in the footer picker, the dashboard's own words.
 export const THEMES = [
-  { id: "default", label: "Default" },
-  { id: "midnight", label: "Midnight" },
-  { id: "daylight", label: "Daylight" },
-  { id: "greenfields", label: "Greenfields" },
-  { id: "moonlight", label: "Moonlight" },
+  { id: "default", label: "Default", note: "Soft gray, light" },
+  { id: "midnight", label: "Midnight", note: "Soft gray, dark" },
+  { id: "daylight", label: "Daylight", note: "Bright, glass over a sky" },
+  { id: "greenfields", label: "Greenfields", note: "Bright, glass over green fields" },
+  { id: "moonlight", label: "Moonlight", note: "Dark, glass over a night sky" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

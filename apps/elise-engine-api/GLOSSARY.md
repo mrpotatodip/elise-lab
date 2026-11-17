@@ -129,7 +129,7 @@ Plain text a signed-in member wrote about a Finding (`scan_finding_comments`), a
 _Avoid_: Note (the decision has a note), reply
 
 **Discussion**:
-The thread of a Finding in the dashboard: its Comments, oldest first, in the detail sheet of the Repo page. Reading it needs the Dashboard Power (`GET /findings/comments`), so a Watcher never sees it.
+The thread of a Finding in the dashboard: its Comments and the decisions people made, oldest first, in a side sheet of its own that the "Discussion" button on each Finding row opens. Reading it needs the Dashboard Power (`GET /findings/comments`), so a Watcher never sees it.
 _Avoid_: Chat, conversation
 
 **Detached run**:

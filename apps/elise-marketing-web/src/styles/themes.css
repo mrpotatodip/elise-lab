@@ -26,11 +26,26 @@ body {
 :root[data-theme="greenfields"] { --sky: var(--greenfields-sky, url("/theme-bgs/bg-greenfields-1.webp")); }
 :root[data-theme="moonlight"] { --sky: var(--moonlight-sky, url("/theme-bgs/bg-moonlight-1.webp")); }
 
-/* Daylight, Greenfields and Moonlight blur what is behind a card or control. */
+/* The miniature of each theme on its tile in the footer picker: its page, its card and its ink,
+   copied from the dashboard's ShellThemeSwitch. They are the one place the site names another
+   theme's colours, so they are fixed and do not follow the current theme. */
+.theme-tile__preview[data-preview="default"] { --page: #f1f2f4; --card: #fcfcfd; --ink: #23262b; }
+.theme-tile__preview[data-preview="midnight"] { --page: #17191d; --card: #25282e; --ink: #eceef1; }
+.theme-tile__preview[data-preview="daylight"] { --page: #cfe3f7; --card: #ffffff; --ink: #1a1d21; }
+.theme-tile__preview[data-preview="greenfields"] { --page: #dcefd9; --card: #ffffff; --ink: #16231a; }
+.theme-tile__preview[data-preview="moonlight"] { --page: #1c2340; --card: #2b3350; --ink: #eceef1; }
+
+/* Daylight, Greenfields and Moonlight blur what is behind a card or control, and blur a dialog
+   much harder (32px against 10px), as the dashboard does. */
+:root {
+  --dialog-blur: none;
+}
+
 :root[data-theme="daylight"],
 :root[data-theme="greenfields"],
 :root[data-theme="moonlight"] {
   --glass-blur: blur(10px) saturate(1.4);
+  --dialog-blur: blur(32px) saturate(1.4);
 }
 
 /* Text sits straight on the sky with no glass behind it. A soft halo and a
