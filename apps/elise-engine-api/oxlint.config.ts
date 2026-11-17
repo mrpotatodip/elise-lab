@@ -1,8 +1,12 @@
 import { defineConfig } from "oxlint";
 
+const FORBID_HONO_RPC = { name: "hono/client", message: "No Hono RPC client: the frontend calls the API through a server function (Hono JS 9.2)." };
+const FORBID_DEEP_IMPORT = { group: ["#/modules/*/*/*"], message: "Import through the folder's barrel: `#/modules/{module}/{folder}` (Hono JS 8.2). Inside one folder, import the sibling with `./file`." };
+const FORBID_HONO_IN_SERVICES = { group: ["hono", "hono/*"], message: "Services never import from `hono`: pass plain values, not a Context (Hono JS 2.3)." };
+
 export default defineConfig({
   ignorePatterns: ["tools/oxlint/anti-slop/**"],
-  plugins: ["typescript", "unicorn", "oxc", "vitest", "promise"],
+  plugins: ["typescript", "unicorn", "oxc", "vitest", "promise", "node"],
   categories: {
     correctness: "error",
     suspicious: "error",
@@ -39,6 +43,13 @@ export default defineConfig({
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
+    "anti-slop/require-validator-schema-reference": "error",
+    "anti-slop-effect/require-return-yield-error": "error",
+    "anti-slop-effect/require-tagged-error-name": "error",
+    "typescript/consistent-type-definitions": ["error", "type"],
+    "typescript/no-explicit-any": "error",
+    "node/no-process-env": "error",
+    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [FORBID_DEEP_IMPORT] }],
     // -----
     // Effect's tagged errors discriminate on
     // its own `_tag` field.
@@ -50,6 +61,15 @@ export default defineConfig({
       files: ["src/modules/**/api/**"],
       rules: {
         "anti-slop/no-error-handling-in-routes": "error",
+        "anti-slop/require-envelope-json": "error",
+        "anti-slop/require-route-doc": "error",
+        "no-console": "error",
+      },
+    },
+    {
+      files: ["src/modules/**/handlers/**", "src/modules/**/queries/**", "src/modules/**/utils/**"],
+      rules: {
+        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [FORBID_DEEP_IMPORT, FORBID_HONO_IN_SERVICES] }],
       },
     },
     {
@@ -58,6 +78,15 @@ export default defineConfig({
         "anti-slop-effect/no-async-in-effect-layers": "error",
         "anti-slop-effect/no-run-effect-in-effect-layers": "error",
         "anti-slop-effect/require-effect-return-type": "error",
+      },
+    },
+    {
+      // -----
+      // Reads `.shape`, which is Zod's own name for a schema's fields.
+      // -----
+      files: ["src/lib/document-fields.ts"],
+      rules: {
+        "anti-slop/no-shape-in-symbol-names": "off",
       },
     },
     {

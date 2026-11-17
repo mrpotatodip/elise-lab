@@ -13,7 +13,10 @@ import { noErrorHandlingInRoutesRule } from "./rules/no-error-handling-in-routes
 import { noHttpExceptionThrowRule } from "./rules/no-http-exception-throw.ts";
 import { noParentRelativeImportsRule } from "./rules/no-parent-relative-imports.ts";
 import { noRawRequestInputRule } from "./rules/no-raw-request-input.ts";
+import { requireEnvelopeJsonRule } from "./rules/require-envelope-json.ts";
+import { requireRouteDocRule } from "./rules/require-route-doc.ts";
 import { requireTypedHonoAppRule } from "./rules/require-typed-hono-app.ts";
+import { requireValidatorSchemaReferenceRule } from "./rules/require-validator-schema-reference.ts";
 import { noUnknownParametersRule } from "./rules/no-unknown-parameters.ts";
 import { noUnknownReturnsRule } from "./rules/no-unknown-returns.ts";
 import { noUnknownTypeAliasesRule } from "./rules/no-unknown-type-aliases.ts";
@@ -37,7 +40,10 @@ const antiSlopPlugin = eslintCompatPlugin({
 		"no-http-exception-throw": noHttpExceptionThrowRule,
 		"no-parent-relative-imports": noParentRelativeImportsRule,
 		"no-raw-request-input": noRawRequestInputRule,
+		"require-envelope-json": requireEnvelopeJsonRule,
+		"require-route-doc": requireRouteDocRule,
 		"require-typed-hono-app": requireTypedHonoAppRule,
+		"require-validator-schema-reference": requireValidatorSchemaReferenceRule,
 		"no-runtime-typeof": noRuntimeTypeofRule,
 		"no-unlisted-comments": noUnlistedCommentsRule,
 		"no-unsafe-dictionary-type": noUnsafeDictionaryTypeRule,

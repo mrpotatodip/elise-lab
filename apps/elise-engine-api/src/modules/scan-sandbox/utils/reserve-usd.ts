@@ -1,6 +1,6 @@
 import { SCAN_SANDBOX_METER_EPSILON } from "#/modules/scan-sandbox/constants";
 import type { Meter } from "#/modules/scan-sandbox/types";
-import { priceUsage } from "#/modules/scan-sandbox/utils/price-usage";
+import { priceUsage } from "./price-usage";
 
 // -----
 // What a call can cost at most for its answer: every output token

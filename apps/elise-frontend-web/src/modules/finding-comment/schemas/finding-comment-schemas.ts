@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { FINDING_COMMENT_BODY_MAX } from "@repo/contracts/elise";
+import { FINDING_COMMENT_BODY_MAX, FindingCommentParamSchema, FindingCommentTextSchema } from "@repo/contracts/elise";
 
-export { CreateFindingCommentBodySchema, FindingCommentSchema, FindingCommentsQuerySchema, FindingThreadSchema } from "@repo/contracts/elise";
-export { FindingCommentTextSchema } from "@repo/contracts/elise";
+export { CreateFindingCommentBodySchema, FindingCommentParamSchema, FindingCommentSchema, FindingCommentsQuerySchema, FindingCommentTextSchema, FindingThreadSchema } from "@repo/contracts/elise";
 export type { CreateFindingCommentBody, FindingComment, FindingCommentsQuery, FindingDecision, FindingThread, FindingThreadEvent } from "@repo/contracts/elise";
+
+export const EditFindingCommentInputSchema = FindingCommentParamSchema.extend({ body: FindingCommentTextSchema });
 
 // -----
 // The composer: one text box, checked against the engine's limit.

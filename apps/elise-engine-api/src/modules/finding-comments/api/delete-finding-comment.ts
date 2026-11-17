@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { FindingCommentParamSchema } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import { signedInUserId } from "#/lib/require-power";
 import { zValidator } from "#/lib/zod-validator";
@@ -10,7 +10,7 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.delete("/:commentId", deleteFindingCommentDoc, zValidator("header", AccountHeaderSchema), zValidator("param", z.object({ commentId: z.uuid() })), async (c) => {
+app.delete("/:commentId", deleteFindingCommentDoc, zValidator("header", AccountHeaderSchema), zValidator("param", FindingCommentParamSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
   const { commentId } = c.req.valid("param");
   const deps = c.get("deps");

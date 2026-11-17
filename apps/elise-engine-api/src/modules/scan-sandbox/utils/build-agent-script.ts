@@ -1,6 +1,6 @@
 import type { ScanOptions } from "#/schemas";
 import { SCAN_SANDBOX_REPO_DIR } from "#/modules/scan-sandbox/constants";
-import { DEFAULT_AGENT_FILES, type AgentFiles } from "#/modules/scan-sandbox/utils/agent-files";
+import { DEFAULT_AGENT_FILES, type AgentFiles } from "./agent-files";
 
 const dropRepoClaudeConfig = ["/.claude", "/CLAUDE.md", "/CLAUDE.local.md", "/.mcp.json"].reduce(
   (command, name) => `${command} ${SCAN_SANDBOX_REPO_DIR}${name}`,

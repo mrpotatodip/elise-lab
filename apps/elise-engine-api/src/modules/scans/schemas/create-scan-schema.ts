@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "#/constants";
-import { ScanOptionsSchema } from "#/schemas";
+import { documentFields } from "#/lib/document-fields";
+import { ScanQueuedSchema as ContractScanQueuedSchema } from "@repo/contracts/elise";
 import { SCANS_GIT_REF, SCANS_GITHUB_REPO } from "#/modules/scans/constants";
 
 export const CreateScanBodySchema = z.object({
@@ -17,9 +18,12 @@ export const CreateScanBodySchema = z.object({
     .meta({ example: "main", description: "A branch, tag or commit to scan. Leave it out for the default branch." }),
 });
 
-export const ScanQueuedSchema = ScanOptionsSchema.extend({
-  scanId: z.string().meta({ example: "zd3u73nfd-06ac9c07-b80c-45da-8fc5-ece4768b5b22" }),
-  status: z.literal("queued"),
+export const ScanQueuedSchema = documentFields(ContractScanQueuedSchema, {
+  skill: { example: "lite" },
+  effort: { example: "low" },
+  profile: { example: "quick" },
+  maxBudgetUsd: { example: 1 },
+  scanId: { example: "zd3u73nfd-06ac9c07-b80c-45da-8fc5-ece4768b5b22" },
 });
 
 export type CreateScanBody = z.infer<typeof CreateScanBodySchema>;
