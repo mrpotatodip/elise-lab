@@ -137,7 +137,6 @@ export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId
     Effect.map((rows) =>
       byBranchOf(rows, (row): RepoFinding => {
         const { finding, firstSeenScanId, unchecked, history, triage, person, url } = row;
-        const { state, decisionStands } = branchStateOf(row);
         return {
         id: finding.id,
         scanId: finding.scanId,
@@ -156,8 +155,8 @@ export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId
         fix: finding.fix,
         needs: finding.needs,
         createdAt: finding.createdAt.toISOString(),
-        triage: triage && decisionStands ? triageView(triage, person) : null,
-        state,
+        triage: triage ? triageView(triage, person) : null,
+        state: branchStateOf(row),
         unchecked,
         firstSeenScanId,
         fixedInScanId: history?.fixedInScanId ?? null,
@@ -184,7 +183,7 @@ const repoOpenCountRowsEffect = (db: DbConnectType, tenantId: string, scope: Bra
           unchecked: latest.unchecked,
           severity: scanFindings.severity,
           history: { state: scanRepoFindings.state, updatedAt: scanRepoFindings.updatedAt },
-          triage: { status: scanFindingTriage.status, updatedAt: scanFindingTriage.updatedAt },
+          triageStatus: scanFindingTriage.status,
         })
         .from(latest)
         .innerJoin(scanFindings, eq(scanFindings.id, latest.rowId))
@@ -195,8 +194,7 @@ const repoOpenCountRowsEffect = (db: DbConnectType, tenantId: string, scope: Bra
   }).pipe(
     Effect.map((rows) =>
       byBranchOf(rows, (row): OpenCountRow => {
-        const { state, decisionStands } = branchStateOf(row);
-        return { state, unchecked: row.unchecked, severity: row.severity, triage: row.triage && decisionStands ? { status: row.triage.status } : null };
+        return { state: branchStateOf(row), unchecked: row.unchecked, severity: row.severity, triage: row.triageStatus ? { status: row.triageStatus } : null };
       }),
     ),
   );

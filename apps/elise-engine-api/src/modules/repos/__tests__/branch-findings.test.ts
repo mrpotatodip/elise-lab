@@ -129,16 +129,20 @@ describe("a Branch's findings are the merge of its Scans", () => {
     expect(found[0]).toMatchObject({ title: "newest words", severity: "critical", firstSeenScanId: ownId("s1"), scanId: ownId("s3") });
   });
 
-  it("keeps a person's decision when a new Scan sees the problem again, and leaves it out of the open counts", async () => {
+  it.each([
+    ["fixed", {}],
+    ["false_positive", {}],
+    ["accepted_risk", { note: "behind the VPN", acceptedUntil: new Date(Date.UTC(2027, 0, 1)) }],
+  ] as const)("keeps a person's %s decision when a later Scan sees the problem again, and leaves it out of the open counts", async (status, extra) => {
     await recordScan("s1", { findings: [confirmed("a", "problem a"), confirmed("b", "problem b")] });
     const [decided] = (await listed()).filter((finding) => finding.title === "problem a");
-    await test.raw.insert(scanFindingTriage).values({ tenantId, repoId, fingerprint: decided.fingerprint, status: "false_positive" });
+    await test.raw.insert(scanFindingTriage).values({ tenantId, repoId, fingerprint: decided.fingerprint, status, ...extra, updatedAt: new Date(Date.UTC(2026, 10, 1, 0, tick, 30)) });
     await recordScan("s2", { findings: [confirmed("a", "problem a"), confirmed("b", "problem b")] });
 
     const after = (await listed()).find((finding) => finding.title === "problem a");
 
-    expect(after).toMatchObject({ scanId: ownId("s2"), triage: { status: "false_positive" } });
-    expect((await mainBranch())?.open.total).toBe(1);
+    expect(after).toMatchObject({ scanId: ownId("s2"), state: "open", triage: { status } });
+    expect((await mainBranch())?.open).toMatchObject({ total: 1, regressed: 0 });
   });
 
   it("adds nothing for a failed Scan, a Scan of a tag or of an old commit, an old lite Scan, or a rejected record", async () => {
@@ -192,16 +196,6 @@ describe("a Branch's findings are the merge of its Scans", () => {
       ["problem d", "regressed"],
     ]);
     expect((await mainBranch())?.open).toMatchObject({ total: 3, regressed: 2 });
-  });
-
-  it("shows a problem marked fixed as back when a later Scan sees it, and counts it open", async () => {
-    await recordScan("s1", { findings: [confirmed("a", "problem a")] });
-    const [decided] = await listed();
-    await test.raw.insert(scanFindingTriage).values({ tenantId, repoId, fingerprint: decided.fingerprint, status: "fixed", updatedAt: new Date(Date.UTC(2026, 10, 1, 0, tick, 30)) });
-    await recordScan("s2", { findings: [confirmed("a", "problem a")] });
-
-    expect(await listed()).toMatchObject([{ title: "problem a", state: "regressed", triage: null }]);
-    expect((await mainBranch())?.open).toMatchObject({ total: 1, regressed: 1 });
   });
 
   it.each([

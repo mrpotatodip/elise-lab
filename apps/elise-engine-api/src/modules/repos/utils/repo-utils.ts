@@ -2,24 +2,19 @@ import type { FindingTriageStatusValue, RepoFinding, RepoFindingStateValue, Repo
 
 type StateInput = {
   history: { state: RepoFindingStateValue; updatedAt: Date } | null;
-  triage: { status: FindingTriageStatusValue; updatedAt: Date } | null;
   seenAt: Date;
 };
 
 // -----
-// The state of a Branch's finding, from the frozen History, a
-// person's decision and the newest Scan that saw it. A problem
-// closed (by the History, or marked fixed by a person) before a
-// Scan saw it again came back: it is `regressed`, and the
-// "fixed" decision no longer stands, as in the Verdict. Every
-// other decision stands.
+// The state of a Branch's finding, from the frozen History and
+// the newest Scan that saw it. A problem the History closed
+// before a Scan saw it again came back: it is `regressed`. A
+// person's decision, `fixed` included, is not part of the state:
+// it always stands, even when a later Scan sees the problem.
 // -----
-export const branchStateOf = ({ history, triage, seenAt }: StateInput) => {
-  const seen = seenAt.getTime();
-  const closedByHistory = history?.state === "fixed_by_code" && history.updatedAt.getTime() < seen;
-  const markedFixedBefore = triage?.status === "fixed" && triage.updatedAt.getTime() < seen;
-  const state: RepoFindingStateValue = closedByHistory || markedFixedBefore ? "regressed" : (history?.state ?? "open");
-  return { state, decisionStands: !markedFixedBefore };
+export const branchStateOf = ({ history, seenAt }: StateInput): RepoFindingStateValue => {
+  const closedByHistory = history?.state === "fixed_by_code" && history.updatedAt.getTime() < seenAt.getTime();
+  return closedByHistory ? "regressed" : (history?.state ?? "open");
 };
 
 // -----
