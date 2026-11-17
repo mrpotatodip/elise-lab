@@ -589,6 +589,13 @@
       "when": 1794859854075,
       "tag": "0083_scans_profile_met",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1794880836326,
+      "tag": "0084_tenant_rls_remaining",
+      "breakpoints": true
     }
   ]
 }
