@@ -1,7 +1,8 @@
 // -----
 // The one reviewed list of the owner role: every source file that
-// opens the owner connection (dbConnect, poolConnect, withPool)
-// or reads DATABASE_URL, with the most uses it may have and why it cannot run as one Account through
+// opens the owner connection (dbConnect, poolConnect, withPool,
+// or the client's createDb and createPoolDb) or reads
+// DATABASE_URL, with the most uses it may have and why it cannot run as one Account through
 // withTenant. The owner role bypasses row-level security, so each
 // of these queries keeps its own Account filter. A file may not
 // grow past its count, a file that no longer uses the owner
@@ -15,7 +16,7 @@ export const OWNER_CONNECTION_USES = {
       "The global count of live Scans crosses Accounts; the GitHub Install lookup of POST /scans runs outside its withTenant transaction; the membership checks read a person's Roles across Accounts before one is chosen",
   },
   "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
-  "lib/db-connection.ts": { uses: 1, reason: "Defines the owner connections the other entries open" },
+  "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },
   "modules/me/api/get-me.ts": { uses: 2, reason: "Lists the Accounts a person belongs to, across Accounts" },
   "modules/runners/api/claim-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/disconnect-runner.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
