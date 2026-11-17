@@ -72,7 +72,7 @@ const bodyWith = async (state?: string): Promise<ConnectGithubBody> => ({
 });
 
 const connect = (port: GithubPort | null, body: ConnectGithubBody, accountId = acme.tenantId, userId = "ada") =>
-  asTenantEffect(test, accountId, (db) => connectGithubSvc(db, port, SECRET, accountId, userId, body, NOW));
+  connectGithubSvc((run) => asTenantEffect(test, accountId, run), port, SECRET, accountId, userId, body, NOW);
 
 const disconnect = (accountId: string, userId: string, id: string) => asTenantEffect(test, accountId, (db) => disconnectGithubSvc(db, accountId, userId, id));
 

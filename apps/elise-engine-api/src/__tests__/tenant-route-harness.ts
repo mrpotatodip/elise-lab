@@ -13,7 +13,7 @@ import type { AppDeps } from "#/types/variables";
 // Worker; here no other Account has one.
 // -----
 const tenantScanDeps: Partial<AppDeps> = {
-  scanRepo: (_env, db) => ({ ...tenantScanRepo(db), activeCounts: () => Effect.succeed({ lite: 0, full: 0 }) }),
+  scanRepo: (_env, db) => tenantScanRepo(db, () => Effect.succeed({ lite: 0, full: 0 })),
   monthSpend: realAppDeps.monthSpend,
   holdCredit: realAppDeps.holdCredit,
   releaseCredit: realAppDeps.releaseCredit,

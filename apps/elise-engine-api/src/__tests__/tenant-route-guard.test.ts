@@ -93,8 +93,8 @@ const seedOtherUsage = async (accountId: string, repoId: string) => {
 const outcomeOf = (found: RunCase, status: number, data: z.infer<typeof EnvelopeSchema>["data"]) => {
   const fields = Array.isArray(data) ? {} : (data ?? {});
   if (found.expect === "own") return { got: [status, Object.fromEntries(Object.keys(found.own).map((key) => [key, fields[key]]))], want: [200, found.own] };
-  const lists = "listedIn" in found && found.listedIn ? [fields[found.listedIn]] : Object.values(fields);
-  const listed = (Array.isArray(data) ? data : lists.filter(Array.isArray).flat()).length;
+  const lists = Array.isArray(data) ? [data] : ("listedIn" in found && found.listedIn ? [fields[found.listedIn]] : Object.values(fields)).filter(Array.isArray);
+  const listed = found.expect === "empty" && lists.length === 0 ? "no list in the answer" : lists.flat().length;
   return { got: [status, listed], want: [STATUS_OF[found.expect], 0] };
 };
 
@@ -162,7 +162,7 @@ describe("every tenant route has a cross-account case", () => {
   });
 
   it("names a test that exists for each write that takes only the caller's Account", () => {
-    const shownBy = caseEntries.flatMap(([, found]) => (found.kind === "own-account" ? [found.shownBy] : []));
+    const shownBy = caseEntries.flatMap(([, found]) => (found.kind === "service-test" ? [found.shownBy] : []));
     expect(shownBy.filter((file) => !existsSync(join(SRC, file)))).toEqual([]);
   });
 
@@ -179,9 +179,9 @@ describe("every tenant route has a cross-account case", () => {
 });
 
 describe("the owner connection stays inside its list", () => {
-  it("opens it from no file outside the list, and no more often than listed", () => {
+  it("opens it from no file outside the list, and exactly as often as listed", () => {
     const used = ownerUsesBySourceFile();
-    expect(Object.entries(used).filter(([file, uses]) => uses > (allowedOwnerUses.get(file) ?? 0))).toEqual([]);
+    expect(Object.entries(used).filter(([file, uses]) => uses !== (allowedOwnerUses.get(file) ?? 0))).toEqual([]);
   });
 
   it("lists no file that stopped using it", () => {

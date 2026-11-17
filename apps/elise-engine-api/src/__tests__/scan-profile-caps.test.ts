@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { Effect } from "effect";
 import { platformMasterPlans, tenantSubscriptions } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -10,7 +11,6 @@ import type { MonthSpend } from "#/modules/usage";
 import type { Bindings } from "#/types/variables";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "./fake-bindings";
 import { memoryScanRepo } from "./memory-scan-repo";
-import { fakeTenantDb } from "./no-tenant-db";
 import { testDeps } from "./test-deps";
 
 const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
@@ -36,12 +36,12 @@ let held: number[] = [];
 const app = buildApp(
   testDeps({
     scanRepo: () => memoryScanRepo().repo,
-    monthSpend: async () => spend,
-    withTenant: fakeTenantDb,
-    holdCredit: async (_db, _accountId, _scanId, holdUsd) => {
-      held.push(holdUsd);
-      return { held: true, balanceUsd: 0 };
-    },
+    monthSpend: () => Effect.sync(() => spend),
+    holdCredit: (_db, _accountId, _scanId, holdUsd) =>
+      Effect.sync(() => {
+        held.push(holdUsd);
+        return { held: true, balanceUsd: 0 };
+      }),
   }),
 ).app;
 

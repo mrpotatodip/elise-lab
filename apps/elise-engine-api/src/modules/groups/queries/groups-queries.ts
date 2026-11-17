@@ -38,7 +38,7 @@ const toGroup = (row: typeof tenantGroups.$inferSelect, memberIds: string[]): Gr
 // -----
 // Every Group of the Tenant with who is in it.
 // -----
-export const listGroupsEffect = (db: AppDbType,tenantId: string): Effect.Effect<GroupList, DbError> =>
+export const listGroupsEffect = (db: AppDbType, tenantId: string): Effect.Effect<GroupList, DbError> =>
   Effect.gen(function* () {
     const groups = yield* Effect.tryPromise({
       try: () => db.select().from(tenantGroups).where(eq(tenantGroups.tenantId, tenantId)).orderBy(asc(tenantGroups.name)),
@@ -56,7 +56,7 @@ export const listGroupsEffect = (db: AppDbType,tenantId: string): Effect.Effect<
     );
   });
 
-const groupOf = async (tx: Pick<AppDbType, "select">,tenantId: string, groupId: string) => {
+const groupOf = async (tx: Pick<AppDbType, "select">, tenantId: string, groupId: string) => {
   const [group] = await tx
     .select()
     .from(tenantGroups)
@@ -64,10 +64,10 @@ const groupOf = async (tx: Pick<AppDbType, "select">,tenantId: string, groupId: 
   return group ?? refuse(new NotFound({ message: GROUP_NOT_FOUND }));
 };
 
-const actorOf = async (tx: Pick<AppDbType, "select">,userId: string) =>
+const actorOf = async (tx: Pick<AppDbType, "select">, userId: string) =>
   (await actorPartyOf(tx, userId)) ?? refuse(new Forbidden({ message: "Forbidden" }));
 
-export const createGroupEffect = (db: AppTxDbType,tenantId: string, userId: string, name: string): Effect.Effect<Group, GroupFailure> =>
+export const createGroupEffect = (db: AppTxDbType, tenantId: string, userId: string, name: string): Effect.Effect<Group, GroupFailure> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -84,7 +84,7 @@ export const createGroupEffect = (db: AppTxDbType,tenantId: string, userId: stri
     catch: classify,
   });
 
-export const renameGroupEffect = (db: AppTxDbType,tenantId: string, userId: string, groupId: string, name: string): Effect.Effect<Group, GroupFailure> =>
+export const renameGroupEffect = (db: AppTxDbType, tenantId: string, userId: string, groupId: string, name: string): Effect.Effect<Group, GroupFailure> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -102,7 +102,7 @@ export const renameGroupEffect = (db: AppTxDbType,tenantId: string, userId: stri
 // Deleting a Group removes its memberships and
 // nothing else: the people stay in the account.
 // -----
-export const deleteGroupEffect = (db: AppTxDbType,tenantId: string, userId: string, groupId: string): Effect.Effect<GroupDeleted, GroupFailure> =>
+export const deleteGroupEffect = (db: AppTxDbType, tenantId: string, userId: string, groupId: string): Effect.Effect<GroupDeleted, GroupFailure> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {

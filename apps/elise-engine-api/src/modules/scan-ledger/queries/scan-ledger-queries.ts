@@ -197,10 +197,6 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
 
 const createErrorOf = (cause: unknown): DbError | Conflict => (pgErrorCode(cause) === PG_UNIQUE_VIOLATION ? new Conflict({ message: ACTIVE_SCAN_CONFLICT }) : toDbError(cause));
 
-// -----
-// A second live scan of the repo: the Conflict names the one
-// that is running.
-// -----
 const activeConflictOf = (db: AppDbType, repoId: string) => (): Effect.Effect<never, DbError | Conflict> =>
   Effect.tryPromise({
     try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"]))).limit(1),
@@ -326,10 +322,13 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
 // -----
 // For POST /scans, inside a withTenant transaction. The writes of
 // a new scan run under a savepoint, so a refused insert rolls back
-// alone and the Conflict can still name the running scan.
+// alone and the Conflict can still name the running scan. The
+// global count crosses Accounts, which the transaction cannot see,
+// so the caller hands it in.
 // -----
-export const tenantScanRepo = (db: AppTxDbType): Omit<ScanRepo, "activeCounts"> => ({
+export const tenantScanRepo = (db: AppTxDbType, activeCounts: ScanRepo["activeCounts"]): ScanRepo => ({
   ...scanWrites(db),
+  activeCounts,
   create: (params, repoId, nowMs) =>
     Effect.tryPromise({
       try: () =>

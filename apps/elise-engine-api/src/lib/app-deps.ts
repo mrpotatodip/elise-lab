@@ -24,11 +24,11 @@ export const realAppDeps: AppDeps = {
   // live Scans (MAX_GLOBAL_FULL_SCANS) crosses Accounts, which a
   // withTenant transaction cannot see, so it stays on the owner role.
   // -----
-  scanRepo: (env, db) => ({ ...tenantScanRepo(db), activeCounts: (nowMs) => activeCountsEffect(dbConnect(env.DATABASE_URL), nowMs) }),
+  scanRepo: (env, db) => tenantScanRepo(db, (nowMs) => activeCountsEffect(dbConnect(env.DATABASE_URL), nowMs)),
   githubAccess: (env, accountId) => githubAccessFor(env, neonInstallationRepo(dbConnect(env.DATABASE_URL)), accountId),
-  monthSpend: (db, accountId) => runEffect(monthSpendEffect(db, accountId, monthStartOf(new Date()))),
-  holdCredit: (db, accountId, scanId, holdUsd) => runEffect(holdCreditEffect(db, { tenantId: accountId, scanId, holdUsd })),
-  releaseCredit: (db, accountId, scanId) => runEffect(settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 })),
+  monthSpend: (db, accountId) => monthSpendEffect(db, accountId, monthStartOf(new Date())),
+  holdCredit: (db, accountId, scanId, holdUsd) => holdCreditEffect(db, { tenantId: accountId, scanId, holdUsd }),
+  releaseCredit: (db, accountId, scanId) => settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 }),
   sessionUserId,
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) => runEffect(userHasPowerEffect(dbConnect(c.env.DATABASE_URL), userId, accountId, power)),

@@ -7,22 +7,14 @@ import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
-import type { CreateScanEnv } from "#/modules/scans/types";
+import type { CreateScanEnv, QueuedScan, RunnerConnected, SubmitScanDeps } from "#/modules/scans/types";
 import { budgetCapOf, budgetRefusalHintOf, limitPathOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
+import { findConnectedRunnerEffect } from "#/modules/runners/queries";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
-
-// -----
-// Whether a Runner of the Account has paired and is not removed.
-// -----
-export type RunnerConnected = (runnerId: string) => Effect.Effect<boolean, DbError>;
-
-// -----
-// A Scan whose row, and hold if it takes one, are written but
-// whose Workflow has not started.
-// -----
-export type QueuedScan = { params: ScanParams; holdUsd: number };
+import type { TenantEffect } from "#/lib/tenant-effect";
+import type { Bindings } from "#/types/variables";
 
 // -----
 // Everything a new Scan writes: the checks, the Scan row and the
@@ -233,4 +225,41 @@ export const createScanSvc = (
 ): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   queueScanSvc(env, repo, accountId, input, spend, access, hold, runnerConnected).pipe(
     Effect.flatMap((queued) => startScanSvc(env, queued, (error) => abandonScanSvc(repo, queued, error, release))),
+  );
+
+// -----
+// POST /scans. The Scan row and its hold commit as the Account in
+// one transaction, so a refused Scan leaves neither. The Workflow
+// reads both on its own connection, so it starts after the commit;
+// if it will not start, a second transaction fails the Scan and
+// gives the hold back.
+// -----
+export const submitScanSvc = (
+  env: Bindings,
+  tenant: TenantEffect,
+  deps: SubmitScanDeps,
+  accountId: string,
+  input: CreateScanBody,
+): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
+  tenant((db) =>
+    deps.monthSpend(db, accountId).pipe(
+      Effect.flatMap((spend) =>
+        queueScanSvc(
+          env,
+          deps.scanRepo(env, db),
+          accountId,
+          input,
+          spend,
+          deps.githubAccess(env, accountId),
+          (scanId, holdUsd) => deps.holdCredit(db, accountId, scanId, holdUsd),
+          (runnerId) => findConnectedRunnerEffect(db, accountId, runnerId),
+        ),
+      ),
+    ),
+  ).pipe(
+    Effect.flatMap((queued) =>
+      startScanSvc(env, queued, (error) =>
+        tenant((db) => abandonScanSvc(deps.scanRepo(env, db), queued, error, (scanId) => deps.releaseCredit(db, accountId, scanId))).pipe(Effect.ignore),
+      ),
+    ),
   );

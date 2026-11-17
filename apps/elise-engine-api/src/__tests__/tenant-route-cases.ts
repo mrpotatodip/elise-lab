@@ -8,8 +8,8 @@
 // -----
 export type CrossAccountCase =
   | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; listedIn?: string; expect: "not-found" | "empty" | "refused" | "created" }
-  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "own"; own: Record<string, number | null> }
-  | { kind: "own-account"; shownBy: string };
+  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "own"; own: Record<string, number | string | null> }
+  | { kind: "service-test"; shownBy: string };
 
 // -----
 // A write that takes no ID but the caller's own Account, so
@@ -18,7 +18,7 @@ export type CrossAccountCase =
 // The test it names shows the write stays in the caller's
 // Account.
 // -----
-const ownAccount = (shownBy: string): CrossAccountCase => ({ kind: "own-account", shownBy });
+const serviceTest = (shownBy: string): CrossAccountCase => ({ kind: "service-test", shownBy });
 
 // -----
 // The repo and fingerprint of the finding the guard test
@@ -62,7 +62,8 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 // -----
 // One entry for every other route, run in this order. "run" is
 // called as one Account with another Account's IDs: "not-found"
-// answers 404, "empty" 200 with no list entries, "refused" 400 (a
+// answers 404, "empty" 200 with at least one list and no entries
+// in any (a new repo: no history, no branches), "refused" 400 (a
 // body that names another Account's row), and "created" 201 for a
 // write that lands in the caller's Account only (a name another
 // Account already uses is free here). A list that names no ID
@@ -138,15 +139,15 @@ export const CROSS_ACCOUNT_CASES = {
   "DELETE /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "DELETE", expect: "not-found" },
   "PUT /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "PUT", expect: "not-found" },
   "DELETE /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "DELETE", expect: "not-found" },
-  "POST /github/connect": ownAccount("modules/github-installs/__tests__/github-installs-svc.test.ts"),
-  "POST /github/installations": ownAccount("modules/github-installs/__tests__/github-installs-svc.test.ts"),
+  "POST /github/connect": serviceTest("modules/github-installs/__tests__/github-installs-svc.test.ts"),
+  "POST /github/installations": serviceTest("modules/github-installs/__tests__/github-installs-svc.test.ts"),
   "GET /github/installations": { kind: "run", path: "/github/installations", expect: "empty" },
   "DELETE /github/installations/:id": { kind: "run", path: `/github/installations/${OTHER_INSTALL_ID}`, method: "DELETE", expect: "not-found" },
   "GET /github/branches": { kind: "run", path: `/github/branches?installationId=${OTHER_INSTALL_ID}&repo=octo/hello`, expect: "not-found" },
   "GET /github/repos": { kind: "run", path: "/github/repos", expect: "empty" },
-  "GET /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", expect: "empty" },
-  "PUT /usage/anthropic-key": ownAccount("modules/anthropic-key/__tests__/anthropic-key-svc.test.ts"),
-  "DELETE /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", method: "DELETE", expect: "empty" },
+  "GET /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", expect: "own", own: { source: "platform", lastFour: null } },
+  "PUT /usage/anthropic-key": serviceTest("modules/anthropic-key/__tests__/anthropic-key-svc.test.ts"),
+  "DELETE /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", method: "DELETE", expect: "own", own: { source: "platform", lastFour: null } },
   "GET /runners": { kind: "run", path: "/runners", expect: "empty" },
   "DELETE /runners/:runnerId": { kind: "run", path: `/runners/${OTHER_RUNNER_ID}`, method: "DELETE", expect: "not-found" },
   // -----

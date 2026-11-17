@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { CreateTeamInviteBodySchema } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import { requirePower, userIdOf } from "#/lib/require-power";
+import { tenantEffectOf } from "#/lib/tenant-effect";
 import { zValidator } from "#/lib/zod-validator";
 import { AccountHeaderSchema } from "#/modules/scans/schemas";
 import { createInviteSvc } from "#/modules/team/handlers";
@@ -15,13 +16,11 @@ app.post("/invites", createTeamInviteDoc, requirePower("company:team:invites:cre
   const body = c.req.valid("json");
   const userId = userIdOf(c);
   const deps = c.get("deps");
-  const data = await deps.withTenant(c, accountId, (db) =>
-    runEffect(
-      createInviteSvc(db, accountId, userId, body, {
-        dashboardUrl: c.env.DASHBOARD_URL,
-        enqueue: (mail) => deps.enqueueInviteEmail(c.env, mail),
-      }),
-    ),
+  const data = await runEffect(
+    createInviteSvc(tenantEffectOf(c, accountId), accountId, userId, body, {
+      dashboardUrl: c.env.DASHBOARD_URL,
+      enqueue: (mail) => deps.enqueueInviteEmail(c.env, mail),
+    }),
   );
   return c.json({ data, error: null }, 201);
 });

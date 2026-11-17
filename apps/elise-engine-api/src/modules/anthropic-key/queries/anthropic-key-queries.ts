@@ -58,8 +58,7 @@ export const saveAnthropicKeyEffect = (db: AppDbType, tenantId: string, userId: 
         .values({ tenantId, sealedKey, lastFour, updatedBy: actorPartyId })
         .onConflictDoUpdate({ target: tenantAnthropicKeys.tenantId, set: { sealedKey, lastFour, updatedBy: actorPartyId } })
         .returning({ updatedAt: tenantAnthropicKeys.updatedAt });
-      // SAFETY: the tenant transaction's insert answers like the pool's one AuditDb names, and access_audit_log has no row-level security.
-      await insertAuditEntry(db as never, { actorPartyId, action: "anthropic.key.set", subjectId: tenantId, tenantId, after: { lastFour } });
+      await insertAuditEntry(db, { actorPartyId, action: "anthropic.key.set", subjectId: tenantId, tenantId, after: { lastFour } });
       return { source: "account" as const, lastFour, updatedAt: row.updatedAt.toISOString() };
     },
     catch: classify,
@@ -75,8 +74,7 @@ export const removeAnthropicKeyEffect = (db: AppDbType, tenantId: string, userId
       const [removed] = await db.delete(tenantAnthropicKeys).where(eq(tenantAnthropicKeys.tenantId, tenantId)).returning({ lastFour: tenantAnthropicKeys.lastFour });
       if (removed) {
         const actorPartyId = await actorPartyOf(db, userId);
-        // SAFETY: the tenant transaction's insert answers like the pool's one AuditDb names, and access_audit_log has no row-level security.
-        await insertAuditEntry(db as never, { actorPartyId, action: "anthropic.key.removed", subjectId: tenantId, tenantId, before: { lastFour: removed.lastFour } });
+        await insertAuditEntry(db,{ actorPartyId, action: "anthropic.key.removed", subjectId: tenantId, tenantId, before: { lastFour: removed.lastFour } });
       }
       return PLATFORM_KEY;
     },

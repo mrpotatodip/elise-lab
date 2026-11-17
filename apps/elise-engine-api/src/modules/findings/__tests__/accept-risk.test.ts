@@ -4,7 +4,7 @@ import { accessAuditLog, authUser, partyPersons } from "@repo/db-elise";
 import { scanFindings, scanFindingTriage, scans } from "@repo/db-elise/schema";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { asTenant, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenantEffect, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { listFindingsEffect, setTriageEffect } from "#/modules/findings/queries";
 
 let test: TestDb;
@@ -26,14 +26,8 @@ const body = (letter: string, overrides: Partial<FindingTriageBody> = {}): Findi
   ...overrides,
 });
 
-// -----
-// As the route runs it: one tenant transaction. A refusal comes back
-// as the effect's own failure, so a test can still flip it.
-// -----
 const set = (input: FindingTriageBody, serviceTokenOrLogin: string | null = "admin") =>
-  Effect.promise(() => asTenant(test, tenantId, (db) => Effect.runPromise(Effect.either(setTriageEffect(db, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW))))).pipe(
-    Effect.flatMap((result) => result),
-  );
+  asTenantEffect(test, tenantId, (db) => setTriageEffect(db, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW));
 
 // -----
 // The audit rows about one problem, oldest first.

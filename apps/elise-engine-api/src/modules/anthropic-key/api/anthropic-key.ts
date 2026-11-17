@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { SetAnthropicKeyBodySchema } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import { requirePower, userIdOf } from "#/lib/require-power";
+import { tenantEffectOf } from "#/lib/tenant-effect";
 import { zValidator } from "#/lib/zod-validator";
 import { getAnthropicKeySvc, removeAnthropicKeySvc, setAnthropicKeySvc } from "#/modules/anthropic-key/handlers";
 import { getAnthropicKeyDoc, removeAnthropicKeyDoc, setAnthropicKeyDoc } from "#/modules/anthropic-key/openapi";
@@ -21,7 +22,7 @@ app.put("/", setAnthropicKeyDoc, requirePower("company:usage:anthropic_key:updat
   const { "x-account-id": accountId } = c.req.valid("header");
   const { apiKey } = c.req.valid("json");
   const userId = userIdOf(c);
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(setAnthropicKeySvc(c.env.KEY_ENCRYPTION_SECRET, db, checkAnthropicKey, accountId, userId, apiKey)));
+  const data = await runEffect(setAnthropicKeySvc(c.env.KEY_ENCRYPTION_SECRET, tenantEffectOf(c, accountId), checkAnthropicKey, accountId, userId, apiKey));
   return c.json({ data, error: null });
 });
 

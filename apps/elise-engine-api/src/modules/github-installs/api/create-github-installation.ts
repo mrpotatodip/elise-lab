@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ConnectGithubBodySchema } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import { requirePower, userIdOf } from "#/lib/require-power";
+import { tenantEffectOf } from "#/lib/tenant-effect";
 import { zValidator } from "#/lib/zod-validator";
 import { connectGithubSvc } from "#/modules/github-installs/handlers";
 import { githubPortFor } from "#/modules/github-installs/lib";
@@ -15,7 +16,7 @@ app.post("/installations", createGithubInstallationDoc, requirePower("company:gi
   const { "x-account-id": accountId } = c.req.valid("header");
   const body = c.req.valid("json");
   const userId = userIdOf(c);
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(connectGithubSvc(db, githubPortFor(c.env), c.env.AUTH_SECRET, accountId, userId, body, new Date())));
+  const data = await runEffect(connectGithubSvc(tenantEffectOf(c, accountId), githubPortFor(c.env), c.env.AUTH_SECRET, accountId, userId, body, new Date()));
   return c.json({ data, error: null }, 201);
 });
 

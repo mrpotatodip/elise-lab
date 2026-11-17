@@ -112,8 +112,7 @@ export const connectInstallationEffect = (db: AppDbType, input: NewInstallation)
             .where(and(eq(tenantGithubInstallations.id, existing.id), eq(tenantGithubInstallations.tenantId, input.tenantId)))
             .returning()
         : await db.insert(tenantGithubInstallations).values({ tenantId: input.tenantId, installationId: input.installationId, connectedBy: actorPartyId, ...fresh }).returning();
-      // SAFETY: the tenant transaction's insert answers like the pool's one AuditDb names, and access_audit_log has no row-level security.
-      await insertAuditEntry(db as never, {
+      await insertAuditEntry(db, {
         actorPartyId,
         action: "github.install.connected",
         subjectId: row.id,
@@ -182,8 +181,7 @@ export const disconnectInstallationEffect = (db: AppDbType, tenantId: string, us
         .set({ status: "removed" })
         .where(and(eq(tenantGithubInstallations.id, id), eq(tenantGithubInstallations.tenantId, tenantId)))
         .returning();
-      // SAFETY: the tenant transaction's insert answers like the pool's one AuditDb names, and access_audit_log has no row-level security.
-      await insertAuditEntry(db as never, {
+      await insertAuditEntry(db, {
         actorPartyId,
         action: "github.install.removed",
         subjectId: removed.id,

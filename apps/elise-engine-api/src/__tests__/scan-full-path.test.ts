@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { buildApp } from "#/index";
@@ -6,7 +7,6 @@ import type { MonthSpend } from "#/modules/usage";
 import type { Bindings } from "#/types/variables";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "./fake-bindings";
 import { memoryScanRepo } from "./memory-scan-repo";
-import { fakeTenantDb } from "./no-tenant-db";
 import { testDeps } from "./test-deps";
 
 const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
@@ -33,7 +33,7 @@ let app: ReturnType<typeof buildApp>["app"];
 beforeEach(() => {
   spend = { ...NO_SPEND, plan: PRO };
   store = memoryScanRepo();
-  app = buildApp(testDeps({ scanRepo: () => store.repo, monthSpend: async () => spend, withTenant: fakeTenantDb })).app;
+  app = buildApp(testDeps({ scanRepo: () => store.repo, monthSpend: () => Effect.sync(() => spend) })).app;
 });
 
 type Body = { repo: string; profile?: string };

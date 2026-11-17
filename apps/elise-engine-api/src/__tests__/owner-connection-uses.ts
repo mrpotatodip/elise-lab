@@ -2,10 +2,11 @@
 // The one reviewed list of the owner role: every source file that
 // opens the owner connection (dbConnect, poolConnect, withPool,
 // or the client's createDb and createPoolDb) or reads
-// DATABASE_URL, with the most uses it may have and why it cannot run as one Account through
-// withTenant. The owner role bypasses row-level security, so each
-// of these queries keeps its own Account filter. A file may not
-// grow past its count, a file that no longer uses the owner
+// DATABASE_URL, with how many uses it has and why it cannot run
+// as one Account through withTenant. The owner role bypasses
+// row-level security, so each of these queries keeps its own
+// Account filter. A file's uses must equal its count, a file that
+// no longer uses the owner
 // connection must leave the list, and a new entry needs a reason
 // a reviewer accepts. Every tenant route runs through withTenant.
 // -----
@@ -27,7 +28,7 @@ export const OWNER_CONNECTION_USES = {
   "modules/scan-records/handlers/record-scan-svc.ts": { uses: 4, reason: "A Workflow step with no request: records the finished Scan, its files and findings, filtered by the Scan's Account" },
   "modules/scan-records/types/scan-records-types.ts": { uses: 1, reason: "The env type of record-scan, which the Workflow passes" },
   "modules/scan-workflow/lib/full-scan-workflow.ts": {
-    uses: 8,
+    uses: 6,
     reason: "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, each filtered by the Scan's Account",
   },
   "modules/scan-workflow/lib/settle-scan-credit.ts": { uses: 4, reason: "A Workflow step with no request: reads the Plan and settles the Scan's credit hold for the Scan's Account" },

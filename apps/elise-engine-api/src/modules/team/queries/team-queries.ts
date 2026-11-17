@@ -61,7 +61,7 @@ const groupIdsBy = <K extends string>(rows: { key: K; groupId: string }[]): Map<
 // The Roles an invite may give: the Tenant's
 // enabled Roles, except tenant_admin.
 // -----
-export const listAssignableRolesEffect = (db: AppDbType,tenantId: string): Effect.Effect<TeamRoles, DbError> =>
+export const listAssignableRolesEffect = (db: AppDbType, tenantId: string): Effect.Effect<TeamRoles, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -84,7 +84,7 @@ export const listAssignableRolesEffect = (db: AppDbType,tenantId: string): Effec
 // Everyone who holds a Role in the Tenant, and
 // the invites still waiting, each with its Groups.
 // -----
-export const listTeamEffect = (db: AppDbType,tenantId: string, now: Date): Effect.Effect<TeamList, DbError> =>
+export const listTeamEffect = (db: AppDbType, tenantId: string, now: Date): Effect.Effect<TeamList, DbError> =>
   Effect.gen(function* () {
     const members = yield* Effect.tryPromise({
       try: () =>
@@ -178,7 +178,7 @@ const refuse = (failure: Conflict | Forbidden | Invalid | NotFound): never => {
 // email (so only the newest link works), save the
 // invite and its Groups, and write the audit row.
 // -----
-export const createInviteEffect = (db: AppTxDbType,invite: NewInvite): Effect.Effect<TeamInvite, Conflict | Invalid | DbError | Forbidden | NotFound> =>
+export const createInviteEffect = (db: AppTxDbType, invite: NewInvite): Effect.Effect<TeamInvite, Conflict | Invalid | DbError | Forbidden | NotFound> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {

@@ -40,7 +40,7 @@ afterAll(async () => {
 const accepts = async () => true;
 const refuses = async () => false;
 const set = (check: (apiKey: string) => Promise<boolean>, apiKey = KEY, secret: string | null = SECRET) =>
-  asTenantEffect(test, acme.tenantId, (db) => setAnthropicKeySvc(secret ?? undefined, db, check, acme.tenantId, userId, apiKey));
+  setAnthropicKeySvc(secret ?? undefined, (run) => asTenantEffect(test, acme.tenantId, run), check, acme.tenantId, userId, apiKey);
 const remove = () => asTenantEffect(test, acme.tenantId, (db) => removeAnthropicKeySvc(db, acme.tenantId, userId));
 const auditOf = (accountId: string) => test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, accountId));
 

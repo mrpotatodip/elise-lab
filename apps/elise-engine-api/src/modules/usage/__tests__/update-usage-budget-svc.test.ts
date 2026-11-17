@@ -2,9 +2,8 @@ import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessAuditLog, tenants } from "@repo/db-elise";
-import { memoryScanRepo } from "#/__tests__/memory-scan-repo";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { updateUsageBudgetSvc } from "#/modules/usage/handlers";
+import { setUsageBudgetSvc } from "#/modules/usage/handlers";
 import type { MonthSpend } from "#/modules/usage";
 
 let test: TestDb;
@@ -24,7 +23,7 @@ const SPEND: MonthSpend = {
 };
 
 const update = (requestedUsd: number | null, spend: MonthSpend = SPEND) =>
-  updateUsageBudgetSvc(ENV, test.pool, memoryScanRepo().repo, tenantId, "admin-user", requestedUsd, spend);
+  setUsageBudgetSvc(ENV, test.pool, tenantId, "admin-user", requestedUsd, spend, 0, new Date());
 const budgetOf = async () => (await test.raw.select().from(tenants).where(eq(tenants.id, tenantId)))[0].monthlyScanBudgetUsd;
 
 beforeAll(async () => {
@@ -36,7 +35,7 @@ afterAll(async () => {
   await test.close();
 });
 
-describe("updateUsageBudgetSvc", () => {
+describe("setUsageBudgetSvc", () => {
   it("saves the budget, records who changed it from what to what, and returns the new usage", async () => {
     const usage = await Effect.runPromise(update(40));
 

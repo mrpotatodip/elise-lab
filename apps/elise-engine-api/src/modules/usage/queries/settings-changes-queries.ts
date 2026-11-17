@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
 import { accessAuditLog } from "@repo/db-elise";
@@ -20,7 +20,8 @@ const lastFourOf = (parsed: ReturnType<typeof KeyDetailsSchema.safeParse>): stri
 // budget, and the Anthropic key being set or removed. The row's
 // subject is the account; the actor is named from the person behind
 // the login, or null once that login is gone. A key row holds its
-// last four characters, never the key.
+// last four characters, never the key. Two changes can share a
+// created_at, so the writing transaction's ID (xmin) breaks the tie.
 // -----
 export const settingsChangesEffect = (db: AppDbType, tenantId: string): Effect.Effect<SettingsChange[], DbError> =>
   Effect.tryPromise({
@@ -30,7 +31,7 @@ export const settingsChangesEffect = (db: AppDbType, tenantId: string): Effect.E
         .from(accessAuditLog)
         .leftJoin(partyPersons, eq(partyPersons.partyId, accessAuditLog.actorPartyId))
         .where(and(eq(accessAuditLog.subjectId, tenantId), inArray(accessAuditLog.action, ["usage.budget.updated", "anthropic.key.set", "anthropic.key.removed"])))
-        .orderBy(desc(accessAuditLog.createdAt))
+        .orderBy(desc(accessAuditLog.createdAt), desc(sql`${accessAuditLog}.xmin::text::bigint`))
         .limit(USAGE_SETTINGS_CHANGES_LIMIT);
       return rows.map(({ entry, person }): SettingsChange => {
         const at = entry.createdAt.toISOString();

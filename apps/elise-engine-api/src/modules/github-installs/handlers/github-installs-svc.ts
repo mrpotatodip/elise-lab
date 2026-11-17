@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import type { ConnectGithubBody, GithubBranches, GithubBranchesQuery, GithubConnect, GithubInstallation, GithubRepo } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
+import type { TenantEffect } from "#/lib/tenant-effect";
 import { Forbidden, Invalid, NotFound, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
 import {
   GITHUB_CHECK_STALE_MS,
@@ -41,10 +42,11 @@ export const githubConnectUrlSvc = (
 // before an install is saved: the state is ours, unexpired and made
 // for this admin and account; GitHub accepts the one-time code; the
 // person behind that code can use this install (the number in the
-// address proves nothing); and the install exists.
+// address proves nothing); and the install exists. GitHub is asked
+// before the transaction opens; only the save runs inside it.
 // -----
 export const connectGithubSvc = (
-  db: AppDbType,
+  tenant: TenantEffect<AppDbType>,
   port: GithubPort | null,
   authSecret: string,
   accountId: string,
@@ -63,7 +65,7 @@ export const connectGithubSvc = (
 
     const info = yield* Effect.tryPromise({ try: () => port.installation(body.installationId), catch: toExternalError });
     if (info === null) return yield* new NotFound({ message: GITHUB_INSTALL_UNKNOWN });
-    return yield* connectInstallationEffect(db, { tenantId: accountId, userId, installationId: body.installationId, info, now });
+    return yield* tenant((db) => connectInstallationEffect(db, { tenantId: accountId, userId, installationId: body.installationId, info, now }));
   });
 
 // -----

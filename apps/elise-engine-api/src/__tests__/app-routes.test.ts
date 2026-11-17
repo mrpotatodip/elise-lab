@@ -5,7 +5,6 @@ import { buildApp } from "#/index";
 import type { Bindings } from "#/types/variables";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "./fake-bindings";
 import { memoryScanRepo } from "./memory-scan-repo";
-import { fakeTenantDb } from "./no-tenant-db";
 import { testDeps } from "./test-deps";
 
 let ledger = memoryScanRepo();
@@ -19,14 +18,6 @@ const app = buildApp(
     sessionUserId: async () => signedInUser,
     userHasAccount: async () => userHoldsRole,
     userHasPower: async (_c, _userId, _accountId, power) => userHoldsRole && (!userIsWatcher || power === "company:summary:read"),
-    // -----
-    // These tests check who may call a route, not what it reads: a
-    // route that gets past access answers null data. POST /scans
-    // runs on the in-memory ledger, which ignores the database.
-    // -----
-    withTenant: async (c, accountId, run) =>
-      // SAFETY: a route other than POST /scans that gets past access answers null data.
-      c.req.method === "POST" && c.req.path === "/scans" ? fakeTenantDb(c, accountId, run) : (null as never),
   }),
 ).app;
 
@@ -190,9 +181,9 @@ describe("signed-in session", () => {
     const { env } = fakeBindings();
     signedInUser = "user-1";
     userHoldsRole = true;
-    const res = await call(env, "/usage", { headers: { authorization: "Bearer session-token", "x-account-id": ACCOUNT } });
+    const res = await post(env, { repo: REPO }, { authorization: "Bearer session-token", "x-account-id": ACCOUNT });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
   });
 
   it("refuses a login that holds no role in the account", async () => {
@@ -274,9 +265,9 @@ describe("watcher session", () => {
     const { env } = fakeBindings();
     signedInUser = "user-1";
     userHoldsRole = true;
-    const res = await call(env, "/usage", { headers: session });
+    const res = await call(env, "/scans", { method: "POST", headers: session, body: JSON.stringify({ repo: REPO }) });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
   });
 });
 
