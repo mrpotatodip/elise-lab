@@ -217,11 +217,17 @@ Put business logic in `utils/` so it can be tested without rendering (`nextProje
 
 ## 6. React: Effects, state and SSR
 
-**6.1 `[React docs]` Use an effect only to sync with something outside React** ([docs](https://react.dev/learn/you-might-not-need-an-effect)). Timers, subscriptions, `requestAnimationFrame`, DOM measurement, dynamic `import()` and cache invalidation after a stream ends are all fine. These aren't:
-- **Deriving data:** compute it during render instead.
+**6.1 `[House]` No `useEffect`, `useLayoutEffect` or `useInsertionEffect`.** Lint enforces it (`anti-slop/no-use-effect`), after [You might not need an effect](https://react.dev/learn/you-might-not-need-an-effect). Use this instead:
+- **Deriving data:** compute it during render.
 - **Reacting to a click or submit:** do it in the event handler.
-- **Resetting state when a prop changes:** give the component a `key` instead.
+- **Resetting state when a prop changes:** give the component a `key`.
 - **Firing a request on mount** (for example a logout): do it in the route's `loader` / `beforeLoad` or an event handler.
+- **Focusing or scrolling to an element when it mounts:** a ref callback with a stable identity (a module-level function or `useCallback`). To act after something unmounts and remounts, set a `useRef` flag in the handler and read it in the ref callback.
+- **A value that changes outside React** (a clock, media query, storage): `useSyncExternalStore`, in a hook in `src/lib` or the module's `hooks/`. Cache the snapshot, or React loops (`src/lib/use-now.ts`).
+- **The page title:** the route's `head`.
+- **Refreshing the cache when a status changes:** in the query's options, not in a component.
+
+**6.1.1 `[House]` When an effect is the right tool, list its file.** A real subscription or timer with no value to read (a window event, a DOM animation) goes in its own hook file, and that file is added to `EFFECT_FILES` in the app's `oxlint.config.ts` with what it syncs with. The list is the review: a new line needs a reason, and a line that can go should go. The component calls the hook and never imports an effect itself (`src/lib/use-window-event.ts`).
 
 **6.2 `[React docs]` Effects clean up after themselves.** Clear timers, cancel animation frames, and ignore late async results with a `cancelled` flag ([docs](https://react.dev/learn/synchronizing-with-effects#how-to-handle-the-effect-firing-twice-in-development)).
 

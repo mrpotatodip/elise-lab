@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { TooltipProvider } from "#/components/ui/tooltip";
 import { useNarrow } from "#/lib/use-hydrated";
+import { useWindowEvent } from "#/lib/use-window-event";
 import { cn } from "#/lib/utils";
 import { useSidebarCollapsed, useSkyRotation } from "../hooks";
 import { ShellSidebar, type ShellRepo } from "./shell-sidebar";
@@ -33,16 +34,16 @@ export function ShellFrame({ accountName, userName, email, scanCount, running, r
     flip();
   }, [flip]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
+  const onKey = useCallback(
+    (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
         toggle();
       }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [toggle]);
+    },
+    [toggle],
+  );
+  useWindowEvent("keydown", onKey);
 
   return (
     <TooltipProvider>
