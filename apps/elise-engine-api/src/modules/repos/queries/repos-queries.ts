@@ -7,49 +7,57 @@ import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effe
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
 import { canonicalRepo, displayRepoUrl } from "#/modules/scan-ledger";
-import { openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
+import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
+import { branchStateOf, openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
+import { weighedScanWhere } from "#/modules/verdict/queries";
 
-type BranchScope = { repoId?: string; branchId?: string };
+type BranchScope = { repoId?: string; branchId?: string; branchIds?: readonly string[] };
 
 // -----
 // The Scans a Branch's findings are made of: every succeeded
-// Scan that belongs to the Branch, of any profile and any age.
-// A failed Scan and a one-off Scan (no Branch) are not among them.
+// full Scan that belongs to the Branch, of any profile and any
+// age. A failed Scan and a one-off Scan (no Branch) are not
+// among them, nor an old lite Scan: its fingerprints are made
+// another way, so its problems would be listed twice.
 // -----
 const branchScansWhere = (tenantId: string, scope: BranchScope) =>
   and(
     eq(scans.tenantId, tenantId),
     eq(scans.status, "succeeded"),
+    eq(scans.skill, SCAN_RECORDS_PROFILE_SKILL),
     isNotNull(scans.branchId),
     scope.repoId ? eq(scans.repoId, scope.repoId) : undefined,
     scope.branchId ? eq(scans.branchId, scope.branchId) : undefined,
+    scope.branchIds ? inArray(scans.branchId, [...scope.branchIds]) : undefined,
   );
 
 // -----
-// The newest succeeded Scan of each Branch: a finding last seen
-// by any other Scan is not in the latest Scan. Keyed by branch.
+// The latest Scan of each Branch: its newest Scan that weighs in
+// a Verdict. A Partial Scan or a Scan that met no profile was
+// not a full look, so it never makes a problem "not in the
+// latest Scan". A Branch with no such Scan has no latest Scan.
 // -----
-const branchTipsEffect = (db: DbConnectType, tenantId: string, scope: BranchScope): Effect.Effect<Map<string, string>, DbError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const rows = await db
-        .selectDistinctOn([scans.branchId], { branchId: scans.branchId, scanId: scans.id })
-        .from(scans)
-        .where(branchScansWhere(tenantId, scope))
-        .orderBy(scans.branchId, desc(scans.createdAt), desc(scans.id));
-      return new Map(rows.flatMap((row) => (row.branchId === null ? [] : [[row.branchId, row.scanId] as const])));
-    },
-    catch: toDbError,
-  });
+const branchTips = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
+  db
+    .selectDistinctOn([scans.branchId], { branchId: sql<string>`${scans.branchId}`.as("tip_branch_id"), scanId: sql<string>`${scans.id}`.as("tip_scan_id") })
+    .from(scans)
+    .where(and(branchScansWhere(tenantId, scope), weighedScanWhere))
+    .orderBy(scans.branchId, desc(scans.createdAt), desc(scans.id))
+    .as("tips");
 
 // -----
 // The newest finding row of each problem (branch and
-// fingerprint) and the oldest Scan that saw it, narrow so that
-// everything joined after it works on one row per problem, not
-// one per Scan. The window runs before the DISTINCT ON picks.
+// fingerprint), the oldest Scan that saw it
+// and whether the latest Scan saw it. Narrow, so that everything
+// joined after it works on one row per problem, not one per
+// Scan. The windows run before the DISTINCT ON picks, and the
+// latest Scan is read in the same statement, so the two always
+// agree.
 // -----
-const latestPerProblem = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
-  db
+const latestPerProblem = (db: DbConnectType, tenantId: string, scope: BranchScope) => {
+  const tips = branchTips(db, tenantId, scope);
+  const problem = sql`partition by ${scans.branchId}, ${scanFindings.fingerprint}`;
+  return db
     .selectDistinctOn([scans.branchId, scanFindings.fingerprint], {
       rowId: sql<string>`${scanFindings.id}`.as("latest_row_id"),
       branchId: scans.branchId,
@@ -57,13 +65,16 @@ const latestPerProblem = (db: DbConnectType, tenantId: string, scope: BranchScop
       repoId: scans.repoId,
       tenantId: scans.tenantId,
       fingerprint: scanFindings.fingerprint,
-      firstSeenScanId: sql<string>`first_value(${scans.id}) over (partition by ${scans.branchId}, ${scanFindings.fingerprint} order by ${scans.createdAt} asc, ${scans.id} asc)`.as("latest_first_seen_scan_id"),
+      firstSeenScanId: sql<string>`first_value(${scans.id}) over (${problem} order by ${scans.createdAt} asc, ${scans.id} asc)`.as("latest_first_seen_scan_id"),
+      unchecked: sql<boolean>`(${tips.scanId} is not null and not coalesce(bool_or(${scans.id} = ${tips.scanId}) over (${problem}), false))`.as("latest_unchecked"),
     })
     .from(scanFindings)
     .innerJoin(scans, eq(scans.id, scanFindings.scanId))
+    .leftJoin(tips, eq(tips.branchId, scans.branchId))
     .where(branchScansWhere(tenantId, scope))
     .orderBy(scans.branchId, scanFindings.fingerprint, desc(scans.createdAt), desc(scans.id), asc(scanFindings.id))
     .as("latest");
+};
 
 type LatestPerProblem = ReturnType<typeof latestPerProblem>;
 
@@ -74,20 +85,43 @@ const triageOn = (latest: LatestPerProblem) =>
   and(eq(scanFindingTriage.tenantId, latest.tenantId), eq(scanFindingTriage.repoId, latest.repoId), eq(scanFindingTriage.fingerprint, latest.fingerprint));
 
 // -----
+// Rows of one or more Branches, grouped by Branch in the order
+// they came.
+// -----
+const byBranchOf = <Row extends { branchId: string | null }, Entry>(rows: readonly Row[], entryOf: (row: Row) => Entry) => {
+  const byBranch = new Map<string, Entry[]>();
+  for (const row of rows) {
+    if (row.branchId === null) continue;
+    const entries = byBranch.get(row.branchId);
+    if (entries) entries.push(entryOf(row));
+    else byBranch.set(row.branchId, [entryOf(row)]);
+  }
+  return byBranch;
+};
+
+// -----
 // Every problem a branch's Scans found, one for each
 // fingerprint: its words from the newest Scan that saw it, first
-// seen at the oldest Scan, the state the older History path
-// recorded (open when there is no row) and what a person
-// decided. A Scan never closes a problem. A branch has tens to
-// hundreds, so counts, filters and pages are made from this one
-// list. The map is keyed by branch.
+// seen at the oldest Scan, its state (branchStateOf) and what a
+// person decided. A Scan never closes a problem. A branch has
+// tens to hundreds, so counts, filters and pages are made from
+// this one list. The map is keyed by branch.
 // -----
-const mergedRowsEffect = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
+export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId?: string): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
   Effect.tryPromise({
     try: () => {
-      const latest = latestPerProblem(db, tenantId, scope);
+      const latest = latestPerProblem(db, tenantId, { branchId });
       return db
-        .select({ finding: scanFindings, branchId: latest.branchId, firstSeenScanId: latest.firstSeenScanId, history: scanRepoFindings, triage: scanFindingTriage, person: partyPersons, url: scanRepos.url })
+        .select({
+          finding: scanFindings,
+          branchId: latest.branchId,
+          firstSeenScanId: latest.firstSeenScanId,
+          unchecked: latest.unchecked,
+          history: scanRepoFindings,
+          triage: scanFindingTriage,
+          person: partyPersons,
+          url: scanRepos.url,
+        })
         .from(latest)
         .innerJoin(scanFindings, eq(scanFindings.id, latest.rowId))
         .innerJoin(scanRepos, eq(scanRepos.id, latest.repoId))
@@ -97,20 +131,11 @@ const mergedRowsEffect = (db: DbConnectType, tenantId: string, scope: BranchScop
         .orderBy(latest.branchId, latest.fingerprint);
     },
     catch: toDbError,
-  });
-
-// -----
-// The tips and the merge do not depend on each other, so they
-// run together; the tips only decide `unchecked` afterwards.
-// -----
-export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId?: string): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
-  Effect.gen(function* () {
-    const scope: BranchScope = { branchId };
-    const [tips, rows] = yield* Effect.all([branchTipsEffect(db, tenantId, scope), mergedRowsEffect(db, tenantId, scope)], { concurrency: "unbounded" });
-    const byBranch = new Map<string, RepoFinding[]>();
-    for (const { finding, branchId: ownBranchId, firstSeenScanId, history, triage, person, url } of rows) {
-      if (ownBranchId === null) continue;
-      const entry: RepoFinding = {
+  }).pipe(
+    Effect.map((rows) =>
+      byBranchOf(rows, (row): RepoFinding => {
+        const { finding, firstSeenScanId, unchecked, history, triage, person, url } = row;
+        return {
         id: finding.id,
         scanId: finding.scanId,
         repo: url,
@@ -129,51 +154,47 @@ export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId
         needs: finding.needs,
         createdAt: finding.createdAt.toISOString(),
         triage: triage ? triageView(triage, person) : null,
-        state: history?.state ?? "open",
-        unchecked: finding.scanId !== tips.get(ownBranchId),
+        state: branchStateOf(row),
+        unchecked,
         firstSeenScanId,
         fixedInScanId: history?.fixedInScanId ?? null,
         possibleDuplicateOf: history?.possibleDuplicateOf ?? null,
-      };
-      byBranch.set(ownBranchId, [...(byBranch.get(ownBranchId) ?? []), entry]);
-    }
-    return byBranch;
-  });
+        };
+      }),
+    ),
+  );
 
 // -----
 // Just what the open counts need for each problem: no
-// evidence, impact or fix text. The same merge as the list,
-// so the counts always match it. Keyed by branch.
+// evidence, impact or fix text. The same merge, latest Scan and
+// state rule (branchStateOf) as the list, so the counts always
+// match it. Keyed by branch.
 // -----
-const repoOpenCountRowsEffect = (db: DbConnectType, tenantId: string, repoId?: string): Effect.Effect<Map<string, OpenCountRow[]>, DbError> =>
-  Effect.gen(function* () {
-    const scope: BranchScope = { repoId };
-    const rowsEffect = Effect.tryPromise({
-      try: () => {
-        const latest = latestPerProblem(db, tenantId, scope);
-        return db
-          .select({ branchId: latest.branchId, scanId: latest.scanId, state: scanRepoFindings.state, severity: scanFindings.severity, triageStatus: scanFindingTriage.status })
-          .from(latest)
-          .innerJoin(scanFindings, eq(scanFindings.id, latest.rowId))
-          .leftJoin(scanRepoFindings, historyOn(latest))
-          .leftJoin(scanFindingTriage, triageOn(latest));
-      },
-      catch: toDbError,
-    });
-    const [tips, rows] = yield* Effect.all([branchTipsEffect(db, tenantId, scope), rowsEffect], { concurrency: "unbounded" });
-    const byBranch = new Map<string, OpenCountRow[]>();
-    for (const row of rows) {
-      if (row.branchId === null) continue;
-      const entry: OpenCountRow = {
-        state: row.state ?? "open",
-        unchecked: row.scanId !== tips.get(row.branchId),
-        severity: row.severity,
-        triage: row.triageStatus ? { status: row.triageStatus } : null,
-      };
-      byBranch.set(row.branchId, [...(byBranch.get(row.branchId) ?? []), entry]);
-    }
-    return byBranch;
-  });
+const repoOpenCountRowsEffect = (db: DbConnectType, tenantId: string, scope: BranchScope): Effect.Effect<Map<string, OpenCountRow[]>, DbError> =>
+  Effect.tryPromise({
+    try: () => {
+      const latest = latestPerProblem(db, tenantId, scope);
+      return db
+        .select({
+          branchId: latest.branchId,
+          unchecked: latest.unchecked,
+          severity: scanFindings.severity,
+          history: { state: scanRepoFindings.state },
+          triageStatus: scanFindingTriage.status,
+        })
+        .from(latest)
+        .innerJoin(scanFindings, eq(scanFindings.id, latest.rowId))
+        .leftJoin(scanRepoFindings, historyOn(latest))
+        .leftJoin(scanFindingTriage, triageOn(latest));
+    },
+    catch: toDbError,
+  }).pipe(
+    Effect.map((rows) =>
+      byBranchOf(rows, (row): OpenCountRow => {
+        return { state: branchStateOf(row), unchecked: row.unchecked, severity: row.severity, triage: row.triageStatus ? { status: row.triageStatus } : null };
+      }),
+    ),
+  );
 
 // -----
 // The default branch is a pointer only a scan with no ref moves.
@@ -224,12 +245,16 @@ export const listReposEffect = (db: DbConnectType, tenantId: string, repoId?: st
           .orderBy(asc(scanRepoBranches.createdAt), asc(scanRepoBranches.name)),
       catch: toDbError,
     });
-    const findings = yield* repoOpenCountRowsEffect(db, tenantId, repoId);
-    return repos.map((repo) => {
-      const last = latest.find((row) => row.repoId === repo.id);
+    const tracked = repos.map((repo) => {
       const branchNames = branches.filter((branch) => branch.repoId === repo.id).map((branch) => branch.name);
       const defaultBranch = effectiveDefaultBranch(repo.defaultBranch, branchNames);
       const defaultBranchId = branches.find((branch) => branch.repoId === repo.id && branch.name === defaultBranch)?.id;
+      return { repo, branchNames, defaultBranch, defaultBranchId };
+    });
+    const defaultBranchIds = tracked.flatMap((entry) => (entry.defaultBranchId ? [entry.defaultBranchId] : []));
+    const findings = defaultBranchIds.length === 0 ? new Map<string, OpenCountRow[]>() : yield* repoOpenCountRowsEffect(db, tenantId, { branchIds: defaultBranchIds });
+    return tracked.map(({ repo, branchNames, defaultBranch, defaultBranchId }) => {
+      const last = latest.find((row) => row.repoId === repo.id);
       return {
         id: repo.id,
         url: repo.url,
@@ -252,9 +277,10 @@ export const getRepoEffect = (db: DbConnectType, tenantId: string, repoId: strin
   );
 
 // -----
-// A repo's branches, each with what is open on it and the commit
-// of its newest succeeded lite scan: the commit to ask a verdict
-// about.
+// A repo's branches, each with what is open on it, the commit
+// of its newest succeeded scan (the commit to ask a verdict
+// about) and its latest full Scan, from the same tips the merge
+// measures "not in the latest full scan" against.
 // -----
 export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repoId: string): Effect.Effect<RepoBranch[], DbError> =>
   Effect.gen(function* () {
@@ -280,7 +306,12 @@ export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repo
           .orderBy(scans.branchId, desc(scans.createdAt), desc(scans.id)),
       catch: toDbError,
     });
-    const findings = yield* repoOpenCountRowsEffect(db, tenantId, repoId);
+    const tips = branchTips(db, tenantId, { repoId });
+    const fullScans = yield* Effect.tryPromise({
+      try: () => db.select({ branchId: tips.branchId, scanId: tips.scanId }).from(tips),
+      catch: toDbError,
+    });
+    const findings = yield* repoOpenCountRowsEffect(db, tenantId, { repoId });
     const defaultBranch = effectiveDefaultBranch(repo?.defaultBranch ?? null, rows.map((branch) => branch.name));
     return rows.map((branch) => {
       const last = latest.find((row) => row.branchId === branch.id);
@@ -292,6 +323,7 @@ export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repo
         latestScanId: last?.id ?? null,
         latestCommit: last?.commitSha ?? null,
         latestScanAt: last?.createdAt.toISOString() ?? null,
+        fullScanId: fullScans.find((row) => row.branchId === branch.id)?.scanId ?? null,
       };
     });
   });
