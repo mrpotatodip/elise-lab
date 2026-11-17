@@ -8,7 +8,7 @@ describe("repoUntrackedCopy", () => {
     ["only ended scans", [{ status: "succeeded" }], "No branch history yet"],
     ["a failed scan", [{ status: "failed" }], "No branch history yet"],
     ["no scans", [], "No branch tracked yet"],
-  ])("says the right thing for %s", (_name, history, title) => {
+  ] as const)("says the right thing for %s", (_name, history, title) => {
     expect(repoUntrackedCopy(history).title).toBe(title);
   });
 });

@@ -1,25 +1,12 @@
 import type { ProfileMetValue } from "@repo/contracts/elise";
 import { SCAN_PROFILE_OPTIONS } from "../constants";
 import type { ScanStatus } from "../schemas";
-
-export type ScanProfileNote = {
-  kind: "lesser" | "unmet";
-  badge: string;
-  title: string;
-  detail: string;
-};
+import type { ScanProfileNote } from "../types";
 
 const RANK = { quick: 1, standard: 2, deep: 3 } as const;
 
 const nameOf = (profile: ScanStatus["profile"]) => SCAN_PROFILE_OPTIONS.find((option) => option.value === profile)?.label ?? profile;
 
-// -----
-// What the engine's profile check says a Runner Scan did, against the profile
-// it asked for. A Scan that met its profile, and a Scan that was not checked
-// (a cloud Scan, a Partial Scan, an old row), have nothing new to say: null.
-// `none` is the profile check's word for a Scan that did the work of no profile.
-// The dashboard never shows the internal names (quick, standard, deep).
-// -----
 export function scanProfileNote(asked: ScanStatus["profile"], met: ProfileMetValue | null | undefined): ScanProfileNote | null {
   if (met === null || met === undefined) return null;
   const askedName = nameOf(asked);

@@ -32,11 +32,6 @@ export const scanNoSummaryText = (status: string) => {
   return "No report";
 };
 
-// -----
-// The Verdict counts scan weight (a Focused scan is 0.5), so the weight
-// still missing may be a half. The next step is a whole number of scans:
-// one more scan covers a half, and a missing 1 is one Balanced scan.
-// -----
 export const verdictScansToRun = (missingWeight: number) => Math.ceil(missingWeight);
 
 const FAILURE_CAUSES = [

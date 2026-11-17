@@ -1,12 +1,4 @@
-type ScanLike = { status: string };
-
-// -----
-// What the card says on a repository page that has no tracked branch. A Scan
-// that is running or has ended is not "run a scan to start": the card says
-// where its findings are instead. A profile Scan resolves no branch (ADR 0004),
-// so a repository can hold finished Scans and still have no branch.
-// -----
-type UntrackedCopy = { title: string; description: string };
+import type { ScanLike, UntrackedCopy } from "../types";
 
 export function repoUntrackedCopy(history: readonly ScanLike[]): UntrackedCopy {
   if (history.some((scan) => scan.status === "queued" || scan.status === "running")) {
