@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNotNull, lt, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, lt, max, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { REPO_LIMIT_PER_TENANT, type DiffEntry, type Repo, type RepoBranch, type RepoFinding, type ScanDiff } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepoBranches, scanRepoFindings, scanRepos, scans } from "@repo/db-elise/schema";
@@ -10,8 +10,6 @@ import { canonicalRepo, displayRepoUrl } from "#/modules/scan-ledger";
 import { openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
 
 type BranchScope = { repoId?: string; branchId?: string };
-
-const keyOf = (branchId: string, fingerprint: string): string => `${branchId}:${fingerprint}`;
 
 // -----
 // The Scans a Branch's findings are made of: every succeeded
@@ -45,22 +43,35 @@ const branchTipsEffect = (db: DbConnectType, tenantId: string, scope: BranchScop
   });
 
 // -----
-// The oldest Scan that saw each problem, keyed by branch and
-// fingerprint.
+// The newest finding row of each problem (branch and
+// fingerprint) and the oldest Scan that saw it, narrow so that
+// everything joined after it works on one row per problem, not
+// one per Scan. The window runs before the DISTINCT ON picks.
 // -----
-const firstSeenEffect = (db: DbConnectType, tenantId: string, scope: BranchScope): Effect.Effect<Map<string, string>, DbError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const rows = await db
-        .selectDistinctOn([scans.branchId, scanFindings.fingerprint], { branchId: scans.branchId, fingerprint: scanFindings.fingerprint, scanId: scans.id })
-        .from(scanFindings)
-        .innerJoin(scans, eq(scans.id, scanFindings.scanId))
-        .where(branchScansWhere(tenantId, scope))
-        .orderBy(scans.branchId, scanFindings.fingerprint, asc(scans.createdAt), asc(scans.id));
-      return new Map(rows.flatMap((row) => (row.branchId === null ? [] : [[keyOf(row.branchId, row.fingerprint), row.scanId] as const])));
-    },
-    catch: toDbError,
-  });
+const latestPerProblem = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
+  db
+    .selectDistinctOn([scans.branchId, scanFindings.fingerprint], {
+      rowId: sql<string>`${scanFindings.id}`.as("latest_row_id"),
+      branchId: scans.branchId,
+      scanId: sql<string>`${scans.id}`.as("latest_scan_id"),
+      repoId: scans.repoId,
+      tenantId: scans.tenantId,
+      fingerprint: scanFindings.fingerprint,
+      firstSeenScanId: sql<string>`first_value(${scans.id}) over (partition by ${scans.branchId}, ${scanFindings.fingerprint} order by ${scans.createdAt} asc, ${scans.id} asc)`.as("latest_first_seen_scan_id"),
+    })
+    .from(scanFindings)
+    .innerJoin(scans, eq(scans.id, scanFindings.scanId))
+    .where(branchScansWhere(tenantId, scope))
+    .orderBy(scans.branchId, scanFindings.fingerprint, desc(scans.createdAt), desc(scans.id), asc(scanFindings.id))
+    .as("latest");
+
+type LatestPerProblem = ReturnType<typeof latestPerProblem>;
+
+const historyOn = (latest: LatestPerProblem) =>
+  and(eq(scanRepoFindings.branchId, latest.branchId), eq(scanRepoFindings.fingerprint, latest.fingerprint));
+
+const triageOn = (latest: LatestPerProblem) =>
+  and(eq(scanFindingTriage.tenantId, latest.tenantId), eq(scanFindingTriage.repoId, latest.repoId), eq(scanFindingTriage.fingerprint, latest.fingerprint));
 
 // -----
 // Every problem a branch's Scans found, one for each
@@ -71,69 +82,62 @@ const firstSeenEffect = (db: DbConnectType, tenantId: string, scope: BranchScope
 // hundreds, so counts, filters and pages are made from this one
 // list. The map is keyed by branch.
 // -----
-const mergedFindingsEffect = (
-  db: DbConnectType,
-  tenantId: string,
-  scope: BranchScope,
-  tips: Map<string, string>,
-  firstSeen: Map<string, string>,
-): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
+const mergedRowsEffect = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
   Effect.tryPromise({
-    try: async () => {
-      const rows = await db
-        .selectDistinctOn([scans.branchId, scanFindings.fingerprint], { finding: scanFindings, branchId: scans.branchId, history: scanRepoFindings, triage: scanFindingTriage, person: partyPersons, url: scanRepos.url })
-        .from(scanFindings)
-        .innerJoin(scans, eq(scans.id, scanFindings.scanId))
-        .innerJoin(scanRepos, eq(scanRepos.id, scans.repoId))
-        .leftJoin(scanRepoFindings, and(eq(scanRepoFindings.branchId, scans.branchId), eq(scanRepoFindings.fingerprint, scanFindings.fingerprint)))
-        .leftJoin(
-          scanFindingTriage,
-          and(eq(scanFindingTriage.tenantId, scans.tenantId), eq(scanFindingTriage.repoId, scans.repoId), eq(scanFindingTriage.fingerprint, scanFindings.fingerprint)),
-        )
+    try: () => {
+      const latest = latestPerProblem(db, tenantId, scope);
+      return db
+        .select({ finding: scanFindings, branchId: latest.branchId, firstSeenScanId: latest.firstSeenScanId, history: scanRepoFindings, triage: scanFindingTriage, person: partyPersons, url: scanRepos.url })
+        .from(latest)
+        .innerJoin(scanFindings, eq(scanFindings.id, latest.rowId))
+        .innerJoin(scanRepos, eq(scanRepos.id, latest.repoId))
+        .leftJoin(scanRepoFindings, historyOn(latest))
+        .leftJoin(scanFindingTriage, triageOn(latest))
         .leftJoin(partyPersons, eq(partyPersons.partyId, scanFindingTriage.setByPartyId))
-        .where(branchScansWhere(tenantId, scope))
-        .orderBy(scans.branchId, scanFindings.fingerprint, desc(scans.createdAt), desc(scans.id), asc(scanFindings.id));
-      const byBranch = new Map<string, RepoFinding[]>();
-      for (const { finding, branchId: ownBranchId, history, triage, person, url } of rows) {
-        if (ownBranchId === null) continue;
-        const entry: RepoFinding = {
-          id: finding.id,
-          scanId: finding.scanId,
-          repo: url,
-          findingId: finding.findingId,
-          fingerprint: finding.fingerprint,
-          status: finding.status,
-          severity: finding.severity,
-          title: finding.title,
-          class: finding.class,
-          file: finding.file,
-          line: finding.line,
-          actor: finding.actor,
-          impact: finding.impact,
-          evidence: finding.evidence,
-          fix: finding.fix,
-          needs: finding.needs,
-          createdAt: finding.createdAt.toISOString(),
-          triage: triage ? triageView(triage, person) : null,
-          state: history?.state ?? "open",
-          unchecked: finding.scanId !== tips.get(ownBranchId),
-          firstSeenScanId: firstSeen.get(keyOf(ownBranchId, finding.fingerprint)) ?? finding.scanId,
-          fixedInScanId: history?.fixedInScanId ?? null,
-          possibleDuplicateOf: history?.possibleDuplicateOf ?? null,
-        };
-        byBranch.set(ownBranchId, [...(byBranch.get(ownBranchId) ?? []), entry]);
-      }
-      return byBranch;
+        .orderBy(latest.branchId, latest.fingerprint);
     },
     catch: toDbError,
   });
 
+// -----
+// The tips and the merge do not depend on each other, so they
+// run together; the tips only decide `unchecked` afterwards.
+// -----
 export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId?: string): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
   Effect.gen(function* () {
     const scope: BranchScope = { branchId };
-    const tips = yield* branchTipsEffect(db, tenantId, scope);
-    const firstSeen = yield* firstSeenEffect(db, tenantId, scope);
-    return yield* mergedFindingsEffect(db, tenantId, scope, tips, firstSeen);
+    const [tips, rows] = yield* Effect.all([branchTipsEffect(db, tenantId, scope), mergedRowsEffect(db, tenantId, scope)], { concurrency: "unbounded" });
+    const byBranch = new Map<string, RepoFinding[]>();
+    for (const { finding, branchId: ownBranchId, firstSeenScanId, history, triage, person, url } of rows) {
+      if (ownBranchId === null) continue;
+      const entry: RepoFinding = {
+        id: finding.id,
+        scanId: finding.scanId,
+        repo: url,
+        findingId: finding.findingId,
+        fingerprint: finding.fingerprint,
+        status: finding.status,
+        severity: finding.severity,
+        title: finding.title,
+        class: finding.class,
+        file: finding.file,
+        line: finding.line,
+        actor: finding.actor,
+        impact: finding.impact,
+        evidence: finding.evidence,
+        fix: finding.fix,
+        needs: finding.needs,
+        createdAt: finding.createdAt.toISOString(),
+        triage: triage ? triageView(triage, person) : null,
+        state: history?.state ?? "open",
+        unchecked: finding.scanId !== tips.get(ownBranchId),
+        firstSeenScanId,
+        fixedInScanId: history?.fixedInScanId ?? null,
+        possibleDuplicateOf: history?.possibleDuplicateOf ?? null,
+      };
+      byBranch.set(ownBranchId, [...(byBranch.get(ownBranchId) ?? []), entry]);
+    }
+    return byBranch;
   });
 
 // -----
@@ -144,41 +148,31 @@ export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId
 const repoOpenCountRowsEffect = (db: DbConnectType, tenantId: string, repoId?: string): Effect.Effect<Map<string, OpenCountRow[]>, DbError> =>
   Effect.gen(function* () {
     const scope: BranchScope = { repoId };
-    const tips = yield* branchTipsEffect(db, tenantId, scope);
-    return yield* Effect.tryPromise({
-      try: async () => {
-        const rows = await db
-          .selectDistinctOn([scans.branchId, scanFindings.fingerprint], {
-            branchId: scans.branchId,
-            scanId: scans.id,
-            state: scanRepoFindings.state,
-            severity: scanFindings.severity,
-            triageStatus: scanFindingTriage.status,
-          })
-          .from(scanFindings)
-          .innerJoin(scans, eq(scans.id, scanFindings.scanId))
-          .leftJoin(scanRepoFindings, and(eq(scanRepoFindings.branchId, scans.branchId), eq(scanRepoFindings.fingerprint, scanFindings.fingerprint)))
-          .leftJoin(
-            scanFindingTriage,
-            and(eq(scanFindingTriage.tenantId, scans.tenantId), eq(scanFindingTriage.repoId, scans.repoId), eq(scanFindingTriage.fingerprint, scanFindings.fingerprint)),
-          )
-          .where(branchScansWhere(tenantId, scope))
-          .orderBy(scans.branchId, scanFindings.fingerprint, desc(scans.createdAt), desc(scans.id), asc(scanFindings.id));
-        const byBranch = new Map<string, OpenCountRow[]>();
-        for (const row of rows) {
-          if (row.branchId === null) continue;
-          const entry: OpenCountRow = {
-            state: row.state ?? "open",
-            unchecked: row.scanId !== tips.get(row.branchId),
-            severity: row.severity,
-            triage: row.triageStatus ? { status: row.triageStatus } : null,
-          };
-          byBranch.set(row.branchId, [...(byBranch.get(row.branchId) ?? []), entry]);
-        }
-        return byBranch;
+    const rowsEffect = Effect.tryPromise({
+      try: () => {
+        const latest = latestPerProblem(db, tenantId, scope);
+        return db
+          .select({ branchId: latest.branchId, scanId: latest.scanId, state: scanRepoFindings.state, severity: scanFindings.severity, triageStatus: scanFindingTriage.status })
+          .from(latest)
+          .innerJoin(scanFindings, eq(scanFindings.id, latest.rowId))
+          .leftJoin(scanRepoFindings, historyOn(latest))
+          .leftJoin(scanFindingTriage, triageOn(latest));
       },
       catch: toDbError,
     });
+    const [tips, rows] = yield* Effect.all([branchTipsEffect(db, tenantId, scope), rowsEffect], { concurrency: "unbounded" });
+    const byBranch = new Map<string, OpenCountRow[]>();
+    for (const row of rows) {
+      if (row.branchId === null) continue;
+      const entry: OpenCountRow = {
+        state: row.state ?? "open",
+        unchecked: row.scanId !== tips.get(row.branchId),
+        severity: row.severity,
+        triage: row.triageStatus ? { status: row.triageStatus } : null,
+      };
+      byBranch.set(row.branchId, [...(byBranch.get(row.branchId) ?? []), entry]);
+    }
+    return byBranch;
   });
 
 // -----
