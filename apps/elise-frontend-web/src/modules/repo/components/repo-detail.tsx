@@ -22,32 +22,22 @@ import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatus
 import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
-import { repoName, repoUntrackedCopy } from "../utils";
+import { repoEmptyCopy, repoName, repoUntrackedCopy, type FindingFilter } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
-import { RepoHistoryNote } from "./repo-history-note";
 
 const RECENT_SCAN_COUNT = 3;
 
 const unratedOf = (summary: { total: number; severity: Record<string, number> }) => summary.total - Object.values(summary.severity).reduce((sum, count) => sum + count, 0);
 
-type FindingFilter = "action" | "decided" | "scan" | "all";
-
 const FILTER_VALUES = ["action", "decided", "scan", "all"] as const satisfies readonly FindingFilter[];
 
 const FILTER_COPY = {
-  action: { label: "Needs action", note: "A scan still sees these and nobody has resolved them." },
-  decided: { label: "Decided by a person", note: "Marked fixed, dismissed or accepted by someone on your team. A scan has not confirmed a fix yet." },
-  scan: { label: "Fixed by a scan", note: "A scan checked the code and the problem is gone." },
-  all: { label: "Every finding", note: "Every finding this branch has had." },
+  action: { label: "Needs action", note: "Problems any scan of this branch found that nobody has resolved. A scan never closes a problem, so one fixed in the code stays here until a person marks it." },
+  decided: { label: "Decided by a person", note: "Marked fixed, dismissed or accepted by someone on your team." },
+  scan: { label: "Fixed by a scan", note: "An earlier scan checked the code and the problem was gone." },
+  all: { label: "Every finding", note: "Every problem any scan of this branch found." },
 } as const satisfies Record<FindingFilter, { label: string; note: string }>;
-
-const EMPTY_COPY = {
-  action: { title: "Nothing needs action", text: "Every finding is fixed, dismissed or accepted. That is not proof the code is safe: only the latest scan's findings are checked." },
-  decided: { title: "No one has decided anything yet", text: "When someone marks a finding fixed, dismisses it or accepts the risk, it appears here." },
-  scan: { title: "No scan has confirmed a fix yet", text: "A finding moves here when a later scan checks the code and the problem is gone." },
-  all: { title: "No findings", text: "Run a scan to check this repository." },
-} as const satisfies Record<FindingFilter, { title: string; text: string }>;
 
 const asFilter = (value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
 
@@ -77,12 +67,15 @@ function RepoFindingFacts({ finding, history }: { finding: RepoFinding; history:
       <SheetFact label="First seen in">
         <ScanLink scanId={finding.firstSeenScanId} history={history} />
       </SheetFact>
+      <SheetFact label="Last seen in">
+        <ScanLink scanId={finding.scanId} history={history} />
+      </SheetFact>
       {finding.fixedInScanId && (
         <SheetFact label="Fixed in">
           <ScanLink scanId={finding.fixedInScanId} history={history} />
         </SheetFact>
       )}
-      {finding.unchecked && <SheetFact label="Latest scan">It did not re-check this finding. Treat it as still open until a scan confirms.</SheetFact>}
+      {finding.unchecked && <SheetFact label="Latest scan">This problem is not in the latest scan. It stays open until a person decides it.</SheetFact>}
       {finding.possibleDuplicateOf && <SheetFact label="Possible duplicate">It may repeat another finding in this repository.</SheetFact>}
     </>
   );
@@ -94,6 +87,7 @@ type FindingRow = {
   open: () => void;
   repoId: string;
   fixedOn: string | null;
+  history: readonly ScanStatus[];
   blocks: boolean;
   onSaved: ComponentProps<typeof FindingTriageSelect>["onSaved"];
 };
@@ -121,7 +115,23 @@ const titleColumn = findingColumn.display({
       >
         {row.original.finding.title}
       </button>
-      {row.original.finding.unchecked && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Not re-checked in the latest scan</p>}
+      {row.original.finding.unchecked && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Not in the latest scan</p>}
+      <p className="relative z-10 mt-1 flex flex-wrap gap-x-3 text-sm leading-relaxed text-muted-foreground">
+        {row.original.finding.firstSeenScanId === row.original.finding.scanId ? (
+          <span>
+            Seen in <ScanLink scanId={row.original.finding.scanId} history={row.original.history} />
+          </span>
+        ) : (
+          <>
+            <span>
+              First seen <ScanLink scanId={row.original.finding.firstSeenScanId} history={row.original.history} />
+            </span>
+            <span>
+              Last seen <ScanLink scanId={row.original.finding.scanId} history={row.original.history} />
+            </span>
+          </>
+        )}
+      </p>
     </>
   ),
 });
@@ -228,7 +238,7 @@ const recentScanColumns = scanColumn.columns([
   }),
 ]);
 
-function RepoFindings({ repoId, branch, commit, history }: { repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[] }) {
+function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[]; openTotal: number }) {
   const blockers = useVerdictBlockers(repoId, commit);
   const queryClient = useQueryClient();
   const findingsOptions = repoFindingsQuery(repoId, { branch });
@@ -248,7 +258,8 @@ function RepoFindings({ repoId, branch, commit, history }: { repoId: string; bra
   const findings = blockers.size === 0 ? matching : matching.toSorted((a, b) => Number(blockers.has(b.fingerprint)) - Number(blockers.has(a.fingerprint)));
   const selectedFinding = selected === undefined ? undefined : findings[selected];
   const showStatus = filter === "action" || filter === "all";
-  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, history), blocks: blockers.has(finding.fingerprint), onSaved: decided }));
+  const emptyCopy = repoEmptyCopy(filter, openTotal);
+  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, history), history, blocks: blockers.has(finding.fingerprint), onSaved: decided }));
   const table = useTable({ features: dataTableFeatures, columns: showStatus ? findingColumnsWithStatus : findingColumnsWithoutStatus, data: rows, getRowId: (row) => row.finding.id });
 
   return (
@@ -290,9 +301,9 @@ function RepoFindings({ repoId, branch, commit, history }: { repoId: string; bra
               <EmptyMedia variant="icon">
                 <ShieldCheck />
               </EmptyMedia>
-              <EmptyTitle>{query !== "" ? "No findings match" : EMPTY_COPY[filter].title}</EmptyTitle>
+              <EmptyTitle>{query !== "" ? "No findings match" : emptyCopy.title}</EmptyTitle>
               <EmptyDescription>
-                {query !== "" ? (hasNextPage ? "Only the findings loaded so far were searched. Load more, or clear the search." : "Try different words, or clear the search.") : EMPTY_COPY[filter].text}
+                {query !== "" ? (hasNextPage ? "Only the findings loaded so far were searched. Load more, or clear the search." : "Try different words, or clear the search.") : emptyCopy.text}
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
@@ -451,8 +462,6 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
 
       {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} findingsHref="#branch-findings" />}
 
-      {open.total > 0 && <RepoHistoryNote byHand />}
-
       {open.regressed > 0 && (
         <Alert variant="destructive">
           <Undo2 />
@@ -465,14 +474,14 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <Alert variant="warning">
           <CircleAlert />
           <AlertDescription>
-            <span className="font-medium">{scanPlural(open.unchecked, "open problem was", "open problems were")} not re-checked by the latest scan.</span> Treat {open.unchecked === 1 ? "it" : "them"} as still open.
+            <span className="font-medium">{scanPlural(open.unchecked, "open problem was", "open problems were")} not in the latest scan.</span> No scan closes a problem, so {open.unchecked === 1 ? "it stays" : "they stay"} open until a person decides {open.unchecked === 1 ? "it" : "them"}.
           </AlertDescription>
         </Alert>
       )}
 
       {current ? (
         <Suspense key={current.name} fallback={<RepoFindingsSkeleton />}>
-          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} />
+          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} openTotal={open.total} />
         </Suspense>
       ) : (
         <Card>

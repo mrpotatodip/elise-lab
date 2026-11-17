@@ -15,7 +15,7 @@ export function RepoOpenFindings({ open }: { open: Repo["open"] }) {
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {open.regressed > 0 && <Badge variant="destructive">{open.regressed} came back</Badge>}
         {open.needsValidation > 0 && <span className="text-xs text-status-warning">{open.needsValidation} to check by hand</span>}
-        {open.unchecked > 0 && <span className="text-xs text-muted-foreground">{scanPlural(open.unchecked, "finding", "findings")} not re-checked</span>}
+        {open.unchecked > 0 && <span className="text-xs text-muted-foreground">{scanPlural(open.unchecked, "finding", "findings")} not in the latest scan</span>}
       </span>
     </span>
   );

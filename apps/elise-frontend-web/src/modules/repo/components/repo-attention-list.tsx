@@ -20,7 +20,7 @@ const reasonFor = ({ open, defaultBranch }: Pick<Repo, "open" | "defaultBranch">
   if (open.total === 0) return "Nothing is open";
   if (open.regressed > 0) return `${scanPlural(open.regressed, "finding came", "findings came")} back. Look at these first`;
   if (open.needsValidation > 0) return `${scanPlural(open.needsValidation, "finding needs", "findings need")} a person to check`;
-  if (open.unchecked > 0) return `${scanPlural(open.unchecked, "finding was", "findings were")} not re-checked`;
+  if (open.unchecked > 0) return `${scanPlural(open.unchecked, "finding is", "findings are")} not in the latest scan`;
   return "Verified and waiting for a decision";
 };
 

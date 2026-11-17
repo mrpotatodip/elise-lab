@@ -1,7 +1,6 @@
 export * from "./repo-attention-list";
 export * from "./repo-detail";
 export * from "./repo-detail-skeleton";
-export * from "./repo-history-note";
 export * from "./repo-list";
 export * from "./repo-list-skeleton";
 export * from "./repo-open-findings";
