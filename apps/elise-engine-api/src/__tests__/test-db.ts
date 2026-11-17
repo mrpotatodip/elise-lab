@@ -1,7 +1,8 @@
 import { createTestDb } from "@repo/db-elise/test-db";
 import { parties, partyMasterTypes, partyPersons, scanRepoBranches, scanRepos, scans, tenants } from "@repo/db-elise/schema";
 import { and, eq, sql } from "drizzle-orm";
-import type { DbConnectType, PoolDbType, TenantDbType } from "#/lib/db-connection";
+import { Data, Effect, Exit } from "effect";
+import type { AppDbType, DbConnectType, PoolDbType, TenantDbType } from "#/lib/db-connection";
 
 // -----
 // A fresh in-memory Postgres with every migration applied.
@@ -32,6 +33,27 @@ export const asTenant = <T>(test: TestDb, accountId: string, run: (db: TenantDbT
     // SAFETY: the pglite transaction answers the same calls as the pg transaction the route's real wrapper passes.
     return run(tx as never);
   });
+
+// -----
+// Thrown out of the transaction to roll it back.
+// -----
+class RolledBack extends Data.TaggedError("RolledBack") {}
+
+// -----
+// asTenant for a service: a failed effect rolls the transaction
+// back, like a route's error does, and comes back as the failure.
+// -----
+export const asTenantEffect = <A, E>(test: TestDb, accountId: string, make: (db: AppDbType) => Effect.Effect<A, E>): Effect.Effect<A, E> =>
+  Effect.flatten(
+    Effect.promise(async () => {
+      let exit: Exit.Exit<A, E> = Exit.die(new RolledBack());
+      await asTenant(test, accountId, async (db) => {
+        exit = await Effect.runPromiseExit(make(db));
+        if (Exit.isFailure(exit)) throw new RolledBack();
+      }).catch((cause: unknown) => (cause instanceof RolledBack ? undefined : Promise.reject(cause)));
+      return exit;
+    }),
+  );
 
 export async function seedTenant(test: TestDb, slug = "acme") {
   const [type] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));

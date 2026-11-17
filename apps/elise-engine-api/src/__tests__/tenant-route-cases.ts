@@ -1,8 +1,18 @@
 export type CrossAccountCase =
   | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "not-found" | "empty" | "created" }
+  | { kind: "own-account"; shownBy: string }
   | { kind: "pending"; ticket: number };
 
 const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket });
+
+// -----
+// A write that takes no ID but the caller's own Account, so
+// there is no other Account's ID to pass, and that needs the
+// GitHub App or the key secret, which the guard has not got.
+// The test it names shows the write stays in the caller's
+// Account.
+// -----
+const ownAccount = (shownBy: string): CrossAccountCase => ({ kind: "own-account", shownBy });
 
 // -----
 // The repo and fingerprint of the finding the guard test
@@ -14,6 +24,7 @@ const OTHER_FINGERPRINT = "b".repeat(64);
 export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
 export const OTHER_REPO_ID = "00000000-0000-4000-8000-0000000000b2";
 export const OTHER_SECOND_REPO = "https://github.com/octocat/Spoon-Knife";
+export const OTHER_INSTALL_ID = "00000000-0000-4000-8000-0000000000b3";
 export const OTHER_RUNNER_ID = "00000000-0000-4000-8000-0000000000c1";
 export const OTHER_RUNNER_NAME = "runner-of-the-other";
 
@@ -100,15 +111,15 @@ export const CROSS_ACCOUNT_CASES = {
   "DELETE /groups/:groupId": pending(78),
   "PUT /groups/:groupId/members/:partyId": pending(78),
   "DELETE /groups/:groupId/members/:partyId": pending(78),
-  "POST /github/connect": pending(79),
-  "POST /github/installations": pending(79),
-  "GET /github/installations": pending(79),
-  "DELETE /github/installations/:id": pending(79),
-  "GET /github/branches": pending(79),
-  "GET /github/repos": pending(79),
-  "GET /usage/anthropic-key": pending(79),
-  "PUT /usage/anthropic-key": pending(79),
-  "DELETE /usage/anthropic-key": pending(79),
+  "POST /github/connect": ownAccount("modules/github-installs/__tests__/github-installs-svc.test.ts"),
+  "POST /github/installations": ownAccount("modules/github-installs/__tests__/github-installs-svc.test.ts"),
+  "GET /github/installations": { kind: "run", path: "/github/installations", expect: "empty" },
+  "DELETE /github/installations/:id": { kind: "run", path: `/github/installations/${OTHER_INSTALL_ID}`, method: "DELETE", expect: "not-found" },
+  "GET /github/branches": { kind: "run", path: `/github/branches?installationId=${OTHER_INSTALL_ID}&repo=octo/hello`, expect: "not-found" },
+  "GET /github/repos": { kind: "run", path: "/github/repos", expect: "empty" },
+  "GET /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", expect: "empty" },
+  "PUT /usage/anthropic-key": ownAccount("modules/anthropic-key/__tests__/anthropic-key-svc.test.ts"),
+  "DELETE /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", method: "DELETE", expect: "empty" },
   "GET /runners": { kind: "run", path: "/runners", expect: "empty" },
   "DELETE /runners/:runnerId": { kind: "run", path: `/runners/${OTHER_RUNNER_ID}`, method: "DELETE", expect: "not-found" },
   // -----

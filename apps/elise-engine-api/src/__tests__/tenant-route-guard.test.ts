@@ -1,6 +1,17 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { authUser, scanFiles, scanFindingComments, scanFindings, scanRepoBranches, scanRepos, scans, tenantRunners } from "@repo/db-elise/schema";
+import {
+  authUser,
+  scanFiles,
+  scanFindingComments,
+  scanFindings,
+  scanRepoBranches,
+  scanRepos,
+  scans,
+  tenantAnthropicKeys,
+  tenantGithubInstallations,
+  tenantRunners,
+} from "@repo/db-elise/schema";
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
@@ -9,6 +20,7 @@ import {
   CROSS_ACCOUNT_CASES,
   NOT_TENANT_ROUTES,
   OTHER_COMMENT_ID,
+  OTHER_INSTALL_ID,
   OTHER_REPO_ID,
   OTHER_RUNNER_ID,
   OTHER_RUNNER_NAME,
@@ -62,6 +74,17 @@ beforeAll(async () => {
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
   await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs, to delete or edit" });
+  await test.raw.insert(tenantGithubInstallations).values({
+    id: OTHER_INSTALL_ID,
+    tenantId: otherTenantId,
+    installationId: 99,
+    accountLogin: "theirs",
+    repositorySelection: "all",
+    status: "active",
+    connectedBy: other.partyId,
+    noticeAcceptedAt: new Date("2026-11-01T00:00:00Z"),
+  });
+  await test.raw.insert(tenantAnthropicKeys).values({ tenantId: otherTenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
 });
 
 afterAll(async () => {
@@ -79,6 +102,11 @@ describe("every tenant route has a cross-account case", () => {
 
   it("lists no route as not-tenant that the app no longer mounts", () => {
     expect(NOT_TENANT_ROUTES.filter((route) => !mountedRoutes.includes(route))).toEqual([]);
+  });
+
+  it("names a test that exists for each write that takes only the caller's Account", () => {
+    const shownBy = caseEntries.flatMap(([, found]) => (found.kind === "own-account" ? [found.shownBy] : []));
+    expect(shownBy.filter((file) => !existsSync(join(SRC, file)))).toEqual([]);
   });
 
   it.each(runCases)("$route answers one Account with nothing of another's", async ({ path, method, body, as, expect: outcome }) => {
