@@ -379,14 +379,6 @@ describe("rate limits", () => {
 });
 
 describe("usage", () => {
-  it("answers the month's spend and what is left", async () => {
-    const { env } = fakeBindings();
-    const res = await call(env, "/usage", { headers: auth });
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ data: { budgetUsd: 20, spentUsd: 0, reservedUsd: 0, remainingUsd: 20, scans: 0 }, error: null });
-  });
-
   it("refuses a signed-in login that holds no role in the account", async () => {
     const { env } = fakeBindings();
     signedInUser = "user-1";

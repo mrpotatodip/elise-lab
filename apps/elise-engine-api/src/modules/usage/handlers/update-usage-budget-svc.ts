@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { Usage } from "@repo/contracts/elise";
-import type { PoolDbType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import { Invalid, type DbError } from "#/lib/effect-query";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import { setMonthlyBudgetEffect } from "#/modules/usage/queries";
@@ -15,8 +15,8 @@ import { allowanceUsdOf, defaultBudgetUsdOf, reservedUsdOf, summarizeUsage } fro
 // -----
 export const updateUsageBudgetSvc = (
   env: UsageEnv,
-  db: PoolDbType,
-  repo: ScanRepo,
+  db: AppDbType,
+  repo: Pick<ScanRepo, "activeSince">,
   accountId: string,
   userId: string,
   requestedUsd: number | null,

@@ -1,7 +1,7 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { scanRunnerJobs, scans, tenantAnthropicKeys, tenants } from "@repo/db-elise/schema";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { planOfEffect } from "#/modules/billing";
@@ -20,7 +20,7 @@ import type { MonthSpend } from "#/modules/usage/types";
 // estimate they carry is for the person to read, not to be spent.
 // The five reads do not depend on each other and run together.
 // -----
-export const monthSpendEffect = (db: DbConnectType, tenantId: string, monthStart: Date): Effect.Effect<MonthSpend, DbError> =>
+export const monthSpendEffect = (db: AppDbType, tenantId: string, monthStart: Date): Effect.Effect<MonthSpend, DbError> =>
   Effect.gen(function* () {
     const read = Effect.all(
       {
@@ -97,27 +97,27 @@ export const monthSpendEffect = (db: DbConnectType, tenantId: string, monthStart
 
 // -----
 // Set the account's own monthly budget, or null to go back to
-// the platform default. The change and its audit row commit
-// together, so there is no change without a record of who made it.
+// the platform default. The route runs it in its withTenant
+// transaction, so the change and its audit row commit together and
+// there is no change without a record of who made it.
 // -----
-export const setMonthlyBudgetEffect = (db: PoolDbType, tenantId: string, userId: string, budgetUsd: number | null): Effect.Effect<void, DbError> =>
+export const setMonthlyBudgetEffect = (db: AppDbType, tenantId: string, userId: string, budgetUsd: number | null): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
-    try: () =>
-      db.transaction(async (tx) => {
-        const actorPartyId = await actorPartyOf(tx, userId);
-        const [before] = await tx.select({ budget: tenants.monthlyScanBudgetUsd }).from(tenants).where(eq(tenants.id, tenantId));
-        await tx
-          .update(tenants)
-          .set({ monthlyScanBudgetUsd: budgetUsd === null ? null : budgetUsd.toFixed(2) })
-          .where(eq(tenants.id, tenantId));
-        await insertAuditEntry(tx, {
-          actorPartyId,
-          action: "usage.budget.updated",
-          subjectId: tenantId,
-          tenantId,
-          before: { monthlyBudgetUsd: before?.budget == null ? null : Number(before.budget) },
-          after: { monthlyBudgetUsd: budgetUsd },
-        });
-      }),
+    try: async () => {
+      const actorPartyId = await actorPartyOf(db, userId);
+      const [before] = await db.select({ budget: tenants.monthlyScanBudgetUsd }).from(tenants).where(eq(tenants.id, tenantId));
+      await db
+        .update(tenants)
+        .set({ monthlyScanBudgetUsd: budgetUsd === null ? null : budgetUsd.toFixed(2) })
+        .where(eq(tenants.id, tenantId));
+      await insertAuditEntry(db, {
+        actorPartyId,
+        action: "usage.budget.updated",
+        subjectId: tenantId,
+        tenantId,
+        before: { monthlyBudgetUsd: before?.budget == null ? null : Number(before.budget) },
+        after: { monthlyBudgetUsd: budgetUsd },
+      });
+    },
     catch: toDbError,
   });

@@ -10,8 +10,7 @@ const app = new Hono<AppEnv>();
 
 app.get("/", getUsageDoc, zValidator("header", AccountHeaderSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
-  const spend = await c.get("deps").monthSpend(c.env, accountId);
-  const data = await runEffect(getUsageSvc(c.env, c.get("deps").scanRepo(c.env), accountId, spend));
+  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(getUsageSvc(c.env, db, accountId)));
   return c.json({ data, error: null });
 });
 

@@ -1,5 +1,11 @@
+// -----
+// "own" is for a route that answers one record of the caller's
+// Account, not a list: the answer must match the caller's values,
+// which differ from those the guard seeds for the other Account.
+// -----
 export type CrossAccountCase =
   | { kind: "run"; path: string; method?: string; body?: unknown; expect: "not-found" | "empty" }
+  | { kind: "run"; path: string; method?: string; body?: unknown; expect: "own"; own: Record<string, number | null> }
   | { kind: "pending"; ticket: number };
 
 const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket });
@@ -71,13 +77,17 @@ export const CROSS_ACCOUNT_CASES = {
   "POST /scans": pending(82),
   "GET /files": pending(81),
   "GET /repos/:repoId/verdict": pending(81),
-  "GET /usage": pending(77),
-  "PATCH /usage/budget": pending(77),
-  "GET /usage/budget/changes": pending(77),
-  "GET /usage/changes": pending(77),
-  "GET /usage/credit": pending(77),
-  "GET /usage/credit/entries": pending(77),
-  "GET /usage/plan": pending(77),
+  "GET /usage": { kind: "run", path: "/usage", expect: "own", own: { budgetUsd: 20, spentUsd: 0, reservedUsd: 0, remainingUsd: 20, scans: 0 } },
+  "GET /usage/budget/changes": { kind: "run", path: "/usage/budget/changes", expect: "empty" },
+  "GET /usage/changes": { kind: "run", path: "/usage/changes", expect: "empty" },
+  "GET /usage/credit": { kind: "run", path: "/usage/credit", expect: "own", own: { planKey: null, balanceUsd: 0, scans: 0 } },
+  "GET /usage/credit/entries": { kind: "run", path: "/usage/credit/entries", expect: "empty" },
+  "GET /usage/plan": { kind: "run", path: "/usage/plan", expect: "own", own: { plan: null, status: null, scans: 0 } },
+  // -----
+  // After the two change lists: the change writes the caller's own
+  // audit row, which those lists would then show.
+  // -----
+  "PATCH /usage/budget": { kind: "run", path: "/usage/budget", method: "PATCH", body: { monthlyBudgetUsd: null }, expect: "own", own: { budgetUsd: 20, spentUsd: 0, scans: 0 } },
   "GET /team": pending(78),
   "GET /team/roles": pending(78),
   "POST /team/invites": pending(78),

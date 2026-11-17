@@ -4,7 +4,7 @@ import { z } from "zod";
 import { accessAuditLog } from "@repo/db-elise";
 import { partyPersons } from "@repo/db-elise/schema";
 import type { SettingsChange } from "@repo/contracts/elise";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { USAGE_SETTINGS_CHANGES_LIMIT } from "#/modules/usage/constants";
 
@@ -22,7 +22,7 @@ const lastFourOf = (parsed: ReturnType<typeof KeyDetailsSchema.safeParse>): stri
 // the login, or null once that login is gone. A key row holds its
 // last four characters, never the key.
 // -----
-export const settingsChangesEffect = (db: DbConnectType, tenantId: string): Effect.Effect<SettingsChange[], DbError> =>
+export const settingsChangesEffect = (db: AppDbType, tenantId: string): Effect.Effect<SettingsChange[], DbError> =>
   Effect.tryPromise({
     try: async () => {
       const rows = await db

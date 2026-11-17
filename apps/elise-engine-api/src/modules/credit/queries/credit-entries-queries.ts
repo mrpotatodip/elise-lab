@@ -3,7 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 import type { CreditEntries } from "@repo/contracts/elise";
 import { tenantCreditLedger } from "@repo/db-elise/schema";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { roundUsd } from "#/modules/credit/utils";
 
@@ -15,7 +15,7 @@ import { roundUsd } from "#/modules/credit/utils";
 // cursor is the ID of the last entry on the page before; the next
 // page is everything older than it.
 // -----
-export const creditEntriesEffect = (db: DbConnectType, tenantId: string, query: { limit: number; cursor?: string }): Effect.Effect<CreditEntries, DbError> =>
+export const creditEntriesEffect = (db: AppDbType, tenantId: string, query: { limit: number; cursor?: string }): Effect.Effect<CreditEntries, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const hold = alias(tenantCreditLedger, "hold");

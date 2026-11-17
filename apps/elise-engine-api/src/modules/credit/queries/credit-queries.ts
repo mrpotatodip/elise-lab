@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { tenantCreditLedger, tenants } from "@repo/db-elise/schema";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { HoldResult, RenewResult, SettleResult } from "#/modules/credit/types";
 import { renewalGrantOf, roundUsd } from "#/modules/credit/utils";
@@ -17,7 +17,7 @@ const sumOf = (tenantId: string) =>
 // What an Account may spend now: every grant and topup, less every
 // charge and every hold of a running scan.
 // -----
-export const balanceEffect = (db: DbConnectType, tenantId: string): Effect.Effect<number, DbError> =>
+export const balanceEffect = (db: AppDbType, tenantId: string): Effect.Effect<number, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [row] = await db.select({ balance: sumOf(tenantId) }).from(tenants).where(eq(tenants.id, tenantId));

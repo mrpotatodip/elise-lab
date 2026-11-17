@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { platformMasterPlans, tenantSubscriptions } from "@repo/db-elise";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import { balanceEffect } from "#/modules/credit";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { PlanState } from "#/modules/billing/types";
@@ -10,7 +10,7 @@ import type { PlanState } from "#/modules/billing/types";
 // The plan of an Account, or null when it has none, with the
 // Account's credit balance as it stands.
 // -----
-export const planOfEffect = (db: DbConnectType, tenantId: string): Effect.Effect<PlanState | null, DbError> =>
+export const planOfEffect = (db: AppDbType, tenantId: string): Effect.Effect<PlanState | null, DbError> =>
   Effect.gen(function* () {
     const row = yield* Effect.tryPromise({
       try: async () => {
