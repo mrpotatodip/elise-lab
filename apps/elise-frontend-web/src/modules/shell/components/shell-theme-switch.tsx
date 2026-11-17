@@ -37,7 +37,7 @@ export function ShellThemeSwitch({ collapsed = false, tooltipSide = "right" }: S
     <Tooltip>
       <TooltipTrigger
         render={
-          <DialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Theme: ${label}. Change theme`} className="text-muted-foreground" />} />
+          <DialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Theme ${label}. Change theme`} className="text-muted-foreground" />} />
         }
       >
         <Icon strokeWidth={1.5} />
@@ -48,18 +48,11 @@ export function ShellThemeSwitch({ collapsed = false, tooltipSide = "right" }: S
       </TooltipContent>
     </Tooltip>
   ) : (
-    <DialogTrigger
-      render={
-        <button
-          type="button"
-          aria-label={`Theme: ${label}. Change theme`}
-          className="flex h-10 w-full items-center gap-2.5 rounded-lg border bg-muted px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      }
-    >
+    <DialogTrigger className="flex h-10 w-full items-center gap-2.5 rounded-lg border bg-muted px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <Icon aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.5} />
       <span className="min-w-0 flex-1 truncate text-left">Theme</span>
       <span className="text-xs text-foreground">{label}</span>
+      <span className="sr-only">, change theme</span>
     </DialogTrigger>
   );
 

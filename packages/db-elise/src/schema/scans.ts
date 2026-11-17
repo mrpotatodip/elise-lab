@@ -28,6 +28,7 @@ import {
   type FindingSeverityValue,
   type FindingStatusValue,
   type FindingTriageStatusValue,
+  type ProfileMetValue,
   type RepoFindingStateValue,
   type ScanKeySourceValue,
   type ScanStateValue,
@@ -127,6 +128,8 @@ export const scans = pgTable(
     priorsUnchecked: integer("priors_unchecked"),
     // Set with the findings of a succeeded full-skill Scan: true when it ran out of money (a Report that starts with PARTIAL:, or a unit deferred as money_exhausted). Null on a Scan recorded before this column, a lite Scan and a Scan that did not succeed.
     partial: boolean("partial"),
+    // Set with the findings of a succeeded Runner Scan whose profile check ran: the profile it met (quick, standard or deep) or none. Null: not checked (a cloud Scan, a Partial Scan, a Scan that did not succeed, or a row from before this column). Plain text, not a database enum; the agent's own files are what it measures.
+    profileMet: text("profile_met").$type<ProfileMetValue>(),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),

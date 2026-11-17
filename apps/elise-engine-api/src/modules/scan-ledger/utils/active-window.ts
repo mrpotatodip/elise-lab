@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lt, ne, or, type SQL } from "drizzle-orm";
 import { scans } from "@repo/db-elise/schema";
 import type { ScanOptions } from "#/schemas";
-import { SCANS_ACTIVE_FULL_WINDOW_MS, SCANS_ACTIVE_WINDOW_MS } from "#/modules/scans/constants";
+import { SCANS_ACTIVE_FULL_WINDOW_MS, SCANS_ACTIVE_WINDOW_MS } from "#/constants";
 
 // -----
 // How long a queued or running Scan may go without an update and still be

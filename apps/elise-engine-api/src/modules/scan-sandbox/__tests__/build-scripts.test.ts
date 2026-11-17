@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { ScanOptions } from "#/schemas";
-import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox/constants";
-import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt, phaseAgentFiles } from "#/modules/scan-sandbox/utils";
+import { SCAN_SANDBOX_FULL_PHASES, SCAN_SANDBOX_PHASE_SKILL_PHASES } from "#/modules/scan-sandbox/constants";
+import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt, phaseAgentFiles, type PromptPlace } from "#/modules/scan-sandbox/utils";
+
+const RUNNER_PLACE: PromptPlace = { repoDir: "./repo", outDir: "./out", networkRule: "do not use the network", validatedBy: "runner", metered: false };
 
 const options: ScanOptions = { skill: "full", model: "claude-haiku-5-5", effort: "low", profile: "quick", maxBudgetUsd: 1 };
+
+const CRITIC_SENTENCE = "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.";
+const VERIFIER_SENTENCE =
+  "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.";
+const DEEP_CRITIC_SENTENCE =
+  "After each hunter wave, run the critic pass with a separate sub-agent. Record each in `critic_passes` in run-metadata.json. If a critic pass accepts something, hunt another wave. Stop when a critic pass accepts nothing.";
+const DEEP_FINAL_SENTENCE =
+  "Then verify each final record with another separate sub-agent. It must not be the unit's owner or a verifier that checked the unit. Record each in `final_verifiers` in run-metadata.json.";
+const ASKED_SENTENCES = [CRITIC_SENTENCE, VERIFIER_SENTENCE, DEEP_CRITIC_SENTENCE, DEEP_FINAL_SENTENCE];
+
+const sharedLines =(text: string) => text.split("\n").filter((line) => !/^(Target|Output directory|The money|Do not use the network|There is no network)/.test(line));
 
 describe("buildAgentScript", () => {
   it("takes an atomic lock first, so a retry starts no second agent", () => {
@@ -81,17 +94,39 @@ describe("buildAgentPrompt", () => {
   });
 
   it.each([
-    ["recon", "Phase 1 (Reconnaissance)", "This is the first run"],
-    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance"],
-    ["check", "Phases 3, 4 and 5", "Do not hunt again"],
-    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again"],
-  ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff) => {
+    ["recon", "Phase 1 (Reconnaissance)", "This is the first run", { quick: [], standard: [], deep: [] }],
+    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance", { quick: [], standard: [CRITIC_SENTENCE], deep: [DEEP_CRITIC_SENTENCE] }],
+    ["check", "Phases 3, 4 and 5", "Do not hunt again", { quick: [VERIFIER_SENTENCE], standard: [VERIFIER_SENTENCE], deep: [VERIFIER_SENTENCE, DEEP_FINAL_SENTENCE] }],
+    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again", { quick: [], standard: [], deep: [] }],
+  ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff, asked) => {
     const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase);
+
+    const sentencesOf = (profile: ScanOptions["profile"], place?: PromptPlace) =>
+      ASKED_SENTENCES.filter((sentence) => buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence));
+    expect({
+      cloud: { quick: sentencesOf("quick"), standard: sentencesOf("standard"), deep: sentencesOf("deep") },
+      runner: {
+        quick: sentencesOf("quick", RUNNER_PLACE),
+        standard: sentencesOf("standard", RUNNER_PLACE),
+        deep: sentencesOf("deep", RUNNER_PLACE),
+      },
+    }).toEqual({ cloud: asked, runner: asked });
 
     expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
     expect(prompt).toContain(`This run does ${skillPhases}`);
     expect(prompt).toContain(handoff);
     expect(prompt).toContain("Profile: deep");
+
+    const onRunner = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
+    const otherParts = Object.entries(SCAN_SANDBOX_PHASE_SKILL_PHASES).filter(([other]) => other !== phase);
+
+    expect(onRunner).toContain(`This run does ${skillPhases}`);
+    expect(otherParts.filter(([, part]) => onRunner.includes(part))).toEqual([]);
+    expect(onRunner).toContain("so stop when yours is done");
+    expect(onRunner).toContain("./repo");
+    expect(onRunner).not.toMatch(/node command|money|deferred/i);
+    expect(onRunner).not.toMatch(/(do not|never|no|without)\s+(start\s+|use\s+|run\s+|spawn\s+)?sub-?agents?/i);
+    expect(sharedLines(onRunner).slice(0, 5)).toEqual(sharedLines(prompt).slice(0, 5));
   });
 
   it("has only the check and report runs validate, and only the report run write the report files", () => {
@@ -113,7 +148,7 @@ describe("buildAgentPrompt", () => {
 
   it("has the agent run the validators in the container and the app run them on a Runner", () => {
     const full: ScanOptions = { ...options, skill: "full" };
-    const onRunner = buildAgentPrompt(full, { repoDir: "./repo", outDir: "./out", networkRule: "do not use the network", validatedBy: "runner" });
+    const onRunner = buildAgentPrompt(full, RUNNER_PLACE);
 
     expect(buildAgentPrompt(full)).toContain("run the skill's validators");
     expect(onRunner).toContain("Do not run the validators or any node command");

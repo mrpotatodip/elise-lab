@@ -6,12 +6,15 @@ import { NotFound, type DbError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import { ScanOptionsSchema } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { parseAgentUsage } from "#/modules/scan-sandbox/utils";
-import { RUNNER_JOB_BAD_OPTIONS, RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_FOUND } from "#/modules/runners/constants";
+import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox";
+import { RUNNER_JOB_BAD_OPTIONS, RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_FOUND, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { claimRunnerJobEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
 
 // -----
 // The Runner takes the next Scan waiting for it, or gets null.
+// The job carries the single prompt stored with it and, built
+// here from the Scan's stored options, the four Phase prompts: an
+// app that knows Phases runs them, an older one runs the prompt.
 // Asking also records that the Runner is alive, through the
 // authentication that comes before this.
 // A job whose options no longer parse is failed on the spot, so
@@ -49,6 +52,7 @@ export const claimJobSvc = (db: DbConnectType, runnerId: string): Effect.Effect<
       profileCapUsd: SCAN_PROFILE_CAPS_USD[options.value.profile],
       maxBudgetUsd: options.value.maxBudgetUsd,
       prompt: row.prompt,
+      phasePrompts: SCAN_SANDBOX_FULL_PHASES.map((phase) => ({ phase, prompt: buildPhasePrompt(options.value, phase, RUNNER_PROMPT_PLACE) })),
       priorsJson: row.priorsJson,
     };
   });

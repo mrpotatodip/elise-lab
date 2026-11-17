@@ -83,7 +83,7 @@ Before execution, the parent opens and retains trusted, non-inheritable director
 
 For a reproduced check, record the command, exact test input, sandbox limits, and only the allowlisted environment variable names plus safe non-secret values needed to reproduce it. Never capture or copy the ambient environment, inherited variables, credential values, authentication state, or unrelated host paths. Launch from an empty environment rather than trying to redact one after execution.
 
-Before delegation, the parent writes `run-metadata.json` with at least `run_id`, `repo`, `target`, `source_ref`, `profile`, `scope_paths`, `execution_policy: "sandboxed-source-and-local-only"`, selected companion files, prior-run paths, shared-file owners, and `run_status: "in_progress"`. Update metadata only when those facts change; candidate state belongs in the coverage ledger and `findings.json`.
+Before delegation, the parent writes `run-metadata.json` with at least `run_id`, `repo`, `target`, `source_ref`, `profile`, `scope_paths`, `execution_policy: "sandboxed-source-and-local-only"`, selected companion files, prior-run paths, shared-file owners, and `run_status: "in_progress"`. Update metadata only when those facts change; candidate state belongs in the coverage ledger and `findings.json`. Two lists in `run-metadata.json` record work no other file shows: after every coverage-critic pass append `{"wave": <hunter wave it followed>, "accepted": <accepted missing units plus legitimate reassignments>}` to `critic_passes`, and after every Phase 5 verifier append `{"fingerprint": "<record>", "agent_id": "<verifier>"}` to `final_verifiers`.
 
 ## Full audit planning
 
@@ -171,7 +171,7 @@ In full audit mode, follow all six phases in order:
 5. **Independent record verification** — use fresh agents to verify final source claims and reconcile corrections or state changes.
 6. **Target-neutral report** — derive `REPORT.md`, `FINDINGS-DETAIL.md`, and `NEEDS-VALIDATION.md` from the final records, with no live-probe instructions.
 
-Do not end the run before one of exactly two terminal states: (a) all Phase 6 artifacts are written and both validators pass, or (b) `run_status: "incomplete"` is recorded with its exact reason and the gap is disclosed in the report. Never stop mid-phase.
+Do not end the run before one of exactly two terminal states: (a) all Phase 6 artifacts are written and both validators pass, or (b) `run_status: "incomplete"` is recorded with its exact reason and the gap is disclosed in the report: `money_exhausted` when money ran out (the report starts with the `PARTIAL:` line above), or `verification_unavailable` when a required fresh verifier or critic could not run for any other reason (the report says so in one plain sentence, never on a `PARTIAL:` line, and `money_exhausted` is never used for it). Never stop mid-phase.
 
 ## Anti-patterns
 

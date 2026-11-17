@@ -19,7 +19,7 @@ export const commitEvidenceEffect = (db: DbConnectType, tenantId: string, repoId
   Effect.tryPromise({
     try: async () => {
       const scanRows = await db
-        .select({ id: scans.id, createdAt: scans.createdAt, skill: scans.skill, profile: scans.profile, partial: scans.partial, priorsGiven: scans.priorsGiven, priorsUnchecked: scans.priorsUnchecked })
+        .select({ id: scans.id, createdAt: scans.createdAt, skill: scans.skill, profile: scans.profile, partial: scans.partial, profileMet: scans.profileMet, priorsGiven: scans.priorsGiven, priorsUnchecked: scans.priorsUnchecked })
         .from(scans)
         .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), eq(scans.commitSha, commit), eq(scans.status, "succeeded")))
         .orderBy(desc(scans.createdAt))

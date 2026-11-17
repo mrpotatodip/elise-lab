@@ -8,8 +8,8 @@ import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
 import { listPriorsEffect, recordScanSvc, SCAN_RECORDS_PRIOR_LIMIT, type PriorFinding } from "#/modules/scan-records";
 import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox";
-import { SCAN_WORKFLOW_FULL_MAX_POLLS } from "#/modules/scan-workflow/constants";
 import type { Bindings } from "#/types/variables";
+import { maxPollsOf } from "./max-polls";
 import { runScan } from "./run-scan";
 import { settleScanCredit } from "./settle-scan-credit";
 
@@ -51,7 +51,7 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
   async run(event: WorkflowEvent<ScanParams>, step: WorkflowStep) {
     return runScan(
       {
-        maxPolls: SCAN_WORKFLOW_FULL_MAX_POLLS,
+        maxPolls: maxPollsOf(event.payload.runnerId),
         phases: event.payload.runnerId ? undefined : SCAN_SANDBOX_FULL_PHASES,
         sandbox: event.payload.runnerId ? runnerSandbox(dbConnect(this.env.DATABASE_URL), event.payload, event.payload.runnerId) : this.env.SANDBOX_FULL.getByName(event.payload.scanId),
         ledger: neonScanRepo(dbConnect(this.env.DATABASE_URL)),

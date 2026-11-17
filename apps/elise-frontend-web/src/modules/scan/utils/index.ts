@@ -2,6 +2,7 @@ export * from "./scan-activity";
 export * from "./scan-branch-scans";
 export * from "./scan-finding-prompt";
 export * from "./scan-plan-summary";
+export * from "./scan-profile-note";
 export * from "./scan-repo-name";
 export * from "./scan-repo-picks";
 export * from "./scan-sidebar";

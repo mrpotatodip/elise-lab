@@ -1,6 +1,6 @@
 import { Suspense, useState } from "react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { FileText, LoaderCircle, OctagonX } from "lucide-react";
+import { CircleAlert, FileText, LoaderCircle, OctagonX } from "lucide-react";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { SkeletonBar } from "#/components/ui/skeleton";
@@ -10,7 +10,7 @@ import { ShellPageHeader } from "#/modules/shell";
 import { SCAN_STEP_COPY } from "../constants";
 import { scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
 import type { ScanStatus } from "../schemas";
-import { scanBytes, scanCost, scanFailure, scanPlural, scanRepoName } from "../utils";
+import { scanBytes, scanCost, scanFailure, scanPlural, scanProfileNote, scanRepoName } from "../utils";
 import { ScanBranchScans } from "./scan-branch-scans";
 import { ScanChangeAlerts } from "./scan-change-alerts";
 import { ScanDiffSkeleton, ScanFindingsTableSkeleton } from "./scan-detail-skeleton";
@@ -70,7 +70,19 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
         <LoaderCircle className="animate-spin" />
         <div className="grid gap-1">
           <AlertDescription className="font-medium">{scan.status === "queued" ? "Waiting for a free slot to start." : (step?.label ?? "Scanning.")}</AlertDescription>
-          <AlertDescription>{step?.note ?? "A scan usually takes a few minutes."} This page updates by itself. You can leave and come back.</AlertDescription>
+          <AlertDescription className="max-w-copy">{step?.note ?? "A scan usually takes a few minutes."} This page updates by itself. You can leave and come back.</AlertDescription>
+        </div>
+      </Alert>
+    );
+  }
+  const note = scan.status === "succeeded" ? scanProfileNote(scan.profile, scan.profileMet) : null;
+  if (note) {
+    return (
+      <Alert variant="warning">
+        <CircleAlert />
+        <div className="grid gap-1">
+          <AlertDescription className="font-medium">{note.title}</AlertDescription>
+          <AlertDescription>{note.detail}</AlertDescription>
         </div>
       </Alert>
     );

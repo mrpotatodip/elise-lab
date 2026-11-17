@@ -277,6 +277,7 @@ describe("a profile scan (the full skill)", () => {
 });
 
 const ledger = (...units: Array<{ status: string; unresolved: string[] }>) => JSON.stringify(units);
+const metadata = (fields: Record<string, string>) => JSON.stringify({ run_id: "r1", profile: "deep", ...fields });
 
 describe("the partial rule", () => {
   it.each([
@@ -287,6 +288,11 @@ describe("the partial rule", () => {
     ["PARTIAL: is not on the first line", { "REPORT.md": "# Report\nPARTIAL: later" }, false],
     ["an unvalidated candidate is kept as a candidate unit with money_exhausted", { "REPORT.md": "# Report", "coverage-ledger.json": ledger({ status: "candidate", unresolved: ["money_exhausted"] }) }, true],
     ["a blank line comes before PARTIAL:", { "REPORT.md": "\n\nPARTIAL: money ran out; 1 unit was not covered." }, true],
+    ["the agent wrote its own PARTIAL: line for something it could not verify", { "REPORT.md": "PARTIAL: I could not verify the findings.\n\n- F-001" }, false],
+    ["the agent wrote its own PARTIAL: line and its metadata says verification was unavailable", { "REPORT.md": "PARTIAL: no node command.", "run-metadata.json": metadata({ run_status: "incomplete", incomplete_reason: "verification_unavailable" }) }, false],
+    ["run-metadata.json says the money ran out", { "REPORT.md": "# Report", "run-metadata.json": metadata({ run_status: "incomplete", incomplete_reason: "money_exhausted" }) }, true],
+    ["run-metadata.json says a run completed", { "REPORT.md": "# Report", "run-metadata.json": metadata({ run_status: "complete" }) }, false],
+    ["run-metadata.json cannot be read", { "REPORT.md": "# Report", "run-metadata.json": "{ not json" }, false],
   ])("a succeeded scan is partial when %s: %j", async (_name, files, expected) => {
     const record = await recordFull({ "findings.json": "[]", ...files });
 

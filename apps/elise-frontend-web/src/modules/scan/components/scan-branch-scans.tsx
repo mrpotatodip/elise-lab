@@ -8,7 +8,7 @@ import { DataTable } from "#/components/ui/data-table";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { scanRepoBranchesQuery } from "../hooks";
 import type { ScanStatus } from "../schemas";
-import { scanBranchScans, scanFailure, scanPlural } from "../utils";
+import { scanBranchScans, scanFailure, scanNoSummaryText, scanPlural } from "../utils";
 import { ScanSeverityDots } from "./scan-severity-dots";
 import { ScanStatusBadge } from "./scan-status-badge";
 import { ScanTime } from "./scan-time";
@@ -57,7 +57,7 @@ const columns = column.columns([
         );
       }
       if (item.status === "failed") return <span className="text-sm text-status-danger">{scanFailure(item.error).title}</span>;
-      return <span className="text-muted-foreground">{item.status === "succeeded" ? "Not recorded" : "No report"}</span>;
+      return <span className="text-muted-foreground">{scanNoSummaryText(item.status)}</span>;
     },
   }),
   column.display({

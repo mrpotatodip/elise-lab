@@ -1,11 +1,12 @@
 import { Effect } from "effect";
-import type { ScanUsage } from "@repo/contracts/elise";
+import type { ProfileMetValue, ScanUsage } from "@repo/contracts/elise";
 import { toExternalError, toParseError, type ExternalError, type ParseError } from "#/lib/effect-query";
 import type { ScanParams, ScanState } from "#/schemas";
 import { readScanFileEffect, scanKey } from "#/modules/scan-store";
 import {
   SCAN_RECORDS_FINDINGS_FILE,
   SCAN_RECORDS_LEDGER_FILE,
+  SCAN_RECORDS_METADATA_FILE,
   SCAN_RECORDS_PROFILE_SKILL,
   SCAN_RECORDS_RECHECK_FILE,
   SCAN_RECORDS_RECORDED_SKILL,
@@ -13,7 +14,7 @@ import {
 } from "#/modules/scan-records/constants";
 import { FullFindingsSchema, LiteFindingsSchema, RecheckSchema, type FullFinding, type LiteFinding, type Recheck } from "#/modules/scan-records/schemas";
 import type { HistoryContext, NewFindingRow, PlannedFinding, ScanBranch, ScanRecord } from "#/modules/scan-records/types";
-import { fingerprintOf, fullFindingRowOf, isPartialScan, planHistory } from "#/modules/scan-records/utils";
+import { checkRunnerProfile, fingerprintOf, fullFindingRowOf, isPartialScan, planHistory, profileMetOf } from "#/modules/scan-records/utils";
 
 const NO_HISTORY: HistoryContext = { history: new Map(), triage: new Map(), given: [] };
 
@@ -45,10 +46,14 @@ const readText = (reports: R2Bucket, params: ScanParams, file: string): Effect.E
 // A succeeded full Scan: the nested records, one row for each
 // confirmed or needs_validation one (the skill's validator
 // gives each fingerprint one record; a repeat is dropped so
-// the unique index cannot fail the whole record), and whether
-// money ran out.
+// the unique index cannot fail the whole record), whether
+// money ran out, and, for a Scan that ran on a Runner, the
+// profile it met (null for a cloud Scan and a Partial Scan).
 // -----
-const readProfileScan = (reports: R2Bucket, params: ScanParams): Effect.Effect<{ findings: NewFindingRow[]; partial: boolean }, ExternalError | ParseError> =>
+const readProfileScan = (
+  reports: R2Bucket,
+  params: ScanParams,
+): Effect.Effect<{ findings: NewFindingRow[]; partial: boolean; profileMet: ProfileMetValue | null }, ExternalError | ParseError> =>
   Effect.gen(function* () {
     const findingsText = yield* readText(reports, params, SCAN_RECORDS_FINDINGS_FILE);
     const records = findingsText === null ? [] : yield* Effect.try({ try: () => FullFindingsSchema.parse(JSON.parse(findingsText)), catch: toParseError });
@@ -57,7 +62,9 @@ const readProfileScan = (reports: R2Bucket, params: ScanParams): Effect.Effect<{
     const findings = yield* Effect.tryPromise({ try: () => Promise.all([...kept.values()].map((record) => fullFindingRowOf(record, params))), catch: toExternalError });
     const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE);
     const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE);
-    return { findings, partial: isPartialScan(report, ledger) };
+    const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE);
+    const check = params.runnerId ? checkRunnerProfile(params.options.profile, { report, ledger, metadata, findings: findingsText }) : null;
+    return { findings, partial: isPartialScan(report, ledger, metadata), profileMet: profileMetOf(params.options.profile, check) };
   });
 
 // -----
@@ -147,6 +154,7 @@ export const buildScanRecordSvc = (
         priorsClosed: movesHistory ? plan.tally.closed : null,
         priorsUnchecked: movesHistory ? plan.tally.unchecked : null,
         partial: profile?.partial ?? null,
+        profileMet: profile?.profileMet ?? null,
         status,
         skill: params.options.skill,
         model: params.options.model,

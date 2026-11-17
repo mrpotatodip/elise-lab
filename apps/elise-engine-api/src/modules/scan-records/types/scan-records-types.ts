@@ -1,6 +1,7 @@
 import type { scanFindings, scanRepoFindings, scans } from "@repo/db-elise/schema";
-import type { FindingOriginValue, FindingSeverityValue, FindingStatusValue, FindingTriageStatusValue } from "@repo/contracts/elise";
-import type { LiteFinding, Recheck } from "#/modules/scan-records/schemas";
+import type { FindingOriginValue, FindingSeverityValue, FindingStatusValue, FindingTriageStatusValue, SCAN_PROFILES } from "@repo/contracts/elise";
+import type { SCAN_RECORDS_PROFILE_CHECK_FILES, SCAN_RECORDS_PROFILE_CHECK_ROW_IDS } from "#/modules/scan-records/constants";
+import type { LiteFinding, ProfileCheckFinding, ProfileCheckMetadata, ProfileCheckUnit, Recheck } from "#/modules/scan-records/schemas";
 import type { Bindings } from "#/types/variables";
 
 // -----
@@ -64,3 +65,31 @@ export type PlanInput = {
 };
 
 export type HistoryContext = Pick<PlanInput, "history" | "triage" | "given">;
+
+// -----
+// Profile check: the table of what each profile requires, what a
+// check reads of a Runner Scan and what it says
+// -----
+export type ScanProfile = (typeof SCAN_PROFILES)[number];
+export type ProfileCheckRowId = (typeof SCAN_RECORDS_PROFILE_CHECK_ROW_IDS)[number];
+export type ProfileCheckRow = {
+  id: ProfileCheckRowId;
+  profile: ScanProfile;
+  requirement: string;
+  file: (typeof SCAN_RECORDS_PROFILE_CHECK_FILES)[number];
+  field: string;
+  needsSkillChange: boolean;
+};
+export type ProfileCheck = { result: "met" } | { result: "lesser"; profile: ScanProfile } | { result: "unmet" };
+export type ProfileCheckFiles = {
+  report: string | null;
+  ledger: string | null;
+  metadata: string | null;
+  findings: string | null;
+};
+export type ProfileCheckFacts = {
+  units: ProfileCheckUnit[];
+  metadata: ProfileCheckMetadata;
+  findings: ProfileCheckFinding[];
+  maxWave: number;
+};

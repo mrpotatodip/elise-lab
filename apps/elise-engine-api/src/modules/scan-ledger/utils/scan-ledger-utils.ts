@@ -21,6 +21,7 @@ export const scanRowToStatus = (row: ScanRow, artifacts: ScanArtifact[], summary
   branch: row.branch,
   branchId: row.branchId,
   untrackedReason: row.untrackedReason,
+  profileMet: row.profileMet,
   skill: row.skill,
   model: row.model,
   effort: row.effort,

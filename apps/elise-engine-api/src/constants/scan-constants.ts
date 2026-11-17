@@ -29,3 +29,13 @@ export const SCAN_REPORT_FILES = [
   "run-metadata.json",
 ] as const;
 export const SCAN_SERVABLE_FILES = SCAN_REPORT_FILES;
+
+// -----
+// How long a Scan may go without a status change and still count as
+// running. A full Scan gets 130 minutes: its 90 minutes of audit
+// (SCAN_WORKFLOW_FULL_MAX_POLLS) plus the clone, the launch and the
+// save around it. A shorter window would count a live full Scan as
+// stalled and let a newer request close it.
+// -----
+export const SCANS_ACTIVE_WINDOW_MS = 90 * 60 * 1000;
+export const SCANS_ACTIVE_FULL_WINDOW_MS = 130 * 60 * 1000;

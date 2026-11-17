@@ -14,6 +14,7 @@ export * from "./scan-diff-card";
 export * from "./scan-list";
 export * from "./scan-list-skeleton";
 export * from "./scan-origin";
+export * from "./scan-profile-badge";
 export * from "./scan-new-dialog";
 export * from "./scan-status-badge";
 export * from "./scan-summary";

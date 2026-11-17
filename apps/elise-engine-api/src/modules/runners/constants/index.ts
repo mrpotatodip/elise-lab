@@ -39,6 +39,7 @@ export const RUNNER_PROMPT_PLACE = {
   outDir: "./out",
   networkRule: "do not use the network",
   validatedBy: "runner",
+  metered: false,
 } as const;
 export const RUNNER_JOB_NOT_FOUND = "This scan is not waiting for a report from this runner";
 export const RUNNER_JOB_PRIVATE = "A private repository can't run on a runner yet. Run it in EliseLAB's cloud.";

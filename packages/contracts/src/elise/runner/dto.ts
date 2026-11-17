@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RUNNER_JOB_ERROR_MAX, RUNNER_JOB_FILE_MAX, RUNNER_JOB_LOG_MAX, RUNNER_NAME_MAX, RUNNER_PAIRING_CODE_MAX } from "../constants";
+import { RUNNER_JOB_PHASE_VALUES } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 
 export const RunnerIdSchema = z.uuid();
@@ -72,7 +73,17 @@ export const RunnerRemovedSchema = z.object({
 // full Skill. Both are optional: an old Worker sends neither, and an
 // old app ignores them. maxBudgetUsd stays the Runner's own ceiling,
 // and the Runner takes no credit.
+// phasePrompts are the four Phase prompts in order, each with its Phase
+// name, built for a Runner's place when the job is claimed. An app that
+// knows Phases runs them one after the other; an older app ignores the
+// field and runs prompt. Optional: an older Worker sends none, and then
+// a newer app runs prompt.
 // -----
+export const RunnerPhasePromptSchema = z.object({
+  phase: z.enum(RUNNER_JOB_PHASE_VALUES),
+  prompt: z.string(),
+});
+
 export const RunnerJobSchema = z.object({
   scanId: z.string(),
   repo: z.string(),
@@ -84,6 +95,7 @@ export const RunnerJobSchema = z.object({
   profileCapUsd: z.number().positive().optional(),
   maxBudgetUsd: z.number().positive(),
   prompt: z.string(),
+  phasePrompts: z.array(RunnerPhasePromptSchema).optional(),
   priorsJson: z.string(),
 });
 
@@ -117,7 +129,7 @@ export const RunnerJobReportedSchema = z.object({
   accepted: z.literal(true),
 });
 
-export type CreateRunnerBody =z.infer<typeof CreateRunnerBodySchema>;
+export type CreateRunnerBody = z.infer<typeof CreateRunnerBodySchema>;
 export type EnrollRunnerBody = z.infer<typeof EnrollRunnerBodySchema>;
 export type CreatedRunner = z.infer<typeof CreatedRunnerSchema>;
 export type RunnerIdentity = z.infer<typeof RunnerIdentitySchema>;
@@ -125,5 +137,6 @@ export type EnrolledRunner = z.infer<typeof EnrolledRunnerSchema>;
 export type RunnerState = z.infer<typeof RunnerStateSchema>;
 export type Runner = z.infer<typeof RunnerSchema>;
 export type Runners = z.infer<typeof RunnersSchema>;
+export type RunnerPhasePrompt = z.infer<typeof RunnerPhasePromptSchema>;
 export type RunnerJob = z.infer<typeof RunnerJobSchema>;
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;

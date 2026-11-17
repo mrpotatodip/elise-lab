@@ -192,7 +192,7 @@ function verdictChecks(verdict: Verdict): Check[] {
   return [
     {
       label: `Scans of this commit that add up to ${scans.required}`,
-      detail: missing === 0 ? `The scans of this commit add up to ${scans.counted}.` : `${scans.counted} of ${scans.required} so far. Run ${scanPlural(verdictScansToRun(missing), "more scan", "more scans")} of this exact commit. A Focused scan counts 0.5, a Balanced or Exhaustive scan counts 1, and a scan that ran out of money counts 0. Only finished scans count.`,
+      detail: missing === 0 ? `The scans of this commit add up to ${scans.counted}.` : `${scans.counted} of ${scans.required} so far. Run ${scanPlural(verdictScansToRun(missing), "more scan", "more scans")} of this exact commit. Each finished scan counts 1, but a scan that ran out of money or did none of the work it asked for counts 0.`,
       state: missing === 0 ? "ok" : "wait",
     },
     {

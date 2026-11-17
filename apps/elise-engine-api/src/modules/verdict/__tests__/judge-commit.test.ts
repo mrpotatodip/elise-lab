@@ -12,6 +12,7 @@ const scan = (id: string, day: number, overrides: Partial<JudgedScan> = {}): Jud
   skill: "lite",
   profile: "quick",
   partial: null,
+  profileMet: null,
   priorsGiven: 0,
   priorsUnchecked: 0,
   ...overrides,
