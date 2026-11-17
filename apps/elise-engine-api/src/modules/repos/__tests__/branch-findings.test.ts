@@ -211,6 +211,7 @@ describe("a Branch's findings are the merge of its Scans", () => {
       ["problem b", false],
     ]);
     expect((await mainBranch())?.open).toMatchObject({ total: 2, unchecked: 0 });
+    expect(await mainBranch()).toMatchObject({ latestScanId: ownId("s2"), fullScanId: ownId("s1") });
   });
 
   it("gives the same open count on the Branch, on the repository list and in the list itself", async () => {

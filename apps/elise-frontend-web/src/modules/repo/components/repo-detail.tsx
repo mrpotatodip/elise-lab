@@ -22,7 +22,7 @@ import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatus
 import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
-import { repoEmptyCopy, repoName, repoUntrackedCopy, type FindingFilter } from "../utils";
+import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
 
@@ -61,7 +61,7 @@ function SheetFact({ label, children }: { label: string; children: React.ReactNo
 
 const fixedOnOf = (finding: RepoFinding, history: readonly ScanStatus[]) => history.find((scan) => scan.scanId === finding.fixedInScanId)?.createdAt ?? null;
 
-function RepoFindingFacts({ finding, history }: { finding: RepoFinding; history: readonly ScanStatus[] }) {
+function RepoFindingFacts({ finding, history, fullScanId }: { finding: RepoFinding; history: readonly ScanStatus[]; fullScanId: string | null | undefined }) {
   return (
     <>
       <SheetFact label="First seen in">
@@ -75,7 +75,17 @@ function RepoFindingFacts({ finding, history }: { finding: RepoFinding; history:
           <ScanLink scanId={finding.fixedInScanId} history={history} />
         </SheetFact>
       )}
-      {finding.unchecked && <SheetFact label="Latest scan">This problem is not in the latest scan. It stays open until a person decides it.</SheetFact>}
+      {finding.unchecked && (
+        <SheetFact label="Latest full scan">
+          {fullScanId ? (
+            <>
+              Not in the latest full scan, <ScanLink scanId={fullScanId} history={history} />. It stays open until a person decides it.
+            </>
+          ) : (
+            "This problem is not in the latest full scan. It stays open until a person decides it."
+          )}
+        </SheetFact>
+      )}
       {finding.possibleDuplicateOf && <SheetFact label="Possible duplicate">It may repeat another finding in this repository.</SheetFact>}
     </>
   );
@@ -115,7 +125,7 @@ const titleColumn = findingColumn.display({
       >
         {row.original.finding.title}
       </button>
-      {row.original.finding.unchecked && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Not in the latest scan</p>}
+      {row.original.finding.unchecked && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Not in the latest full scan</p>}
       <p className="relative z-10 mt-1 flex flex-wrap gap-x-3 text-sm leading-relaxed text-muted-foreground">
         {row.original.finding.firstSeenScanId === row.original.finding.scanId ? (
           <span>
@@ -185,7 +195,9 @@ const openColumn = findingColumn.display({
 const findingColumnsWithStatus = findingColumn.columns([severityColumn, titleColumn, statusColumn, whereColumn, decisionColumn, openColumn]);
 const findingColumnsWithoutStatus = findingColumn.columns([severityColumn, titleColumn, whereColumn, decisionColumn, openColumn]);
 
-type RecentScanRow = ScanStatus & { oneOff: boolean };
+type RecentScanRow = ScanStatus & { oneOff: boolean; notFull: boolean };
+
+const NOT_FULL_COPY = "It did not run as a full audit, so it does not count toward the commit's answer or decide what is in the latest full scan.";
 
 const scanColumn = dataTableColumns<RecentScanRow>();
 
@@ -223,6 +235,12 @@ const recentScanColumns = scanColumn.columns([
             <ScanSeverityDots counts={scan.summary.severity} />
             {unratedOf(scan.summary) > 0 && <span className="text-xs text-muted-foreground">{unratedOf(scan.summary)} unrated</span>}
             {scan.summary.new > 0 && <span className="text-xs text-muted-foreground">{scan.summary.new} new</span>}
+            {scan.notFull && (
+              <Badge variant="outline" title={NOT_FULL_COPY}>
+                Not a full scan
+                <span className="sr-only">. {NOT_FULL_COPY}</span>
+              </Badge>
+            )}
           </span>
         );
       }
@@ -238,7 +256,14 @@ const recentScanColumns = scanColumn.columns([
   }),
 ]);
 
-function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[]; openTotal: number }) {
+// -----
+// The card takes focus (tabIndex -1) when "Review N problems"
+// jumps to it, so the next Tab starts in the list, not at the
+// top of the page.
+// -----
+type RepoFindingsProps ={ repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[]; openTotal: number; fullScanId: string | null | undefined };
+
+function RepoFindings({ repoId, branch, commit, history, openTotal, fullScanId }: RepoFindingsProps) {
   const blockers = useVerdictBlockers(repoId, commit);
   const queryClient = useQueryClient();
   const findingsOptions = repoFindingsQuery(repoId, { branch });
@@ -263,10 +288,9 @@ function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: 
   const table = useTable({ features: dataTableFeatures, columns: showStatus ? findingColumnsWithStatus : findingColumnsWithoutStatus, data: rows, getRowId: (row) => row.finding.id });
 
   return (
-    <Card id="branch-findings" className="scroll-mt-20">
-      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-7">
+    <Card id="branch-findings" tabIndex={-1} aria-labelledby="branch-findings-title" className="scroll-mt-20 outline-none">      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-7">
         <div className="grid max-w-xl gap-1.5">
-          <CardTitle>Findings on this branch</CardTitle>
+          <CardTitle id="branch-findings-title">Findings on this branch</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {FILTER_COPY[filter].note}
             {findings.length > 0 ? (filter === "action" ? " Select a row for the impact, evidence and fix, and record your decision." : " Select a row to read the impact, evidence and fix.") : ""}
@@ -336,7 +360,7 @@ function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: 
         selected={selectedFinding ? selected : undefined}
         onSelect={setSelected}
         status={selectedFinding && <FindingStatusBanner state={selectedFinding.state} triage={selectedFinding.triage} fixedOn={fixedOnOf(selectedFinding, history)} />}
-        facts={selectedFinding && <RepoFindingFacts finding={selectedFinding} history={history} />}
+        facts={selectedFinding && <RepoFindingFacts finding={selectedFinding} history={history} fullScanId={fullScanId} />}
         decision={
           selectedFinding &&
           (selectedFinding.state === "fixed_by_code" ? (
@@ -383,7 +407,9 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
   const olderScans = branchScans.length - recentScans.length;
   const newestScan = branchScans[0];
   const github = repo.url.replace(/\.git$/, "").replace(/\/$/, "");
-  const recentRows = recentScans.map((scan) => ({ ...scan, oneOff: Boolean(current && !scan.branchId && scan.commitSha) }));
+  const notFull = current ? repoNotFullScanIds(current, branchScans) : new Set<string>();
+  const fullScan = current?.fullScanId ? branchScans.find((scan) => scan.scanId === current.fullScanId) : undefined;
+  const recentRows = recentScans.map((scan) => ({ ...scan, oneOff: Boolean(current && !scan.branchId && scan.commitSha), notFull: notFull.has(scan.scanId) }));
   const recentTable = useTable({ features: dataTableFeatures, columns: recentScanColumns, data: recentRows, getRowId: (scan) => scan.scanId });
 
   return (
@@ -421,7 +447,22 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                     <ScanStatusBadge status={newestScan.status} />
                     <span>
                       Last scan <ScanTime value={newestScan.createdAt} />
+                      {notFull.has(newestScan.scanId) && " (not a full scan)"}
                     </span>
+                    {notFull.has(newestScan.scanId) && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {fullScan ? (
+                            <>
+                              Latest full scan <ScanTime value={fullScan.createdAt} />
+                            </>
+                          ) : (
+                            "No full scan yet"
+                          )}
+                        </span>
+                      </>
+                    )}
                   </>
                 ) : (
                   <span>Never scanned</span>
@@ -474,14 +515,14 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <Alert variant="warning">
           <CircleAlert />
           <AlertDescription>
-            <span className="font-medium">{scanPlural(open.unchecked, "open problem was", "open problems were")} not in the latest scan.</span> No scan closes a problem, so {open.unchecked === 1 ? "it stays" : "they stay"} open until a person decides {open.unchecked === 1 ? "it" : "them"}.
+            <span className="font-medium">{scanPlural(open.unchecked, "open problem was", "open problems were")} not in the latest full scan.</span> No scan closes a problem, so {open.unchecked === 1 ? "it stays" : "they stay"} open until a person decides {open.unchecked === 1 ? "it" : "them"}.
           </AlertDescription>
         </Alert>
       )}
 
       {current ? (
         <Suspense key={current.name} fallback={<RepoFindingsSkeleton />}>
-          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} openTotal={open.total} />
+          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} openTotal={open.total} fullScanId={current.fullScanId} />
         </Suspense>
       ) : (
         <Card>

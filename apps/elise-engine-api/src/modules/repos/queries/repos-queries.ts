@@ -277,9 +277,10 @@ export const getRepoEffect = (db: DbConnectType, tenantId: string, repoId: strin
   );
 
 // -----
-// A repo's branches, each with what is open on it and the commit
-// of its newest succeeded lite scan: the commit to ask a verdict
-// about.
+// A repo's branches, each with what is open on it, the commit
+// of its newest succeeded scan (the commit to ask a verdict
+// about) and its latest full Scan, from the same tips the merge
+// measures "not in the latest full scan" against.
 // -----
 export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repoId: string): Effect.Effect<RepoBranch[], DbError> =>
   Effect.gen(function* () {
@@ -305,6 +306,11 @@ export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repo
           .orderBy(scans.branchId, desc(scans.createdAt), desc(scans.id)),
       catch: toDbError,
     });
+    const tips = branchTips(db, tenantId, { repoId });
+    const fullScans = yield* Effect.tryPromise({
+      try: () => db.select({ branchId: tips.branchId, scanId: tips.scanId }).from(tips),
+      catch: toDbError,
+    });
     const findings = yield* repoOpenCountRowsEffect(db, tenantId, { repoId });
     const defaultBranch = effectiveDefaultBranch(repo?.defaultBranch ?? null, rows.map((branch) => branch.name));
     return rows.map((branch) => {
@@ -317,6 +323,7 @@ export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repo
         latestScanId: last?.id ?? null,
         latestCommit: last?.commitSha ?? null,
         latestScanAt: last?.createdAt.toISOString() ?? null,
+        fullScanId: fullScans.find((row) => row.branchId === branch.id)?.scanId ?? null,
       };
     });
   });
