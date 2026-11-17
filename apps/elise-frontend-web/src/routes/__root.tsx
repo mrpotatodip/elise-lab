@@ -2,7 +2,7 @@ import { HeadContent, Scripts, createRootRouteWithContext } from "@tanstack/reac
 import type { QueryClient } from "@tanstack/react-query";
 import { Toaster } from "#/components/ui/sonner";
 import { sessionQuery, type SessionUser } from "#/modules/auth";
-import { themeInitScript } from "#/modules/shell/hooks/use-theme";
+import { themeInitScript } from "#/modules/shell";
 import appCss from "../styles/globals.css?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient; user: SessionUser | null }>()({

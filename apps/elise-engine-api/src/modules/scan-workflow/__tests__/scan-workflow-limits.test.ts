@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SCANS_ACTIVE_FULL_WINDOW_MS } from "#/constants";
 import { SCAN_WORKFLOW_FULL_MAX_POLLS, SCAN_WORKFLOW_FULL_PHASE_MINUTES, SCAN_WORKFLOW_POLL_SECONDS } from "#/modules/scan-workflow/constants";
-import { maxPollsOf } from "#/modules/scan-workflow/lib/max-polls";
+import { maxPollsOf } from "#/modules/scan-workflow/lib";
 
 const minutesOf = (polls: number) => (polls * SCAN_WORKFLOW_POLL_SECONDS) / 60;
 

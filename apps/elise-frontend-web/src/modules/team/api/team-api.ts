@@ -65,11 +65,13 @@ export const removeGroupMember = createServerFn({ method: "POST" })
 // Accepting sends the session token only when there is one, so a person who
 // already has a login joins as themselves.
 // -----
-export const previewTeamInvite = createServerFn({ method: "GET" })
+// oxlint-disable-next-line anti-slop/require-server-fn-session -- an invite link opens before sign-in
+export const previewTeamInvite =createServerFn({ method: "GET" })
   .validator(InviteTokenInputSchema)
   .handler(async ({ data }) => engineJson(TeamInvitePreviewSchema, `/team/invites/${encodeURIComponent(data.token)}`));
 
-export const acceptTeamInvite = createServerFn({ method: "POST" })
+// oxlint-disable-next-line anti-slop/require-server-fn-session -- passes the session cookie only when there is one
+export const acceptTeamInvite =createServerFn({ method: "POST" })
   .validator(AcceptInviteInputSchema)
   .handler(async ({ data: { token, ...body } }) =>
     engineJson(AcceptedTeamInviteSchema, `/team/invites/${encodeURIComponent(token)}/accept`, jsonPost(JSON.stringify(body)), { token: getCookie("elise_session") }),

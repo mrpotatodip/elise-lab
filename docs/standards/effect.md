@@ -218,3 +218,5 @@ Never call `Effect.run*` anywhere else. `runEffect` maps typed failures to `AppE
 | `require-try-promise-catch` | Effect 2.2 |
 | `no-throw-in-effect-gen` | Effect 2.3 |
 | `no-effect-catch-all` | Effect 3.5 |
+| `require-return-yield-error` | Effect 3.4 |
+| `require-tagged-error-name` | Effect 3.1 |

@@ -1,12 +1,15 @@
 import { z } from "zod";
-import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS } from "#/constants";
+import { ScanOptionsSchema as ContractScanOptionsSchema } from "@repo/contracts/elise";
+import { SCAN_MODELS } from "#/constants";
+import { documentFields } from "#/lib/document-fields";
 
-export const ScanOptionsSchema = z.object({
-  skill: z.enum(SCAN_SKILLS).meta({ example: "lite" }),
+export const ScanOptionsSchema = documentFields(ContractScanOptionsSchema, {
+  skill: { example: "lite" },
+  effort: { example: "low" },
+  profile: { example: "quick" },
+  maxBudgetUsd: { example: 1 },
+}).extend({
   model: z.enum(SCAN_MODELS).meta({ example: "claude-haiku-5-5" }),
-  effort: z.enum(SCAN_EFFORTS).meta({ example: "low" }),
-  profile: z.enum(SCAN_PROFILES).meta({ example: "quick" }),
-  maxBudgetUsd: z.number().positive().meta({ example: 1 }),
 });
 
 export type ScanOptions = z.infer<typeof ScanOptionsSchema>;
