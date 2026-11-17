@@ -209,7 +209,7 @@ export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repo
         db
           .selectDistinctOn([scans.branchId], { branchId: scans.branchId, id: scans.id, commitSha: scans.commitSha, createdAt: scans.createdAt })
           .from(scans)
-          .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), eq(scans.status, "succeeded"), eq(scans.skill, "lite")))
+          .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), eq(scans.status, "succeeded")))
           .orderBy(scans.branchId, desc(scans.createdAt), desc(scans.id)),
       catch: toDbError,
     });
