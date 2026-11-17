@@ -36,7 +36,7 @@ export const listBranchesEffect = (db: DbConnectType, tenantId: string, repoId: 
 
 // -----
 // The tracked branches of a repo whose latest commit is this one:
-// the commit of the newest succeeded lite scan of the branch, the
+// the commit of the newest succeeded scan of the branch, the
 // same commit the repo page shows as its latest.
 // -----
 export const findBranchesAtTipEffect = (db: DbConnectType, tenantId: string, repoId: string, commit: string): Effect.Effect<BranchRef[], DbError> =>
@@ -45,7 +45,7 @@ export const findBranchesAtTipEffect = (db: DbConnectType, tenantId: string, rep
       const tips = await db
         .selectDistinctOn([scans.branchId], { branchId: scans.branchId, commitSha: scans.commitSha })
         .from(scans)
-        .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), isNotNull(scans.branchId), eq(scans.status, "succeeded"), eq(scans.skill, "lite")))
+        .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), isNotNull(scans.branchId), eq(scans.status, "succeeded")))
         .orderBy(scans.branchId, desc(scans.createdAt));
       const ids = tips.flatMap((tip) => (tip.commitSha === commit && tip.branchId !== null ? [tip.branchId] : []));
       if (ids.length === 0) return [];
