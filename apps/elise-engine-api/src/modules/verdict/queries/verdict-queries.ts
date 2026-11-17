@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 import { scanFindings, scanFindingTriage, scans } from "@repo/db-elise/schema";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { VERDICT_SCAN_FETCH_LIMIT } from "#/modules/verdict/constants";
 import type { JudgedFinding, JudgedScan, JudgedTriage } from "#/modules/verdict/types";
@@ -15,7 +15,7 @@ type CommitEvidence = { scans: JudgedScan[]; findings: JudgedFinding[]; triage: 
 // branch), their findings, and the decisions people made about
 // the repo. The History is not read.
 // -----
-export const commitEvidenceEffect = (db: DbConnectType, tenantId: string, repoId: string, commit: string): Effect.Effect<CommitEvidence, DbError> =>
+export const commitEvidenceEffect = (db: AppDbType, tenantId: string, repoId: string, commit: string): Effect.Effect<CommitEvidence, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const scanRows = await db

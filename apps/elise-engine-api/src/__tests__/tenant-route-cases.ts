@@ -2,9 +2,12 @@
 // "own" is for a route that answers one record of the caller's
 // Account, not a list: the answer must match the caller's values,
 // which differ from those the guard seeds for the other Account.
+// "listedIn" names the one field that holds the list, for an
+// answer that carries other arrays (the counts of /files list one
+// row for each file type even when there is no file).
 // -----
 export type CrossAccountCase =
-  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "not-found" | "empty" | "refused" | "created" }
+  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; listedIn?: string; expect: "not-found" | "empty" | "refused" | "created" }
   | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "own"; own: Record<string, number | null> }
   | { kind: "own-account"; shownBy: string }
   | { kind: "pending"; ticket: number };
@@ -106,8 +109,8 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /scans/:scanId/diff": { kind: "run", path: "/scans/theirs/diff", expect: "not-found" },
   "GET /scans/:scanId/files/:file": { kind: "run", path: "/scans/theirs/files/REPORT.md", expect: "not-found" },
   "POST /scans": pending(82),
-  "GET /files": pending(81),
-  "GET /repos/:repoId/verdict": pending(81),
+  "GET /files": { kind: "run", path: "/files", listedIn: "files", expect: "empty" },
+  "GET /repos/:repoId/verdict": { kind: "run", path: `/repos/${OTHER_REPO_ID}/verdict?commit=${"c".repeat(40)}`, expect: "not-found" },
   "GET /usage": { kind: "run", path: "/usage", expect: "own", own: { budgetUsd: 20, spentUsd: 0, reservedUsd: 0, remainingUsd: 20, scans: 0 } },
   "GET /usage/budget/changes": { kind: "run", path: "/usage/budget/changes", expect: "empty" },
   "GET /usage/changes": { kind: "run", path: "/usage/changes", expect: "empty" },

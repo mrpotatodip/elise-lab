@@ -10,7 +10,6 @@ export const OWNER_CONNECTION_USES = {
   "lib/app-deps.ts": 15,
   "lib/auth.ts": 2,
   "lib/db-connection.ts": 1,
-  "modules/files/api/files.ts": 2,
   "modules/me/api/get-me.ts": 2,
   "modules/runners/api/claim-job.ts": 2,
   "modules/runners/api/disconnect-runner.ts": 2,
@@ -26,6 +25,5 @@ export const OWNER_CONNECTION_USES = {
   "modules/sign-up/api/create-account.ts": 2,
   "modules/team/api/accept-team-invite.ts": 2,
   "modules/team/api/preview-team-invite.ts": 2,
-  "modules/verdict/api/get-verdict.ts": 2,
   "types/variables.ts": 1,
 } satisfies Record<string, number>;
