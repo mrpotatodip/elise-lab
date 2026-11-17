@@ -2,14 +2,14 @@
 // "own" is for a route that answers one record of the caller's
 // Account, not a list: the answer must match the caller's values,
 // which differ from those the guard seeds for the other Account.
+// "listedIn" names the one field that holds the list, for an
+// answer that carries other arrays (the counts of /files list one
+// row for each file type even when there is no file).
 // -----
 export type CrossAccountCase =
-  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "not-found" | "empty" | "refused" | "created" }
+  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; listedIn?: string; expect: "not-found" | "empty" | "refused" | "created" }
   | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "own"; own: Record<string, number | null> }
-  | { kind: "own-account"; shownBy: string }
-  | { kind: "pending"; ticket: number };
-
-const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket });
+  | { kind: "own-account"; shownBy: string };
 
 // -----
 // A write that takes no ID but the caller's own Account, so
@@ -67,9 +67,7 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 // write that lands in the caller's Account only (a name another
 // Account already uses is free here). A list that names no ID
 // runs as "stranger", an Account with no rows, so the list is
-// empty unless it shows another Account's rows. "pending" names
-// the RLS ticket that moves the route onto the tenant role and
-// replaces the entry with a "run" case.
+// empty unless it shows another Account's rows.
 // -----
 export const CROSS_ACCOUNT_CASES = {
   "GET /findings": { kind: "run", path: "/findings?scanId=theirs", expect: "empty" },
@@ -111,8 +109,8 @@ export const CROSS_ACCOUNT_CASES = {
   // the caller's, so the answer is "created", not 409 or 429.
   // -----
   "POST /scans": { kind: "run", path: "/scans", method: "POST", body: { repo: OTHER_REPO }, as: "stranger", expect: "created" },
-  "GET /files": pending(81),
-  "GET /repos/:repoId/verdict": pending(81),
+  "GET /files": { kind: "run", path: "/files", listedIn: "files", expect: "empty" },
+  "GET /repos/:repoId/verdict": { kind: "run", path: `/repos/${OTHER_REPO_ID}/verdict?commit=${"c".repeat(40)}`, expect: "not-found" },
   "GET /usage": { kind: "run", path: "/usage", expect: "own", own: { budgetUsd: 20, spentUsd: 0, reservedUsd: 0, remainingUsd: 20, scans: 0 } },
   "GET /usage/budget/changes": { kind: "run", path: "/usage/budget/changes", expect: "empty" },
   "GET /usage/changes": { kind: "run", path: "/usage/changes", expect: "empty" },

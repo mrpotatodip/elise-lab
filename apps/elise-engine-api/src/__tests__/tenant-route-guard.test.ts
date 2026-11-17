@@ -93,7 +93,8 @@ const seedOtherUsage = async (accountId: string, repoId: string) => {
 const outcomeOf = (found: RunCase, status: number, data: z.infer<typeof EnvelopeSchema>["data"]) => {
   const fields = Array.isArray(data) ? {} : (data ?? {});
   if (found.expect === "own") return { got: [status, Object.fromEntries(Object.keys(found.own).map((key) => [key, fields[key]]))], want: [200, found.own] };
-  const listed = (Array.isArray(data) ? data : Object.values(fields).filter(Array.isArray).flat()).length;
+  const lists = "listedIn" in found && found.listedIn ? [fields[found.listedIn]] : Object.values(fields);
+  const listed = (Array.isArray(data) ? data : lists.filter(Array.isArray).flat()).length;
   return { got: [status, listed], want: [STATUS_OF[found.expect], 0] };
 };
 
