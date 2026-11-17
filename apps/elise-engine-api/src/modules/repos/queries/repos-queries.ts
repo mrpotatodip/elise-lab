@@ -47,7 +47,7 @@ const branchTips = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
 
 // -----
 // The newest finding row of each problem (branch and
-// fingerprint), when it was seen, the oldest Scan that saw it
+// fingerprint), the oldest Scan that saw it
 // and whether the latest Scan saw it. Narrow, so that everything
 // joined after it works on one row per problem, not one per
 // Scan. The windows run before the DISTINCT ON picks, and the
@@ -62,7 +62,6 @@ const latestPerProblem = (db: DbConnectType, tenantId: string, scope: BranchScop
       rowId: sql<string>`${scanFindings.id}`.as("latest_row_id"),
       branchId: scans.branchId,
       scanId: sql<string>`${scans.id}`.as("latest_scan_id"),
-      seenAt: scans.createdAt,
       repoId: scans.repoId,
       tenantId: scans.tenantId,
       fingerprint: scanFindings.fingerprint,
@@ -116,7 +115,6 @@ export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId
         .select({
           finding: scanFindings,
           branchId: latest.branchId,
-          seenAt: latest.seenAt,
           firstSeenScanId: latest.firstSeenScanId,
           unchecked: latest.unchecked,
           history: scanRepoFindings,
@@ -179,10 +177,9 @@ const repoOpenCountRowsEffect = (db: DbConnectType, tenantId: string, scope: Bra
       return db
         .select({
           branchId: latest.branchId,
-          seenAt: latest.seenAt,
           unchecked: latest.unchecked,
           severity: scanFindings.severity,
-          history: { state: scanRepoFindings.state, updatedAt: scanRepoFindings.updatedAt },
+          history: { state: scanRepoFindings.state },
           triageStatus: scanFindingTriage.status,
         })
         .from(latest)

@@ -176,7 +176,7 @@ describe("a Branch's findings are the merge of its Scans", () => {
     expect((await test.raw.select({ partial: scans.partial }).from(scans).where(eq(scans.id, ownId("partial"))))[0].partial).toBe(true);
   });
 
-  it("keeps a problem the older path closed closed, shows one it recorded as regressed as back, and one it closed before a Scan saw it again as back", async () => {
+  it("keeps a problem the older path closed closed, even one a later Scan saw again, and shows one it recorded as regressed as back", async () => {
     const titles = ["problem a", "problem b", "problem c", "problem d"];
     await recordScan("s1", { findings: titles.map((title, index) => confirmed(`${index}`, title)) });
     await recordScan("s2", { findings: titles.map((title, index) => confirmed(`${index}`, title)) });
@@ -193,9 +193,9 @@ describe("a Branch's findings are the merge of its Scans", () => {
       ["problem a", "fixed_by_code"],
       ["problem b", "regressed"],
       ["problem c", "open"],
-      ["problem d", "regressed"],
+      ["problem d", "fixed_by_code"],
     ]);
-    expect((await mainBranch())?.open).toMatchObject({ total: 3, regressed: 2 });
+    expect((await mainBranch())?.open).toMatchObject({ total: 2, regressed: 1 });
   });
 
   it.each([

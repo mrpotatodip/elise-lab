@@ -1,21 +1,13 @@
 import type { FindingTriageStatusValue, RepoFinding, RepoFindingStateValue, RepoOpen, SeverityCounts } from "@repo/contracts/elise";
 
-type StateInput = {
-  history: { state: RepoFindingStateValue; updatedAt: Date } | null;
-  seenAt: Date;
-};
-
 // -----
-// The state of a Branch's finding, from the frozen History and
-// the newest Scan that saw it. A problem the History closed
-// before a Scan saw it again came back: it is `regressed`. A
-// person's decision, `fixed` included, is not part of the state:
-// it always stands, even when a later Scan sees the problem.
+// The state of a Branch's finding: the frozen History's, or open
+// when it has no row. A Scan never changes it, so a problem the
+// History closed stays closed even when a later Scan sees it
+// again. A person's decision is not part of the state: it always
+// stands.
 // -----
-export const branchStateOf = ({ history, seenAt }: StateInput): RepoFindingStateValue => {
-  const closedByHistory = history?.state === "fixed_by_code" && history.updatedAt.getTime() < seenAt.getTime();
-  return closedByHistory ? "regressed" : (history?.state ?? "open");
-};
+export const branchStateOf = ({ history }: { history: { state: RepoFindingStateValue } | null }): RepoFindingStateValue => history?.state ?? "open";
 
 // -----
 // The columns the open counts need, so a count does not
