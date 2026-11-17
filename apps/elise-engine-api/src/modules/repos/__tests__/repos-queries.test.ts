@@ -248,3 +248,14 @@ describe("addBranchSvc", () => {
     expect(names).not.toContain("7495881421f63f1e64673e7f32bbb1f40555435d");
   });
 });
+
+describe("a branch read only by profile scans", () => {
+  it("shows the profile scan as the branch's latest scan and commit", async () => {
+    const [{ id: developId }] = await test.raw.insert(scanRepoBranches).values({ tenantId, repoId, name: "develop" }).returning({ id: scanRepoBranches.id });
+    await test.raw.insert(scans).values(scan("d1", "2026-11-06T00:00:00Z", { skill: "full", branch: "develop", branchId: developId }));
+
+    const branches = await run(listRepoBranchesEffect(test.http, tenantId, repoId));
+
+    expect(branches.find((branch) => branch.name === "develop")).toMatchObject({ latestScanId: "d1", latestCommit: "d1-sha" });
+  });
+});

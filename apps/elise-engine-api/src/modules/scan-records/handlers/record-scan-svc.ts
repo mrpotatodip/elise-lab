@@ -13,9 +13,10 @@ import { readGivenSvc } from "./read-given-svc";
 const NO_HISTORY: HistoryContext = { history: new Map(), triage: new Map(), given: [] };
 
 // -----
-// Only a succeeded scan of the recorded skill that belongs to a
-// tracked branch moves that branch's history, and it is judged
-// against the priors saved when it launched. A scan that was already closed as
+// Every succeeded scan belongs to the branch it read, so the
+// branch page lists it. Only one of the recorded skill moves that
+// branch's history, and it is judged against the priors saved when
+// it launched: a profile scan reads no history (it is frozen). A scan that was already closed as
 // failed (a newer request expired it) writes nothing: its
 // history is stale.
 // -----
@@ -37,9 +38,10 @@ export const recordScanSvc = (
       yield* Effect.sync(() => console.warn(`scan records: ${params.scanId} was closed as failed before it finished, so its results are not recorded`));
       return;
     }
-    const recorded = status === "succeeded" && params.options.skill === SCAN_RECORDS_RECORDED_SKILL;
-    const outcome: ScanBranchOutcome = recorded ? yield* resolveScanBranchEffect(db, params.accountId, repoId, { name: branchName, ref }) : { id: null, reason: null };
-    const context = outcome.id
+    const succeeded = status === "succeeded";
+    const movesHistory = succeeded && params.options.skill === SCAN_RECORDS_RECORDED_SKILL;
+    const outcome: ScanBranchOutcome = succeeded ? yield* resolveScanBranchEffect(db, params.accountId, repoId, { name: branchName, ref }) : { id: null, reason: null };
+    const context = movesHistory && outcome.id
       ? { ...(yield* readHistoryEffect(db, params.accountId, repoId, outcome.id)), given: yield* readGivenSvc(env.REPORTS, params) }
       : NO_HISTORY;
     const record = yield* buildScanRecordSvc(env.REPORTS, params, repoId, { ...outcome, name: outcome.name ?? branchName }, status, error, usage, context);

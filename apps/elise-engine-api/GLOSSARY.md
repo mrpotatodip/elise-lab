@@ -97,7 +97,7 @@ One repo an Account scans, kept once per Account (`scan_repos`) however its URL 
 _Avoid_: Project, target
 
 **Branch**:
-A line of code of a Repo that has a History of its own (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a `lite` Scan of it succeeds and the Repo has a free slot, or when a person adds it. A profile Scan resolves no Branch today, a known gap (ADR 0004). The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row. A new Branch starts with an empty History.
+A line of code of a Repo that has a History of its own (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a Scan of it succeeds and the Repo has a free slot, or when a person adds it. A profile Scan joins its Branch but moves no History (ADR 0004). The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row. A new Branch starts with an empty History.
 _Avoid_: Ref (a ref can also be a tag or a commit)
 
 **One-off Scan**:
