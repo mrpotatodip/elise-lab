@@ -1,32 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { PROFILE_CHECK_FOCUSED_DEFERRED_REASON, PROFILE_CHECK_QUICK_SUBSYSTEM, type ProfileCheckRow } from "@repo/contracts/elise";
+import { SCAN_RECORDS_PROFILE_CHECK_FOCUSED_DEFERRED_REASON, SCAN_RECORDS_PROFILE_CHECK_QUICK_SUBSYSTEM } from "#/modules/scan-records/constants";
+import type { ProfileCheckFiles, ScanProfile } from "#/modules/scan-records/types";
 import { checkRunnerProfile } from "#/modules/scan-records/utils";
 
-type ScanProfile = ProfileCheckRow["profile"];
-
-interface Check {
+type Check = {
   agent_id: string;
   reviewed_paths: string[];
   invariant: string;
   method: string;
   result: string;
   artifact: null;
-}
+};
 
-interface Refs {
+type Refs = {
   surface: string;
   boundary: string;
   subsystem: string;
   attack_class: string;
   lifecycle?: string;
-}
+};
 
-interface Attempt {
+type Attempt = {
   wave: number;
   agent_id: string;
-}
+};
 
-interface Unit {
+type Unit = {
   coverage_id: string;
   canonical_refs: Refs;
   surface: string;
@@ -46,9 +45,9 @@ interface Unit {
   local_checks: Check[];
   result_fingerprints: string[];
   unresolved: string[];
-}
+};
 
-interface MetadataExtra {
+type MetadataExtra = {
   run_status?: string;
   incomplete_reason?: string;
   critic_passes?: { wave: number; accepted: number }[];
@@ -56,21 +55,14 @@ interface MetadataExtra {
   phase_completed?: number | string;
   phase_2_note?: string;
   report_note?: string;
-}
+};
 
-interface Record_ {
+type Record_ = {
   verdict: string;
   fingerprint: string;
   title: string;
-}
+};
 
-// -----
-// Ledgers written the way the stub claude writes them: the field
-// shapes of the real Runner Scans of 2026-11-16 (a Focused run on
-// one agent with units deferred by the critic, a Focused monorepo
-// run with hunters h1..h5, a Balanced run with fresh verifiers in
-// local_checks), cut to the fields the check reads and a few more.
-// -----
 const checkBy = (agent: string): Check => ({
   agent_id: agent,
   reviewed_paths: ["src/a.ts"],
@@ -82,7 +74,7 @@ const checkBy = (agent: string): Check => ({
 
 const unitOf = (id: string, over: Partial<Unit>): Unit => ({
   coverage_id: id,
-  canonical_refs: { surface: `${id}.ts`, boundary: "boundary", subsystem: PROFILE_CHECK_QUICK_SUBSYSTEM, attack_class: "ATTACK-CLASSES.md#Access control" },
+  canonical_refs: { surface: `${id}.ts`, boundary: "boundary", subsystem: SCAN_RECORDS_PROFILE_CHECK_QUICK_SUBSYSTEM, attack_class: "ATTACK-CLASSES.md#Access control" },
   surface: `${id}.ts`,
   boundary: "boundary",
   subsystem: "All in-scope subsystems (quick profile)",
@@ -111,7 +103,7 @@ const deferredByCritic = (id: string): Unit =>
     agent_id: null,
     reviewed_paths: [],
     local_checks: [],
-    unresolved: [`${PROFILE_CHECK_FOCUSED_DEFERRED_REASON}: needs node_modules, which is not available`],
+    unresolved: [`${SCAN_RECORDS_PROFILE_CHECK_FOCUSED_DEFERRED_REASON}: needs node_modules, which is not available`],
   });
 
 const candidateOf = (id: string, owner: string, verifiers: string[], fingerprint: string, over: Partial<Unit> = {}): Unit =>
@@ -132,14 +124,7 @@ const metadataOf = (profile: string, over: MetadataExtra = {}): string =>
 
 const recordOf = (verdict: string, fingerprint: string): Record_ => ({ verdict, fingerprint, title: "A finding" });
 
-interface Files {
-  report: string | null;
-  ledger: string | null;
-  metadata: string | null;
-  findings: string | null;
-}
-
-const filesOf = (ledger: Unit[], metadata: string, findings: Record_[] = []): Files => ({
+const filesOf = (ledger: Unit[], metadata: string, findings: Record_[] = []): ProfileCheckFiles => ({
   report: "# Report\n\nA quick pass.\n",
   ledger: JSON.stringify(ledger),
   metadata,
@@ -192,7 +177,7 @@ const balancedOfRun4 = (extraMetadata: MetadataExtra) => {
   );
 };
 
-const exhaustiveOf = (finalAgent: string, over: { metadata?: MetadataExtra; ledger?: Unit[] } = {}): Files =>
+const exhaustiveOf = (finalAgent: string, over: { metadata?: MetadataExtra; ledger?: Unit[] } = {}): ProfileCheckFiles =>
   filesOf(
     over.ledger ?? [
       coveredBy("a", "hunter-a", { canonical_refs: lifecycleRefs("auth", "request"), wave: 2, attempts: [{ wave: 1, agent_id: "hunter-a0" }] }),
@@ -209,7 +194,7 @@ const exhaustiveOf = (finalAgent: string, over: { metadata?: MetadataExtra; ledg
     [recordOf("needs_validation", "fp-1")],
   );
 
-const verdictOf = (profile: ScanProfile, files: Files) => checkRunnerProfile(profile, files);
+const verdictOf = (profile: ScanProfile, files: ProfileCheckFiles) => checkRunnerProfile(profile, files);
 
 describe("checkRunnerProfile", () => {
   describe("a Scan that did its profile's work is met", () => {
@@ -217,6 +202,15 @@ describe("checkRunnerProfile", () => {
       ["Focused, one agent, units deferred as quick_profile_final_critic (old Skill)", "quick", FOCUSED_RUN3],
       ["Focused, one agent, critic pass recorded and nothing deferred", "quick", FOCUSED_NEW_SKILL],
       ["Focused, five hunters, a fresh verifier on each candidate", "quick", FOCUSED_MONOREPO],
+      [
+        "Focused whose findings.json holds a rejected record that no unit holds, next to a record verified by another agent",
+        "quick",
+        filesOf(
+          [coveredBy("a", "h1"), candidateOf("c", "h4", ["verifier-c"], "fp-1")],
+          metadataOf("quick", { critic_passes: [{ wave: 1, accepted: 0 }] }),
+          [recordOf("needs_validation", "fp-1"), recordOf("rejected", "orphan-rejected")],
+        ),
+      ],
       ["Balanced, the real run's shape (four rejected candidates, fresh verifiers) with a critic pass recorded", "standard", balancedOfRun4({ critic_passes: [{ wave: 1, accepted: 0 }] })],
       ["Balanced, a critic pass and a fresh final verifier", "standard", exhaustiveOf("final-v1", { metadata: { critic_passes: [{ wave: 1, accepted: 0 }] } })],
       ["Exhaustive, lifecycle units, critic waves to a clean one, a separate final verifier", "deep", exhaustiveOf("final-v1")],

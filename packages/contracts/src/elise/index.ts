@@ -19,4 +19,3 @@ export * from "./verdict";
 export * from "./file";
 export * from "./github";
 export * from "./runner";
-export * from "./profile-check";

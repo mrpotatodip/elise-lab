@@ -1,10 +1,5 @@
 import { z } from "zod";
 
-// -----
-// The files the profile check reads, cut to the fields of
-// PROFILE_CHECK_ROWS. The agent wrote them, so a field it left out
-// is a default and a field of the wrong type fails the parse.
-// -----
 const jsonText = <T extends z.ZodType>(schema: T) =>
   z
     .string()

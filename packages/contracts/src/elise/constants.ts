@@ -55,21 +55,12 @@ export const TEAM_INVITE_GROUP_LIMIT = 20;
 // a pass needs succeeded scans of the commit whose weights
 // add up to VERDICT_MIN_SCANS. A scan weighs what its Skill
 // and profile say: every profile and an old lite scan count
-// one, so one scan gives a Verdict (the owner set quick to 1
-// on 2026-11-16; it was 0.5). Provisional until real scans
-// are measured.
+// one, so one scan gives a Verdict. Provisional until real
+// scans are measured.
 // -----
 export const ACCEPTED_RISK_MAX_DAYS = 90;
 export const VERDICT_MIN_SCANS = 1;
 export const VERDICT_SCAN_WEIGHTS = { quick: 1, standard: 1, deep: 1, lite: 1 } as const;
-
-// -----
-// Profile check: two values of the Skill's own wording that
-// the engine reads. A quick Scan's coarse subsystem identity,
-// and the reason on a unit it defers on purpose.
-// -----
-export const PROFILE_CHECK_QUICK_SUBSYSTEM = "profile/quick/all-in-scope-subsystems";
-export const PROFILE_CHECK_FOCUSED_DEFERRED_REASON = "quick_profile_final_critic";
 
 // -----
 // Finding comments: the longest body, and how many events
