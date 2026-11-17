@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { accessAuditLog, authUser, tenantGithubInstallations } from "@repo/db-elise/schema";
 import type { ConnectGithubBody } from "@repo/contracts/elise";
-import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenant, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { GithubInstallationInfo } from "#/modules/github-app";
 import { connectGithubSvc, disconnectGithubSvc, githubConnectUrlSvc, listGithubBranchesSvc, listGithubInstallationsSvc, listGithubReposSvc } from "#/modules/github-installs/handlers";
 import { neonInstallationRepo, type GithubPort } from "#/modules/github-installs";
@@ -72,7 +72,9 @@ const bodyWith = async (state?: string): Promise<ConnectGithubBody> => ({
 });
 
 const connect = (port: GithubPort | null, body: ConnectGithubBody, accountId = acme.tenantId, userId = "ada") =>
-  connectGithubSvc(test.pool, port, SECRET, accountId, userId, body, NOW);
+  asTenant(test, accountId, (db) => connectGithubSvc(db, port, SECRET, accountId, userId, body, NOW));
+
+const disconnect = (accountId: string, userId: string, id: string) => asTenant(test, accountId, (db) => disconnectGithubSvc(db, accountId, userId, id));
 
 const rows = () => test.raw.select().from(tenantGithubInstallations);
 
@@ -286,7 +288,7 @@ describe("listGithubInstallationsSvc", () => {
 
   it("does not ask about an install the admin disconnected, and does not revive it", async () => {
     const saved = await Effect.runPromise(connect(fakePort().port, await bodyWith()));
-    await Effect.runPromise(disconnectGithubSvc(test.pool, acme.tenantId, "ada", saved.id));
+    await Effect.runPromise(disconnect(acme.tenantId, "ada", saved.id));
     const { asked, record } = asks();
     const { port } = fakePort({ installation: async (id) => (record(id), infoOf()) });
 
@@ -338,7 +340,7 @@ describe("listGithubBranchesSvc", () => {
 
   it("answers NotFound for a disconnected install, and never asks GitHub", async () => {
     const saved = await connected();
-    await Effect.runPromise(disconnectGithubSvc(test.pool, acme.tenantId, "ada", saved.id));
+    await Effect.runPromise(disconnect(acme.tenantId, "ada", saved.id));
     const asked = asks();
     const { port } = fakePort({ repoBranches: async (id) => (asked.record(id), null) });
 
@@ -386,7 +388,7 @@ describe("disconnectGithubSvc", () => {
   it("marks the install removed, writes who did it to the audit trail, and stops scans using it", async () => {
     const saved = await connected();
 
-    const removed = await Effect.runPromise(disconnectGithubSvc(test.pool, acme.tenantId, "ada", saved.id));
+    const removed = await Effect.runPromise(disconnect(acme.tenantId, "ada", saved.id));
 
     expect(removed).toMatchObject({ id: saved.id, status: "removed" });
     const entries = await auditOf(saved.id);
@@ -399,8 +401,8 @@ describe("disconnectGithubSvc", () => {
   it("is harmless twice, and writes one audit row", async () => {
     const saved = await connected();
 
-    await Effect.runPromise(disconnectGithubSvc(test.pool, acme.tenantId, "ada", saved.id));
-    const again = await Effect.runPromise(disconnectGithubSvc(test.pool, acme.tenantId, "ada", saved.id));
+    await Effect.runPromise(disconnect(acme.tenantId, "ada", saved.id));
+    const again = await Effect.runPromise(disconnect(acme.tenantId, "ada", saved.id));
 
     expect(again.status).toBe("removed");
     expect((await auditOf(saved.id)).filter((entry) => entry.action === "github.install.removed")).toHaveLength(1);
@@ -409,14 +411,14 @@ describe("disconnectGithubSvc", () => {
   it("answers NotFound for an install of another account, and leaves it as it was", async () => {
     const saved = await connected();
 
-    const error = await Effect.runPromise(Effect.flip(disconnectGithubSvc(test.pool, other.tenantId, "bob", saved.id)));
+    const error = await Effect.runPromise(Effect.flip(disconnect(other.tenantId, "bob", saved.id)));
 
     expect(error).toMatchObject({ _tag: "NotFound", message: "GitHub install not found" });
     expect(await rows()).toMatchObject([{ status: "active" }]);
   });
 
   it("answers NotFound for an unknown id", async () => {
-    const error = await Effect.runPromise(Effect.flip(disconnectGithubSvc(test.pool, acme.tenantId, "ada", crypto.randomUUID())));
+    const error = await Effect.runPromise(Effect.flip(disconnect(acme.tenantId, "ada", crypto.randomUUID())));
 
     expect(error._tag).toBe("NotFound");
   });
@@ -424,7 +426,7 @@ describe("disconnectGithubSvc", () => {
   it("refuses a login that has no Party", async () => {
     const saved = await connected();
 
-    const error = await Effect.runPromise(Effect.flip(disconnectGithubSvc(test.pool, acme.tenantId, "ghost", saved.id)));
+    const error = await Effect.runPromise(Effect.flip(disconnect(acme.tenantId, "ghost", saved.id)));
 
     expect(error._tag).toBe("Forbidden");
     expect(await rows()).toMatchObject([{ status: "active" }]);
@@ -432,7 +434,7 @@ describe("disconnectGithubSvc", () => {
 
   it("is undone by connecting the install again", async () => {
     const saved = await connected();
-    await Effect.runPromise(disconnectGithubSvc(test.pool, acme.tenantId, "ada", saved.id));
+    await Effect.runPromise(disconnect(acme.tenantId, "ada", saved.id));
 
     const again = await Effect.runPromise(connect(fakePort().port, await bodyWith()));
 
