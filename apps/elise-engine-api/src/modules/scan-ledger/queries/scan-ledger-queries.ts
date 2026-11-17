@@ -5,7 +5,7 @@ import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, toDbError, type DbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanStatus } from "#/schemas";
-import type { ScanPage, ScanRepo } from "#/modules/scan-ledger/types";
+import type { ScanFilter, ScanPage, ScanRepo } from "#/modules/scan-ledger/types";
 import { canonicalRepo, displayRepoUrl, liveScansSql, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
@@ -50,7 +50,7 @@ export const activeScansEffect = (db: AppDbType, accountId: string, nowMs: numbe
 // The rows with their files, the Runner a scan ran on and, for a
 // scan whose findings are recorded, the counts of what it found.
 // -----
-const withFiles = (db: DbConnectType, rows: ScanRow[]): Effect.Effect<ScanStatus[], DbError> =>
+const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], DbError> =>
   rows.length === 0
     ? Effect.succeed([])
     : Effect.gen(function* () {
@@ -87,7 +87,34 @@ const withFiles = (db: DbConnectType, rows: ScanRow[]): Effect.Effect<ScanStatus
 // -----
 // A scan id starts with an inverted timestamp, so
 // ascending ids are newest first and an id is a cursor.
+// It takes any database, so a route can read the page
+// inside its withTenant transaction.
 // -----
+export const listScansEffect = (db: AppDbType, accountId: string, limit: number, cursor?: string, filter?: ScanFilter): Effect.Effect<ScanPage, DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select()
+        .from(scans)
+        .where(
+          and(
+            eq(scans.tenantId, accountId),
+            cursor ? gt(scans.id, cursor) : undefined,
+            filter?.repoId ? eq(scans.repoId, filter.repoId) : undefined,
+            filter?.status ? eq(scans.status, filter.status) : undefined,
+          ),
+        )
+        .orderBy(asc(scans.id))
+        .limit(limit + 1),
+    catch: toDbError,
+  }).pipe(
+    Effect.flatMap((rows) =>
+      withFiles(db, rows.slice(0, limit)).pipe(
+        Effect.map((page) => ({ scans: page, nextCursor: rows.length > limit ? rows[limit - 1].id : null })),
+      ),
+    ),
+  );
+
 export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
   // -----
   // Insert or find the repo's record. The unique index
@@ -232,30 +259,7 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
           catch: toDbError,
         }).pipe(Effect.asVoid),
 
-  list: (accountId, limit, cursor, filter): Effect.Effect<ScanPage, DbError> =>
-    Effect.tryPromise({
-      try: () =>
-        db
-          .select()
-          .from(scans)
-          .where(
-            and(
-              eq(scans.tenantId, accountId),
-              cursor ? gt(scans.id, cursor) : undefined,
-              filter?.repoId ? eq(scans.repoId, filter.repoId) : undefined,
-              filter?.status ? eq(scans.status, filter.status) : undefined,
-            ),
-          )
-          .orderBy(asc(scans.id))
-          .limit(limit + 1),
-      catch: toDbError,
-    }).pipe(
-      Effect.flatMap((rows) =>
-        withFiles(db, rows.slice(0, limit)).pipe(
-          Effect.map((page) => ({ scans: page, nextCursor: rows.length > limit ? rows[limit - 1].id : null })),
-        ),
-      ),
-    ),
+  list: (accountId, limit, cursor, filter) => listScansEffect(db, accountId, limit, cursor, filter),
 
   get: (accountId, scanId) =>
     Effect.tryPromise({

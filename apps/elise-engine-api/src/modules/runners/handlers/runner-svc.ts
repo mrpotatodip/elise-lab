@@ -8,7 +8,7 @@ import {
   type RunnerIdentity,
   type Runners,
 } from "@repo/contracts/elise";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Forbidden, NotFound, type DbError } from "#/lib/effect-query";
 import { RUNNER_NOT_FOUND, RUNNER_PAIRING_INVALID } from "#/modules/runners/constants";
 import { claimPairingEffect, createRunnerEffect, findRunnerByTokenEffect, listRunnersEffect, removeRunnerEffect, revokeRunnerByTokenEffect } from "#/modules/runners/queries";
@@ -18,7 +18,7 @@ import { generatePairingCode, generateRunnerToken, hashPairingCode, hashRunnerTo
 // The code is made here and returned once. Only its
 // hash reaches the database.
 // -----
-export const createRunnerSvc = (db: DbConnectType, accountId: string, userId: string, body: CreateRunnerBody): Effect.Effect<CreatedRunner, Forbidden | DbError> =>
+export const createRunnerSvc = (db: AppDbType, accountId: string, userId: string, body: CreateRunnerBody): Effect.Effect<CreatedRunner, Forbidden | DbError> =>
   Effect.gen(function* () {
     const pairingCode = generatePairingCode();
     const codeHash = yield* Effect.promise(() => hashPairingCode(pairingCode));
@@ -45,9 +45,9 @@ export const enrollRunnerSvc = (db: DbConnectType, body: EnrollRunnerBody): Effe
     return { ...identity, token };
   });
 
-export const listRunnersSvc = (db: DbConnectType, accountId: string): Effect.Effect<Runners, DbError> => listRunnersEffect(db, accountId, new Date());
+export const listRunnersSvc = (db: AppDbType, accountId: string): Effect.Effect<Runners, DbError> => listRunnersEffect(db, accountId, new Date());
 
-export const removeRunnerSvc = (db: DbConnectType, accountId: string, runnerId: string): Effect.Effect<{ removed: true }, NotFound | DbError> =>
+export const removeRunnerSvc = (db: AppDbType, accountId: string, runnerId: string): Effect.Effect<{ removed: true }, NotFound | DbError> =>
   removeRunnerEffect(db, accountId, runnerId, new Date()).pipe(
     Effect.flatMap((removed) => (removed ? Effect.succeed({ removed: true as const }) : Effect.fail(new NotFound({ message: RUNNER_NOT_FOUND })))),
   );

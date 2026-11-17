@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, isNotNull, lt, max, sql } from "dri
 import { Effect } from "effect";
 import { REPO_LIMIT_PER_TENANT, type DiffEntry, type Repo, type RepoBranch, type RepoFinding, type ScanDiff } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepoBranches, scanRepoFindings, scanRepos, scans } from "@repo/db-elise/schema";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
@@ -29,7 +29,7 @@ const branchScansWhere = (tenantId: string, scope: BranchScope) =>
 // The newest succeeded Scan of each Branch: a finding last seen
 // by any other Scan is not in the latest Scan. Keyed by branch.
 // -----
-const branchTipsEffect = (db: DbConnectType, tenantId: string, scope: BranchScope): Effect.Effect<Map<string, string>, DbError> =>
+const branchTipsEffect = (db: AppDbType, tenantId: string, scope: BranchScope): Effect.Effect<Map<string, string>, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const rows = await db
@@ -48,7 +48,7 @@ const branchTipsEffect = (db: DbConnectType, tenantId: string, scope: BranchScop
 // everything joined after it works on one row per problem, not
 // one per Scan. The window runs before the DISTINCT ON picks.
 // -----
-const latestPerProblem = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
+const latestPerProblem = (db: AppDbType, tenantId: string, scope: BranchScope) =>
   db
     .selectDistinctOn([scans.branchId, scanFindings.fingerprint], {
       rowId: sql<string>`${scanFindings.id}`.as("latest_row_id"),
@@ -82,7 +82,7 @@ const triageOn = (latest: LatestPerProblem) =>
 // hundreds, so counts, filters and pages are made from this one
 // list. The map is keyed by branch.
 // -----
-const mergedRowsEffect = (db: DbConnectType, tenantId: string, scope: BranchScope) =>
+const mergedRowsEffect = (db: AppDbType, tenantId: string, scope: BranchScope) =>
   Effect.tryPromise({
     try: () => {
       const latest = latestPerProblem(db, tenantId, scope);
@@ -103,7 +103,7 @@ const mergedRowsEffect = (db: DbConnectType, tenantId: string, scope: BranchScop
 // The tips and the merge do not depend on each other, so they
 // run together; the tips only decide `unchecked` afterwards.
 // -----
-export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId?: string): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
+export const repoFindingsEffect = (db: AppDbType, tenantId: string, branchId?: string): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
   Effect.gen(function* () {
     const scope: BranchScope = { branchId };
     const [tips, rows] = yield* Effect.all([branchTipsEffect(db, tenantId, scope), mergedRowsEffect(db, tenantId, scope)], { concurrency: "unbounded" });
@@ -145,7 +145,7 @@ export const repoFindingsEffect = (db: DbConnectType, tenantId: string, branchId
 // evidence, impact or fix text. The same merge as the list,
 // so the counts always match it. Keyed by branch.
 // -----
-const repoOpenCountRowsEffect = (db: DbConnectType, tenantId: string, repoId?: string): Effect.Effect<Map<string, OpenCountRow[]>, DbError> =>
+const repoOpenCountRowsEffect = (db: AppDbType, tenantId: string, repoId?: string): Effect.Effect<Map<string, OpenCountRow[]>, DbError> =>
   Effect.gen(function* () {
     const scope: BranchScope = { repoId };
     const rowsEffect = Effect.tryPromise({
@@ -186,7 +186,7 @@ const effectiveDefaultBranch = (pointer: string | null, trackedNames: readonly s
 // The account's repos, or one, with how many scans each has,
 // its latest scan and what is still open on its default branch.
 // -----
-export const listReposEffect = (db: DbConnectType, tenantId: string, repoId?: string): Effect.Effect<Repo[], DbError> =>
+export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string): Effect.Effect<Repo[], DbError> =>
   Effect.gen(function* () {
     const repos = yield* Effect.tryPromise({
       try: () =>
@@ -246,7 +246,7 @@ export const listReposEffect = (db: DbConnectType, tenantId: string, repoId?: st
     });
   });
 
-export const getRepoEffect = (db: DbConnectType, tenantId: string, repoId: string): Effect.Effect<Repo, NotFound | DbError> =>
+export const getRepoEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<Repo, NotFound | DbError> =>
   listReposEffect(db, tenantId, repoId).pipe(
     Effect.flatMap(([repo]) => (repo ? Effect.succeed(repo) : Effect.fail(new NotFound({ message: "Repo not found" })))),
   );
@@ -256,7 +256,7 @@ export const getRepoEffect = (db: DbConnectType, tenantId: string, repoId: strin
 // of its newest succeeded lite scan: the commit to ask a verdict
 // about.
 // -----
-export const listRepoBranchesEffect = (db: DbConnectType, tenantId: string, repoId: string): Effect.Effect<RepoBranch[], DbError> =>
+export const listRepoBranchesEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<RepoBranch[], DbError> =>
   Effect.gen(function* () {
     const [repo] = yield* Effect.tryPromise({
       try: () => db.select({ defaultBranch: scanRepos.defaultBranch }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId))),
@@ -316,7 +316,7 @@ const entryOf = (row: { fingerprint: string; status: DiffEntry["status"]; severi
 //   notRechecked in the previous list, missing from this
 //                one with no evidence it was fixed
 // -----
-export const scanDiffEffect = (db: DbConnectType, tenantId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
+export const scanDiffEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
   Effect.gen(function* () {
     const [scan] = yield* Effect.tryPromise({
       try: () => db.select().from(scans).where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId))),
@@ -397,7 +397,7 @@ export const REPO_LIMIT_MESSAGE = `An account can have at most ${REPO_LIMIT_PER_
 // (refused past the account's limit), then its branches (refused
 // past the repo's limit), so a refusal leaves nothing behind.
 // -----
-export const addRepoEffect = (db: PoolDbType, tenantId: string, url: string, branches: string[]): Effect.Effect<string, Conflict | NotFound | DbError> =>
+export const addRepoEffect = (db: AppTxDbType, tenantId: string, url: string, branches: string[]): Effect.Effect<string, Conflict | NotFound | DbError> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
