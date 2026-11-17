@@ -11,7 +11,7 @@ import {
   type TeamList,
   type TeamRoles,
 } from "@repo/contracts/elise";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { ExternalError, type DbError, type Forbidden } from "#/lib/effect-query";
 import { errorChainForLog } from "#/lib/redact-log";
 import { generateInviteToken, hashInviteToken } from "#/modules/team/lib";
@@ -26,9 +26,9 @@ import {
 } from "#/modules/team/queries";
 import type { InviteMailer, TeamFailure } from "#/modules/team/types";
 
-export const listTeamSvc = (db: DbConnectType, accountId: string): Effect.Effect<TeamList, DbError> => listTeamEffect(db, accountId, new Date());
+export const listTeamSvc = (db: AppDbType, accountId: string): Effect.Effect<TeamList, DbError> => listTeamEffect(db, accountId, new Date());
 
-export const listTeamRolesSvc = (db: DbConnectType, accountId: string): Effect.Effect<TeamRoles, DbError> => listAssignableRolesEffect(db, accountId);
+export const listTeamRolesSvc = (db: AppDbType,accountId: string): Effect.Effect<TeamRoles, DbError> => listAssignableRolesEffect(db, accountId);
 
 // -----
 // Queue the email for a saved invite. The invite
@@ -36,7 +36,7 @@ export const listTeamRolesSvc = (db: DbConnectType, accountId: string): Effect.E
 // is logged and never fails the request: the admin
 // still has the link to send by hand.
 // -----
-const queueInviteEmail = (db: PoolDbType, accountId: string, userId: string, mailer: InviteMailer, invite: TeamInvite, token: string) =>
+const queueInviteEmail = (db: AppDbType,accountId: string, userId: string, mailer: InviteMailer, invite: TeamInvite, token: string) =>
   Effect.gen(function* () {
     const { accountName, inviterName } = yield* inviteEmailContextEffect(db, accountId, userId);
     yield* Effect.tryPromise({
@@ -64,7 +64,7 @@ const queueInviteEmail = (db: PoolDbType, accountId: string, userId: string, mai
 // is saved, its email is queued.
 // -----
 export const createInviteSvc = (
-  db: PoolDbType,
+  db: AppDbType & AppTxDbType,
   accountId: string,
   userId: string,
   body: CreateTeamInviteBody,
@@ -88,7 +88,7 @@ export const createInviteSvc = (
     return { token, invite };
   });
 
-export const revokeInviteSvc = (db: PoolDbType, accountId: string, userId: string, inviteId: string): Effect.Effect<{ id: string }, TeamFailure> =>
+export const revokeInviteSvc = (db: AppTxDbType,accountId: string, userId: string, inviteId: string): Effect.Effect<{ id: string }, TeamFailure> =>
   revokeInviteEffect(db, accountId, inviteId, userId, new Date());
 
 export const previewInviteSvc = (db: DbConnectType, token: string): Effect.Effect<TeamInvitePreview, Forbidden | DbError> =>

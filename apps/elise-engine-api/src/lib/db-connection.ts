@@ -29,6 +29,13 @@ export type TenantDbType = Parameters<Parameters<ReturnType<typeof createTenantD
 export type AppDbType = Pick<PgDatabase<PgQueryResultHKT, typeof schema>, "select" | "insert" | "update" | "delete">;
 
 // -----
+// What a write that opens its own transaction needs. On the pool
+// it is a new transaction; on a withTenant transaction it is a
+// savepoint inside it, so the write stays on elise_app.
+// -----
+export type AppTxDbType = Pick<PgDatabase<PgQueryResultHKT, typeof schema>, "transaction">;
+
+// -----
 // Runs a job as one account on the elise_app role over
 // Hyperdrive. set_config(..., true) lasts for this transaction
 // only, so a pooled connection never carries it to the next

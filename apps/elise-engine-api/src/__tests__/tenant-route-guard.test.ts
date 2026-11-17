@@ -1,14 +1,39 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { scanFindingComments, scanFindings, scans } from "@repo/db-elise/schema";
+import { ensureTenantRoles, findTenantRole } from "@repo/db-elise";
+import {
+  authUser,
+  parties,
+  partyMasterTypes,
+  partyPersons,
+  partyRoles,
+  scanFindingComments,
+  scanFindings,
+  scans,
+  tenantGroupMembers,
+  tenantGroups,
+  tenantTeamInviteGroups,
+  tenantTeamInvites,
+} from "@repo/db-elise/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { CROSS_ACCOUNT_CASES, NOT_TENANT_ROUTES, OTHER_COMMENT_ID, type CrossAccountCase } from "#/__tests__/tenant-route-cases";
+import {
+  CROSS_ACCOUNT_CASES,
+  NOT_TENANT_ROUTES,
+  OTHER_COMMENT_ID,
+  OTHER_GROUP_ID,
+  OTHER_GROUP_NAME,
+  OTHER_INVITE_ID,
+  OTHER_PARTY_ID,
+  type CrossAccountCase,
+} from "#/__tests__/tenant-route-cases";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 
-const EnvelopeSchema = z.object({ data: z.record(z.string(), z.unknown()).nullable() });
+const EnvelopeSchema = z.object({ data: z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())]).nullable() });
+const STATUS_OF = { "not-found": 404, empty: 200, refused: 400, created: 201 } as const;
 
 let test: TestDb;
 let tenantId: string;
@@ -33,7 +58,9 @@ const ownerUsesBySourceFile = () =>
 
 beforeAll(async () => {
   test = await openTestDb();
-  tenantId = (await seedTenant(test, "acme")).tenantId;
+  const caller = await seedTenant(test, "acme");
+  tenantId = caller.tenantId;
+  const callerPartyId = caller.partyId;
   const otherTenantId = (await seedTenant(test, "other")).tenantId;
   await seedRepo(test, tenantId);
   const otherRepoId = await seedRepo(test, otherTenantId);
@@ -41,6 +68,18 @@ beforeAll(async () => {
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
   await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs, to delete or edit" });
+  await test.raw.insert(authUser).values({ id: "guard-test-user", name: "Ada Rossi", email: "guard@example.com", partyId: callerPartyId });
+  await ensureTenantRoles(test.raw, otherTenantId);
+  const otherRole = await findTenantRole(test.raw, otherTenantId, "workspace_member");
+  if (!otherRole) throw new Error("workspace_member role missing");
+  const [personType] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
+  await test.raw.insert(parties).values({ id: OTHER_PARTY_ID, masterTypeId: personType.id });
+  await test.raw.insert(partyPersons).values({ partyId: OTHER_PARTY_ID, firstName: "Bo", lastName: "Chen" });
+  await test.raw.insert(partyRoles).values({ partyId: OTHER_PARTY_ID, tenantId: otherTenantId, roleId: otherRole.id, roleScope: "tenant" });
+  await test.raw.insert(tenantGroups).values({ id: OTHER_GROUP_ID, tenantId: otherTenantId, name: OTHER_GROUP_NAME });
+  await test.raw.insert(tenantGroupMembers).values({ groupId: OTHER_GROUP_ID, tenantId: otherTenantId, partyId: OTHER_PARTY_ID });
+  await test.raw.insert(tenantTeamInvites).values({ id: OTHER_INVITE_ID, tenantId: otherTenantId, email: "theirs@example.com", roleId: otherRole.id, tokenHash: "theirs", invitedBy: OTHER_PARTY_ID, expiresAt: new Date("2099-01-01T00:00:00Z") });
+  await test.raw.insert(tenantTeamInviteGroups).values({ inviteId: OTHER_INVITE_ID, groupId: OTHER_GROUP_ID, tenantId: otherTenantId });
 });
 
 afterAll(async () => {
@@ -63,8 +102,8 @@ describe("every tenant route has a cross-account case", () => {
   it.each(runCases)("$route answers one Account with nothing of another's", async ({ path, method, body, expect: outcome }) => {
     const res = await callAs(app, tenantId, path, { method, body });
     const { data } = EnvelopeSchema.parse(await res.json());
-    const lists = Object.values(data ?? {}).filter(Array.isArray);
-    expect(outcome === "not-found" ? [res.status, 0] : [res.status, lists.flat().length]).toEqual(outcome === "not-found" ? [404, 0] : [200, 0]);
+    const lists = Array.isArray(data) ? [data] : Object.values(data ?? {}).filter(Array.isArray);
+    expect([res.status, lists.flat().length]).toEqual([STATUS_OF[outcome], 0]);
   });
 });
 

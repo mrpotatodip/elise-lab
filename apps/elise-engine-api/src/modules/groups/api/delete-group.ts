@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { GroupParamSchema } from "@repo/contracts/elise";
-import { withPool } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { requirePower, userIdOf } from "#/lib/require-power";
 import { zValidator } from "#/lib/zod-validator";
@@ -14,11 +13,7 @@ const app = new Hono<AppEnv>();
 app.delete("/:groupId", deleteGroupDoc, requirePower("company:team:groups:delete"), zValidator("header", AccountHeaderSchema), zValidator("param", GroupParamSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
   const { groupId } = c.req.valid("param");
-  const data = await withPool(
-    c.env.DATABASE_URL,
-    (promise) => c.executionCtx.waitUntil(promise),
-    (db) => runEffect(deleteGroupSvc(db, accountId, userIdOf(c), groupId)),
-  );
+  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(deleteGroupSvc(db, accountId, userIdOf(c), groupId)));
   return c.json({ data, error: null });
 });
 

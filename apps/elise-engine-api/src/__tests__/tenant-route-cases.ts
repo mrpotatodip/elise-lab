@@ -1,5 +1,5 @@
 export type CrossAccountCase =
-  | { kind: "run"; path: string; method?: string; body?: unknown; expect: "not-found" | "empty" }
+  | { kind: "run"; path: string; method?: string; body?: unknown; expect: "not-found" | "empty" | "refused" | "created" }
   | { kind: "pending"; ticket: number };
 
 const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket });
@@ -12,6 +12,10 @@ const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket
 const OTHER_REPO = "https://github.com/octocat/Hello-World";
 const OTHER_FINGERPRINT = "b".repeat(64);
 export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
+export const OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000b2";
+export const OTHER_GROUP_NAME = "Backend";
+export const OTHER_INVITE_ID = "00000000-0000-4000-8000-0000000000b3";
+export const OTHER_PARTY_ID = "00000000-0000-4000-8000-0000000000b4";
 
 // -----
 // Routes that name no Account of their own: sign-in, the
@@ -36,8 +40,12 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 
 // -----
 // One entry for every other route. "run" is called as one
-// Account with another Account's IDs. "pending" names the
-// RLS ticket that moves the route onto the tenant role and
+// Account with another Account's IDs: "not-found" answers 404,
+// "empty" 200 with no list entries, "refused" 400 (a body that
+// names another Account's row), and "created" 201 for a write
+// that lands in the caller's Account only (a name another
+// Account already uses is free here). "pending" names the RLS
+// ticket that moves the route onto the tenant role and
 // replaces the entry with a "run" case.
 // -----
 export const CROSS_ACCOUNT_CASES = {
@@ -78,16 +86,22 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /usage/credit": pending(77),
   "GET /usage/credit/entries": pending(77),
   "GET /usage/plan": pending(77),
-  "GET /team": pending(78),
-  "GET /team/roles": pending(78),
-  "POST /team/invites": pending(78),
-  "DELETE /team/invites/:inviteId": pending(78),
-  "GET /groups": pending(78),
-  "POST /groups": pending(78),
-  "PATCH /groups/:groupId": pending(78),
-  "DELETE /groups/:groupId": pending(78),
-  "PUT /groups/:groupId/members/:partyId": pending(78),
-  "DELETE /groups/:groupId/members/:partyId": pending(78),
+  "GET /team": { kind: "run", path: "/team", expect: "empty" },
+  "GET /team/roles": { kind: "run", path: "/team/roles", expect: "empty" },
+  "POST /team/invites": {
+    kind: "run",
+    path: "/team/invites",
+    method: "POST",
+    body: { email: "new@example.com", role: "workspace_member", groupIds: [OTHER_GROUP_ID] },
+    expect: "refused",
+  },
+  "DELETE /team/invites/:inviteId": { kind: "run", path: `/team/invites/${OTHER_INVITE_ID}`, method: "DELETE", expect: "not-found" },
+  "GET /groups": { kind: "run", path: "/groups", expect: "empty" },
+  "POST /groups": { kind: "run", path: "/groups", method: "POST", body: { name: OTHER_GROUP_NAME }, expect: "created" },
+  "PATCH /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "PATCH", body: { name: "Not mine to rename" }, expect: "not-found" },
+  "DELETE /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "DELETE", expect: "not-found" },
+  "PUT /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "PUT", expect: "not-found" },
+  "DELETE /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "DELETE", expect: "not-found" },
   "POST /github/connect": pending(79),
   "POST /github/installations": pending(79),
   "GET /github/installations": pending(79),
