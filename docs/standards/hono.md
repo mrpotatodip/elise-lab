@@ -21,6 +21,7 @@
 | 8 | [Hono JS: Routes and paths](#8-hono-js-routes-and-paths) |
 | 9 | [Hono JS: RPC types](#9-hono-js-rpc-types) |
 | 10 | [Hono JS: OpenAPI](#10-hono-js-openapi) |
+| 11 | [Hono JS: Lint](#11-hono-js-lint) |
 
 ---
 
@@ -326,3 +327,27 @@ Sub-resources nest under the parent: `POST /:id/members`, `DELETE /:id/members/:
 **10.4 `[House]` Write the description with `routeText`.** It has three parts: *Context* (why a caller needs the route), *What happens* (numbered steps, short sentences, words from the app's `GLOSSARY.md`) and *Example* (one `curl` a beginner can copy, with the answer). Use the `EXAMPLE_*` ids from `#/lib/openapi` so every example tells one story.
 
 **10.5 `[House]` The spec is for developers.** `GET /openapi.json` and the Scalar page `GET /docs` answer only when `ENVIRONMENT` is `development`; every other value is a 404. A new tag goes in `openApiDocument` (`#/lib/openapi-document`).
+
+## 11. Hono JS: Lint
+
+**11.1 `[House]` Lint enforces these; reviewers don't check them by hand.** The rules live in `apps/elise-engine-api/oxlint.config.ts` and `tools/oxlint/anti-slop/`. Don't disable one with a directive: fix the code, or ask for a listed exception in the config with its reason.
+
+| Rule | Standard |
+|---|---|
+| `anti-slop/require-typed-hono-app` | 1.4 |
+| `anti-slop/no-raw-request-input` | 3.1 |
+| `anti-slop/require-validator-schema-reference` | 3.2 |
+| `anti-slop/require-envelope-json` | 4.1 |
+| `scripts/check-contract-copies.mjs`: no schema with a contract's name | Contracts 1.5, 3.7 |
+| `anti-slop/no-error-handling-in-routes` | 5.1 |
+| `anti-slop/no-http-exception-throw` | 5.2 |
+| `no-console` in `api/` | 5.4 |
+| `no-restricted-imports`: `hono` in `handlers/`, `queries/`, `utils/` | 2.3 |
+| `node/no-process-env` | 7.1 |
+| `no-restricted-imports`: a file inside another folder (not its barrel) | 8.2 |
+| `anti-slop/no-parent-relative-imports` | 8.2 |
+| `no-restricted-imports`: `hono/client` | 9.2 |
+| `anti-slop/require-route-doc` | 10.1 |
+| `typescript/consistent-type-definitions` (`type`, not `interface`) | 1.8 |
+
+**Not in lint yet:** 1.9 (74 imports reach into another module today; fix them as you edit), and the layout rules 1.1, 1.2, 1.5 and 1.6 (folder names, barrels, `index.http`), which oxlint can't see.

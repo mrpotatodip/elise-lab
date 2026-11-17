@@ -7,6 +7,8 @@ import { noRunEffectInEffectLayersRule } from "./rules/no-run-effect-in-effect-l
 import { noServiceConstructorImportsRule } from "./rules/no-service-constructor-imports.ts";
 import { noThrowInEffectGenRule } from "./rules/no-throw-in-effect-gen.ts";
 import { requireEffectReturnTypeRule } from "./rules/require-effect-return-type.ts";
+import { requireReturnYieldErrorRule } from "./rules/require-return-yield-error.ts";
+import { requireTaggedErrorNameRule } from "./rules/require-tagged-error-name.ts";
 import { requireTryPromiseCatchRule } from "./rules/require-try-promise-catch.ts";
 
 /** Opt-in Oxlint rules for Effect services, layers and run points. */
@@ -20,7 +22,9 @@ const antiSlopEffectPlugin = eslintCompatPlugin({
 		"no-service-constructor-imports": noServiceConstructorImportsRule,
 		"no-throw-in-effect-gen": noThrowInEffectGenRule,
 		"require-effect-return-type": requireEffectReturnTypeRule,
-		"require-try-promise-catch": requireTryPromiseCatchRule,
+		"require-return-yield-error": requireReturnYieldErrorRule,
+			"require-tagged-error-name": requireTaggedErrorNameRule,
+			"require-try-promise-catch": requireTryPromiseCatchRule,
 	},
 });
 

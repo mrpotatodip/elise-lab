@@ -251,7 +251,7 @@ function VerdictChecklist({ verdict }: { verdict: Verdict }) {
             const { Icon, className, label } = CHECK_ICON[check.state];
             return (
               <li key={check.label} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5 text-sm">
-                <Icon aria-hidden="true" className={`mt-0.5 size-4 ${className}`} />
+                <Icon aria-hidden="true" className={cn("mt-0.5 size-4", className)} />
                 <span>
                   <span className="font-medium">{check.label}</span>
                   <span className="sr-only"> ({label})</span>

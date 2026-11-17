@@ -23,7 +23,7 @@
 
 ## 2. Worker frontend: Session and accounts
 
-**2.1 `[House]` Every server function that touches user data starts with the session check.** Call `requireUser()` first. A route guard alone is not enough, because a server function is a public endpoint.
+**2.1 `[House]` Every server function that touches user data starts with the session check.** Call `requireUser()` first. A route guard alone is not enough, because a server function is a public endpoint. Lint checks it (`anti-slop/require-server-fn-session`: the handler calls `engineAuth()` or `requireSession()`). A function that must be open, such as an invite link, says why in an `oxlint-disable-next-line` directive.
 
 **2.2 `[House]` Take the account from the session, never from the input.** If the backend scopes data by an account id, send `user.id`. A request body or search param that names the account lets one user read another's data.
 

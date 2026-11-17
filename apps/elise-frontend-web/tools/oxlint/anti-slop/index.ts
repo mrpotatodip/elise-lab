@@ -17,13 +17,23 @@ import { noUnlistedCommentsRule } from "./rules/no-unlisted-comments.ts";
 import { noUnsafeDictionaryTypeRule } from "./rules/no-unsafe-dictionary-type.ts";
 import { noUseEffectRule } from "./rules/no-use-effect.ts";
 import { noWidenThenAssertRule } from "./rules/no-widen-then-assert.ts";
+import { noEngineClientImportRule } from "./rules/no-engine-client-import.ts";
+import { noRawColorsRule } from "./rules/no-raw-colors.ts";
+import { noTemplateLiteralClassNameRule } from "./rules/no-template-literal-class-name.ts";
+import { requireImportedServerFnSchemaRule } from "./rules/require-imported-server-fn-schema.ts";
 import { requireSafetyCommentForTypeAssertionRule } from "./rules/require-safety-comment-for-type-assertion.ts";
+import { requireServerFnSessionRule } from "./rules/require-server-fn-session.ts";
 
 /** Generic Oxlint rules that reject low-evidence and low-signal implementation patterns. */
 const antiSlopPlugin = eslintCompatPlugin({
 	meta: { name: "anti-slop" },
 	rules: {
 		"no-chained-type-assertions": noChainedTypeAssertionsRule,
+		"no-engine-client-import": noEngineClientImportRule,
+		"no-raw-colors": noRawColorsRule,
+		"no-template-literal-class-name": noTemplateLiteralClassNameRule,
+		"require-imported-server-fn-schema": requireImportedServerFnSchemaRule,
+		"require-server-fn-session": requireServerFnSessionRule,
 		"no-conditional-empty-object-spread": noConditionalEmptyObjectSpreadRule,
 		"no-deprecated-query-client-calls": noDeprecatedQueryClientCallsRule,
 		"no-known-value-widening": noKnownValueWideningRule,

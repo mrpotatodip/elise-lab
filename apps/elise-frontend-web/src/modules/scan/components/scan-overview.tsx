@@ -8,6 +8,7 @@ import { CreditCard } from "#/modules/credit";
 import { UsageCard } from "#/modules/usage";
 import { Suspense, type ReactNode } from "react";
 import { Skeleton } from "#/components/ui/skeleton";
+import { cn } from "#/lib/utils";
 import { isScanActive, overviewQuery, scansQuery } from "../hooks";
 import type { ScanStatus } from "../schemas";
 import { scanActivity, scanSuccessRate } from "../utils";
@@ -83,7 +84,7 @@ export function ScanOverview({ decide, attention }: ScanOverviewProps) {
 
       {decide}
 
-      <div className={`grid gap-8 ${attention ? "lg:grid-cols-2" : ""}`}>
+      <div className={cn("grid gap-8", attention && "lg:grid-cols-2")}>
         {attention}
         <Card className="flex flex-col">
           <CardHeader className="flex-row items-start justify-between gap-3">

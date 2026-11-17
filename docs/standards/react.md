@@ -268,6 +268,17 @@ Put business logic in `utils/` so it can be tested without rendering (`nextProje
 - **No chained assertions** (`as unknown as T`) and no widen-then-assert.
 - **No module mocking in tests** (`vi.mock`). Pass dependencies in instead.
 
+Lint also enforces these, so reviewers don't check them by hand:
+- **`type`, not `interface`** (5.1, 8.3), **no `any`** (8.2) and **no default export** (5.1): `typescript/consistent-type-definitions`, `typescript/no-explicit-any`, `import/no-default-export`.
+- **No `@/` import and no deep import into another module** (1.3, 1.4): `no-restricted-imports`.
+- **No `hc`** (3.1): `no-restricted-imports` on `hono/client`.
+- **Components, hooks and routes never import the engine client or the session helpers** (3.1): `anti-slop/no-engine-client-import`.
+- **A server function names an imported schema** (3.5): `engineJson(Schema, …)` and `.validator(Schema)` take a schema from `@repo/contracts/elise` or the module's `../schemas`, never one built or declared in the `api/` file: `anti-slop/require-imported-server-fn-schema`.
+- **No template literal in `className`** (7.2): `anti-slop/no-template-literal-class-name`.
+- **No hex value or raw palette class in a feature module** (7.3): `anti-slop/no-raw-colors`.
+
+Not in lint yet: 7.1 (ten raw `<button>`s in feature code today; `react/forbid-elements` finds them), and the layout rules (1.1, 1.2, 4.1 to 4.5), which need a file-layout check.
+
 **8.2 `[House]` No `any`.** Even where no lint rule enforces it. Use a named type, or `unknown` at a boundary and parse it.
 
 **8.3 `[House]` Types come from schemas where one exists.** Write `export type X = z.infer<typeof XSchema>` in the same `schemas/` file as the schema, at the bottom (Contracts 3.8). Use `types/` only for types with no runtime schema. Prefer `type` over `interface`.
