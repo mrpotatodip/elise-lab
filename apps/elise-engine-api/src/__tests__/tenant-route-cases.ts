@@ -16,6 +16,8 @@ export const OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000b2";
 export const OTHER_GROUP_NAME = "Backend";
 export const OTHER_INVITE_ID = "00000000-0000-4000-8000-0000000000b3";
 export const OTHER_PARTY_ID = "00000000-0000-4000-8000-0000000000b4";
+export const OTHER_RUNNER_ID = "00000000-0000-4000-8000-0000000000c1";
+export const OTHER_RUNNER_NAME = "runner-of-the-other";
 
 // -----
 // Routes that name no Account of their own: sign-in, the
@@ -39,11 +41,11 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 ];
 
 // -----
-// One entry for every other route. "run" is called as one
-// Account with another Account's IDs: "not-found" answers 404,
-// "empty" 200 with no list entries, "refused" 400 (a body that
-// names another Account's row), and "created" 201 for a write
-// that lands in the caller's Account only (a name another
+// One entry for every other route, run in this order. "run" is
+// called as one Account with another Account's IDs: "not-found"
+// answers 404, "empty" 200 with no list entries, "refused" 400 (a
+// body that names another Account's row), and "created" 201 for a
+// write that lands in the caller's Account only (a name another
 // Account already uses is free here). "pending" names the RLS
 // ticket that moves the route onto the tenant role and
 // replaces the entry with a "run" case.
@@ -66,7 +68,13 @@ export const CROSS_ACCOUNT_CASES = {
     body: { body: "Not mine to edit" },
     expect: "not-found",
   },
-  "PUT /findings/triage": pending(74),
+  "PUT /findings/triage": {
+    kind: "run",
+    path: "/findings/triage",
+    method: "PUT",
+    body: { repo: OTHER_REPO, fingerprint: OTHER_FINGERPRINT, status: "fixed" },
+    expect: "not-found",
+  },
   "GET /repos": pending(75),
   "POST /repos": pending(75),
   "GET /repos/:repoId": pending(75),
@@ -111,7 +119,12 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /usage/anthropic-key": pending(79),
   "PUT /usage/anthropic-key": pending(79),
   "DELETE /usage/anthropic-key": pending(79),
-  "POST /runners": pending(80),
-  "GET /runners": pending(80),
-  "DELETE /runners/:runnerId": pending(80),
+  "GET /runners": { kind: "run", path: "/runners", expect: "empty" },
+  "DELETE /runners/:runnerId": { kind: "run", path: `/runners/${OTHER_RUNNER_ID}`, method: "DELETE", expect: "not-found" },
+  // -----
+  // Adding names no other Account's ID, so "created" says it lands
+  // in the caller's Account. It stays below "GET /runners": the
+  // Account has a Runner of its own from here on.
+  // -----
+  "POST /runners": { kind: "run", path: "/runners", method: "POST", body: { name: "Guard laptop" }, expect: "created" },
 } satisfies Record<string, CrossAccountCase>;

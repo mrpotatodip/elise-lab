@@ -4,7 +4,7 @@ import { scanFindingComments, scanFindings, scanFindingTriage, scans } from "@re
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { FINDING_THREAD_EVENT_LIMIT, FindingThreadSchema, type FindingTriageStatusValue } from "@repo/contracts/elise";
-import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenant, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { setTriageEffect } from "#/modules/findings/queries";
 
@@ -78,7 +78,7 @@ describe("a thread with decisions", () => {
   });
 
   it("shows a decision made with the service token, or by a removed login, with no name", async () => {
-    await Effect.runPromise(setTriageEffect(test.pool, tenantId, repoId, { repo: REPO, fingerprint: fp("b"), status: "fixed" }, undefined, at(0)));
+    await asTenant(test, tenantId, (db) => Effect.runPromise(setTriageEffect(db, tenantId, repoId, { repo: REPO, fingerprint: fp("b"), status: "fixed" }, undefined, at(0))));
     await decision("c", await triageRow("c"), 1, { status: "false_positive" }, null);
 
     const names = async (letter: string) => (await thread(letter)).map((event) => [event.kind, event.kind === "decision" ? event.actorName : "n/a"]);

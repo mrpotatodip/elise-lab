@@ -11,6 +11,8 @@ import type { AppEnv } from "#/types/variables";
 // The Runner behind the bearer token, or a 401. Asking records
 // that it was seen. A token that is unknown or revoked is the
 // same 401, so a removed Runner learns only that it is out.
+// Owner role: the token names the Runner, and the Runner names
+// its Account.
 // -----
 export const runnerOf = async (c: Context<AppEnv>): Promise<RunnerIdentity> => {
   const token = bearerTokenOf(c.req.header("authorization"));
