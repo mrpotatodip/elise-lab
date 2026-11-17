@@ -209,11 +209,6 @@ describe("a branch other than the default", () => {
   });
 });
 
-// -----
-// A Runner Scan is recorded like a cloud one: the files the agent
-// wrote are read from the bucket and the partial flag lands on the
-// scans row. Only money sets it.
-// -----
 describe("the partial flag on a Runner scan's row", () => {
   const RUNNER_ID = "3f2a9c1e-5b7d-4e86-9a0c-1d2e3f4a5b6c";
 
@@ -236,13 +231,6 @@ describe("the partial flag on a Runner scan's row", () => {
   });
 });
 
-// -----
-// The profile check lands on the scans row as profile_met next to
-// partial: the profile the Scan met, or none. A cloud Scan, a
-// Partial Scan and a Scan that did not succeed store null. The
-// ledgers have the field shapes of the real Runner Scans of
-// 2026-11-16, cut to what the check reads.
-// -----
 const metadataOf = (profile: string) => JSON.stringify({ run_id: "run-1", profile, run_status: "complete" });
 
 describe("the profile met on a Runner scan's row", () => {
@@ -251,11 +239,6 @@ describe("the profile met on a Runner scan's row", () => {
   const hunted = { status: "covered", agent_id: "hunter-inline", wave: 1, attempts: [], local_checks: [{ agent_id: "hunter-inline" }], result_fingerprints: [], unresolved: [] };
   const deferredByCritic = { status: "deferred", agent_id: null, wave: 1, attempts: [], local_checks: [], result_fingerprints: [], unresolved: ["quick_profile_final_critic: needs node_modules"] };
 
-  // -----
-  // What an app built before the Skill recorded critic passes
-  // writes for a Focused Scan: the units its critic deferred on
-  // purpose, no critic_passes.
-  // -----
   const FOCUSED_OLD_SKILL = { "findings.json": "[]", "REPORT.md": "# Report", "coverage-ledger.json": JSON.stringify([hunted, hunted, deferredByCritic]), "run-metadata.json": metadataOf("quick") };
   const NO_CRITIC = { ...FOCUSED_OLD_SKILL, "coverage-ledger.json": JSON.stringify([hunted]) };
   const NO_LEDGER = { "findings.json": "[]", "REPORT.md": "# Report", "run-metadata.json": metadataOf("quick") };

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ScanOptions } from "#/schemas";
-import { RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { SCAN_SANDBOX_FULL_PHASES, SCAN_SANDBOX_PHASE_SKILL_PHASES } from "#/modules/scan-sandbox/constants";
-import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt, phaseAgentFiles } from "#/modules/scan-sandbox/utils";
+import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt, phaseAgentFiles, type PromptPlace } from "#/modules/scan-sandbox/utils";
+
+const RUNNER_PLACE: PromptPlace = { repoDir: "./repo", outDir: "./out", networkRule: "do not use the network", validatedBy: "runner", metered: false };
 
 const options: ScanOptions = { skill: "full", model: "claude-haiku-5-5", effort: "low", profile: "quick", maxBudgetUsd: 1 };
 
@@ -100,22 +101,14 @@ describe("buildAgentPrompt", () => {
   ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff, asked) => {
     const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase);
 
-    // -----
-    // A Balanced hunt asks for a separate critic after the last wave and a check for
-    // separate verifiers. An Exhaustive hunt asks for a critic after every wave and
-    // another wave while one accepts work, and its check also asks for separate final
-    // verifiers. The words are the same in the cloud's place and the Runner's. A
-    // Focused check asks for the per-candidate verifier sentence only: no critic and no
-    // final verifiers, and a Focused hunt never asks. Recon and report never do.
-    // -----
-    const sentencesOf = (profile: ScanOptions["profile"], place?: typeof RUNNER_PROMPT_PLACE) =>
+    const sentencesOf = (profile: ScanOptions["profile"], place?: PromptPlace) =>
       ASKED_SENTENCES.filter((sentence) => buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence));
     expect({
       cloud: { quick: sentencesOf("quick"), standard: sentencesOf("standard"), deep: sentencesOf("deep") },
       runner: {
-        quick: sentencesOf("quick", RUNNER_PROMPT_PLACE),
-        standard: sentencesOf("standard", RUNNER_PROMPT_PLACE),
-        deep: sentencesOf("deep", RUNNER_PROMPT_PLACE),
+        quick: sentencesOf("quick", RUNNER_PLACE),
+        standard: sentencesOf("standard", RUNNER_PLACE),
+        deep: sentencesOf("deep", RUNNER_PLACE),
       },
     }).toEqual({ cloud: asked, runner: asked });
 
@@ -124,13 +117,7 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain(handoff);
     expect(prompt).toContain("Profile: deep");
 
-    // -----
-    // The same Phase for a Runner's place: it does only its own part, tells the agent to
-    // stop, forbids neither sub-agents nor node commands, carries no money sentence, and
-    // differs from the cloud's only in the paths, the network rule, who runs the validators
-    // and that sentence.
-    // -----
-    const onRunner = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PROMPT_PLACE);
+    const onRunner = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
     const otherParts = Object.entries(SCAN_SANDBOX_PHASE_SKILL_PHASES).filter(([other]) => other !== phase);
 
     expect(onRunner).toContain(`This run does ${skillPhases}`);
@@ -161,7 +148,7 @@ describe("buildAgentPrompt", () => {
 
   it("has the agent run the validators in the container and the app run them on a Runner", () => {
     const full: ScanOptions = { ...options, skill: "full" };
-    const onRunner = buildAgentPrompt(full, RUNNER_PROMPT_PLACE);
+    const onRunner = buildAgentPrompt(full, RUNNER_PLACE);
 
     expect(buildAgentPrompt(full)).toContain("run the skill's validators");
     expect(onRunner).toContain("Do not run the validators or any node command");

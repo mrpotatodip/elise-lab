@@ -6,8 +6,7 @@ import { NotFound, type DbError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import { ScanOptionsSchema } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox/constants";
-import { buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox/utils";
+import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox";
 import { RUNNER_JOB_BAD_OPTIONS, RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_FOUND, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { claimRunnerJobEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
 

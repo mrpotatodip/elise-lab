@@ -98,17 +98,6 @@ describe("verdictSvc", () => {
   });
 });
 
-// -----
-// Scans count by weight. A checked scan weighs the profile it
-// met, an unmet one 0; a scan with no profile_met (an old row,
-// a cloud scan) weighs the profile it asked for, an old lite
-// scan 1. Every case has a commit of its own.
-//
-// "lesser" asked for deep and met quick. With every weight at 1
-// today, it adds the same as a met scan; the expected numbers
-// below come from VERDICT_SCAN_WEIGHTS, so they follow it if a
-// weight changes.
-// -----
 type Kind = "quick" | "standard" | "deep" | "lite" | "old-full" | "partial" | "lesser" | "unmet";
 
 const kindValues = (kind: Kind): Partial<typeof scans.$inferInsert> => {

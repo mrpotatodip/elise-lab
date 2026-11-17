@@ -7,10 +7,7 @@ import type { FullPhase } from "#/modules/scan-sandbox/types";
 // Where the agent finds the repo and writes its files, and what it
 // is told about the network. The container has fixed paths and no
 // network. A Runner works in a folder of its own, with paths
-// relative to it. metered says whether a meter holds the Scan's
-// money: only then do the Phase prompts tell the agent that its
-// money is limited. A Runner has no meter, so its agent is never
-// told, and never reports a spent budget that is not spent.
+// relative to it.
 // -----
 export type PromptPlace = { repoDir: string; outDir: string; networkRule: string; validatedBy: "agent" | "runner"; metered: boolean };
 
@@ -59,20 +56,6 @@ const PHASE_HANDOFF = {
   report: "Earlier runs did everything but the report. Read run-metadata.json, coverage-ledger.json and findings.json in the output directory first. Do not hunt or validate again. Write the report files from the final records only.",
 } satisfies Record<FullPhase, string>;
 
-// -----
-// A Balanced or Exhaustive Scan is asked for a separate critic and separate
-// verifiers: left alone, an agent may do it all itself, and the profile check
-// then stores the Scan as unmet. The words are the same in the cloud's place
-// and the Runner's. A Focused Scan is asked only for the verifiers (its rows
-// in the profile check, fresh-verifier-per-candidate and not-declared-incomplete,
-// need a check by an agent that is not the unit's owner), never for a critic,
-// and a Focused Scan with no candidate has nothing to verify. The prompt cannot
-// force a sub-agent to start. An Exhaustive Scan is asked for more, because its rows
-// in the profile check are stricter: a critic after every wave until one
-// accepts nothing, and a final verifier that is neither the owner nor a
-// verifier of the unit. The Skill already says how each record is shaped and
-// that the units are split per lifecycle mode, so the prompt does not.
-// -----
 const VERIFY_CANDIDATES =
   "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`.";
 
@@ -97,12 +80,6 @@ const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"]) =>
 
 const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
 
-// -----
-// A Phase prompt for a Runner's place does not carry the single prompt's
-// "do not run any node command": that line would keep the agent from
-// starting sub-agents. It says only that the app runs the validators, once,
-// after the check run ends.
-// -----
 const PHASE_VALIDATION_BY_RUNNER =
   "When findings.json and coverage-ledger.json are final, stop: the app that started you runs the skill's validators on them after this run ends.";
 

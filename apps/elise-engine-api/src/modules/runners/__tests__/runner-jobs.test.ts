@@ -10,12 +10,10 @@ import type { ScanOptions, ScanParams } from "#/schemas";
 import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
-import { buildScanRecordSvc } from "#/modules/scan-records";
-import { writeScanRecordEffect } from "#/modules/scan-records/queries";
+import { buildScanRecordSvc, writeScanRecordEffect } from "#/modules/scan-records";
 import { saveScanFilesEffect } from "#/modules/scan-store";
 import { fakeBindings } from "#/__tests__/fake-bindings";
-import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox/constants";
-import { buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox/utils";
+import { SCAN_SANDBOX_FULL_PHASES, buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox";
 import { monthSpendEffect } from "#/modules/usage";
 import { claimRunnerJobEffect, createRunnerEffect, claimPairingEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
 
@@ -300,15 +298,6 @@ describe("the runner as a sandbox", () => {
   });
 });
 
-// -----
-// A Runner's result, from the route's service to the Scan the API
-// shows: what the Workflow does with it (read the files, keep them,
-// record the Scan) and the row and the response that carry the
-// profile met. The route itself opens its own database connection
-// and the record step takes no AppDeps, so neither can use the
-// shared testDeps fixture: this follows the record-step tests and
-// runs on pglite with every migration.
-// -----
 type LedgerUnit = { status: string; agent_id: string | null; unresolved: string[] };
 const ledgerUnit = (over: Partial<LedgerUnit>) => ({ status: "covered", agent_id: "hunter-inline", wave: 1, attempts: [], local_checks: [], result_fingerprints: [], unresolved: [], ...over });
 
