@@ -24,11 +24,14 @@ export const SCAN_REPORT_FILES = [
   "FINDINGS-DETAIL.md",
   "NEEDS-VALIDATION.md",
   "coverage-ledger.json",
-  "recheck.json",
-  "prior-findings.json",
   "run-metadata.json",
 ] as const;
-export const SCAN_SERVABLE_FILES = SCAN_REPORT_FILES;
+// -----
+// What an older Scan saved besides these: its answer to the Prior
+// findings and the list it was given. No new Scan writes them, but
+// an old Scan's page still serves them.
+// -----
+export const SCAN_SERVABLE_FILES = [...SCAN_REPORT_FILES, "recheck.json", "prior-findings.json"] as const;
 
 // -----
 // How long a Scan may go without a status change and still count as

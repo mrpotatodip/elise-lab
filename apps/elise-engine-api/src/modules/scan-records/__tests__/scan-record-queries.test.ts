@@ -22,7 +22,6 @@ const record: ScanRecord = {
     finishedAt: new Date("2026-11-07T00:01:00.000Z"),
   },
   findings: [],
-  history: [],
 };
 
 describe("writeScanRecordEffect", () => {
