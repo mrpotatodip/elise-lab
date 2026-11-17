@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { REPO_BRANCH_LIMIT } from "@repo/contracts/elise";
 import { scanRepoBranches, scanRepos, scans } from "@repo/db-elise/schema";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import { isCommitId } from "#/modules/branches/utils";
@@ -13,7 +13,7 @@ const limitMessageFor = (tracked: Iterable<string>): string => `${BRANCH_LIMIT_M
 
 export type BranchRef = { id: string; name: string };
 
-export const findBranchEffect = (db: DbConnectType, tenantId: string, repoId: string, name: string): Effect.Effect<BranchRef | null, DbError> =>
+export const findBranchEffect = (db: AppDbType, tenantId: string, repoId: string, name: string): Effect.Effect<BranchRef | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -23,7 +23,7 @@ export const findBranchEffect = (db: DbConnectType, tenantId: string, repoId: st
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows[0] ?? null));
 
-export const listBranchesEffect = (db: DbConnectType, tenantId: string, repoId: string): Effect.Effect<BranchRef[], DbError> =>
+export const listBranchesEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<BranchRef[], DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -39,7 +39,7 @@ export const listBranchesEffect = (db: DbConnectType, tenantId: string, repoId: 
 // the commit of the newest succeeded scan of the branch, the
 // same commit the repo page shows as its latest.
 // -----
-export const findBranchesAtTipEffect = (db: DbConnectType, tenantId: string, repoId: string, commit: string): Effect.Effect<BranchRef[], DbError> =>
+export const findBranchesAtTipEffect = (db: AppDbType, tenantId: string, repoId: string, commit: string): Effect.Effect<BranchRef[], DbError> =>
   Effect.tryPromise({
     try: async () => {
       const tips = await db
@@ -71,7 +71,7 @@ export type ScanBranchOutcome = { id: string | null; reason: string | null; name
 // repo's default pointer to the name git reported.
 // -----
 const resolveNamedScanBranchEffect = (
-  db: DbConnectType,
+  db: AppDbType,
   tenantId: string,
   repoId: string,
   scan: { name: string | null; ref: string | null },
@@ -118,7 +118,7 @@ const resolveNamedScanBranchEffect = (
 // reason says which.
 // -----
 export const resolveScanBranchEffect = (
-  db: DbConnectType,
+  db: AppDbType,
   tenantId: string,
   repoId: string,
   scan: { name: string | null; ref: string | null },
@@ -131,15 +131,13 @@ export const resolveScanBranchEffect = (
     return { id: null, reason: `this commit is the latest of ${atTip.length} tracked branches (${atTip.map((branch) => branch.name).join(", ")}), so this scan has no History` };
   });
 
-type PoolTransaction = Parameters<Parameters<PoolDbType["transaction"]>[0]>[0];
-
 // -----
 // Track these branches of a repo, inside a transaction. A name
 // already tracked is left as it is. The repo row is locked while
 // the rows are counted, so two requests cannot both pass the limit.
 // Throws NotFound or Conflict to roll the transaction back.
 // -----
-export const addBranchesTx = async (tx: PoolTransaction, tenantId: string, repoId: string, names: string[]): Promise<BranchRef[]> => {
+export const addBranchesTx = async (tx: AppDbType, tenantId: string, repoId: string, names: string[]): Promise<BranchRef[]> => {
   const [repo] = await tx
     .select({ id: scanRepos.id })
     .from(scanRepos)
@@ -170,7 +168,7 @@ export const classifyBranchFailure = (cause: unknown): Conflict | NotFound | DbE
       ? new Conflict({ message: BRANCH_LIMIT_MESSAGE })
       : toDbError(cause);
 
-export const addBranchesEffect = (db: PoolDbType, tenantId: string, repoId: string, names: string[]): Effect.Effect<BranchRef[], Conflict | NotFound | DbError> =>
+export const addBranchesEffect = (db: AppTxDbType, tenantId: string, repoId: string, names: string[]): Effect.Effect<BranchRef[], Conflict | NotFound | DbError> =>
   Effect.tryPromise({
     try: () => db.transaction((tx) => addBranchesTx(tx, tenantId, repoId, names)),
     catch: classifyBranchFailure,

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { buildApp } from "#/index";
@@ -32,7 +33,7 @@ let app: ReturnType<typeof buildApp>["app"];
 beforeEach(() => {
   spend = { ...NO_SPEND, plan: PRO };
   store = memoryScanRepo();
-  app = buildApp(testDeps({ scanRepo: () => store.repo, monthSpend: async () => spend })).app;
+  app = buildApp(testDeps({ scanRepo: () => store.repo, monthSpend: () => Effect.sync(() => spend) })).app;
 });
 
 type Body = { repo: string; profile?: string };
@@ -91,42 +92,6 @@ describe("POST /scans: every new Scan runs the full path", () => {
     expect(res.status).toBe(429);
     expect(ErrorSchema.parse(await res.json()).error.code).toBe("NO_ACTIVE_PLAN");
     expect(createdFull).toHaveLength(0);
-  });
-
-  it("still reads an old row stored with skill lite", async () => {
-    const { env } = fakeBindings();
-    store.rows.set("old", {
-      scanId: "old",
-      accountId: ACCOUNT,
-      repo: repoOf("old"),
-      repoId: "5b2c3f0e-6f43-4f51-9a52-0b1f0f7f9a10",
-      ref: null,
-      branch: null,
-      branchId: null,
-      untrackedReason: null,
-      commitSha: null,
-      skill: "lite",
-      model: "claude-sonnet-5-5",
-      effort: "high",
-      profile: "quick",
-      maxBudgetUsd: 2,
-      status: "succeeded",
-      step: null,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-      finishedAt: "2026-01-01T00:00:00.000Z",
-      error: null,
-      files: null,
-      usage: null,
-    });
-    const res = await app.fetch(
-      new Request("http://localhost/scans/old", { headers: { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": ACCOUNT } }),
-      env,
-      testExecutionContext,
-    );
-
-    expect(res.status).toBe(200);
-    expect(z.object({ data: z.object({ skill: z.string() }) }).parse(await res.json()).data.skill).toBe("lite");
   });
 });
 

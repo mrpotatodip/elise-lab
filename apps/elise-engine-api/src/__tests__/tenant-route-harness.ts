@@ -1,9 +1,23 @@
-import { sql } from "drizzle-orm";
+import { Effect } from "effect";
 import { buildApp } from "#/index";
+import { realAppDeps } from "#/lib/app-deps";
+import { tenantScanRepo } from "#/modules/scan-ledger";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
-import type { TestDb } from "#/__tests__/test-db";
+import { asTenant, type TestDb } from "#/__tests__/test-db";
 import { testDeps } from "#/__tests__/test-deps";
 import type { AppDeps } from "#/types/variables";
+
+// -----
+// POST /scans on the real queries of the withTenant transaction.
+// The global count of live Scans runs on the owner role in the
+// Worker; here no other Account has one.
+// -----
+const tenantScanDeps: Partial<AppDeps> = {
+  scanRepo: (_env, db) => tenantScanRepo(db, () => Effect.succeed({ lite: 0, full: 0 })),
+  monthSpend: realAppDeps.monthSpend,
+  holdCredit: realAppDeps.holdCredit,
+  releaseCredit: realAppDeps.releaseCredit,
+};
 
 // -----
 // The route's real wrapper runs the job as the elise_app role with
@@ -15,14 +29,9 @@ import type { AppDeps } from "#/types/variables";
 export const tenantRouteApp = (openDb: () => TestDb, overrides: Partial<AppDeps> = {}) =>
   buildApp(
     testDeps({
+      ...tenantScanDeps,
       ...overrides,
-      withTenant: (_c, accountId, run) =>
-        openDb().raw.transaction(async (tx) => {
-          await tx.execute(sql`set local role elise_app`);
-          await tx.execute(sql`select set_config('app.tenant_id', ${accountId}, true)`);
-          // SAFETY: the pglite transaction answers the same calls as the pg transaction the route's real wrapper passes.
-          return run(tx as never);
-        }),
+      withTenant: (_c, accountId, run) => asTenant(openDb(), accountId, run),
     }),
   ).app;
 

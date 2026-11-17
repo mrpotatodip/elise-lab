@@ -82,3 +82,31 @@ export async function runEffect<A>(effect: Effect.Effect<A, AppFailure>): Promis
   console.error(redactForLog(Cause.pretty(exit.cause)));
   throw new InternalServiceError("Unexpected failure", { cause: Cause.squash(exit.cause) });
 }
+
+class RolledBack extends Data.TaggedError("RolledBack") {}
+
+// -----
+// Runs an effect in a callback that a Promise library awaits, such
+// as a transaction (Effect 6.3). A failure throws, so the library
+// rolls back, and comes out as the same typed failure; an error of
+// the library itself is a DbError.
+// -----
+export const effectInCallback = <D, A, E>(open: (callback: (db: D) => Promise<Exit.Exit<A, E>>) => Promise<Exit.Exit<A, E>>, run: (db: D) => Effect.Effect<A, E>): Effect.Effect<A, E | DbError> =>
+  Effect.suspend(() => {
+    let failed: Exit.Exit<A, E> | undefined;
+    return Effect.tryPromise({
+      try: () =>
+        open(async (db) => {
+          const exit = await Effect.runPromiseExit(run(db));
+          if (Exit.isFailure(exit)) {
+            failed = exit;
+            throw new RolledBack();
+          }
+          return exit;
+        }),
+      catch: (cause): Exit.Exit<A, E | DbError> => failed ?? Exit.fail(toDbError(cause)),
+    }).pipe(
+      Effect.merge,
+      Effect.flatMap((exit) => exit),
+    );
+  });

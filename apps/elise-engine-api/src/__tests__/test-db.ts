@@ -1,7 +1,9 @@
 import { createTestDb } from "@repo/db-elise/test-db";
 import { parties, partyMasterTypes, partyPersons, scanRepoBranches, scanRepos, scans, tenants } from "@repo/db-elise/schema";
-import { and, eq } from "drizzle-orm";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import { and, eq, sql } from "drizzle-orm";
+import type { Effect } from "effect";
+import type { DbConnectType, PoolDbType, TenantDbType } from "#/lib/db-connection";
+import { effectInCallback, type DbError } from "#/lib/effect-query";
 
 // -----
 // A fresh in-memory Postgres with every migration applied.
@@ -18,6 +20,27 @@ export async function openTestDb() {
 }
 
 export type TestDb = Awaited<ReturnType<typeof openTestDb>>;
+
+// -----
+// What the Worker's withTenant does, on pglite: one transaction
+// of the elise_app role with app.tenant_id set. A query that
+// forgets its tenant filter still sees only this account's rows,
+// and a throw rolls everything back.
+// -----
+export const asTenant = <T>(test: TestDb, accountId: string, run: (db: TenantDbType) => Promise<T>): Promise<T> =>
+  test.raw.transaction(async (tx) => {
+    await tx.execute(sql`set local role elise_app`);
+    await tx.execute(sql`select set_config('app.tenant_id', ${accountId}, true)`);
+    // SAFETY: the pglite transaction answers the same calls as the pg transaction the route's real wrapper passes.
+    return run(tx as never);
+  });
+
+// -----
+// asTenant for a service: a failed effect rolls the transaction
+// back, like a route's error does, and comes back as the failure.
+// -----
+export const asTenantEffect = <A, E>(test: TestDb, accountId: string, make: (db: TenantDbType) => Effect.Effect<A, E>): Effect.Effect<A, E | DbError> =>
+  effectInCallback((callback) => asTenant(test, accountId, callback), make);
 
 export async function seedTenant(test: TestDb, slug = "acme") {
   const [type] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));

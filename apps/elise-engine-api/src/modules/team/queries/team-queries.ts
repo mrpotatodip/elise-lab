@@ -23,7 +23,7 @@ import {
   type TeamList,
   type TeamRoles,
 } from "@repo/contracts/elise";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { Conflict, DbError, Forbidden, Invalid, NotFound, toDbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
@@ -61,7 +61,7 @@ const groupIdsBy = <K extends string>(rows: { key: K; groupId: string }[]): Map<
 // The Roles an invite may give: the Tenant's
 // enabled Roles, except tenant_admin.
 // -----
-export const listAssignableRolesEffect = (db: DbConnectType, tenantId: string): Effect.Effect<TeamRoles, DbError> =>
+export const listAssignableRolesEffect = (db: AppDbType, tenantId: string): Effect.Effect<TeamRoles, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -84,7 +84,7 @@ export const listAssignableRolesEffect = (db: DbConnectType, tenantId: string): 
 // Everyone who holds a Role in the Tenant, and
 // the invites still waiting, each with its Groups.
 // -----
-export const listTeamEffect = (db: DbConnectType, tenantId: string, now: Date): Effect.Effect<TeamList, DbError> =>
+export const listTeamEffect = (db: AppDbType, tenantId: string, now: Date): Effect.Effect<TeamList, DbError> =>
   Effect.gen(function* () {
     const members = yield* Effect.tryPromise({
       try: () =>
@@ -172,20 +172,18 @@ const refuse = (failure: Conflict | Forbidden | Invalid | NotFound): never => {
 
 // -----
 // Make an invite. In one transaction: check the
-// Role and Groups, refuse a person already in the
+// Groups (a Group of another account is unknown)
+// and the Role, refuse a person already in the
 // account, replace any pending invite for the same
 // email (so only the newest link works), save the
 // invite and its Groups, and write the audit row.
 // -----
-export const createInviteEffect = (db: PoolDbType, invite: NewInvite): Effect.Effect<TeamInvite, Conflict | Invalid | DbError | Forbidden | NotFound> =>
+export const createInviteEffect = (db: AppTxDbType, invite: NewInvite): Effect.Effect<TeamInvite, Conflict | Invalid | DbError | Forbidden | NotFound> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
         const actorPartyId = await actorPartyOf(tx, invite.actorUserId);
         if (!actorPartyId) return refuse(new Forbidden({ message: "Forbidden" }));
-
-        const role = await findTenantRole(tx, invite.tenantId, invite.roleKey);
-        if (!role?.enabled || role.key === TENANT_ADMIN_ROLE_KEY) return refuse(new Invalid({ message: TEAM_ROLE_UNKNOWN }));
 
         const groupIds = [...new Set(invite.groupIds)];
         if (groupIds.length > 0) {
@@ -195,6 +193,9 @@ export const createInviteEffect = (db: PoolDbType, invite: NewInvite): Effect.Ef
             .where(and(eq(tenantGroups.tenantId, invite.tenantId), inArray(tenantGroups.id, groupIds)));
           if (found.length !== groupIds.length) return refuse(new Invalid({ message: TEAM_GROUP_UNKNOWN }));
         }
+
+        const role = await findTenantRole(tx, invite.tenantId, invite.roleKey);
+        if (!role?.enabled || role.key === TENANT_ADMIN_ROLE_KEY) return refuse(new Invalid({ message: TEAM_ROLE_UNKNOWN }));
 
         const [member] = await tx
           .select({ id: partyRoles.id })
@@ -278,7 +279,7 @@ export const createInviteEffect = (db: PoolDbType, invite: NewInvite): Effect.Ef
 // account, and the admin who made the invite.
 // -----
 export const inviteEmailContextEffect = (
-  db: PoolDbType,
+  db: AppDbType,
   tenantId: string,
   actorUserId: string,
 ): Effect.Effect<{ accountName: string; inviterName: string }, DbError> =>
@@ -299,7 +300,7 @@ export const inviteEmailContextEffect = (
 // accepted, revoked or unknown one is NotFound.
 // -----
 export const revokeInviteEffect = (
-  db: PoolDbType,
+  db: AppTxDbType,
   tenantId: string,
   inviteId: string,
   actorUserId: string,

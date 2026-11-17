@@ -2,7 +2,7 @@ import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { PlanDetails } from "@repo/contracts/elise";
 import { partyRoles, platformMasterPlans, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 
@@ -13,7 +13,7 @@ import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 // invites still waiting. An account with no plan has no plan or
 // subscription fields, but still has its seats and scans.
 // -----
-export const planDetailsEffect = (db: DbConnectType, tenantId: string, now: Date): Effect.Effect<PlanDetails, DbError> =>
+export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): Effect.Effect<PlanDetails, DbError> =>
   Effect.gen(function* () {
     const row = yield* Effect.tryPromise({
       try: async () => {

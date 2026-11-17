@@ -1,62 +1,39 @@
 // -----
-// Every source file that opens the owner connection (dbConnect,
-// poolConnect, withPool) or reads DATABASE_URL, with the most
-// uses it may have. A tenant route belongs here only until its
-// RLS ticket moves it to withTenant; the system paths of #83
-// stay. A file may not grow past its count, and a file that
-// no longer uses the owner connection must leave the list.
+// The one reviewed list of the owner role: every source file that
+// opens the owner connection (dbConnect, poolConnect, withPool,
+// or the client's createDb and createPoolDb) or reads
+// DATABASE_URL, with how many uses it has and why it cannot run
+// as one Account through withTenant. The owner role bypasses
+// row-level security, so each of these queries keeps its own
+// Account filter. A file's uses must equal its count, a file that
+// no longer uses the owner
+// connection must leave the list, and a new entry needs a reason
+// a reviewer accepts. Every tenant route runs through withTenant.
 // -----
 export const OWNER_CONNECTION_USES = {
-  "lib/app-deps.ts": 15,
-  "lib/auth.ts": 2,
-  "lib/db-connection.ts": 1,
-  "modules/anthropic-key/api/anthropic-key.ts": 6,
-  "modules/credit/api/get-credit-entries.ts": 2,
-  "modules/files/api/files.ts": 2,
-  "modules/findings/api/findings.ts": 4,
-  "modules/github-installs/api/create-github-installation.ts": 2,
-  "modules/github-installs/api/disconnect-github-installation.ts": 2,
-  "modules/github-installs/api/list-github-branches.ts": 2,
-  "modules/github-installs/api/list-github-installations.ts": 2,
-  "modules/github-installs/api/list-github-repos.ts": 2,
-  "modules/groups/api/add-group-member.ts": 2,
-  "modules/groups/api/create-group.ts": 2,
-  "modules/groups/api/delete-group.ts": 2,
-  "modules/groups/api/list-groups.ts": 2,
-  "modules/groups/api/remove-group-member.ts": 2,
-  "modules/groups/api/rename-group.ts": 2,
-  "modules/me/api/get-me.ts": 2,
-  "modules/plan/api/get-plan.ts": 2,
-  "modules/repos/api/add-branch.ts": 4,
-  "modules/repos/api/add-repo.ts": 4,
-  "modules/repos/api/get-repo.ts": 2,
-  "modules/repos/api/list-repo-findings.ts": 2,
-  "modules/repos/api/list-repos.ts": 2,
-  "modules/runners/api/claim-job.ts": 2,
-  "modules/runners/api/create-runner.ts": 2,
-  "modules/runners/api/disconnect-runner.ts": 2,
-  "modules/runners/api/enroll-runner.ts": 2,
-  "modules/runners/api/list-runners.ts": 2,
-  "modules/runners/api/remove-runner.ts": 2,
-  "modules/runners/api/report-job.ts": 2,
-  "modules/runners/api/runner-me.ts": 2,
-  "modules/runners/lib/runner-of.ts": 2,
-  "modules/scan-records/handlers/record-scan-svc.ts": 4,
-  "modules/scan-records/types/scan-records-types.ts": 1,
-  "modules/scan-workflow/lib/full-scan-workflow.ts": 8,
-  "modules/scan-workflow/lib/settle-scan-credit.ts": 4,
-  "modules/scans/api/create-scan.ts": 2,
-  "modules/scans/api/diff-scan.ts": 2,
-  "modules/sign-up/api/create-account.ts": 2,
-  "modules/team/api/accept-team-invite.ts": 2,
-  "modules/team/api/create-team-invite.ts": 2,
-  "modules/team/api/list-team-roles.ts": 2,
-  "modules/team/api/list-team.ts": 2,
-  "modules/team/api/preview-team-invite.ts": 2,
-  "modules/team/api/revoke-team-invite.ts": 2,
-  "modules/usage/api/get-budget-changes.ts": 2,
-  "modules/usage/api/get-settings-changes.ts": 2,
-  "modules/usage/api/update-usage-budget.ts": 2,
-  "modules/verdict/api/get-verdict.ts": 2,
-  "types/variables.ts": 1,
-} satisfies Record<string, number>;
+  "lib/app-deps.ts": {
+    uses: 8,
+    reason:
+      "The global count of live Scans crosses Accounts; the GitHub Install lookup of POST /scans runs outside its withTenant transaction; the membership checks read a person's Roles across Accounts before one is chosen",
+  },
+  "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
+  "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },
+  "modules/me/api/get-me.ts": { uses: 2, reason: "Lists the Accounts a person belongs to, across Accounts" },
+  "modules/runners/api/claim-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
+  "modules/runners/api/disconnect-runner.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
+  "modules/runners/api/enroll-runner.ts": { uses: 2, reason: "A pairing code is looked up before its Account is known" },
+  "modules/runners/api/report-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
+  "modules/runners/api/runner-me.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
+  "modules/runners/lib/runner-of.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
+  "modules/scan-records/handlers/record-scan-svc.ts": { uses: 4, reason: "A Workflow step with no request: records the finished Scan, its files and findings, filtered by the Scan's Account" },
+  "modules/scan-records/types/scan-records-types.ts": { uses: 1, reason: "The env type of record-scan, which the Workflow passes" },
+  "modules/scan-workflow/lib/full-scan-workflow.ts": {
+    uses: 6,
+    reason: "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, each filtered by the Scan's Account",
+  },
+  "modules/scan-workflow/lib/settle-scan-credit.ts": { uses: 4, reason: "A Workflow step with no request: reads the Plan and settles the Scan's credit hold for the Scan's Account" },
+  "modules/sign-up/api/create-account.ts": { uses: 2, reason: "Creates the Account, so none exists to run as yet" },
+  "modules/team/api/accept-team-invite.ts": { uses: 2, reason: "An invite token is looked up before its Account is known" },
+  "modules/team/api/preview-team-invite.ts": { uses: 2, reason: "An invite token is looked up before its Account is known" },
+  "types/variables.ts": { uses: 1, reason: "Declares the DATABASE_URL binding" },
+} satisfies Record<string, { uses: number; reason: string }>;

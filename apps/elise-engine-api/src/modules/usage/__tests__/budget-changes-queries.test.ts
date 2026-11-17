@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authUser } from "@repo/db-elise";
-import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { USAGE_BUDGET_CHANGES_LIMIT } from "#/modules/usage/constants";
 import { budgetChangesEffect, setMonthlyBudgetEffect } from "#/modules/usage/queries";
 
@@ -9,7 +9,8 @@ let test: TestDb;
 let tenantId: string;
 let otherTenantId: string;
 
-const set = (tenant: string, userId: string, budgetUsd: number | null) => Effect.runPromise(setMonthlyBudgetEffect(test.pool, tenant, userId, budgetUsd));
+const set = (tenant: string, userId: string, budgetUsd: number | null) =>
+  Effect.runPromise(asTenantEffect(test, tenant, (db) => setMonthlyBudgetEffect(db, tenant, userId, budgetUsd)));
 const changes = (tenant: string) => Effect.runPromise(budgetChangesEffect(test.http, tenant));
 
 beforeAll(async () => {

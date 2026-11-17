@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import type { FindingsQuery } from "@repo/contracts/elise";
 import { scanFindings, scans } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenantEffect, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { findingRepoIdEffect, listFindingsEffect, setTriageEffect } from "#/modules/findings/queries";
 import { listFindingsSvc } from "#/modules/findings/handlers";
 
@@ -100,7 +100,9 @@ describe("triage", () => {
   });
 
   it("saves a decision that then shows on the finding and filters it out of open", async () => {
-    const saved = await Effect.runPromise(setTriageEffect(test.pool, tenantId, repoId, { repo: REPO, fingerprint: fp("a"), status: "false_positive", note: "fixture" }, undefined, new Date()));
+    const saved = await Effect.runPromise(
+      asTenantEffect(test, tenantId, (db) => setTriageEffect(db, tenantId, repoId, { repo: REPO, fingerprint: fp("a"), status: "false_positive", note: "fixture" }, undefined, new Date())),
+    );
     const all = await Effect.runPromise(listFindingsEffect(test.http, tenantId, query()));
     const open = await Effect.runPromise(listFindingsEffect(test.http, tenantId, query({ triage: "open" })));
     const decided = await Effect.runPromise(listFindingsEffect(test.http, tenantId, query({ triage: "false_positive" })));
@@ -112,7 +114,7 @@ describe("triage", () => {
   });
 
   it("changes the decision on a second save instead of adding a row", async () => {
-    await Effect.runPromise(setTriageEffect(test.pool, tenantId, repoId, { repo: REPO, fingerprint: fp("a"), status: "fixed" }, undefined, new Date()));
+    await Effect.runPromise(asTenantEffect(test, tenantId, (db) => setTriageEffect(db, tenantId, repoId, { repo: REPO, fingerprint: fp("a"), status: "fixed" }, undefined, new Date())));
     const rows = await Effect.runPromise(listFindingsEffect(test.http, tenantId, query({ triage: "fixed" })));
 
     expect(ids(rows)).toEqual(["F-001"]);

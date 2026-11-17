@@ -10,6 +10,10 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
+// -----
+// Owner role: the pairing code names no Account. The row it
+// matches is how the Runner learns its Account.
+// -----
 app.post("/enroll", enrollRunnerDoc, requireEnrollLimit, requireEnrollTotalLimit, zValidator("json", EnrollRunnerBodySchema), async (c) => {
   const body = c.req.valid("json");
   const data = await runEffect(enrollRunnerSvc(dbConnect(c.env.DATABASE_URL), body));

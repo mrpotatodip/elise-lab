@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { GithubInstallationParamSchema } from "@repo/contracts/elise";
-import { withPool } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { requirePower, userIdOf } from "#/lib/require-power";
 import { zValidator } from "#/lib/zod-validator";
@@ -15,11 +14,7 @@ app.delete("/installations/:id", disconnectGithubInstallationDoc, requirePower("
   const { "x-account-id": accountId } = c.req.valid("header");
   const { id } = c.req.valid("param");
   const userId = userIdOf(c);
-  const data = await withPool(
-    c.env.DATABASE_URL,
-    (promise) => c.executionCtx.waitUntil(promise),
-    (db) => runEffect(disconnectGithubSvc(db, accountId, userId, id)),
-  );
+  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(disconnectGithubSvc(db, accountId, userId, id)));
   return c.json({ data, error: null });
 });
 

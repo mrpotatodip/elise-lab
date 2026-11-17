@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { FindingList, FindingsQuery, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
-import type { AppDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, NotFound, type DbError } from "#/lib/effect-query";
 import { findingRepoIdEffect, listFindingsEffect, setTriageEffect } from "#/modules/findings/queries";
 
@@ -17,13 +17,14 @@ export const listFindingsSvc = (db: AppDbType, accountId: string, query: Finding
   });
 
 // -----
-// Any triage decision, audited. userId is the signed-in login,
+// Any triage decision, audited, in the one transaction
+// of withTenant, so a failed audit row leaves no decision.
+// userId is the signed-in login,
 // or undefined for the service token. For an accepted risk the
 // caller has already proved userId is an admin of the account.
 // -----
 export const setFindingTriageSvc = (
-  db: DbConnectType,
-  pool: PoolDbType,
+  db: TenantDbType,
   accountId: string,
   body: FindingTriageBody,
   userId: string | undefined,
@@ -31,5 +32,5 @@ export const setFindingTriageSvc = (
   Effect.gen(function* () {
     const repoId = yield* findingRepoIdEffect(db, accountId, body.repo, body.fingerprint);
     if (!repoId) return yield* new NotFound({ message: "Finding not found" });
-    return yield* setTriageEffect(pool, accountId, repoId, body, userId, new Date());
+    return yield* setTriageEffect(db, accountId, repoId, body, userId, new Date());
   });

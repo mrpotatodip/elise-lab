@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import type { ConnectGithubBody, GithubBranches, GithubBranchesQuery, GithubConnect, GithubInstallation, GithubRepo } from "@repo/contracts/elise";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
+import type { TenantEffect } from "#/lib/tenant-effect";
 import { Forbidden, Invalid, NotFound, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
 import {
   GITHUB_CHECK_STALE_MS,
@@ -41,10 +42,11 @@ export const githubConnectUrlSvc = (
 // before an install is saved: the state is ours, unexpired and made
 // for this admin and account; GitHub accepts the one-time code; the
 // person behind that code can use this install (the number in the
-// address proves nothing); and the install exists.
+// address proves nothing); and the install exists. GitHub is asked
+// before the transaction opens; only the save runs inside it.
 // -----
 export const connectGithubSvc = (
-  db: PoolDbType,
+  tenant: TenantEffect<AppDbType>,
   port: GithubPort | null,
   authSecret: string,
   accountId: string,
@@ -63,7 +65,7 @@ export const connectGithubSvc = (
 
     const info = yield* Effect.tryPromise({ try: () => port.installation(body.installationId), catch: toExternalError });
     if (info === null) return yield* new NotFound({ message: GITHUB_INSTALL_UNKNOWN });
-    return yield* connectInstallationEffect(db, { tenantId: accountId, userId, installationId: body.installationId, info, now });
+    return yield* tenant((db) => connectInstallationEffect(db, { tenantId: accountId, userId, installationId: body.installationId, info, now }));
   });
 
 // -----
@@ -72,7 +74,7 @@ export const connectGithubSvc = (
 // install shows as such without a webhook. If GitHub cannot answer, the
 // status stays as it was. An install the admin disconnected is not asked.
 // -----
-export const listGithubInstallationsSvc = (db: DbConnectType, port: GithubPort | null, accountId: string, now: Date): Effect.Effect<GithubInstallation[], DbError> =>
+export const listGithubInstallationsSvc = (db: AppDbType, port: GithubPort | null, accountId: string, now: Date): Effect.Effect<GithubInstallation[], DbError> =>
   Effect.gen(function* () {
     const installs = yield* listInstallationsEffect(db, accountId);
     if (port === null) return installs;
@@ -95,19 +97,20 @@ export const listGithubInstallationsSvc = (db: DbConnectType, port: GithubPort |
 // -----
 // The branches of one repo, for the scan form. The install is looked up
 // among the Account's own active installs, so another Account's install
-// id finds nothing. A repo the install cannot see answers 404.
+// id finds nothing, whether or not GitHub is set up. A repo the install
+// cannot see answers 404.
 // -----
 export const listGithubBranchesSvc = (
-  db: DbConnectType,
+  db: AppDbType,
   port: GithubPort | null,
   accountId: string,
   query: GithubBranchesQuery,
 ): Effect.Effect<GithubBranches, Invalid | NotFound | DbError | ExternalError> =>
   Effect.gen(function* () {
-    if (port === null) return yield* new Invalid({ message: GITHUB_NOT_SET_UP });
     const installs = yield* listInstallationsEffect(db, accountId, true);
     const install = installs.find((candidate) => candidate.id === query.installationId);
     if (install === undefined) return yield* new NotFound({ message: GITHUB_INSTALL_NOT_FOUND });
+    if (port === null) return yield* new Invalid({ message: GITHUB_NOT_SET_UP });
 
     const [owner = "", name = ""] = query.repo.split("/");
     const found = yield* Effect.tryPromise({ try: () => port.repoBranches(install.installationId, owner, name), catch: toExternalError });
@@ -115,7 +118,7 @@ export const listGithubBranchesSvc = (
     return found;
   });
 
-export const disconnectGithubSvc =(db: PoolDbType, accountId: string, userId: string, id: string): Effect.Effect<GithubInstallation, NotFound | Forbidden | DbError> =>
+export const disconnectGithubSvc =(db: AppDbType, accountId: string, userId: string, id: string): Effect.Effect<GithubInstallation, NotFound | Forbidden | DbError> =>
   disconnectInstallationEffect(db, accountId, userId, id);
 
 // -----
@@ -123,7 +126,7 @@ export const disconnectGithubSvc =(db: PoolDbType, accountId: string, userId: st
 // install GitHub will not answer for is left out, and the rest still
 // show: one broken install must not hide the others.
 // -----
-export const listGithubReposSvc = (db: DbConnectType, port: GithubPort | null, accountId: string): Effect.Effect<GithubRepo[], DbError> =>
+export const listGithubReposSvc = (db: AppDbType, port: GithubPort | null, accountId: string): Effect.Effect<GithubRepo[], DbError> =>
   Effect.gen(function* () {
     if (port === null) return [];
     const installs = yield* listInstallationsEffect(db, accountId, true);

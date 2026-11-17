@@ -161,7 +161,7 @@ describe("a Branch's findings are the merge of its Scans", () => {
     const tip = "2".repeat(40);
     await recordScan("main-1", { commit: tip, findings: [confirmed("a", "problem a")] });
     await recordScan("by-commit", { read: { name: null, ref: tip }, commit: tip, findings: [confirmed("b", "found by commit")] });
-    await run(addBranchSvc(test.http, test.pool, tenantId, repoId, { name: "release" }));
+    await run(addBranchSvc(test.pool, tenantId, repoId, { name: "release" }));
     await recordScan("release-1", { read: { name: "release", ref: "release" }, commit: tip, findings: [confirmed("r", "release problem")] });
     await recordScan("by-shared-commit", { read: { name: null, ref: tip }, commit: tip, findings: [confirmed("s", "found by shared commit")] });
 

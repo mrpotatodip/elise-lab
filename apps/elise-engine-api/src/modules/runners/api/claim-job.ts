@@ -8,6 +8,10 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
+// -----
+// Owner role: the token names the Runner, and the Runner
+// names its Account.
+// -----
 app.post("/claim", claimJobDoc, async (c) => {
   const runner = await runnerOf(c);
   const data = await runEffect(claimJobSvc(dbConnect(c.env.DATABASE_URL), runner.runnerId));

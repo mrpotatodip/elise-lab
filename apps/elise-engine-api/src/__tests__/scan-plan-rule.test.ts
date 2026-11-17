@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { buildApp } from "#/index";
@@ -31,7 +32,7 @@ let spend: MonthSpend = NO_SPEND;
 const app = buildApp(
   testDeps({
     scanRepo: () => memoryScanRepo().repo,
-    monthSpend: async () => spend,
+    monthSpend: () => Effect.sync(() => spend),
   }),
 ).app;
 

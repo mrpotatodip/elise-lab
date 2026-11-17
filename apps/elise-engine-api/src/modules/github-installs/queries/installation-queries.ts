@@ -2,7 +2,7 @@ import { and, asc, eq, ne } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import { tenantGithubInstallations, type TTenantGithubInstallation } from "@repo/db-elise";
 import { GithubInstallationSchema, type GithubInstallation } from "@repo/contracts/elise";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, Forbidden, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
@@ -47,7 +47,7 @@ const toInstallation = (row: TTenantGithubInstallation): GithubInstallation =>
 // The installs of one Account, oldest first. The status is what the
 // last check saw: there is no webhook to keep it fresh.
 // -----
-export const listInstallationsEffect = (db: DbConnectType, tenantId: string, activeOnly = false): Effect.Effect<GithubInstallation[], DbError> =>
+export const listInstallationsEffect = (db: AppDbType, tenantId: string, activeOnly = false): Effect.Effect<GithubInstallation[], DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -59,11 +59,11 @@ export const listInstallationsEffect = (db: DbConnectType, tenantId: string, act
   }).pipe(Effect.flatMap((rows) => Effect.try(() => rows.map(toInstallation)).pipe(Effect.orDie)));
 
 // -----
-// Thrown inside a transaction to roll it back.
+// Thrown to fail the caller's transaction, so it rolls back.
 // -----
-class Refused extends Data.TaggedError("Refused")<{ failure: Conflict | Forbidden }> {}
+class Refused extends Data.TaggedError("Refused")<{ failure: Forbidden }> {}
 
-const refuse = (failure: Conflict | Forbidden): never => {
+const refuse = (failure: Forbidden): never => {
   throw new Refused({ failure });
 };
 
@@ -74,54 +74,59 @@ const classify = (cause: unknown): Conflict | Forbidden | DbError => {
 
 // -----
 // Save an install for an Account, and write who did it to the audit
-// trail in the same transaction. An install already held by another
-// Account is refused: one install belongs to one Account. The same
-// Account connecting it again refreshes the row, so a second visit or
-// a retry is harmless.
+// trail, in the caller's transaction. An install already held by
+// another Account is refused: one install belongs to one Account.
+// That Account's row is out of sight here, so the unique index on the
+// install number refuses it. The same Account connecting it again
+// refreshes the row, so a second visit or a retry is harmless.
 // -----
-export const connectInstallationEffect = (db: PoolDbType, input: NewInstallation): Effect.Effect<GithubInstallation, Conflict | Forbidden | DbError> =>
+export const connectInstallationEffect = (db: AppDbType, input: NewInstallation): Effect.Effect<GithubInstallation, Conflict | Forbidden | DbError> =>
   Effect.tryPromise({
-    try: () =>
-      db.transaction(async (tx) => {
-        const actorPartyId = await actorPartyOf(tx, input.userId);
-        if (!actorPartyId) return refuse(new Forbidden({ message: "Forbidden" }));
+    try: async () => {
+      const actorPartyId = await actorPartyOf(db, input.userId);
+      if (!actorPartyId) return refuse(new Forbidden({ message: "Forbidden" }));
 
-        const [existing] = await tx
-          .select({ id: tenantGithubInstallations.id, tenantId: tenantGithubInstallations.tenantId })
-          .from(tenantGithubInstallations)
-          .where(and(eq(tenantGithubInstallations.provider, "github"), eq(tenantGithubInstallations.installationId, input.installationId)));
-        if (existing && existing.tenantId !== input.tenantId) return refuse(new Conflict({ message: GITHUB_INSTALL_TAKEN }));
+      const [existing] = await db
+        .select({ id: tenantGithubInstallations.id })
+        .from(tenantGithubInstallations)
+        .where(
+          and(
+            eq(tenantGithubInstallations.tenantId, input.tenantId),
+            eq(tenantGithubInstallations.provider, "github"),
+            eq(tenantGithubInstallations.installationId, input.installationId),
+          ),
+        );
 
-        const fresh = {
+      const fresh = {
+        accountLogin: input.info.accountLogin,
+        repositorySelection: input.info.repositorySelection,
+        htmlUrl: input.info.htmlUrl,
+        status: input.info.suspended ? "suspended" : "active",
+        noticeAcceptedAt: input.now,
+        checkedAt: input.now,
+      };
+      const [row] = existing
+        ? await db
+            .update(tenantGithubInstallations)
+            .set(fresh)
+            .where(and(eq(tenantGithubInstallations.id, existing.id), eq(tenantGithubInstallations.tenantId, input.tenantId)))
+            .returning()
+        : await db.insert(tenantGithubInstallations).values({ tenantId: input.tenantId, installationId: input.installationId, connectedBy: actorPartyId, ...fresh }).returning();
+      await insertAuditEntry(db, {
+        actorPartyId,
+        action: "github.install.connected",
+        subjectId: row.id,
+        tenantId: input.tenantId,
+        after: {
+          installationId: input.installationId,
           accountLogin: input.info.accountLogin,
           repositorySelection: input.info.repositorySelection,
-          htmlUrl: input.info.htmlUrl,
-          status: input.info.suspended ? "suspended" : "active",
-          noticeAcceptedAt: input.now,
-          checkedAt: input.now,
-        };
-        const [row] = existing
-          ? await tx
-              .update(tenantGithubInstallations)
-              .set(fresh)
-              .where(and(eq(tenantGithubInstallations.id, existing.id), eq(tenantGithubInstallations.tenantId, input.tenantId)))
-              .returning()
-          : await tx.insert(tenantGithubInstallations).values({ tenantId: input.tenantId, installationId: input.installationId, connectedBy: actorPartyId, ...fresh }).returning();
-        await insertAuditEntry(tx, {
-          actorPartyId,
-          action: "github.install.connected",
-          subjectId: row.id,
-          tenantId: input.tenantId,
-          after: {
-            installationId: input.installationId,
-            accountLogin: input.info.accountLogin,
-            repositorySelection: input.info.repositorySelection,
-            noticeAcceptedAt: input.now.toISOString(),
-            reconnected: existing !== undefined,
-          },
-        });
-        return row;
-      }),
+          noticeAcceptedAt: input.now.toISOString(),
+          reconnected: existing !== undefined,
+        },
+      });
+      return row;
+    },
     catch: classify,
   }).pipe(Effect.flatMap((row) => Effect.try(() => toInstallation(row)).pipe(Effect.orDie)));
 
@@ -130,7 +135,7 @@ export const connectInstallationEffect = (db: PoolDbType, input: NewInstallation
 // more, so it is removed. A removed install is never revived here: a
 // new install of the App has a new number and goes through Connect.
 // -----
-export const saveInstallationCheckEffect = (db: DbConnectType, tenantId: string, id: string, info: GithubInstallationInfo | null, now: Date): Effect.Effect<void, DbError> =>
+export const saveInstallationCheckEffect = (db: AppDbType, tenantId: string, id: string, info: GithubInstallationInfo | null, now: Date): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -154,36 +159,37 @@ export const saveInstallationCheckEffect = (db: DbConnectType, tenantId: string,
 // An admin stops EliseLAB using an install. The row stays, so the scans
 // that used it keep their link, and the audit trail says who did it.
 // Disconnecting twice is harmless. It cannot take access away on
-// GitHub: only an uninstall there does that.
+// GitHub: only an uninstall there does that. Another Account's install
+// is not found before the login is looked at, in the caller's
+// transaction.
 // -----
-export const disconnectInstallationEffect = (db: PoolDbType, tenantId: string, userId: string, id: string): Effect.Effect<GithubInstallation, NotFound | Forbidden | DbError> =>
+export const disconnectInstallationEffect = (db: AppDbType, tenantId: string, userId: string, id: string): Effect.Effect<GithubInstallation, NotFound | Forbidden | DbError> =>
   Effect.tryPromise({
-    try: () =>
-      db.transaction(async (tx) => {
-        const actorPartyId = await actorPartyOf(tx, userId);
-        if (!actorPartyId) return refuse(new Forbidden({ message: "Forbidden" }));
+    try: async () => {
+      const [row] = await db
+        .select()
+        .from(tenantGithubInstallations)
+        .where(and(eq(tenantGithubInstallations.id, id), eq(tenantGithubInstallations.tenantId, tenantId)));
+      if (!row) return null;
 
-        const [row] = await tx
-          .select()
-          .from(tenantGithubInstallations)
-          .where(and(eq(tenantGithubInstallations.id, id), eq(tenantGithubInstallations.tenantId, tenantId)));
-        if (!row) return null;
-        if (row.status === "removed") return row;
+      const actorPartyId = await actorPartyOf(db, userId);
+      if (!actorPartyId) return refuse(new Forbidden({ message: "Forbidden" }));
+      if (row.status === "removed") return row;
 
-        const [removed] = await tx
-          .update(tenantGithubInstallations)
-          .set({ status: "removed" })
-          .where(and(eq(tenantGithubInstallations.id, id), eq(tenantGithubInstallations.tenantId, tenantId)))
-          .returning();
-        await insertAuditEntry(tx, {
-          actorPartyId,
-          action: "github.install.removed",
-          subjectId: removed.id,
-          tenantId,
-          after: { installationId: removed.installationId, accountLogin: removed.accountLogin },
-        });
-        return removed;
-      }),
+      const [removed] = await db
+        .update(tenantGithubInstallations)
+        .set({ status: "removed" })
+        .where(and(eq(tenantGithubInstallations.id, id), eq(tenantGithubInstallations.tenantId, tenantId)))
+        .returning();
+      await insertAuditEntry(db, {
+        actorPartyId,
+        action: "github.install.removed",
+        subjectId: removed.id,
+        tenantId,
+        after: { installationId: removed.installationId, accountLogin: removed.accountLogin },
+      });
+      return removed;
+    },
     catch: (cause) => {
       const failure = classify(cause);
       return failure._tag === "Conflict" ? toDbError(cause) : failure;

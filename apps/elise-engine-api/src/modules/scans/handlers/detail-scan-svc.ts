@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { NotFound, toExternalError, type DbError } from "#/lib/effect-query";
 import type { ScanStatus } from "#/schemas";
-import type { ScanRepo } from "#/modules/scan-ledger";
+import type { ScanReads } from "#/modules/scan-ledger";
 import type { DetailScanEnv } from "#/modules/scans/types";
 
 // -----
@@ -11,7 +11,7 @@ import type { DetailScanEnv } from "#/modules/scans/types";
 // -----
 export const detailScanSvc = (
   env: DetailScanEnv,
-  repo: ScanRepo,
+  repo: ScanReads,
   accountId: string,
   scanId: string,
 ): Effect.Effect<ScanStatus, NotFound | DbError> =>

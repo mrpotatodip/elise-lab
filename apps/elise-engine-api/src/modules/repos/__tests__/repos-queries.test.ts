@@ -196,8 +196,8 @@ describe("a second branch", () => {
 
 describe("addBranchSvc", () => {
   it("refuses a commit id and HEAD, which are not branches, and tracks nothing", async () => {
-    const commit = await fail(addBranchSvc(test.http, test.pool, tenantId, repoId, { name: "7495881421f63f1e64673e7f32bbb1f40555435d" }));
-    const head = await fail(addBranchSvc(test.http, test.pool, tenantId, repoId, { name: "HEAD" }));
+    const commit = await fail(addBranchSvc(test.pool, tenantId, repoId, { name: "7495881421f63f1e64673e7f32bbb1f40555435d" }));
+    const head = await fail(addBranchSvc(test.pool, tenantId, repoId, { name: "HEAD" }));
     const names = (await run(listRepoBranchesEffect(test.http, tenantId, repoId))).map((branch) => branch.name);
 
     expect(commit).toMatchObject({ _tag: "Invalid", message: expect.stringContaining("is a commit, not a branch") });

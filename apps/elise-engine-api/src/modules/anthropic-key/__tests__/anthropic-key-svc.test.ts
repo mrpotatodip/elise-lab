@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { accessAuditLog, authUser, tenantAnthropicKeys } from "@repo/db-elise/schema";
-import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { getAnthropicKeySvc, removeAnthropicKeySvc, setAnthropicKeySvc } from "#/modules/anthropic-key/handlers";
 import { findSealedKeyEffect } from "#/modules/anthropic-key/queries";
 import { openKey } from "#/modules/anthropic-key/utils";
@@ -40,7 +40,8 @@ afterAll(async () => {
 const accepts = async () => true;
 const refuses = async () => false;
 const set = (check: (apiKey: string) => Promise<boolean>, apiKey = KEY, secret: string | null = SECRET) =>
-  setAnthropicKeySvc(secret ?? undefined, test.pool, check, acme.tenantId, userId, apiKey);
+  setAnthropicKeySvc(secret ?? undefined, (run) => asTenantEffect(test, acme.tenantId, run), check, acme.tenantId, userId, apiKey);
+const remove = () => asTenantEffect(test, acme.tenantId, (db) => removeAnthropicKeySvc(db, acme.tenantId, userId));
 const auditOf = (accountId: string) => test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, accountId));
 
 describe("setAnthropicKeySvc", () => {
@@ -62,6 +63,16 @@ describe("setAnthropicKeySvc", () => {
 
     expect(await test.raw.select().from(tenantAnthropicKeys)).toHaveLength(1);
     expect(await Effect.runPromise(getAnthropicKeySvc(test.http, acme.tenantId))).toMatchObject({ lastFour: "n3wK" });
+  });
+
+  it("saves the key for the caller's Account only, and leaves another Account's key as it was", async () => {
+    await test.raw.insert(tenantAnthropicKeys).values({ tenantId: other.tenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
+
+    await Effect.runPromise(set(accepts));
+
+    const rows = await test.raw.select({ tenantId: tenantAnthropicKeys.tenantId, sealedKey: tenantAnthropicKeys.sealedKey }).from(tenantAnthropicKeys);
+    expect(rows.filter((row) => row.tenantId === other.tenantId)).toEqual([{ tenantId: other.tenantId, sealedKey: "theirs" }]);
+    expect(rows.map((row) => row.tenantId).toSorted()).toEqual([acme.tenantId, other.tenantId].toSorted());
   });
 
   it.each([
@@ -104,7 +115,7 @@ describe("removeAnthropicKeySvc", () => {
   it("goes back to the platform key and records the removal", async () => {
     await Effect.runPromise(set(accepts));
 
-    const removed = await Effect.runPromise(removeAnthropicKeySvc(test.pool, acme.tenantId, userId));
+    const removed = await Effect.runPromise(remove());
 
     expect(removed).toEqual({ source: "platform", lastFour: null, updatedAt: null });
     expect(await test.raw.select().from(tenantAnthropicKeys)).toHaveLength(0);
@@ -113,7 +124,7 @@ describe("removeAnthropicKeySvc", () => {
   });
 
   it("changes nothing and records nothing when there is no key", async () => {
-    await Effect.runPromise(removeAnthropicKeySvc(test.pool, acme.tenantId, userId));
+    await Effect.runPromise(remove());
 
     expect(await auditOf(acme.tenantId)).toHaveLength(0);
   });

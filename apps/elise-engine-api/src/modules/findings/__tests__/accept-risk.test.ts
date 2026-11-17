@@ -1,9 +1,10 @@
 import { Effect } from "effect";
 import { FindingTriageBodySchema, type FindingTriageBody } from "@repo/contracts/elise";
 import { accessAuditLog, authUser, partyPersons } from "@repo/db-elise";
-import { scanFindings, scans } from "@repo/db-elise/schema";
+import { scanFindings, scanFindingTriage, scans } from "@repo/db-elise/schema";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenantEffect, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { listFindingsEffect, setTriageEffect } from "#/modules/findings/queries";
 
 let test: TestDb;
@@ -25,7 +26,8 @@ const body = (letter: string, overrides: Partial<FindingTriageBody> = {}): Findi
   ...overrides,
 });
 
-const set = (input: FindingTriageBody, serviceTokenOrLogin: string | null = "admin") => setTriageEffect(test.pool, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW);
+const set = (input: FindingTriageBody, serviceTokenOrLogin: string | null = "admin") =>
+  asTenantEffect(test, tenantId, (db) => setTriageEffect(db, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW));
 
 // -----
 // The audit rows about one problem, oldest first.
@@ -113,6 +115,18 @@ describe("every other decision", () => {
     expect(saved).toMatchObject({ status: "fixed", acceptedUntil: null });
     expect(rows).toHaveLength(2);
     expect(rows[1]).toMatchObject({ action: "finding.triage.set", before: { status: "accepted_risk", acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString() } });
+  });
+});
+
+describe("a decision whose audit row cannot be written", () => {
+  it("leaves no decision either", async () => {
+    await test.raw.execute(sql`create function refuse_audit() returns trigger as $$ begin raise exception 'audit refused'; end $$ language plpgsql`);
+    await test.raw.execute(sql.raw(`create trigger refuse_audit before insert on access_audit_log for each row when (new.after->>'fingerprint' = '${fp("f")}') execute function refuse_audit()`));
+
+    const failure = await Effect.runPromise(Effect.flip(set(body("f", { status: "fixed", note: null, acceptDays: undefined }))));
+    const rows = await test.raw.select().from(scanFindingTriage).where(eq(scanFindingTriage.fingerprint, fp("f")));
+
+    expect([failure._tag, rows]).toEqual(["DbError", []]);
   });
 });
 
