@@ -1,17 +1,18 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { scanFindingComments, scanFindings, scans } from "@repo/db-elise/schema";
+import { scanFindingComments, scanFindings, scanRepoBranches, scanRepos, scans } from "@repo/db-elise/schema";
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { CROSS_ACCOUNT_CASES, NOT_TENANT_ROUTES, OTHER_COMMENT_ID, type CrossAccountCase } from "#/__tests__/tenant-route-cases";
+import { CROSS_ACCOUNT_CASES, NOT_TENANT_ROUTES, OTHER_COMMENT_ID, OTHER_REPO_ID, OTHER_SECOND_REPO, type CrossAccountCase } from "#/__tests__/tenant-route-cases";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 
 const EnvelopeSchema = z.object({ data: z.record(z.string(), z.unknown()).nullable() });
 
 let test: TestDb;
 let tenantId: string;
+let strangerId: string;
 
 const app = tenantRouteApp(() => test, { sessionUserId: async () => "guard-test-user" });
 
@@ -35,8 +36,11 @@ beforeAll(async () => {
   test = await openTestDb();
   tenantId = (await seedTenant(test, "acme")).tenantId;
   const otherTenantId = (await seedTenant(test, "other")).tenantId;
+  strangerId = (await seedTenant(test, "stranger")).tenantId;
   await seedRepo(test, tenantId);
   const otherRepoId = await seedRepo(test, otherTenantId);
+  await test.raw.insert(scanRepos).values({ id: OTHER_REPO_ID, tenantId: otherTenantId, canonical: "octocat/spoon-knife", url: OTHER_SECOND_REPO, defaultBranch: "main" });
+  await test.raw.insert(scanRepoBranches).values({ tenantId: otherTenantId, repoId: OTHER_REPO_ID, name: "main" });
   await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"));
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
@@ -60,8 +64,8 @@ describe("every tenant route has a cross-account case", () => {
     expect(NOT_TENANT_ROUTES.filter((route) => !mountedRoutes.includes(route))).toEqual([]);
   });
 
-  it.each(runCases)("$route answers one Account with nothing of another's", async ({ path, method, body, expect: outcome }) => {
-    const res = await callAs(app, tenantId, path, { method, body });
+  it.each(runCases)("$route answers one Account with nothing of another's", async ({ path, method, body, as, expect: outcome }) => {
+    const res = await callAs(app, as === "stranger" ? strangerId : tenantId, path, { method, body });
     const { data } = EnvelopeSchema.parse(await res.json());
     const lists = Object.values(data ?? {}).filter(Array.isArray);
     expect(outcome === "not-found" ? [res.status, 0] : [res.status, lists.flat().length]).toEqual(outcome === "not-found" ? [404, 0] : [200, 0]);

@@ -1,5 +1,5 @@
 export type CrossAccountCase =
-  | { kind: "run"; path: string; method?: string; body?: unknown; expect: "not-found" | "empty" }
+  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "not-found" | "empty" }
   | { kind: "pending"; ticket: number };
 
 const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket });
@@ -12,6 +12,8 @@ const pending = (ticket: number): CrossAccountCase => ({ kind: "pending", ticket
 const OTHER_REPO = "https://github.com/octocat/Hello-World";
 const OTHER_FINGERPRINT = "b".repeat(64);
 export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
+export const OTHER_REPO_ID = "00000000-0000-4000-8000-0000000000b2";
+export const OTHER_SECOND_REPO = "https://github.com/octocat/Spoon-Knife";
 
 // -----
 // Routes that name no Account of their own: sign-in, the
@@ -38,7 +40,9 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 // One entry for every other route. "run" is called as one
 // Account with another Account's IDs. "pending" names the
 // RLS ticket that moves the route onto the tenant role and
-// replaces the entry with a "run" case.
+// replaces the entry with a "run" case. A list that names no
+// ID runs as "stranger", an Account with no rows, so the list
+// is empty unless it shows another Account's rows.
 // -----
 export const CROSS_ACCOUNT_CASES = {
   "GET /findings": { kind: "run", path: "/findings?scanId=theirs", expect: "empty" },
@@ -59,11 +63,11 @@ export const CROSS_ACCOUNT_CASES = {
     expect: "not-found",
   },
   "PUT /findings/triage": pending(74),
-  "GET /repos": pending(75),
-  "POST /repos": pending(75),
-  "GET /repos/:repoId": pending(75),
-  "GET /repos/:repoId/findings": pending(75),
-  "POST /repos/:repoId/branches": pending(75),
+  "GET /repos": { kind: "run", path: "/repos", as: "stranger", expect: "empty" },
+  "POST /repos": { kind: "run", path: "/repos", method: "POST", body: { repo: OTHER_SECOND_REPO }, expect: "empty" },
+  "GET /repos/:repoId": { kind: "run", path: `/repos/${OTHER_REPO_ID}`, expect: "not-found" },
+  "GET /repos/:repoId/findings": { kind: "run", path: `/repos/${OTHER_REPO_ID}/findings`, expect: "not-found" },
+  "POST /repos/:repoId/branches": { kind: "run", path: `/repos/${OTHER_REPO_ID}/branches`, method: "POST", body: { name: "release" }, expect: "not-found" },
   "GET /scans": pending(76),
   "GET /scans/:scanId": pending(76),
   "GET /scans/:scanId/diff": pending(76),
