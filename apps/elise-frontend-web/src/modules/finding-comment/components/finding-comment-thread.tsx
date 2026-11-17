@@ -37,7 +37,7 @@ function EditableComment({ event, canEdit, canDelete, editPending, onEdit, onDel
     button.focus();
   }, []);
   const stopEditing = () => {
-    restoreFocus.current = true;
+    restoreFocus.current = canEdit;
     setEditing(false);
   };
   const markers =
