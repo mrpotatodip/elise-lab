@@ -3,22 +3,16 @@ import type { ScanUsage } from "@repo/contracts/elise";
 import { dbConnect } from "#/lib/db-connection";
 import type { DbError, ExternalError, ParseError } from "#/lib/effect-query";
 import type { ScanParams, ScanState } from "#/schemas";
-import { SCAN_RECORDS_RECORDED_SKILL } from "#/modules/scan-records/constants";
 import { resolveScanBranchEffect, type ScanBranchOutcome } from "#/modules/branches";
-import { readHistoryEffect, scanRowOfEffect, writeScanRecordEffect } from "#/modules/scan-records/queries";
-import type { HistoryContext, RecordScanEnv } from "#/modules/scan-records/types";
+import { scanRowOfEffect, writeScanRecordEffect } from "#/modules/scan-records/queries";
+import type { RecordScanEnv } from "#/modules/scan-records/types";
 import { buildScanRecordSvc } from "./build-scan-record-svc";
-import { readGivenSvc } from "./read-given-svc";
-
-const NO_HISTORY: HistoryContext = { history: new Map(), triage: new Map(), given: [] };
 
 // -----
 // Every succeeded scan belongs to the branch it read, so the
-// branch page lists it. Only one of the recorded skill moves that
-// branch's history, and it is judged against the priors saved when
-// it launched: a profile scan reads no history (it is frozen). A scan that was already closed as
-// failed (a newer request expired it) writes nothing: its
-// history is stale.
+// branch page lists it. No scan writes the History. A scan that
+// was already closed as failed (a newer request expired it)
+// writes nothing.
 // -----
 export const recordScanSvc = (
   env: RecordScanEnv,
@@ -39,11 +33,7 @@ export const recordScanSvc = (
       return;
     }
     const succeeded = status === "succeeded";
-    const movesHistory = succeeded && params.options.skill === SCAN_RECORDS_RECORDED_SKILL;
     const outcome: ScanBranchOutcome = succeeded ? yield* resolveScanBranchEffect(db, params.accountId, repoId, { name: branchName, ref }) : { id: null, reason: null };
-    const context = movesHistory && outcome.id
-      ? { ...(yield* readHistoryEffect(db, params.accountId, repoId, outcome.id)), given: yield* readGivenSvc(env.REPORTS, params) }
-      : NO_HISTORY;
-    const record = yield* buildScanRecordSvc(env.REPORTS, params, repoId, { ...outcome, name: outcome.name ?? branchName }, status, error, usage, context);
+    const record = yield* buildScanRecordSvc(env.REPORTS, params, repoId, { ...outcome, name: outcome.name ?? branchName }, status, error, usage);
     yield* writeScanRecordEffect(db, record);
   });

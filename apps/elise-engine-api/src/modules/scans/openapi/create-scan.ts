@@ -24,7 +24,6 @@ export const createScanDoc = describeRoute({
       "The Worker finds or makes the repo's record for the account. `Octocat/Hello-World.git` and `octocat/hello-world` are one repo.",
       "The Worker refuses the request if the account already has too many active scans, or if this repo already has an active scan (409, naming the running scan).",
       "The Worker saves the status `queued` and starts the Workflow. The scan reads the default branch, or the `ref` (a branch, tag or commit) if one is given, and records the commit it read.",
-      "A lite scan is given the repo's unresolved findings from earlier scans and re-checks them first, so a problem is carried forward, closed only by evidence, or flagged as back.",
       "The Worker returns the scan ID. Read the status with GET /scans/{scanId}.",
     ],
     example: [

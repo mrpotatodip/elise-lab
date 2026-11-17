@@ -31,7 +31,7 @@ export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: s
       return { commitSha: null, branch: null };
     },
 
-    launchAgent: async (options, priors) => {
+    launchAgent: async (options) => {
       await runEffect(
         insertRunnerJobEffect(db, {
           scanId: params.scanId,
@@ -41,7 +41,7 @@ export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: s
           ref: params.ref ?? null,
           prompt: buildAgentPrompt(options, RUNNER_PROMPT_PLACE),
           optionsJson: JSON.stringify(options),
-          priorsJson: priors.length > 0 ? JSON.stringify(priors, null, 2) : "",
+          priorsJson: "",
         }),
       );
     },

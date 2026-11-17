@@ -19,7 +19,6 @@ let accounts = 0;
 
 const REPO = "https://github.com/octocat/Hello-World";
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
-const NO_HISTORY = { history: new Map(), triage: new Map(), given: [] };
 const EVIDENCE = [{ file: "src/a.ts", line: 1, description: "the query has no tenant filter" }];
 
 const confirmed = (id: string, title: string, severity: "critical" | "high" | "medium" | "low" = "high") => ({
@@ -40,7 +39,7 @@ type Saved = { findings?: unknown[]; profile?: "quick" | "standard" | "deep"; re
 // -----
 // Records a Scan the way the workflow does: find the Branch it
 // read, build the record from the files the agent wrote, write it.
-// A profile Scan reads and writes no History.
+// No Scan reads or writes the History.
 // -----
 const ownId = (name: string) => `a${accounts}-${name}`;
 const plainId = (id: string) => id.slice(ownId("").length);
@@ -62,7 +61,7 @@ const recordScan = async (name: string, saved: Saved = {}) => {
   const bindings = fakeBindings();
   bindings.store.set(`accounts/${tenantId}/scans/${scanId}/findings.json`, JSON.stringify(saved.findings ?? []));
   if (saved.report) bindings.store.set(`accounts/${tenantId}/scans/${scanId}/REPORT.md`, saved.report);
-  const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { ...outcome, name: outcome.name ?? read.name }, status, null, null, NO_HISTORY));
+  const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { ...outcome, name: outcome.name ?? read.name }, status, null, null));
   await run(writeScanRecordEffect(test.http, record));
   await test.raw.update(scans).set({ commitSha: saved.commit ?? `${scanId}-sha` }).where(eq(scans.id, scanId));
 };

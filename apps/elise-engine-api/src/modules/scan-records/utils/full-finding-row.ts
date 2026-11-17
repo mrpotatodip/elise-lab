@@ -2,7 +2,7 @@ import type { ScanParams } from "#/schemas";
 import { SCAN_RECORDS_FULL_CLASS } from "#/modules/scan-records/constants";
 import type { FullFinding } from "#/modules/scan-records/schemas";
 import type { NewFindingRow } from "#/modules/scan-records/types";
-import { sha256Hex } from "./fingerprint-of";
+import { sha256Hex } from "@repo/db-elise";
 
 const validationPlanText = (plan: { local?: string; deployment?: string }): string | null => {
   const parts = [plan.local ? `Local: ${plan.local}` : null, plan.deployment ? `Deployment: ${plan.deployment}` : null].filter((part) => part !== null);

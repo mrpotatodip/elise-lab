@@ -55,7 +55,7 @@ const newScan = async () => {
 };
 
 const queue = async (scanId: string, over: Partial<ScanParams> = {}, at = NOW, options: ScanOptions = OPTIONS) => {
-  await runnerSandbox(test.http, paramsFor(scanId, over), over.runnerId ?? runnerId, () => at).launchAgent(options, []);
+  await runnerSandbox(test.http, paramsFor(scanId, over), over.runnerId ?? runnerId, () => at).launchAgent(options);
   return scanId;
 };
 
@@ -314,13 +314,13 @@ describe("the profile met after a Runner's result", () => {
     const scanId = await newScan();
     await test.raw.update(scans).set({ skill: "full", profile: "deep" }).where(eq(scans.id, scanId));
     const params = paramsFor(scanId, { options: FULL_OPTIONS });
-    await runnerSandbox(test.http, params, runnerId, () => NOW).launchAgent(FULL_OPTIONS, []);
+    await runnerSandbox(test.http, params, runnerId, () => NOW).launchAgent(FULL_OPTIONS);
     await run(claimRunnerJobEffect(test.http, runnerId, NOW));
     await report(scanId, { state: "succeeded", files });
 
     const bindings = fakeBindings();
     await run(saveScanFilesEffect(bindings.env.REPORTS, tenantId, scanId, await runnerSandbox(test.http, params, runnerId).readFiles()));
-    const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { id: null, name: null, reason: null }, "succeeded", null, null, { history: new Map(), triage: new Map(), given: [] }));
+    const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { id: null, name: null, reason: null }, "succeeded", null, null));
     await run(writeScanRecordEffect(test.http, record));
     return scanId;
   };

@@ -8,33 +8,11 @@ import {
   SCAN_RECORDS_LEDGER_FILE,
   SCAN_RECORDS_METADATA_FILE,
   SCAN_RECORDS_PROFILE_SKILL,
-  SCAN_RECORDS_RECHECK_FILE,
-  SCAN_RECORDS_RECORDED_SKILL,
   SCAN_RECORDS_REPORT_FILE,
 } from "#/modules/scan-records/constants";
-import { FullFindingsSchema, LiteFindingsSchema, RecheckSchema, type FullFinding, type LiteFinding, type Recheck } from "#/modules/scan-records/schemas";
-import type { HistoryContext, NewFindingRow, PlannedFinding, ScanBranch, ScanRecord } from "#/modules/scan-records/types";
-import { checkRunnerProfile, fingerprintOf, fullFindingRowOf, isPartialScan, planHistory, profileMetOf } from "#/modules/scan-records/utils";
-
-const NO_HISTORY: HistoryContext = { history: new Map(), triage: new Map(), given: [] };
-
-// -----
-// The planner stamps every row with a branch. A scan with no
-// branch writes no History rows, so this id never reaches the
-// database.
-// -----
-const UNUSED_BRANCH_ID = "00000000-0000-0000-0000-000000000000";
-
-const readFindings = (
-  reports: R2Bucket,
-  params: ScanParams,
-): Effect.Effect<LiteFinding[], ExternalError | ParseError> =>
-  Effect.gen(function* () {
-    const object = yield* readScanFileEffect(reports, scanKey(params.accountId, params.scanId, SCAN_RECORDS_FINDINGS_FILE));
-    if (!object) return [];
-    const text = yield* Effect.tryPromise({ try: () => object.text(), catch: toExternalError });
-    return yield* Effect.try({ try: () => LiteFindingsSchema.parse(JSON.parse(text)), catch: toParseError });
-  });
+import { FullFindingsSchema, type FullFinding } from "#/modules/scan-records/schemas";
+import type { NewFindingRow, ScanBranch, ScanRecord } from "#/modules/scan-records/types";
+import { checkRunnerProfile, fullFindingRowOf, isPartialScan, profileMetOf } from "#/modules/scan-records/utils";
 
 const readText = (reports: R2Bucket, params: ScanParams, file: string): Effect.Effect<string | null, ExternalError> =>
   Effect.gen(function* () {
@@ -67,37 +45,6 @@ const readProfileScan = (
     return { findings, partial: isPartialScan(report, ledger, metadata), profileMet: profileMetOf(params.options.profile, check) };
   });
 
-// -----
-// A missing or unreadable recheck.json means the agent
-// answered nothing: every prior stays open and unchecked.
-// -----
-const readRecheck = (reports: R2Bucket, params: ScanParams): Effect.Effect<Recheck, ExternalError> =>
-  Effect.gen(function* () {
-    const object = yield* readScanFileEffect(reports, scanKey(params.accountId, params.scanId, SCAN_RECORDS_RECHECK_FILE));
-    if (!object) return [];
-    const text = yield* Effect.tryPromise({ try: () => object.text(), catch: toExternalError });
-    return yield* Effect.try({ try: () => RecheckSchema.parse(JSON.parse(text)), catch: toParseError }).pipe(Effect.orElseSucceed((): Recheck => []));
-  });
-
-const toRow = ({ finding, fingerprint, origin }: PlannedFinding, params: ScanParams): NewFindingRow => ({
-  origin,
-  tenantId: params.accountId,
-  scanId: params.scanId,
-  findingId: finding.id,
-  fingerprint,
-  status: finding.status,
-  severity: finding.status === "confirmed" ? finding.severity : null,
-  title: finding.title,
-  class: finding.class,
-  file: finding.location[0]?.file ?? null,
-  line: finding.location[0]?.line ?? null,
-  actor: finding.actor ?? null,
-  impact: finding.impact ?? null,
-  evidence: finding.evidence ?? null,
-  fix: finding.fix ?? null,
-  needs: finding.needs ?? null,
-});
-
 export const buildScanRecordSvc = (
   reports: R2Bucket,
   params: ScanParams,
@@ -106,39 +53,16 @@ export const buildScanRecordSvc = (
   status: ScanState,
   error: string | null,
   usage: ScanUsage | null,
-  context: HistoryContext,
 ): Effect.Effect<ScanRecord, ExternalError | ParseError> =>
   Effect.gen(function* () {
     // -----
-    // A scan that failed, or of a skill whose findings are
-    // not recorded, saw nothing. A scan with no tracked branch
-    // (a tag, a commit, an untracked name) records its findings
-    // but must not move any History: its checkout is not the
-    // code a History is about.
-    // -----
-    const recordsFindings = status === "succeeded" && params.options.skill === SCAN_RECORDS_RECORDED_SKILL;
-    // -----
-    // A succeeded full Scan records its findings and its partial
-    // flag too, but writes no History row and gets no priors:
-    // the History is frozen at the end of the lite era.
+    // A succeeded Scan records its findings, its partial flag and,
+    // on a Runner, the profile it met. A failed Scan saw nothing.
+    // No Scan writes the History or gets Prior findings: its rows
+    // are frozen. A Scan of the older Skill is no longer started,
+    // so its findings are not read here.
     // -----
     const profile = status === "succeeded" && params.options.skill === SCAN_RECORDS_PROFILE_SKILL ? yield* readProfileScan(reports, params) : null;
-    const movesHistory = recordsFindings && branch.id !== null;
-    const found = recordsFindings ? yield* readFindings(reports, params) : [];
-    const fingerprints = yield* Effect.tryPromise({
-      try: () => Promise.all(found.map((finding) => fingerprintOf(finding.class, finding.location[0]?.file ?? null, finding.title))),
-      catch: toExternalError,
-    });
-    const recheck = movesHistory ? yield* readRecheck(reports, params) : [];
-    const plan = planHistory({
-      scanId: params.scanId,
-      repoId,
-      branchId: branch.id ?? UNUSED_BRANCH_ID,
-      tenantId: params.accountId,
-      ...(movesHistory ? context : NO_HISTORY),
-      found: found.map((finding, index) => ({ finding, fingerprint: fingerprints[index] })),
-      recheck,
-    });
     return {
       scan: {
         id: params.scanId,
@@ -149,10 +73,6 @@ export const buildScanRecordSvc = (
         branch: branch.name,
         branchId: branch.id,
         untrackedReason: branch.id ? null : branch.reason,
-        priorsGiven: movesHistory ? plan.tally.given : null,
-        priorsCarried: movesHistory ? plan.tally.carried : null,
-        priorsClosed: movesHistory ? plan.tally.closed : null,
-        priorsUnchecked: movesHistory ? plan.tally.unchecked : null,
         partial: profile?.partial ?? null,
         profileMet: profile?.profileMet ?? null,
         status,
@@ -172,7 +92,6 @@ export const buildScanRecordSvc = (
         createdAt: new Date(params.createdAt),
         finishedAt: status === "succeeded" || status === "failed" ? new Date() : null,
       },
-      findings: profile ? profile.findings : plan.findings.map((item) => toRow(item, params)),
-      history: movesHistory ? plan.history : [],
+      findings: profile ? profile.findings : [],
     };
   });

@@ -5,7 +5,6 @@ import type { ScanUsage } from "@repo/contracts/elise";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { memoryScanRepo } from "#/__tests__/memory-scan-repo";
 import type { ScanParams, ScanState } from "#/schemas";
-import type { PriorFinding } from "#/modules/scan-records";
 import { SCAN_SANDBOX_FULL_PHASES, type FullPhase, type OutboundAnthropicKey, type OutboundGithub } from "#/modules/scan-sandbox";
 import { runScan } from "#/modules/scan-workflow/lib";
 import type { SandboxPort } from "#/modules/scan-workflow/types";
@@ -13,7 +12,6 @@ import type { SandboxPort } from "#/modules/scan-workflow/types";
 const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const REPO_ID = "5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6";
 const usage: ScanUsage = { inputTokens: 1, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.1, turns: 3, durationMs: 4000 };
-const prior: PriorFinding = { priorId: "a".repeat(64), status: "confirmed", severity: "high", title: "t", class: "authz", file: "src/a.ts", line: 1 };
 
 const params = (extra: Partial<ScanParams> = {}): ScanParams => ({
   scanId: "scan-1",
@@ -39,7 +37,6 @@ const fakeStep = (names: string[]): WorkflowStep => {
 };
 
 type SetupOptions = {
-  priors?: PriorFinding[];
   recordFails?: ScanState;
   agent?: "succeeded" | "failed" | "running";
   pollThrows?: boolean;
@@ -58,7 +55,6 @@ const setup = (options: SetupOptions = {}) => {
   const settles: string[] = [];
   const ledger = memoryScanRepo();
   const bindings = fakeBindings();
-  const launches: PriorFinding[][] = [];
   const prepares: { ref?: string }[] = [];
   const githubs: (OutboundGithub | undefined)[] = [];
   const anthropicKeys: (OutboundAnthropicKey | undefined)[] = [];
@@ -69,7 +65,7 @@ const setup = (options: SetupOptions = {}) => {
       anthropicKeys.push(anthropicKey);
       return { commitSha: "abc123", branch: ref && /^v\d/.test(ref) ? null : (ref ?? "main") };
     },
-    launchAgent: async (_options, priors) => void launches.push(priors),
+    launchAgent: async () => undefined,
     launchPhase: async (_options, phase) => {
       currentPhase = phase;
       capReached = capReached || options.capReachedInPhase === phase;
@@ -94,7 +90,6 @@ const setup = (options: SetupOptions = {}) => {
     sandbox,
     ledger: ledger.repo,
     reports: bindings.env.REPORTS,
-    readPriors: async () => options.priors ?? [],
     sealedKeyFor: async () => options.sealedKey ?? null,
     recordScan: async (_params: ScanParams, status: ScanState) => {
       calls.push(`record:${status}:${ledger.rows.get("scan-1")?.status}`);
@@ -102,7 +97,7 @@ const setup = (options: SetupOptions = {}) => {
     },
     settleCredit: async (_params: ScanParams, status: "succeeded" | "failed") => void settles.push(status),
   };
-  return { names, calls, ledger, bindings, launches, prepares, githubs, anthropicKeys, settles, deps };
+  return { names, calls, ledger, bindings, prepares, githubs, anthropicKeys, settles, deps };
 };
 
 const queue = async (ledger: ReturnType<typeof memoryScanRepo>, input: ScanParams) => {
@@ -274,40 +269,6 @@ describe("runScan", () => {
     expect(onBranch.ledger.rows.get("scan-1")).toMatchObject({ branch: "release" });
     expect(onTag.prepares).toEqual([{ ref: "v1.0.0" }]);
     expect(onTag.ledger.rows.get("scan-1")).toMatchObject({ branch: null });
-  });
-
-  it("saves the priors with the scan before the agent starts, and hands the same list to the agent", async () => {
-    const { names, ledger, bindings, launches, deps } = setup({ priors: [prior] });
-    await queue(ledger, params());
-
-    await runScan(deps, params(), fakeStep(names));
-
-    expect(names.indexOf("read-priors")).toBeLessThan(names.indexOf("launch-agent"));
-    expect(launches).toEqual([[prior]]);
-    expect(JSON.parse(bindings.store.get(`accounts/${ACCOUNT}/scans/scan-1/prior-findings.json`) ?? "null")).toEqual([prior]);
-    expect(ledger.files.get("scan-1/prior-findings.json")).toMatchObject({ name: "prior-findings.json" });
-  });
-
-  it("saves no priors file when there are no priors", async () => {
-    const { names, ledger, bindings, launches, deps } = setup();
-    await queue(ledger, params());
-
-    await runScan(deps, params(), fakeStep(names));
-
-    expect(launches).toEqual([[]]);
-    expect(bindings.store.has(`accounts/${ACCOUNT}/scans/scan-1/prior-findings.json`)).toBe(false);
-  });
-
-  it("gives a profile Scan no priors and saves no prior-findings.json, whatever the History holds", async () => {
-    const profileScan = params({ options: { ...params().options, skill: "full" } });
-    const { names, ledger, bindings, launches, deps } = setup({ priors: [prior] });
-    await queue(ledger, profileScan);
-
-    await runScan(deps, profileScan, fakeStep(names));
-
-    expect(launches).toEqual([[]]);
-    expect(bindings.store.has(`accounts/${ACCOUNT}/scans/scan-1/prior-findings.json`)).toBe(false);
-    expect(ledger.files.has("scan-1/prior-findings.json")).toBe(false);
   });
 
   it("fails the scan when its results cannot be recorded, and still tries to record the failure", async () => {

@@ -58,14 +58,13 @@ export const claimJobSvc = (db: DbConnectType, runnerId: string): Effect.Effect<
   });
 
 // -----
-// Only the names a Scan may keep, and not the earlier findings,
-// which the Workflow saved itself.
+// Only the names a Scan may keep.
 // -----
 const keptFiles = (sent: RunnerJobResultBody["files"]): ScanFiles => {
   const kept: ScanFiles = {};
   for (const name of SCAN_REPORT_FILES) {
     const text = sent?.[name];
-    if (text !== undefined && name !== "prior-findings.json") kept[name] = text;
+    if (text !== undefined) kept[name] = text;
   }
   return kept;
 };
