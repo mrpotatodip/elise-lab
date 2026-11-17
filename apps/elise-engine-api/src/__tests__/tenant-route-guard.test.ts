@@ -1,8 +1,13 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { ensureTenantRoles, findTenantRole } from "@repo/db-elise";
 import {
   accessAuditLog,
   authUser,
+  parties,
+  partyMasterTypes,
+  partyPersons,
+  partyRoles,
   platformMasterPlans,
   scanFiles,
   scanFindingComments,
@@ -13,9 +18,13 @@ import {
   tenantAnthropicKeys,
   tenantCreditLedger,
   tenantGithubInstallations,
+  tenantGroupMembers,
+  tenantGroups,
   tenantRunners,
   tenants,
   tenantSubscriptions,
+  tenantTeamInviteGroups,
+  tenantTeamInvites,
 } from "@repo/db-elise/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -26,7 +35,11 @@ import {
   CROSS_ACCOUNT_CASES,
   NOT_TENANT_ROUTES,
   OTHER_COMMENT_ID,
+  OTHER_GROUP_ID,
+  OTHER_GROUP_NAME,
   OTHER_INSTALL_ID,
+  OTHER_INVITE_ID,
+  OTHER_PARTY_ID,
   OTHER_REPO_ID,
   OTHER_RUNNER_ID,
   OTHER_RUNNER_NAME,
@@ -36,7 +49,7 @@ import {
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 
 const EnvelopeSchema = z.object({ data: z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())]).nullable() });
-const STATUS_OF = { "not-found": 404, empty: 200, created: 201 };
+const STATUS_OF = { "not-found": 404, empty: 200, refused: 400, created: 201 };
 const GUARD_USER_ID = "guard-test-user";
 
 let test: TestDb;
@@ -114,6 +127,17 @@ beforeAll(async () => {
   });
   await test.raw.insert(tenantAnthropicKeys).values({ tenantId: otherTenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
   await seedOtherUsage(otherTenantId, otherRepoId);
+  await ensureTenantRoles(test.raw, otherTenantId);
+  const otherRole = await findTenantRole(test.raw, otherTenantId, "workspace_member");
+  if (!otherRole) throw new Error("workspace_member role missing");
+  const [personType] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
+  await test.raw.insert(parties).values({ id: OTHER_PARTY_ID, masterTypeId: personType.id });
+  await test.raw.insert(partyPersons).values({ partyId: OTHER_PARTY_ID, firstName: "Bo", lastName: "Chen" });
+  await test.raw.insert(partyRoles).values({ partyId: OTHER_PARTY_ID, tenantId: otherTenantId, roleId: otherRole.id, roleScope: "tenant" });
+  await test.raw.insert(tenantGroups).values({ id: OTHER_GROUP_ID, tenantId: otherTenantId, name: OTHER_GROUP_NAME });
+  await test.raw.insert(tenantGroupMembers).values({ groupId: OTHER_GROUP_ID, tenantId: otherTenantId, partyId: OTHER_PARTY_ID });
+  await test.raw.insert(tenantTeamInvites).values({ id: OTHER_INVITE_ID, tenantId: otherTenantId, email: "theirs@example.com", roleId: otherRole.id, tokenHash: "theirs", invitedBy: OTHER_PARTY_ID, expiresAt: new Date("2099-01-01T00:00:00Z") });
+  await test.raw.insert(tenantTeamInviteGroups).values({ inviteId: OTHER_INVITE_ID, groupId: OTHER_GROUP_ID, tenantId: otherTenantId });
 });
 
 afterAll(async () => {

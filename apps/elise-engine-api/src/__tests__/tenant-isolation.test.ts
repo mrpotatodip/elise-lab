@@ -22,8 +22,6 @@ let other: Seed;
 // Tables with a tenant_id column that keep no policy, and why. A new
 // tenant table fails the catalog test until it has a policy or is
 // listed here with a reason.
-// - An invite is found by its token before the person belongs to any
-//   Tenant, and its group list is found the same way.
 // - party_master_roles and party_roles hold platform Roles with no
 //   Tenant (a null tenant_id) that every Account must read, and a
 //   Role check runs before any Tenant is set.
@@ -34,8 +32,6 @@ let other: Seed;
 //   Worker does not use it yet (ADR 0001).
 // -----
 const NO_POLICY = [
-  "tenant_team_invites",
-  "tenant_team_invite_groups",
   "party_master_roles",
   "party_roles",
   "platform_invite_code_redemptions",

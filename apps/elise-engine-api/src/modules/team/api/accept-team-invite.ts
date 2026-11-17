@@ -13,6 +13,10 @@ const app = new Hono<AppEnv>();
 // -----
 // A session is read only when the request sends
 // credentials: a new person sends none.
+// Owner role on purpose: the invite is found by its
+// token, before any Account is known, so there is no
+// app.tenant_id to set and the invite tables' policy
+// would hide every row.
 // -----
 app.post("/invites/:token/accept", acceptTeamInviteDoc, requireInviteLimit, zValidator("param", TeamInviteTokenParamSchema), zValidator("json", AcceptTeamInviteBodySchema), async (c) => {
   const { token } = c.req.valid("param");

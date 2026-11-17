@@ -4,7 +4,7 @@
 // which differ from those the guard seeds for the other Account.
 // -----
 export type CrossAccountCase =
-  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "not-found" | "empty" | "created" }
+  | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "not-found" | "empty" | "refused" | "created" }
   | { kind: "run"; path: string; method?: string; body?: unknown; as?: "stranger"; expect: "own"; own: Record<string, number | null> }
   | { kind: "own-account"; shownBy: string }
   | { kind: "pending"; ticket: number };
@@ -31,6 +31,10 @@ export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
 export const OTHER_REPO_ID = "00000000-0000-4000-8000-0000000000b2";
 export const OTHER_SECOND_REPO = "https://github.com/octocat/Spoon-Knife";
 export const OTHER_INSTALL_ID = "00000000-0000-4000-8000-0000000000b3";
+export const OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000b5";
+export const OTHER_GROUP_NAME = "Backend";
+export const OTHER_INVITE_ID = "00000000-0000-4000-8000-0000000000b6";
+export const OTHER_PARTY_ID = "00000000-0000-4000-8000-0000000000b7";
 export const OTHER_RUNNER_ID = "00000000-0000-4000-8000-0000000000c1";
 export const OTHER_RUNNER_NAME = "runner-of-the-other";
 
@@ -56,12 +60,16 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 ];
 
 // -----
-// One entry for every other route, run in this order. "run" is called as one
-// Account with another Account's IDs. "pending" names the
-// RLS ticket that moves the route onto the tenant role and
-// replaces the entry with a "run" case. A list that names no
-// ID runs as "stranger", an Account with no rows, so the list
-// is empty unless it shows another Account's rows.
+// One entry for every other route, run in this order. "run" is
+// called as one Account with another Account's IDs: "not-found"
+// answers 404, "empty" 200 with no list entries, "refused" 400 (a
+// body that names another Account's row), and "created" 201 for a
+// write that lands in the caller's Account only (a name another
+// Account already uses is free here). A list that names no ID
+// runs as "stranger", an Account with no rows, so the list is
+// empty unless it shows another Account's rows. "pending" names
+// the RLS ticket that moves the route onto the tenant role and
+// replaces the entry with a "run" case.
 // -----
 export const CROSS_ACCOUNT_CASES = {
   "GET /findings": { kind: "run", path: "/findings?scanId=theirs", expect: "empty" },
@@ -111,16 +119,22 @@ export const CROSS_ACCOUNT_CASES = {
   // audit row, which those lists would then show.
   // -----
   "PATCH /usage/budget": { kind: "run", path: "/usage/budget", method: "PATCH", body: { monthlyBudgetUsd: null }, expect: "own", own: { budgetUsd: 20, spentUsd: 0, scans: 0 } },
-  "GET /team": pending(78),
-  "GET /team/roles": pending(78),
-  "POST /team/invites": pending(78),
-  "DELETE /team/invites/:inviteId": pending(78),
-  "GET /groups": pending(78),
-  "POST /groups": pending(78),
-  "PATCH /groups/:groupId": pending(78),
-  "DELETE /groups/:groupId": pending(78),
-  "PUT /groups/:groupId/members/:partyId": pending(78),
-  "DELETE /groups/:groupId/members/:partyId": pending(78),
+  "GET /team": { kind: "run", path: "/team", expect: "empty" },
+  "GET /team/roles": { kind: "run", path: "/team/roles", expect: "empty" },
+  "POST /team/invites": {
+    kind: "run",
+    path: "/team/invites",
+    method: "POST",
+    body: { email: "new@example.com", role: "workspace_member", groupIds: [OTHER_GROUP_ID] },
+    expect: "refused",
+  },
+  "DELETE /team/invites/:inviteId": { kind: "run", path: `/team/invites/${OTHER_INVITE_ID}`, method: "DELETE", expect: "not-found" },
+  "GET /groups": { kind: "run", path: "/groups", expect: "empty" },
+  "POST /groups": { kind: "run", path: "/groups", method: "POST", body: { name: OTHER_GROUP_NAME }, expect: "created" },
+  "PATCH /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "PATCH", body: { name: "Not mine to rename" }, expect: "not-found" },
+  "DELETE /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "DELETE", expect: "not-found" },
+  "PUT /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "PUT", expect: "not-found" },
+  "DELETE /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "DELETE", expect: "not-found" },
   "POST /github/connect": ownAccount("modules/github-installs/__tests__/github-installs-svc.test.ts"),
   "POST /github/installations": ownAccount("modules/github-installs/__tests__/github-installs-svc.test.ts"),
   "GET /github/installations": { kind: "run", path: "/github/installations", expect: "empty" },
