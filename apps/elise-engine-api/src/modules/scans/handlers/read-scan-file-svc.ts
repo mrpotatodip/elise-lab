@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { NotFound, type DbError, type ExternalError } from "#/lib/effect-query";
-import type { ScanRepo } from "#/modules/scan-ledger";
+import type { ScanReads } from "#/modules/scan-ledger";
 import { readScanFileEffect, scanPrefix } from "#/modules/scan-store";
 
 // -----
@@ -10,7 +10,7 @@ import { readScanFileEffect, scanPrefix } from "#/modules/scan-store";
 // -----
 export const readScanFileSvc = (
   reports: R2Bucket,
-  repo: ScanRepo,
+  repo: ScanReads,
   accountId: string,
   scanId: string,
   file: string,

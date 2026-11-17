@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 import { Invalid, NotFound, type Conflict, type DbError } from "#/lib/effect-query";
 import type { RepoBranchList, RepoDetail, RepoFindingList, RepoFindingsQuery, RepoList, ScanDiff } from "@repo/contracts/elise";
-import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
-import { listScansEffect } from "#/modules/scan-ledger";
+import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
+import { scanReads } from "#/modules/scan-ledger";
 import { REPOS_HISTORY_LIMIT } from "#/modules/repos/constants";
 import { addBranchesEffect, isCommitId, listBranchesEffect, normalizeBranchName } from "#/modules/branches";
 import { addRepoEffect, getRepoEffect, listRepoBranchesEffect, listReposEffect, repoFindingsEffect, scanDiffEffect } from "#/modules/repos/queries";
@@ -19,7 +19,7 @@ export const listReposSvc = (db: AppDbType, accountId: string): Effect.Effect<Re
 export const getRepoSvc = (db: AppDbType, accountId: string, repoId: string): Effect.Effect<RepoDetail, NotFound | DbError> =>
   Effect.gen(function* () {
     const repo = yield* getRepoEffect(db, accountId, repoId);
-    const page = yield* listScansEffect(db, accountId, REPOS_HISTORY_LIMIT, undefined, { repoId });
+    const page = yield* scanReads(db).list(accountId, REPOS_HISTORY_LIMIT, undefined, { repoId });
     const branches = yield* listRepoBranchesEffect(db, accountId, repoId);
     return { ...repo, history: page.scans, branches };
   });
@@ -47,7 +47,7 @@ export const listRepoFindingsSvc = (db: AppDbType, accountId: string, repoId: st
     return { findings: wanted.slice(offset, end), nextCursor: wanted.length > end ? String(end) : null };
   });
 
-export const scanDiffSvc = (db: DbConnectType, accountId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
+export const scanDiffSvc = (db: AppDbType, accountId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
   scanDiffEffect(db, accountId, scanId);
 
 const branchNamesOf = (names: string[]): Effect.Effect<string[], Invalid> =>

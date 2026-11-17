@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { authUser, scanFindingComments, scanFindings, scanRepoBranches, scanRepos, scans, tenantRunners } from "@repo/db-elise/schema";
+import { authUser, scanFiles, scanFindingComments, scanFindings, scanRepoBranches, scanRepos, scans, tenantRunners } from "@repo/db-elise/schema";
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
@@ -58,6 +58,7 @@ beforeAll(async () => {
   await test.raw.insert(scanRepos).values({ id: OTHER_REPO_ID, tenantId: otherTenantId, canonical: "octocat/spoon-knife", url: OTHER_SECOND_REPO, defaultBranch: "main" });
   await test.raw.insert(scanRepoBranches).values({ tenantId: otherTenantId, repoId: OTHER_REPO_ID, name: "main" });
   await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"));
+  await test.raw.insert(scanFiles).values({ tenantId: otherTenantId, scanId: "theirs", name: "REPORT.md", r2Key: `accounts/${otherTenantId}/scans/theirs/REPORT.md`, sizeBytes: 8, contentType: "text/markdown; charset=utf-8" });
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
   await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs, to delete or edit" });
