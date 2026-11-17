@@ -310,9 +310,9 @@ export type FindingTriageBody = z.infer<typeof FindingTriageBodySchema>;
 // -----
 // What is open on a branch: its findings are the merge of every
 // succeeded Scan of the branch. unchecked counts the open
-// problems that are not in the latest Scan: the newest succeeded
-// Scan of the branch did not see them, and no Scan closes a
-// problem.
+// problems that are not in the latest full Scan: the newest
+// Scan of the branch that weighs in a Verdict did not see them,
+// and no Scan closes a problem.
 // -----
 export const RepoOpenSchema = z.object({
   total: z.number().int().min(0),
@@ -350,6 +350,10 @@ export const RepoListSchema = z.object({ repos: z.array(RepoSchema) });
 // -----
 // A branch with its own history. latestCommit is the commit of
 // its newest succeeded scan: the commit to ask the verdict about.
+// fullScanId is the latest full Scan: the newest Scan of the
+// branch that weighs in a Verdict, the one "not in the latest
+// full scan" is measured against. null when no Scan of the
+// branch weighs. Optional so an older engine still parses.
 // -----
 export const RepoBranchSchema = z.object({
   id: z.uuid(),
@@ -359,6 +363,7 @@ export const RepoBranchSchema = z.object({
   latestScanId: z.string().nullable(),
   latestCommit: z.string().nullable(),
   latestScanAt: z.string().nullable(),
+  fullScanId: z.string().nullable().optional(),
 });
 
 export const RepoBranchListSchema = z.object({ branches: z.array(RepoBranchSchema) });
@@ -369,9 +374,9 @@ export const RepoParamSchema = z.object({ repoId: z.uuid() });
 
 // -----
 // scanId is the Scan that last saw the problem and firstSeenScanId
-// the one that first saw it. unchecked is true when the last-seen
-// Scan is not the branch's newest succeeded Scan: not in the
-// latest Scan.
+// the one that first saw it. unchecked is true when the branch's
+// latest full Scan (its newest Scan that weighs in a Verdict) did
+// not see it.
 // -----
 export const RepoFindingSchema = FindingSchema.extend({
   state: z.enum(REPO_FINDING_STATE_VALUES),

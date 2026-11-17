@@ -22,7 +22,7 @@ import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatus
 import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
-import { repoEmptyCopy, repoName, repoUntrackedCopy, type FindingFilter } from "../utils";
+import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
 
@@ -41,11 +41,13 @@ const FILTER_COPY = {
 
 const asFilter = (value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
 
-function ScanLink({ scanId, history }: { scanId: string; history: readonly ScanStatus[] }) {
-  const scan = history.find((item) => item.scanId === scanId);
+type ScanStarts = ReadonlyMap<string, ScanStatus["createdAt"]>;
+
+function ScanLink({ scanId, starts }: { scanId: string; starts: ScanStarts }) {
+  const startedAt = starts.get(scanId);
   return (
     <Link to="/scans/$scanId" params={{ scanId }} className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      {scan ? <ScanTime value={scan.createdAt} /> : "Open the scan"}
+      {startedAt ? <ScanTime value={startedAt} /> : "Open the scan"}
     </Link>
   );
 }
@@ -59,23 +61,33 @@ function SheetFact({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-const fixedOnOf = (finding: RepoFinding, history: readonly ScanStatus[]) => history.find((scan) => scan.scanId === finding.fixedInScanId)?.createdAt ?? null;
+const fixedOnOf = (finding: RepoFinding, starts: ScanStarts) => (finding.fixedInScanId ? (starts.get(finding.fixedInScanId) ?? null) : null);
 
-function RepoFindingFacts({ finding, history }: { finding: RepoFinding; history: readonly ScanStatus[] }) {
+function RepoFindingFacts({ finding, starts, fullScanId }: { finding: RepoFinding; starts: ScanStarts; fullScanId: string | null | undefined }) {
   return (
     <>
       <SheetFact label="First seen in">
-        <ScanLink scanId={finding.firstSeenScanId} history={history} />
+        <ScanLink scanId={finding.firstSeenScanId} starts={starts} />
       </SheetFact>
       <SheetFact label="Last seen in">
-        <ScanLink scanId={finding.scanId} history={history} />
+        <ScanLink scanId={finding.scanId} starts={starts} />
       </SheetFact>
       {finding.fixedInScanId && (
         <SheetFact label="Fixed in">
-          <ScanLink scanId={finding.fixedInScanId} history={history} />
+          <ScanLink scanId={finding.fixedInScanId} starts={starts} />
         </SheetFact>
       )}
-      {finding.unchecked && <SheetFact label="Latest scan">This problem is not in the latest scan. It stays open until a person decides it.</SheetFact>}
+      {finding.unchecked && (
+        <SheetFact label="Latest full scan">
+          {fullScanId ? (
+            <>
+              Not in the latest full scan, <ScanLink scanId={fullScanId} starts={starts} />. It stays open until a person decides it.
+            </>
+          ) : (
+            "This problem is not in the latest full scan. It stays open until a person decides it."
+          )}
+        </SheetFact>
+      )}
       {finding.possibleDuplicateOf && <SheetFact label="Possible duplicate">It may repeat another finding in this repository.</SheetFact>}
     </>
   );
@@ -87,7 +99,7 @@ type FindingRow = {
   open: () => void;
   repoId: string;
   fixedOn: string | null;
-  history: readonly ScanStatus[];
+  starts: ScanStarts;
   blocks: boolean;
   onSaved: ComponentProps<typeof FindingTriageSelect>["onSaved"];
 };
@@ -115,19 +127,19 @@ const titleColumn = findingColumn.display({
       >
         {row.original.finding.title}
       </button>
-      {row.original.finding.unchecked && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Not in the latest scan</p>}
+      {row.original.finding.unchecked && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Not in the latest full scan</p>}
       <p className="relative z-10 mt-1 flex flex-wrap gap-x-3 text-sm leading-relaxed text-muted-foreground">
         {row.original.finding.firstSeenScanId === row.original.finding.scanId ? (
           <span>
-            Seen in <ScanLink scanId={row.original.finding.scanId} history={row.original.history} />
+            Seen in <ScanLink scanId={row.original.finding.scanId} starts={row.original.starts} />
           </span>
         ) : (
           <>
             <span>
-              First seen <ScanLink scanId={row.original.finding.firstSeenScanId} history={row.original.history} />
+              First seen <ScanLink scanId={row.original.finding.firstSeenScanId} starts={row.original.starts} />
             </span>
             <span>
-              Last seen <ScanLink scanId={row.original.finding.scanId} history={row.original.history} />
+              Last seen <ScanLink scanId={row.original.finding.scanId} starts={row.original.starts} />
             </span>
           </>
         )}
@@ -185,7 +197,9 @@ const openColumn = findingColumn.display({
 const findingColumnsWithStatus = findingColumn.columns([severityColumn, titleColumn, statusColumn, whereColumn, decisionColumn, openColumn]);
 const findingColumnsWithoutStatus = findingColumn.columns([severityColumn, titleColumn, whereColumn, decisionColumn, openColumn]);
 
-type RecentScanRow = ScanStatus & { oneOff: boolean };
+type RecentScanRow = ScanStatus & { oneOff: boolean; notFull: boolean };
+
+const NOT_FULL_COPY = "It did not run as a full audit, so it does not count toward the commit's answer or decide what is in the latest full scan.";
 
 const scanColumn = dataTableColumns<RecentScanRow>();
 
@@ -223,6 +237,12 @@ const recentScanColumns = scanColumn.columns([
             <ScanSeverityDots counts={scan.summary.severity} />
             {unratedOf(scan.summary) > 0 && <span className="text-xs text-muted-foreground">{unratedOf(scan.summary)} unrated</span>}
             {scan.summary.new > 0 && <span className="text-xs text-muted-foreground">{scan.summary.new} new</span>}
+            {scan.notFull && (
+              <Badge variant="outline" title={NOT_FULL_COPY}>
+                Not a full scan
+                <span className="sr-only">. {NOT_FULL_COPY}</span>
+              </Badge>
+            )}
           </span>
         );
       }
@@ -238,7 +258,14 @@ const recentScanColumns = scanColumn.columns([
   }),
 ]);
 
-function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[]; openTotal: number }) {
+// -----
+// The card takes focus (tabIndex -1) when "Review N problems"
+// jumps to it, so the next Tab starts in the list, not at the
+// top of the page.
+// -----
+type RepoFindingsProps ={ repoId: string; branch: string; commit: string | undefined; history: readonly ScanStatus[]; fullScanId: string | null | undefined };
+
+function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindingsProps) {
   const blockers = useVerdictBlockers(repoId, commit);
   const queryClient = useQueryClient();
   const findingsOptions = repoFindingsQuery(repoId, { branch });
@@ -258,15 +285,15 @@ function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: 
   const findings = blockers.size === 0 ? matching : matching.toSorted((a, b) => Number(blockers.has(b.fingerprint)) - Number(blockers.has(a.fingerprint)));
   const selectedFinding = selected === undefined ? undefined : findings[selected];
   const showStatus = filter === "action" || filter === "all";
-  const emptyCopy = repoEmptyCopy(filter, openTotal);
-  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, history), history, blocks: blockers.has(finding.fingerprint), onSaved: decided }));
+  const emptyCopy = repoEmptyCopy(filter, hasNextPage);
+  const starts: ScanStarts = new Map(history.map((scan) => [scan.scanId, scan.createdAt]));
+  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, starts), starts, blocks: blockers.has(finding.fingerprint), onSaved: decided }));
   const table = useTable({ features: dataTableFeatures, columns: showStatus ? findingColumnsWithStatus : findingColumnsWithoutStatus, data: rows, getRowId: (row) => row.finding.id });
 
   return (
-    <Card id="branch-findings" className="scroll-mt-20">
-      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-7">
+    <Card id="branch-findings" tabIndex={-1} aria-labelledby="branch-findings-title" className="scroll-mt-20 outline-none">      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-7">
         <div className="grid max-w-xl gap-1.5">
-          <CardTitle>Findings on this branch</CardTitle>
+          <CardTitle id="branch-findings-title">Findings on this branch</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {FILTER_COPY[filter].note}
             {findings.length > 0 ? (filter === "action" ? " Select a row for the impact, evidence and fix, and record your decision." : " Select a row to read the impact, evidence and fix.") : ""}
@@ -312,7 +339,8 @@ function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: 
                   Clear search
                 </Button>
               ) : (
-                filter !== "all" && (
+                filter !== "all" &&
+                !hasNextPage && (
                   <Button variant="outline" onClick={() => setFilter("all")}>
                     Show every finding
                   </Button>
@@ -335,8 +363,8 @@ function RepoFindings({ repoId, branch, commit, history, openTotal }: { repoId: 
         findings={findings.map(fromRecorded)}
         selected={selectedFinding ? selected : undefined}
         onSelect={setSelected}
-        status={selectedFinding && <FindingStatusBanner state={selectedFinding.state} triage={selectedFinding.triage} fixedOn={fixedOnOf(selectedFinding, history)} />}
-        facts={selectedFinding && <RepoFindingFacts finding={selectedFinding} history={history} />}
+        status={selectedFinding && <FindingStatusBanner state={selectedFinding.state} triage={selectedFinding.triage} fixedOn={fixedOnOf(selectedFinding, starts)} />}
+        facts={selectedFinding && <RepoFindingFacts finding={selectedFinding} starts={starts} fullScanId={fullScanId} />}
         decision={
           selectedFinding &&
           (selectedFinding.state === "fixed_by_code" ? (
@@ -383,7 +411,9 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
   const olderScans = branchScans.length - recentScans.length;
   const newestScan = branchScans[0];
   const github = repo.url.replace(/\.git$/, "").replace(/\/$/, "");
-  const recentRows = recentScans.map((scan) => ({ ...scan, oneOff: Boolean(current && !scan.branchId && scan.commitSha) }));
+  const notFull = current ? repoNotFullScanIds(current, branchScans) : new Set<string>();
+  const fullScan = current?.fullScanId ? branchScans.find((scan) => scan.scanId === current.fullScanId) : undefined;
+  const recentRows = recentScans.map((scan) => ({ ...scan, oneOff: Boolean(current && !scan.branchId && scan.commitSha), notFull: notFull.has(scan.scanId) }));
   const recentTable = useTable({ features: dataTableFeatures, columns: recentScanColumns, data: recentRows, getRowId: (scan) => scan.scanId });
 
   return (
@@ -421,7 +451,22 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                     <ScanStatusBadge status={newestScan.status} />
                     <span>
                       Last scan <ScanTime value={newestScan.createdAt} />
+                      {notFull.has(newestScan.scanId) && " (not a full scan)"}
                     </span>
+                    {notFull.has(newestScan.scanId) && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {fullScan ? (
+                            <>
+                              Latest full scan <ScanTime value={fullScan.createdAt} />
+                            </>
+                          ) : (
+                            "No full scan yet"
+                          )}
+                        </span>
+                      </>
+                    )}
                   </>
                 ) : (
                   <span>Never scanned</span>
@@ -474,14 +519,14 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <Alert variant="warning">
           <CircleAlert />
           <AlertDescription>
-            <span className="font-medium">{scanPlural(open.unchecked, "open problem was", "open problems were")} not in the latest scan.</span> No scan closes a problem, so {open.unchecked === 1 ? "it stays" : "they stay"} open until a person decides {open.unchecked === 1 ? "it" : "them"}.
+            <span className="font-medium">{scanPlural(open.unchecked, "open problem is", "open problems are")} not in the latest full scan.</span> No scan closes a problem, so {open.unchecked === 1 ? "it stays" : "they stay"} open until a person decides {open.unchecked === 1 ? "it" : "them"}.
           </AlertDescription>
         </Alert>
       )}
 
       {current ? (
         <Suspense key={current.name} fallback={<RepoFindingsSkeleton />}>
-          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} openTotal={open.total} />
+          <RepoFindings repoId={repoId} branch={current.name} commit={current.latestCommit ?? undefined} history={repo.history} fullScanId={current.fullScanId} />
         </Suspense>
       ) : (
         <Card>

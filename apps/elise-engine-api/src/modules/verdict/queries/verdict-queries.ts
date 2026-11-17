@@ -1,5 +1,6 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
+import { VERDICT_SCAN_WEIGHTS } from "@repo/contracts/elise";
 import { scanFindings, scanFindingTriage, scans } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
@@ -7,6 +8,23 @@ import { VERDICT_SCAN_FETCH_LIMIT } from "#/modules/verdict/constants";
 import type { JudgedFinding, JudgedScan, JudgedTriage } from "#/modules/verdict/types";
 
 type CommitEvidence = { scans: JudgedScan[]; findings: JudgedFinding[]; triage: JudgedTriage[] };
+
+const WEIGHED_PROFILES = Object.entries(VERDICT_SCAN_WEIGHTS)
+  .filter(([name, weight]) => name !== "lite" && weight > 0)
+  .map(([name]) => name);
+
+// -----
+// The Scans that scanWeight gives a weight, as SQL, for a query
+// that must pick them in the database: an old lite Scan, or a
+// Scan that is not partial and met (or, with no Profile check,
+// asked for) a profile that weighs. A Partial Scan, a Scan that
+// met no profile and an older full Scan whose findings were
+// never recorded (partial is null) are left out.
+// -----
+export const weighedScanWhere = or(
+  VERDICT_SCAN_WEIGHTS.lite > 0 ? eq(scans.skill, "lite") : undefined,
+  and(eq(scans.partial, false), inArray(sql`coalesce(${scans.profileMet}, ${scans.profile})`, WEIGHED_PROFILES)),
+);
 
 // -----
 // What the verdict reads: the newest succeeded scans of one

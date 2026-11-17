@@ -39,7 +39,7 @@ export function RepoSummaryStrip({ repos }: { repos: readonly Repo[] }) {
         />
         <Cell label="Came back" value={totals.regressed} note={totals.regressed > 0 ? "Fixed before, reported again. Look at these first." : "Nothing that was fixed has returned."} />
         <Cell label="Needs a person" value={totals.needsValidation} note={totals.needsValidation > 0 ? "Likely but unverified. Check by hand before acting." : "Every open finding was verified."} />
-        <Cell label="Not in the latest scan" value={totals.unchecked} note={totals.unchecked > 0 ? "Open findings the latest scan of their branch did not see. They stay open until a person decides them." : "Every open finding is in the latest scan of its branch."} />
+        <Cell label="Not in the latest full scan" value={totals.unchecked} note={totals.unchecked > 0 ? "Open findings the latest full scan of their branch did not see. They stay open until a person decides them." : "Every open finding is in the latest full scan of its branch."} />
       </Card>
     </section>
   );

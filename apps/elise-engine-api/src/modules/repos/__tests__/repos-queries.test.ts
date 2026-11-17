@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { scanFindings, scanFindingTriage, scanRepoBranches, scanRepoFindings, scanRepos, scans } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { branchIdOf, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { getRepoEffect, listRepoBranchesEffect, listReposEffect, scanDiffEffect } from "#/modules/repos/queries";
+import { getRepoEffect, listRepoBranchesEffect, listReposEffect } from "#/modules/repos/queries";
 import { addBranchSvc, listRepoFindingsSvc } from "#/modules/repos/handlers";
 
 let test: TestDb;
@@ -11,12 +11,11 @@ let repoId: string;
 let branchId: string;
 
 const fp = (letter: string) => letter.repeat(64);
-const titles = (entries: { title: string }[]) => entries.map((entry) => entry.title);
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 const fail = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(Effect.flip(effect));
 
 const scan = (id: string, createdAt: string, extra: Partial<typeof scans.$inferInsert> = {}) =>
-  scanValues(tenantId, repoId, id, createdAt, { branch: "main", branchId, commitSha: `${id}-sha`, ...extra });
+  scanValues(tenantId, repoId, id, createdAt, { skill: "full", partial: false, branch: "main", branchId, commitSha: `${id}-sha`, ...extra });
 
 const found = (scanId: string, letter: string, severity: "critical" | "high" | "medium" | "low", origin: "new" | "carried" = "new") => ({
   tenantId,
@@ -43,15 +42,17 @@ const history = (letter: string, extra: Partial<typeof scanRepoFindings.$inferIn
 });
 
 // -----
-// s0: e. s1: a, b, d (e gone). s2: a re-checked, c new, e back.
-// b was checked and gone in s2; d simply vanished from the list.
+// Full Scans. s0: e. s1: a, b, d (e gone). s2: a, c new, e back.
+// The History closed b; d simply vanished from the list. "old" is
+// newer but an older full Scan whose findings were never
+// recorded, so s2 stays the latest Scan of main.
 // -----
 beforeAll(async () => {
   test = await openTestDb();
   tenantId = (await seedTenant(test, "acme")).tenantId;
   repoId = await seedRepo(test, tenantId);
   branchId = await branchIdOf(test, repoId);
-  await test.raw.insert(scans).values([scan("s0", "2026-10-31T00:00:00Z"), scan("s1", "2026-11-01T00:00:00Z"), scan("s2", "2026-11-02T00:00:00Z"), scan("full", "2026-11-03T00:00:00Z", { skill: "full" })]);
+  await test.raw.insert(scans).values([scan("s0", "2026-10-31T00:00:00Z"), scan("s1", "2026-11-01T00:00:00Z"), scan("s2", "2026-11-02T00:00:00Z"), scan("old", "2026-11-03T00:00:00Z", { partial: null })]);
   await test.raw.insert(scanFindings).values([
     found("s0", "e", "low"),
     found("s1", "a", "high"),
@@ -79,13 +80,13 @@ describe("listReposEffect", () => {
   it("counts the scans, names the latest and counts only what is still open", async () => {
     const [repo] = await run(listReposEffect(test.http, tenantId));
 
-    expect(repo).toMatchObject({ id: repoId, canonical: "octocat/hello-world", branchNames: ["main"], scans: 4, lastScanId: "full", lastScanStatus: "succeeded" });
+    expect(repo).toMatchObject({ id: repoId, canonical: "octocat/hello-world", branchNames: ["main"], scans: 4, lastScanId: "old", lastScanStatus: "succeeded" });
     expect(repo.open).toEqual({
       total: 3,
       severity: { critical: 0, high: 1, medium: 0, low: 2, informational: 0 },
       needsValidation: 0,
       regressed: 1,
-      unchecked: 3,
+      unchecked: 1,
     });
   });
 
@@ -154,42 +155,6 @@ describe("listRepoFindingsSvc", () => {
   });
 });
 
-describe("scans with no tracked branch", () => {
-  it("cannot be compared, and are not the previous scan of a later one", async () => {
-    await test.raw.insert(scans).values([scan("branch", "2026-11-02T12:00:00Z", { ref: "feature/x", branch: null, branchId: null }), scan("s3", "2026-11-04T00:00:00Z")]);
-    await test.raw.insert(scanFindings).values([found("branch", "a", "high"), found("s3", "a", "high")]);
-
-    expect(await fail(scanDiffEffect(test.http, tenantId, "branch"))).toMatchObject({ _tag: "Invalid" });
-    expect((await run(scanDiffEffect(test.http, tenantId, "s3"))).previousScanId).toBe("s2");
-  });
-});
-
-describe("scanDiffEffect", () => {
-  it("sorts a scan against the previous one", async () => {
-    const diff = await run(scanDiffEffect(test.http, tenantId, "s2"));
-
-    expect(diff.previousScanId).toBe("s1");
-    expect(titles(diff.stillOpen)).toEqual(["problem a"]);
-    expect(titles(diff.new)).toEqual(["problem c"]);
-    expect(titles(diff.regressed)).toEqual(["problem e"]);
-    expect(titles(diff.fixed)).toEqual(["problem b"]);
-    expect(titles(diff.notRechecked)).toEqual(["problem d"]);
-  });
-
-  it("calls everything new in the first scan", async () => {
-    const diff = await run(scanDiffEffect(test.http, tenantId, "s0"));
-
-    expect(diff.previousScanId).toBeNull();
-    expect(diff.stillOpen).toEqual([]);
-    expect(diff.regressed).toEqual([]);
-  });
-
-  it("refuses a scan that has no recorded findings, and one that is not there", async () => {
-    expect(await fail(scanDiffEffect(test.http, tenantId, "full"))).toMatchObject({ _tag: "Invalid" });
-    expect(await fail(scanDiffEffect(test.http, tenantId, "nope"))).toMatchObject({ _tag: "NotFound" });
-  });
-});
-
 describe("a second branch", () => {
   let releaseId: string;
 
@@ -221,14 +186,7 @@ describe("a second branch", () => {
 
     expect(branches.map((branch) => [branch.name, branch.isDefault])).toEqual([["main", true], ["release", false]]);
     expect(branches[1]).toMatchObject({ latestScanId: "r1", latestCommit: "r1-sha", open: { total: 1, severity: { medium: 1 } } });
-    expect(branches[0].latestScanId).toBe("s3");
-  });
-
-  it("compares a scan only with the previous scan of its own branch", async () => {
-    const diff = await run(scanDiffEffect(test.http, tenantId, "r1"));
-
-    expect(diff.previousScanId).toBeNull();
-    expect(titles(diff.new)).toEqual(["problem x"]);
+    expect(branches[0].latestScanId).toBe("old");
   });
 
   it("is NotFound for a branch the repo does not track", async () => {

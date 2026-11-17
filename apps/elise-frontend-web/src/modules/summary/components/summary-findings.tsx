@@ -44,10 +44,13 @@ function CopyLink({ repoId, finding }: { repoId: string; finding: Pick<RepoFindi
 // A finding is written out in full, the same for everyone who opens its
 // link: what it is, where it is, what could happen, how it gets fixed, and
 // what a person must check when the agent could not confirm it. The id in
-// the link scrolls here and marks it.
+// the link scrolls here and marks it. The ref runs when a row mounts, which
+// covers a row that a later page brings in; a hash that changes while the
+// row is on the page is the browser's own jump. The hash may be encoded.
 // -----
 const scrollWhenLinked = (row: HTMLLIElement | null) => {
-  if (row !== null && row.id === window.location.hash.slice(1)) row.scrollIntoView({ block: "start" });
+  const hash = window.location.hash.slice(1);
+  if (row !== null && (row.id === hash || encodeURIComponent(row.id) === hash)) row.scrollIntoView({ block: "start" });
 };
 
 function SummaryFinding({ repoId, finding }: { repoId: string; finding: RepoFinding }) {

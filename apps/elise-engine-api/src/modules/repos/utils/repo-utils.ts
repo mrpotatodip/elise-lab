@@ -1,4 +1,13 @@
-import type { FindingTriageStatusValue, RepoFinding, RepoOpen, SeverityCounts } from "@repo/contracts/elise";
+import type { FindingTriageStatusValue, RepoFinding, RepoFindingStateValue, RepoOpen, SeverityCounts } from "@repo/contracts/elise";
+
+// -----
+// The state of a Branch's finding: the frozen History's, or open
+// when it has no row. A Scan never changes it, so a problem the
+// History closed stays closed even when a later Scan sees it
+// again. A person's decision is not part of the state: it always
+// stands.
+// -----
+export const branchStateOf = ({ history }: { history: { state: RepoFindingStateValue } | null }): RepoFindingStateValue => history?.state ?? "open";
 
 // -----
 // The columns the open counts need, so a count does not
