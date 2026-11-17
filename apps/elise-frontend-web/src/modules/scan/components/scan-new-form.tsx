@@ -349,7 +349,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
         <div className="flex items-center justify-end gap-3">
           <p className={cn("mr-auto text-sm leading-relaxed", budgetSpent ? "text-status-danger" : "text-muted-foreground")} role={budgetSpent ? "alert" : undefined}>
             {runner !== undefined
-              ? `This audit runs on ${runner.name}'s own Claude, so no spend limit applies. It will show what it would have cost.`
+              ? `This audit runs on ${runner.name}'s own Claude, so no monthly budget applies. The audit still stops at its own spend limit. It will show what it would have cost.`
               : usage === undefined
                 ? "Each audit stops at a spend limit, and your account has a monthly budget."
                 : usage.budgetApplies === false

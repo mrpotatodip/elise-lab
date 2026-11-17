@@ -70,7 +70,7 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
         <LoaderCircle className="animate-spin" />
         <div className="grid gap-1">
           <AlertDescription className="font-medium">{scan.status === "queued" ? "Waiting for a free slot to start." : (step?.label ?? "Scanning.")}</AlertDescription>
-          <AlertDescription>{step?.note ?? "A scan usually takes a few minutes."} This page updates by itself. You can leave and come back.</AlertDescription>
+          <AlertDescription className="max-w-copy">{step?.note ?? "A scan usually takes a few minutes."} This page updates by itself. You can leave and come back.</AlertDescription>
         </div>
       </Alert>
     );

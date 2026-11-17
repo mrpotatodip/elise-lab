@@ -26,6 +26,12 @@ export const scanTokens = (count: number) => COMPACT.format(count);
 
 export const scanPlural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
+export const scanNoSummaryText = (status: string) => {
+  if (status === "succeeded") return "Not recorded";
+  if (status === "queued" || status === "running") return "Not ready yet";
+  return "No report";
+};
+
 // -----
 // The Verdict counts scan weight (a Focused scan is 0.5), so the weight
 // still missing may be a half. The next step is a whole number of scans:

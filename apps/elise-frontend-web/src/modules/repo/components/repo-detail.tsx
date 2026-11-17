@@ -19,10 +19,10 @@ import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
 import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup } from "#/modules/finding";
-import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
+import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
-import { repoName } from "../utils";
+import { repoName, repoUntrackedCopy } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
 import { RepoHistoryNote } from "./repo-history-note";
@@ -184,7 +184,7 @@ const recentScanColumns = scanColumn.columns([
     id: "started",
     header: "Started",
     cell: ({ row }) => (
-      <Link to="/scans/$scanId" params={{ scanId: row.original.scanId }} className="after:absolute after:inset-0 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Link to="/scans/$scanId" params={{ scanId: row.original.scanId }} className="inline-flex min-h-6 items-center after:absolute after:inset-0 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <ScanTime value={row.original.createdAt} />
       </Link>
     ),
@@ -217,7 +217,7 @@ const recentScanColumns = scanColumn.columns([
         );
       }
       if (scan.status === "failed") return <span className="text-sm text-status-danger">{scanFailure(scan.error).title}</span>;
-      return <span className="text-muted-foreground">{scan.status === "succeeded" ? "Not recorded" : "No report"}</span>;
+      return <span className="text-muted-foreground">{scanNoSummaryText(scan.status)}</span>;
     },
   }),
   scanColumn.display({
@@ -363,6 +363,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
   const oldest = repo.history.at(-1);
   const current = repo.branches.find((branch) => branch.id === branchId);
   const open = current?.open ?? repo.open;
+  const untracked = repoUntrackedCopy(repo.history);
   const branchCommits = new Set(repo.history.filter((scan) => current && scan.branchId === current.id && scan.commitSha).map((scan) => scan.commitSha));
   const pinnedToBranch = (scan: ScanStatus) => !scan.branchId && scan.commitSha != null && branchCommits.has(scan.commitSha);
   const branchScans = current ? repo.history.filter((scan) => scan.branchId === current.id || (current.isDefault && !scan.branchId && !scan.ref) || pinnedToBranch(scan)) : repo.history;
@@ -481,8 +482,8 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                 <EmptyMedia variant="icon">
                   <GitBranch />
                 </EmptyMedia>
-                <EmptyTitle>No branch tracked yet</EmptyTitle>
-                <EmptyDescription>Run a scan of this repository to read its default branch, or add the repository again from the repository list with the branch names to track.</EmptyDescription>
+                <EmptyTitle>{untracked.title}</EmptyTitle>
+                <EmptyDescription>{untracked.description}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           </CardContent>

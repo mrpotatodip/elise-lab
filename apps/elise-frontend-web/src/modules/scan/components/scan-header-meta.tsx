@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, ExternalLink, FolderGit2, GitBranch } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
+import { useHydrated } from "#/lib/use-hydrated";
 import type { ScanStatus } from "../schemas";
 import { scanDuration } from "../utils";
 import { ScanStatusBadge } from "./scan-status-badge";
@@ -77,6 +79,18 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
 // page: the status, when it started, how long it took, and the commit it read.
 // Kind of review, model and effort are in Run details, lower down.
 // -----
+function RunningFor({ since }: { since: string }) {
+  const hydrated = useHydrated();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <>{hydrated ? scanDuration(Math.max(0, now - Date.parse(since))) : "a moment"}</>;
+}
+
 function ScanStatusLine({ scan }: { scan: ScanStatus }) {
   const duration = scanDuration(scan.usage?.durationMs);
   const commit = scan.commitSha?.slice(0, 7);
@@ -89,7 +103,13 @@ function ScanStatusLine({ scan }: { scan: ScanStatus }) {
       </span>
       <span aria-hidden="true">·</span>
       <span>
-        {scan.finishedAt ? "Took" : "Running for"} {duration ?? (scan.finishedAt ? "an unknown time" : "a moment")}
+        {scan.finishedAt ? (
+          <>Took {duration ?? "an unknown time"}</>
+        ) : (
+          <>
+            Running for <RunningFor since={scan.createdAt} />
+          </>
+        )}
       </span>
       <span aria-hidden="true">·</span>
       {commit ? (
@@ -99,7 +119,7 @@ function ScanStatusLine({ scan }: { scan: ScanStatus }) {
           <span className="sr-only">, opens the commit on GitHub</span>
         </a>
       ) : (
-        <span>{scan.ref ? `Reading ${scan.ref}` : "Reading the default branch"}</span>
+        <span>{scan.ref ? `Scanning ${scan.ref}` : "Scanning the default branch"}</span>
       )}
     </p>
   );
