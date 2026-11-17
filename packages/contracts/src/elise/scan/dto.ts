@@ -306,6 +306,14 @@ export type FindingTriageBody = z.infer<typeof FindingTriageBodySchema>;
 // -----
 // Repos: one record per repo an account scans, with its history
 // -----
+
+// -----
+// What is open on a branch: its findings are the merge of every
+// succeeded Scan of the branch. unchecked counts the open
+// problems that are not in the latest Scan: the newest succeeded
+// Scan of the branch did not see them, and no Scan closes a
+// problem.
+// -----
 export const RepoOpenSchema = z.object({
   total: z.number().int().min(0),
   severity: SeverityCountsSchema,
@@ -359,6 +367,12 @@ export const RepoDetailSchema = RepoSchema.extend({ history: z.array(ScanStatusS
 
 export const RepoParamSchema = z.object({ repoId: z.uuid() });
 
+// -----
+// scanId is the Scan that last saw the problem and firstSeenScanId
+// the one that first saw it. unchecked is true when the last-seen
+// Scan is not the branch's newest succeeded Scan: not in the
+// latest Scan.
+// -----
 export const RepoFindingSchema = FindingSchema.extend({
   state: z.enum(REPO_FINDING_STATE_VALUES),
   unchecked: z.boolean(),
