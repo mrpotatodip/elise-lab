@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link2 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,12 +46,16 @@ function CopyLink({ repoId, finding }: { repoId: string; finding: Pick<RepoFindi
 // what a person must check when the agent could not confirm it. The id in
 // the link scrolls here and marks it.
 // -----
+const scrollWhenLinked = (row: HTMLLIElement | null) => {
+  if (row !== null && row.id === window.location.hash.slice(1)) row.scrollIntoView({ block: "start" });
+};
+
 function SummaryFinding({ repoId, finding }: { repoId: string; finding: RepoFinding }) {
   const needs = finding.status === "needs_validation" ? finding.needs : null;
   const where = findingWhere(finding);
 
   return (
-    <li id={findingAnchor(finding.id)} className="grid scroll-mt-20 gap-4 px-6 py-5 target:bg-accent/40 target:shadow-[inset_3px_0_0_0_var(--primary)]">
+    <li ref={scrollWhenLinked} id={findingAnchor(finding.id)} className="grid scroll-mt-20 gap-4 px-6 py-5 target:bg-accent/40 target:shadow-[inset_3px_0_0_0_var(--primary)]">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           {finding.severity !== null && <ScanSeverityBadge severity={finding.severity} />}
@@ -97,11 +100,6 @@ function FindingsPending() {
 export function SummaryFindings({ repo }: { repo: Repo }) {
   const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(repoFindingsQuery(repo.id, { branch: repo.defaultBranch ?? undefined, triage: "open" }));
   const findings = data ? openFindings(data.pages.flatMap((page) => page.findings)) : [];
-
-  useEffect(() => {
-    const id = window.location.hash.slice(1);
-    if (id !== "" && findings.length > 0) document.getElementById(id)?.scrollIntoView({ block: "start" });
-  }, [findings.length]);
 
   return (
     <Card>

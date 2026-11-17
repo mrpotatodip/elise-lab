@@ -66,7 +66,8 @@ export const RunnerRemovedSchema = z.object({
 // -----
 // A Scan for a Runner to run. The Runner clones repo at ref (the
 // default branch when null), puts priorsJson in prior-findings.json
-// when it is not empty, and gives the agent the prompt. The Worker
+// when it is not empty (the Worker now always sends ""), and gives
+// the agent the prompt. The Worker
 // builds the prompt, so the audit's words stay in one place.
 // profile and profileCapUsd are the Scan's profile and the cap the
 // profile has in the Worker's table, for a Runner app that runs the

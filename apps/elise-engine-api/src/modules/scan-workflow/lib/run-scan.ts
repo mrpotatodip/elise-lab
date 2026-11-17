@@ -3,7 +3,6 @@ import { ScanUsageSchema, type ScanUsage } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import type { ScanParams, ScanState } from "#/schemas";
 import type { ScanPatch } from "#/modules/scan-ledger";
-import { SCAN_RECORDS_RECORDED_SKILL } from "#/modules/scan-records";
 import { saveScanFilesEffect } from "#/modules/scan-store";
 import type { FullPhase } from "#/modules/scan-sandbox";
 import {
@@ -122,25 +121,10 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
       await runEffect(ledger.mark(params.accountId, params.scanId, checkout));
       return checkout;
     });
-    // -----
-    // Its own step, so a retry of the launch gives the agent
-    // the same list. The list is saved with the scan: recording
-    // judges the answer against what was asked. Only a Scan of
-    // the recorded skill is given one: the History is frozen at
-    // the end of the lite era, so a profile Scan reads none.
-    // -----
-    const priors = await step.do("read-priors", async () => {
-      if (params.options.skill !== SCAN_RECORDS_RECORDED_SKILL) return [];
-      const found = await deps.readPriors(params);
-      if (found.length === 0) return found;
-      const saved = await runEffect(saveScanFilesEffect(reports, params.accountId, params.scanId, { "prior-findings.json": JSON.stringify(found) }));
-      await runEffect(ledger.addFiles(params.accountId, params.scanId, saved));
-      return found;
-    });
     if (deps.phases === undefined) {
       await step.do("launch-agent", { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_LAUNCH_TIMEOUT }, async () => {
         await runEffect(ledger.mark(params.accountId, params.scanId, { step: "auditing" }));
-        await sandbox.launchAgent(params.options, priors);
+        await sandbox.launchAgent(params.options);
         return true;
       });
 

@@ -1,14 +1,31 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Effect } from "effect";
-import { scanFindings, scanRepoFindings, scans } from "@repo/db-elise/schema";
+import type { ScanStateValue } from "@repo/contracts/elise";
+import { scanFindings, scans } from "@repo/db-elise/schema";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { DbConnectType } from "#/lib/db-connection";
 import type { ScanRecord } from "#/modules/scan-records/types";
 
+// -----
+// The repo a scan belongs to, the branch it read and the state
+// it is in now, from the scans row made when it was queued.
+// -----
+export type ScanRowOf = { repoId: string; status: ScanStateValue; branch: string | null; ref: string | null };
+
+export const scanRowOfEffect = (db: DbConnectType, tenantId: string, scanId: string): Effect.Effect<ScanRowOf, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [row] = await db.select({ repoId: scans.repoId, status: scans.status, branch: scans.branch, ref: scans.ref }).from(scans).where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId)));
+      if (!row) throw new Error(`scan ${scanId} has no row to take its repo from`);
+      return row;
+    },
+    catch: toDbError,
+  });
+
 export const writeScanRecordEffect = (db: DbConnectType, record: ScanRecord): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const { scan, findings: rows, history } = record;
+      const { scan, findings: rows } = record;
       const upsert = db
         .insert(scans)
         .values(scan)
@@ -21,10 +38,6 @@ export const writeScanRecordEffect = (db: DbConnectType, record: ScanRecord): Ef
             branchId: scan.branchId,
             untrackedReason: scan.untrackedReason,
             finishedAt: scan.finishedAt,
-            priorsGiven: scan.priorsGiven,
-            priorsCarried: scan.priorsCarried,
-            priorsClosed: scan.priorsClosed,
-            priorsUnchecked: scan.priorsUnchecked,
             partial: scan.partial,
             profileMet: scan.profileMet,
             inputTokens: scan.inputTokens,
@@ -39,32 +52,11 @@ export const writeScanRecordEffect = (db: DbConnectType, record: ScanRecord): Ef
         });
       const clear = db.delete(scanFindings).where(eq(scanFindings.scanId, scan.id));
       // -----
-      // One batch is one transaction: the scan, its findings
-      // and the branch's history change together or not at all.
-      // first_seen stays as it was; every other column takes
-      // the planned value.
+      // One batch is one transaction: the scan and its findings
+      // change together or not at all.
       // -----
-      const advance =
-        history.length === 0
-          ? []
-          : [
-              db
-                .insert(scanRepoFindings)
-                .values(history)
-                .onConflictDoUpdate({
-                  target: [scanRepoFindings.branchId, scanRepoFindings.fingerprint],
-                  set: {
-                    state: sql`excluded.state`,
-                    unchecked: sql`excluded.unchecked`,
-                    lastSeenScanId: sql`excluded.last_seen_scan_id`,
-                    fixedInScanId: sql`excluded.fixed_in_scan_id`,
-                    possibleDuplicateOf: sql`excluded.possible_duplicate_of`,
-                    updatedAt: new Date(),
-                  },
-                }),
-            ];
       const insertFindings = rows.length === 0 ? [] : [db.insert(scanFindings).values(rows)];
-      await db.batch([upsert, clear, ...insertFindings, ...advance]);
+      await db.batch([upsert, clear, ...insertFindings]);
     },
     catch: toDbError,
   });

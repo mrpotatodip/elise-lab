@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, ExternalLink, FolderGit2, GitBranch } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import { useHydrated } from "#/lib/use-hydrated";
+import { useNow } from "#/lib/use-now";
 import type { ScanStatus } from "../schemas";
 import { scanDuration } from "../utils";
 import { ScanStatusBadge } from "./scan-status-badge";
@@ -81,12 +81,7 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
 // -----
 function RunningFor({ since }: { since: string }) {
   const hydrated = useHydrated();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow();
 
   return <>{hydrated ? scanDuration(Math.max(0, now - Date.parse(since))) : "a moment"}</>;
 }

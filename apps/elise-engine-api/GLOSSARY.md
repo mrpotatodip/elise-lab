@@ -47,7 +47,7 @@ The Claude Code program that runs inside the container and reads the repo.
 _Avoid_: Bot, AI
 
 **Skill**:
-A folder of written instructions the agent follows. We have one, `full`. Every new Scan runs it, a Runner Scan included, whatever the request sent; the Profile sets how much it covers, not the Skill. `lite` was the first Skill and is gone from the code (#141); it stays only as a value in old rows.
+A folder of written instructions the agent follows. We have one, `full`. Every new Scan runs it, a Runner Scan included, whatever the request sent; the Profile sets how much it covers, not the Skill. `lite` was the first Skill and is gone from the code (#141, #178); it stays only as a value, with its display name, in old rows. Nothing starts, records or writes the History for a Scan of it.
 _Avoid_: Prompt, plugin
 
 **Profile**:
@@ -75,7 +75,7 @@ What the engine says a succeeded Runner Scan did, against the Profile it asked f
 _Avoid_: Coverage check, coverage
 
 **Full worker**:
-The only path a Scan takes, since each runs the `full` Skill: its own Workflow, its own Sandbox class and its own Image, inside the Worker. It has limits of its own. ADR 0006 holds the decisions.
+The only path a Scan takes, since each runs the `full` Skill: its own Workflow, its own Sandbox class and its own Image, inside the Worker. It has limits of its own. Every Scan on it has a Profile, records its findings with the Scan and writes no History. ADR 0006 holds the decisions.
 _Avoid_: Full server, second Worker (it is one Worker with two paths)
 
 **Usage**:
@@ -97,20 +97,20 @@ One repo an Account scans, kept once per Account (`scan_repos`) however its URL 
 _Avoid_: Project, target
 
 **Branch**:
-A line of code of a Repo that has a History of its own (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a Scan of it succeeds and the Repo has a free slot, or when a person adds it. A profile Scan joins its Branch but moves no History (ADR 0004). The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row. A new Branch starts with an empty History.
+A line of code of a Repo (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a Scan of it succeeds and the Repo has a free slot, or when a person adds it. Its findings are the merge of every succeeded Scan of the Branch, of any profile and age: one finding per fingerprint, with the words of the newest Scan that saw it, first seen at the oldest Scan and last seen at the newest. A Scan never closes a problem, so one the latest Scan did not see stays open and is "not in the latest Scan" (ADR 0004). The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row.
 _Avoid_: Ref (a ref can also be a tag or a commit)
 
 **One-off Scan**:
-A `lite` Scan that ends with no Branch: its `ref` is a tag or a commit, the clone was on a detached HEAD, or the Repo has no free slot. It records its Findings and can count toward a Verdict, but it has no Prior findings and no History, and it saves the reason (`untracked_reason`). A `ref` is fetched as a branch first (`refs/heads/NAME`), so a tag with the same name as a branch is never read by mistake.
+A Scan that ends with no Branch: its `ref` is a tag or a commit that is not the latest of exactly one tracked Branch, the clone was on a detached HEAD, or the Repo has no free slot. It records its Findings and can count toward a Verdict, but it adds nothing to any Branch's findings, and it saves the reason (`untracked_reason`). A `ref` is fetched as a branch first (`refs/heads/NAME`), so a tag with the same name as a branch is never read by mistake.
 
 **History**:
-Where a Branch's problems stand across its Scans (`scan_repo_findings`), one row per fingerprint, with the Scan that first and last saw it. The state is `open`, `fixed_by_code` (a Scan checked and it was gone) or `regressed` (it was fixed and came back). Only a succeeded `lite` Scan of a tracked Branch changes it, and only inside the transaction that records the Scan. It is frozen: profile Scans never change it, and the open counts of a Repo and its Branches come from it.
+What the older `lite` Scans recorded about a Branch's problems (`scan_repo_findings`), one row per fingerprint. The state is `open`, `fixed_by_code` (a Scan checked and it was gone) or `regressed` (it was fixed and came back). It is frozen: no Scan writes it any more and its rows are never changed. It is read for state only: a Branch's finding that has a History row takes its state from it, and any other finding is `open`. The Branch's findings, not the History, are what the pages list and count (see Branch). The "not re-checked" flag stored on its rows is no longer read.
 
 **Prior finding**:
-An unresolved problem from the History that the Worker hands the agent (`prior-findings.json`, at most 50, worst first) to re-check before it hunts for new ones. Its `priorId` is its fingerprint. The list is saved with the Scan (`prior-findings.json`), and the answer is judged against it. A one-off Scan and a profile Scan get none. Resolved means fixed by code, or marked fixed, false positive or accepted risk by a person.
+An unresolved problem from the History that the older `lite` Scans were handed (`prior-findings.json`, at most 50, worst first) to re-check before they hunted for new ones. Its `priorId` is its fingerprint. No Scan is given any now (#178): the step that read them and the code that judged the answer are gone. It survives in old rows: a Scan's `priors_given`, `priors_carried`, `priors_closed` and `priors_unchecked` columns, which the Verdict still reads, and the two saved files, which an old Scan still serves.
 
 **Carried finding**:
-A Prior finding the agent re-checked and still saw. It is repeated in the Scan's `findings.json` with its `priorId` and keeps its fingerprint, so a reworded title does not make it new. A Prior the agent did not answer for stays open and `unchecked`: a problem is closed only by evidence, never by silence.
+A Prior finding that the agent re-checked and still saw. It was repeated in the Scan's `findings.json` with its `priorId` and kept its fingerprint, so a reworded title did not make it new. A Prior the agent did not answer for stayed open and `unchecked`: a problem was closed only by evidence, never by silence. Only old rows hold one (`origin` `carried`).
 
 **Verdict**:
 The answer to "can this commit ship?": `pass`, `fail` or `cannot_tell`. It belongs to one commit and is computed on each request from the Scans of that commit. `pass` means the Scans found nothing over the limit, never that the commit is safe. `cannot_tell` means the Scans cannot be trusted yet (their Verdict weight is below 1, or a Prior finding was left unchecked). Only `pass` ships.

@@ -3,7 +3,6 @@ import { ShellStatCell as Cell } from "#/modules/shell";
 import { ScanSeverityDots, scanPlural } from "#/modules/scan";
 import type { Repo } from "../schemas";
 import { repoTotals } from "../utils";
-import { RepoHistoryNote } from "./repo-history-note";
 
 // -----
 // The same four answers as the repository summary, as one card with one lead
@@ -11,13 +10,12 @@ import { RepoHistoryNote } from "./repo-history-note";
 // four boxes of equal weight hide the one that is not. No icon chips and no
 // tints: colour belongs to the findings themselves (the severity dots).
 // -----
-export function RepoSummaryStrip({ repos, byHand = false }: { repos: readonly Repo[]; byHand?: boolean }) {
+export function RepoSummaryStrip({ repos }: { repos: readonly Repo[] }) {
   const totals = repoTotals(repos);
   const notRated = totals.total - Object.values(totals.severity).reduce((sum, count) => sum + count, 0);
 
   return (
     <section aria-label="Summary across repositories" className="grid gap-6">
-      {totals.total > 0 && <RepoHistoryNote byHand={byHand} />}
       <Card className="grid divide-y lg:grid-cols-4 lg:divide-x lg:divide-y-0">
         <Cell
           lead
@@ -41,7 +39,7 @@ export function RepoSummaryStrip({ repos, byHand = false }: { repos: readonly Re
         />
         <Cell label="Came back" value={totals.regressed} note={totals.regressed > 0 ? "Fixed before, reported again. Look at these first." : "Nothing that was fixed has returned."} />
         <Cell label="Needs a person" value={totals.needsValidation} note={totals.needsValidation > 0 ? "Likely but unverified. Check by hand before acting." : "Every open finding was verified."} />
-        <Cell label="Not re-checked" value={totals.unchecked} note={totals.unchecked > 0 ? "Open findings the latest scan did not re-verify. Treat them as still open." : "The latest scans re-checked every open finding."} />
+        <Cell label="Not in the latest scan" value={totals.unchecked} note={totals.unchecked > 0 ? "Open findings the latest scan of their branch did not see. They stay open until a person decides them." : "Every open finding is in the latest scan of its branch."} />
       </Card>
     </section>
   );

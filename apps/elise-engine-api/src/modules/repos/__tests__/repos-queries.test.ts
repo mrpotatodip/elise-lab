@@ -85,7 +85,7 @@ describe("listReposEffect", () => {
       severity: { critical: 0, high: 1, medium: 0, low: 2, informational: 0 },
       needsValidation: 0,
       regressed: 1,
-      unchecked: 1,
+      unchecked: 3,
     });
   });
 
@@ -134,8 +134,7 @@ describe("listRepoFindingsSvc", () => {
       ["problem d", "open"],
     ]);
     expect(page.findings[0].triage).toMatchObject({ status: "false_positive" });
-    expect(page.findings.find((finding) => finding.title === "problem d")).toMatchObject({ unchecked: true, scanId: "s1" });
-  });
+    expect(page.findings.find((finding) => finding.title === "problem d")).toMatchObject({ unchecked: true, scanId: "s1" });  });
 
   it("filters by state and pages with a cursor", async () => {
     const regressed = await run(listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 50, state: "regressed" }));
