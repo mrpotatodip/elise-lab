@@ -2,7 +2,7 @@ import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { tenantRunners, tenants } from "@repo/db-elise";
 import type { Runner, RunnerIdentity } from "@repo/contracts/elise";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Forbidden, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf } from "#/modules/audit-trail";
 import type { NewRunner, PairingClaim } from "#/modules/runners/types";
@@ -24,7 +24,7 @@ const identityOrNull = (db: DbConnectType, rows: RunnerRow[]): Effect.Effect<Run
 // A row that holds only a pairing code: no token yet. The
 // answer has the id and the expiry, never a hash.
 // -----
-export const createRunnerEffect = (db: DbConnectType, runner: NewRunner): Effect.Effect<{ id: string; name: string; expiresAt: string }, Forbidden | DbError> =>
+export const createRunnerEffect = (db: AppDbType, runner: NewRunner): Effect.Effect<{ id: string; name: string; expiresAt: string }, Forbidden | DbError> =>
   Effect.tryPromise({
     try: async () => {
       const createdBy = await actorPartyOf(db, runner.actorUserId);
@@ -61,7 +61,7 @@ export const claimPairingEffect = (db: DbConnectType, claim: PairingClaim): Effe
 // ones. The state is read from the row: a token means
 // connected, else an unexpired code means waiting.
 // -----
-export const listRunnersEffect = (db: DbConnectType, tenantId: string, now: Date): Effect.Effect<Runner[], DbError> =>
+export const listRunnersEffect = (db: AppDbType, tenantId: string, now: Date): Effect.Effect<Runner[], DbError> =>
   Effect.tryPromise({
     try: () => db.select().from(tenantRunners).where(and(eq(tenantRunners.tenantId, tenantId), isNull(tenantRunners.revokedAt))).orderBy(desc(tenantRunners.createdAt)),
     catch: toDbError,
@@ -87,7 +87,7 @@ export const listRunnersEffect = (db: DbConnectType, tenantId: string, now: Date
 // working and an unused code is cleared. False when the
 // Account has no such live Runner.
 // -----
-export const removeRunnerEffect = (db: DbConnectType, tenantId: string, runnerId: string, now: Date): Effect.Effect<boolean, DbError> =>
+export const removeRunnerEffect = (db: AppDbType, tenantId: string, runnerId: string, now: Date): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
