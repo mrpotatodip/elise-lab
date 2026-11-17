@@ -1,7 +1,6 @@
-import { sql } from "drizzle-orm";
 import { buildApp } from "#/index";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
-import type { TestDb } from "#/__tests__/test-db";
+import { asTenant, type TestDb } from "#/__tests__/test-db";
 import { testDeps } from "#/__tests__/test-deps";
 import type { AppDeps } from "#/types/variables";
 
@@ -16,13 +15,7 @@ export const tenantRouteApp = (openDb: () => TestDb, overrides: Partial<AppDeps>
   buildApp(
     testDeps({
       ...overrides,
-      withTenant: (_c, accountId, run) =>
-        openDb().raw.transaction(async (tx) => {
-          await tx.execute(sql`set local role elise_app`);
-          await tx.execute(sql`select set_config('app.tenant_id', ${accountId}, true)`);
-          // SAFETY: the pglite transaction answers the same calls as the pg transaction the route's real wrapper passes.
-          return run(tx as never);
-        }),
+      withTenant: (_c, accountId, run) => asTenant(openDb(), accountId, run),
     }),
   ).app;
 

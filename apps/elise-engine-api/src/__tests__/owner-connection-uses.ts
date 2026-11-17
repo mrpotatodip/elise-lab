@@ -13,7 +13,6 @@ export const OWNER_CONNECTION_USES = {
   "modules/anthropic-key/api/anthropic-key.ts": 6,
   "modules/credit/api/get-credit-entries.ts": 2,
   "modules/files/api/files.ts": 2,
-  "modules/findings/api/findings.ts": 4,
   "modules/github-installs/api/create-github-installation.ts": 2,
   "modules/github-installs/api/disconnect-github-installation.ts": 2,
   "modules/github-installs/api/list-github-branches.ts": 2,

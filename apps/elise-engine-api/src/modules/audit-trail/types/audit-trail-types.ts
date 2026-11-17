@@ -1,9 +1,9 @@
-import type { PoolDbType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 
 // -----
 // What a write needs: a transaction or the pool.
 // -----
-export type AuditDb = Pick<PoolDbType, "insert">;
+export type AuditDb = Pick<AppDbType, "insert">;
 
 export type AuditAction =
   | "team.invite.created"

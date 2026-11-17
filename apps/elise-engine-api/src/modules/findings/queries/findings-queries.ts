@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-
 import { Effect } from "effect";
 import type { Finding, FindingsQuery, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepos, scans, type TFindingTriage } from "@repo/db-elise/schema";
-import type { AppDbType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { canonicalRepo } from "#/modules/scan-ledger";
@@ -119,14 +119,15 @@ export const findingRepoIdEffect = (db: Pick<AppDbType, "select">, tenantId: str
 const DAY_MS = 86_400_000;
 
 // -----
-// Every triage decision, in one transaction with its audit row,
-// so a decision is never saved without its record. The row names
+// Every triage decision, with its audit row, in the transaction
+// db already is (withTenant), so a decision is never saved without
+// its record and a failed audit row rolls the decision back. The row names
 // the previous decision too. userId is null for the service
 // token, which names no one; an accepted risk refuses it, and
 // needs a reason and acceptDays.
 // -----
 export const setTriageEffect = (
-  db: PoolDbType,
+  db: TenantDbType,
   tenantId: string,
   repoId: string,
   body: FindingTriageBody,
@@ -141,29 +142,28 @@ export const setTriageEffect = (
     if (accepting && !actorPartyId) return yield* new Forbidden({ message: "Forbidden" });
     const acceptedUntil = accepting && body.acceptDays !== undefined ? new Date(now.getTime() + body.acceptDays * DAY_MS) : null;
     return yield* Effect.tryPromise({
-      try: () =>
-        db.transaction(async (tx) => {
-          const key = and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId), eq(scanFindingTriage.fingerprint, body.fingerprint));
-          const [previous] = await tx.select().from(scanFindingTriage).where(key);
-          const [row] = await tx
-            .insert(scanFindingTriage)
-            .values({ tenantId, repoId, fingerprint: body.fingerprint, status: body.status, note, acceptedUntil, setByPartyId: actorPartyId })
-            .onConflictDoUpdate({
-              target: [scanFindingTriage.tenantId, scanFindingTriage.repoId, scanFindingTriage.fingerprint],
-              set: { status: body.status, note, acceptedUntil, setByPartyId: actorPartyId, updatedAt: now },
-            })
-            .returning();
-          await insertAuditEntry(tx, {
-            actorPartyId,
-            action: accepting ? "finding.risk.accepted" : "finding.triage.set",
-            subjectId: row.id,
-            tenantId,
-            before: previous ? { status: previous.status, note: previous.note, acceptedUntil: previous.acceptedUntil?.toISOString() ?? null } : undefined,
-            after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null },
-          });
-          const [person] = actorPartyId ? await tx.select().from(partyPersons).where(eq(partyPersons.partyId, actorPartyId)) : [];
-          return triageView(row, person);
-        }),
+      try: async () => {
+        const key = and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId), eq(scanFindingTriage.fingerprint, body.fingerprint));
+        const [previous] = await db.select().from(scanFindingTriage).where(key);
+        const [row] = await db
+          .insert(scanFindingTriage)
+          .values({ tenantId, repoId, fingerprint: body.fingerprint, status: body.status, note, acceptedUntil, setByPartyId: actorPartyId })
+          .onConflictDoUpdate({
+            target: [scanFindingTriage.tenantId, scanFindingTriage.repoId, scanFindingTriage.fingerprint],
+            set: { status: body.status, note, acceptedUntil, setByPartyId: actorPartyId, updatedAt: now },
+          })
+          .returning();
+        await insertAuditEntry(db, {
+          actorPartyId,
+          action: accepting ? "finding.risk.accepted" : "finding.triage.set",
+          subjectId: row.id,
+          tenantId,
+          before: previous ? { status: previous.status, note: previous.note, acceptedUntil: previous.acceptedUntil?.toISOString() ?? null } : undefined,
+          after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null },
+        });
+        const [person] = actorPartyId ? await db.select().from(partyPersons).where(eq(partyPersons.partyId, actorPartyId)) : [];
+        return triageView(row, person);
+      },
       catch: toDbError,
     });
   });
