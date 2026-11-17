@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { dbConnect } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { zValidator } from "#/lib/zod-validator";
 import { listRunnersSvc } from "#/modules/runners/handlers";
@@ -12,7 +11,7 @@ const app = new Hono<AppEnv>();
 
 app.get("/", listRunnersDoc, requireAccountMember, zValidator("header", AccountHeaderSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
-  const data = await runEffect(listRunnersSvc(dbConnect(c.env.DATABASE_URL), accountId));
+  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listRunnersSvc(db, accountId)));
   return c.json({ data, error: null });
 });
 
