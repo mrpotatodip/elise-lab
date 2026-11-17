@@ -9,6 +9,10 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
+// -----
+// Owner role: the token names the Runner, and the Runner
+// names its Account.
+// -----
 app.delete("/me", disconnectRunnerDoc, async (c) => {
   const token = bearerTokenOf(c.req.header("authorization"));
   if (!token) throw new UnauthorizedError();
