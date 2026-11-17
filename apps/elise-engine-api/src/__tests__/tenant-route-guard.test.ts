@@ -64,7 +64,7 @@ const tenantRoutes = mountedRoutes.filter((route) => !NOT_TENANT_ROUTES.includes
 const caseEntries = Object.entries<CrossAccountCase>(CROSS_ACCOUNT_CASES);
 const runCases = caseEntries.flatMap(([route, found]) => (found.kind === "run" ? [{ route, ...found }] : []));
 type RunCase = (typeof runCases)[number];
-const allowedOwnerUses = new Map<string, number>(Object.entries(OWNER_CONNECTION_USES));
+const allowedOwnerUses = new Map<string, number>(Object.entries(OWNER_CONNECTION_USES).map(([file, { uses }]) => [file, uses]));
 const SRC = resolve(__dirname, "..");
 const OWNER_USE = /\b(dbConnect|poolConnect|withPool)\(|\bDATABASE_URL\b/g;
 
