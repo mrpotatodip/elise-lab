@@ -29,6 +29,24 @@ const runnersOf = (db: AppDbType, ids: string[]) =>
   });
 
 // -----
+// An Account's live scans. Callers count these scans and add up
+// their budget caps, so the rows come back with no files and no
+// finding counts: a queued or running scan has no summary, and two
+// more queries on the path of every new scan would buy nothing.
+// They do carry their Runner, because a scan on a Runner is counted
+// apart from one in our cloud.
+// -----
+export const activeScansEffect = (db: AppDbType, accountId: string, nowMs: number): Effect.Effect<ScanStatus[], DbError> =>
+  Effect.gen(function* () {
+    const rows = yield* Effect.tryPromise({
+      try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), liveScansSql(nowMs))),
+      catch: toDbError,
+    });
+    const runners = rows.length === 0 ? [] : yield* runnersOf(db, rows.map((row) => row.id));
+    return rows.map((row) => scanRowToStatus(row, [], null, runners.find((runner) => runner.scanId === row.id) ?? null));
+  });
+
+// -----
 // The rows with their files, the Runner a scan ran on and, for a
 // scan whose findings are recorded, the counts of what it found.
 // -----
@@ -265,23 +283,7 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
           catch: toDbError,
         }).pipe(Effect.asVoid),
 
-  // -----
-  // Callers count these scans and add up their budget caps, so the
-  // rows come back with no files and no finding counts: a queued or
-  // running scan has no summary, and two more queries on the
-  // path of every new scan would buy nothing. They do carry their
-  // Runner, because a scan on a Runner is counted apart from one in
-  // our cloud.
-  // -----
-  activeSince: (accountId, nowMs) =>
-    Effect.gen(function* () {
-      const rows = yield* Effect.tryPromise({
-        try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), liveScansSql(nowMs))),
-        catch: toDbError,
-      });
-      const runners = rows.length === 0 ? [] : yield* runnersOf(db, rows.map((row) => row.id));
-      return rows.map((row) => scanRowToStatus(row, [], null, runners.find((runner) => runner.scanId === row.id) ?? null));
-    }),
+  activeSince: (accountId, nowMs) => activeScansEffect(db, accountId, nowMs),
 
   // -----
   // How many live scans each path holds, over every Account. It

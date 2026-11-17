@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { platformMasterPlans, tenantSubscriptions } from "@repo/db-elise/schema";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { buildApp } from "#/index";
 import type { PlanState } from "#/modules/billing";
 import type { MonthSpend } from "#/modules/usage";
@@ -24,7 +28,6 @@ const PRO: PlanState = {
   status: "active",
   pastDueSince: null,
 };
-const BYOK: PlanState = { ...PRO, planKey: "byok", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0 };
 
 let spend: MonthSpend = NO_SPEND;
 let held: number[] = [];
@@ -47,7 +50,6 @@ beforeEach(() => {
 
 type Body = { repo: string; profile?: string; max_budget_usd?: number };
 const post = (env: Bindings, body: Body) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
-const getCredit = (env: Bindings) => app.fetch(new Request("http://localhost/usage/credit", { headers }), env, testExecutionContext);
 
 const ScanBodySchema = z.object({ data: z.object({ maxBudgetUsd: z.number(), profile: z.string() }) });
 const ErrorBodySchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
@@ -116,15 +118,30 @@ describe("POST /scans: the cap of a profile", () => {
 
 describe("GET /usage/credit: the cap and hold of each profile", () => {
   const ProfilesSchema = z.object({ data: z.object({ profiles: z.array(z.object({ profile: z.string(), capUsd: z.number(), holdUsd: z.number().nullable() })) }) });
+  let test: TestDb;
+  const accountOf = new Map<string, string>();
+  const creditApp = tenantRouteApp(() => test);
+
+  beforeAll(async () => {
+    test = await openTestDb();
+    for (const planKey of ["pro", "byok", "none"]) {
+      const { tenantId } = await seedTenant(test, planKey);
+      accountOf.set(planKey, tenantId);
+      const [plan] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, planKey));
+      if (plan) await test.raw.insert(tenantSubscriptions).values({ tenantId, planId: plan.id, status: "active", source: "grant" });
+    }
+  });
+
+  afterAll(async () => {
+    await test.close();
+  });
 
   it.each([
-    ["a platform plan", { ...NO_SPEND, plan: PRO }, [9, 18, 27]],
-    ["an account plan on its own key", { ...NO_SPEND, plan: BYOK, ownKey: true }, [null, null, null]],
-    ["no plan", NO_SPEND, [null, null, null]],
-  ])("lists the caps 6, 12 and 18 dollars with the holds of %s", async (_name, account, holds) => {
-    spend = account;
-    const { env } = fakeBindings();
-    const res = await getCredit(env);
+    ["a platform plan", "pro", [9, 18, 27]],
+    ["an account plan on its own key", "byok", [null, null, null]],
+    ["no plan", "none", [null, null, null]],
+  ])("lists the caps 6, 12 and 18 dollars with the holds of %s", async (_name, planKey, holds) => {
+    const res = await callAs(creditApp, accountOf.get(planKey) ?? "", "/usage/credit");
 
     expect(ProfilesSchema.parse(await res.json()).data.profiles).toEqual([
       { profile: "quick", capUsd: 6, holdUsd: holds[0] },

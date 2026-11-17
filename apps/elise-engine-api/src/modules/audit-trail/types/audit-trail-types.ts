@@ -1,7 +1,8 @@
 import type { AppDbType } from "#/lib/db-connection";
 
 // -----
-// What a write needs: a transaction or the pool.
+// What a write needs: a transaction, the pool, or a withTenant
+// transaction.
 // -----
 export type AuditDb = Pick<AppDbType, "insert">;
 

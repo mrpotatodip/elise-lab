@@ -1,7 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
+  accessAuditLog,
   authUser,
+  platformMasterPlans,
   scanFiles,
   scanFindingComments,
   scanFindings,
@@ -9,9 +11,13 @@ import {
   scanRepos,
   scans,
   tenantAnthropicKeys,
+  tenantCreditLedger,
   tenantGithubInstallations,
   tenantRunners,
+  tenants,
+  tenantSubscriptions,
 } from "@repo/db-elise/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
@@ -44,6 +50,7 @@ const mountedRoutes = [...new Set(app.routes.filter((route) => route.method !== 
 const tenantRoutes = mountedRoutes.filter((route) => !NOT_TENANT_ROUTES.includes(route));
 const caseEntries = Object.entries<CrossAccountCase>(CROSS_ACCOUNT_CASES);
 const runCases = caseEntries.flatMap(([route, found]) => (found.kind === "run" ? [{ route, ...found }] : []));
+type RunCase = (typeof runCases)[number];
 const allowedOwnerUses = new Map<string, number>(Object.entries(OWNER_CONNECTION_USES));
 const SRC = resolve(__dirname, "..");
 const OWNER_USE = /\b(dbConnect|poolConnect|withPool)\(|\bDATABASE_URL\b/g;
@@ -55,6 +62,27 @@ const ownerUsesBySourceFile = () =>
       .map((file) => [file.split("\\").join("/"), (readFileSync(join(SRC, file), "utf8").match(OWNER_USE) ?? []).length] as const)
       .filter(([, uses]) => uses > 0),
   );
+
+// -----
+// The other Account's money: a Plan, credit, a budget of its own
+// with the change that set it, and a scan's spend this month. The
+// usage routes must answer the caller with none of it.
+// -----
+const seedOtherUsage = async (accountId: string, repoId: string) => {
+  const [pro] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "pro"));
+  await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: pro.id, status: "active", source: "grant" });
+  await test.raw.insert(tenantCreditLedger).values({ tenantId: accountId, kind: "topup", amountUsd: "40.0000", idempotencyKey: "theirs-topup" });
+  await test.raw.update(tenants).set({ monthlyScanBudgetUsd: "99.00" }).where(eq(tenants.id, accountId));
+  await test.raw.insert(accessAuditLog).values({ action: "usage.budget.updated", subjectId: accountId, before: { monthlyBudgetUsd: null }, after: { tenantId: accountId, monthlyBudgetUsd: 99 } });
+  await test.raw.insert(scans).values(scanValues(accountId, repoId, "theirs-spent", new Date().toISOString(), { costUsd: "3.0000", keySource: "platform" }));
+};
+
+const outcomeOf = (found: RunCase, status: number, data: z.infer<typeof EnvelopeSchema>["data"]) => {
+  const fields = Array.isArray(data) ? {} : (data ?? {});
+  if (found.expect === "own") return { got: [status, Object.fromEntries(Object.keys(found.own).map((key) => [key, fields[key]]))], want: [200, found.own] };
+  const listed = (Array.isArray(data) ? data : Object.values(fields).filter(Array.isArray).flat()).length;
+  return { got: [status, listed], want: [STATUS_OF[found.expect], 0] };
+};
 
 beforeAll(async () => {
   test = await openTestDb();
@@ -85,6 +113,7 @@ beforeAll(async () => {
     noticeAcceptedAt: new Date("2026-11-01T00:00:00Z"),
   });
   await test.raw.insert(tenantAnthropicKeys).values({ tenantId: otherTenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
+  await seedOtherUsage(otherTenantId, otherRepoId);
 });
 
 afterAll(async () => {
@@ -109,11 +138,10 @@ describe("every tenant route has a cross-account case", () => {
     expect(shownBy.filter((file) => !existsSync(join(SRC, file)))).toEqual([]);
   });
 
-  it.each(runCases)("$route answers one Account with nothing of another's", async ({ path, method, body, as, expect: outcome }) => {
-    const res = await callAs(app, as === "stranger" ? strangerId : tenantId, path, { method, body });
-    const { data } = EnvelopeSchema.parse(await res.json());
-    const lists = Array.isArray(data) ? [data] : Object.values(data ?? {}).filter(Array.isArray);
-    expect([res.status, lists.flat().length]).toEqual([STATUS_OF[outcome], 0]);
+  it.each(runCases)("$route answers one Account with nothing of another's", async (found) => {
+    const res = await callAs(app, found.as === "stranger" ? strangerId : tenantId, found.path, { method: found.method, body: found.body });
+    const { got, want } = outcomeOf(found, res.status, EnvelopeSchema.parse(await res.json()).data);
+    expect(got).toEqual(want);
   });
 
   it("keeps a Runner added by one Account out of another Account's list", async () => {
