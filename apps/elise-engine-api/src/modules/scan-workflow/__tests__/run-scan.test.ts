@@ -47,11 +47,12 @@ type SetupOptions = {
   maxPolls?: number;
   phases?: readonly FullPhase[];
   failingPhase?: FullPhase;
-  spentAllInPhase?: FullPhase;
+  capReachedInPhase?: FullPhase;
 };
 
 const setup = (options: SetupOptions = {}) => {
   let currentPhase: FullPhase | undefined;
+  let capReached = false;
   const names: string[] = [];
   const calls: string[] = [];
   const settles: string[] = [];
@@ -71,12 +72,10 @@ const setup = (options: SetupOptions = {}) => {
     launchAgent: async (_options, priors) => void launches.push(priors),
     launchPhase: async (_options, phase) => {
       currentPhase = phase;
+      capReached = capReached || options.capReachedInPhase === phase;
       calls.push(`launch:${phase}`);
     },
-    endPhase: async (phase) => {
-      calls.push(`end:${phase}`);
-      return { phase, allowanceUsd: 0.25, spentUsd: options.spentAllInPhase === phase ? 0.25 : 0.1, exhausted: options.spentAllInPhase === phase };
-    },
+    capReached: async () => capReached,
     pollAgent: async () => {
       if (options.failingPhase !== undefined && options.failingPhase === currentPhase) return { state: "failed", error: "claude exited 1" };
       if (options.pollThrows) throw new Error("sandbox unreachable");
@@ -113,35 +112,36 @@ const queue = async (ledger: ReturnType<typeof memoryScanRepo>, input: ScanParam
 describe("runScan, a full scan in phases", () => {
   const full = (extra: Partial<ScanParams> = {}) => params({ options: { ...params().options, skill: "full" }, ...extra });
 
-  it("runs recon, hunt, check and report in order, each started, waited for and closed, and no single-run launch", async () => {
+  it("runs recon, hunt, check and report in order, each started and waited for, and no single-run launch", async () => {
     const { names, calls, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES });
     await queue(ledger, full());
 
     await runScan(deps, full(), fakeStep(names));
 
-    expect(calls.filter((call) => call.startsWith("launch:") || call.startsWith("end:"))).toEqual([
-      "launch:recon",
-      "end:recon",
-      "launch:hunt",
-      "end:hunt",
-      "launch:check",
-      "end:check",
-      "launch:report",
-      "end:report",
-    ]);
+    expect(calls.filter((call) => call.startsWith("launch:"))).toEqual(["launch:recon", "launch:hunt", "launch:check", "launch:report"]);
     expect(names).not.toContain("launch-agent");
     expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded" });
   });
 
-  it("goes on to the next phase when one ended with an error because its slice ran out", async () => {
-    const { names, calls, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES, failingPhase: "hunt", spentAllInPhase: "hunt" });
+  it("goes on to the next phase when one reached the cap but still ended well, as a Partial Scan does", async () => {
+    const { names, calls, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES, capReachedInPhase: "hunt" });
     await queue(ledger, full());
 
     await runScan(deps, full(), fakeStep(names));
 
-    expect(calls).toContain("launch:check");
     expect(calls).toContain("launch:report");
     expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded" });
+  });
+
+  it("fails the scan with an error that says the cap was reached when a phase ends with an error after the whole pool was spent, and charges what the meter counted", async () => {
+    const { names, calls, ledger, settles, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES, failingPhase: "hunt", capReachedInPhase: "hunt" });
+    await queue(ledger, full());
+
+    await expect(runScan(deps, full(), fakeStep(names))).rejects.toThrow("the budget cap of $1 was reached during the hunt phase");
+
+    expect(calls).not.toContain("launch:check");
+    expect(ledger.rows.get("scan-1")).toMatchObject({ status: "failed", usage });
+    expect(settles).toEqual(["failed"]);
   });
 
   it("fails the scan when a phase fails with money left, and starts no later phase", async () => {
@@ -296,6 +296,18 @@ describe("runScan", () => {
 
     expect(launches).toEqual([[]]);
     expect(bindings.store.has(`accounts/${ACCOUNT}/scans/scan-1/prior-findings.json`)).toBe(false);
+  });
+
+  it("gives a profile Scan no priors and saves no prior-findings.json, whatever the History holds", async () => {
+    const profileScan = params({ options: { ...params().options, skill: "full" } });
+    const { names, ledger, bindings, launches, deps } = setup({ priors: [prior] });
+    await queue(ledger, profileScan);
+
+    await runScan(deps, profileScan, fakeStep(names));
+
+    expect(launches).toEqual([[]]);
+    expect(bindings.store.has(`accounts/${ACCOUNT}/scans/scan-1/prior-findings.json`)).toBe(false);
+    expect(ledger.files.has("scan-1/prior-findings.json")).toBe(false);
   });
 
   it("fails the scan when its results cannot be recorded, and still tries to record the failure", async () => {

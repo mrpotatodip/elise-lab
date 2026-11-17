@@ -20,6 +20,8 @@ The page never holds the API token. Rust keeps it in the system keychain and mak
 
 A scan uses your Claude login but not your Claude Code settings. The app writes its own settings file and the audit skill into the scan's work folder and tells `claude` to load only that (`--setting-sources project`), so an allow rule you keep for daily work, such as `curl`, cannot widen what the agent may do. Your `~/.claude` folder is neither read nor changed.
 
+A job says which audit to run (`lite` or `full`). A full job is one run of `claude`, with no Phases, and it stops at the lower of the job's `profileCapUsd` and the Runner's own ceiling through `claude`'s `--max-budget-usd`. A job with no `profileCapUsd` (an older Worker) uses the budget it sends. When the limit is hit and the audit had already written `REPORT.md`, the files are sent and the Scan ends as a Partial Scan; otherwise the Scan ends with an error that says the cap was reached.
+
 The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The activity is `idle`, `running` or `finished`.
 
 ## Run it

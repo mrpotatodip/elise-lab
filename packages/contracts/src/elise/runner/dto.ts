@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RUNNER_JOB_ERROR_MAX, RUNNER_JOB_FILE_MAX, RUNNER_JOB_LOG_MAX, RUNNER_NAME_MAX, RUNNER_PAIRING_CODE_MAX } from "../constants";
+import { SCAN_PROFILES } from "../scan/dto";
 
 export const RunnerIdSchema = z.uuid();
 
@@ -66,6 +67,11 @@ export const RunnerRemovedSchema = z.object({
 // default branch when null), puts priorsJson in prior-findings.json
 // when it is not empty, and gives the agent the prompt. The Worker
 // builds the prompt, so the audit's words stay in one place.
+// profile and profileCapUsd are the Scan's profile and the cap the
+// profile has in the Worker's table, for a Runner app that runs the
+// full Skill. Both are optional: an old Worker sends neither, and an
+// old app ignores them. maxBudgetUsd stays the Runner's own ceiling,
+// and the Runner takes no credit.
 // -----
 export const RunnerJobSchema = z.object({
   scanId: z.string(),
@@ -74,6 +80,8 @@ export const RunnerJobSchema = z.object({
   skill: z.string(),
   model: z.string(),
   effort: z.string(),
+  profile: z.enum(SCAN_PROFILES).optional(),
+  profileCapUsd: z.number().positive().optional(),
   maxBudgetUsd: z.number().positive(),
   prompt: z.string(),
   priorsJson: z.string(),

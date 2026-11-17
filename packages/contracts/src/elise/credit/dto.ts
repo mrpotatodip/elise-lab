@@ -1,5 +1,19 @@
 import { z } from "zod";
 import { CREDIT_ENTRY_KIND_VALUES, SCAN_KEY_SOURCE_VALUES, SUBSCRIPTION_SOURCE_VALUES, SUBSCRIPTION_STATUS_VALUES } from "../enums";
+import { SCAN_PROFILES } from "../scan/dto";
+
+// -----
+// The most a scan of one profile may spend (capUsd) and the credit it
+// holds while it runs (holdUsd: the cap times the plan's markup). The
+// markup stays out of the contract, so the dashboard reads the hold
+// from here. holdUsd is null when no credit is held: an account on its
+// own key, or with no plan.
+// -----
+export const ScanProfileCapSchema = z.object({
+  profile: z.enum(SCAN_PROFILES),
+  capUsd: z.number().positive(),
+  holdUsd: z.number().min(0).nullable(),
+});
 
 // -----
 // GET /usage/credit: the credit an account may spend on scans now,
@@ -9,8 +23,10 @@ import { CREDIT_ENTRY_KIND_VALUES, SCAN_KEY_SOURCE_VALUES, SUBSCRIPTION_SOURCE_V
 // own Anthropic key and take none. Every field is null or zero for an
 // account with no plan. scanAllowance is the most scans a UTC month
 // allows, null for no limit; scans is how many the month has so far.
+// profiles lists the cap and the hold of each scan profile.
 // -----
 export const CreditBalanceSchema = z.object({
+  profiles: z.array(ScanProfileCapSchema).optional(),
   planKey: z.string().nullable(),
   keySource: z.enum(["platform", "account"]).nullable(),
   balanceUsd: z.number(),
@@ -19,6 +35,7 @@ export const CreditBalanceSchema = z.object({
   scanAllowance: z.number().int().min(1).nullable(),
 });
 
+export type ScanProfileCap = z.infer<typeof ScanProfileCapSchema>;
 export type CreditBalance = z.infer<typeof CreditBalanceSchema>;
 
 // -----

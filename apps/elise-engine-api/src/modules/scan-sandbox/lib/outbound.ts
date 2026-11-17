@@ -1,5 +1,4 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
-import { sandboxesOf } from "#/lib/scan-path";
 import type { Bindings } from "#/types/variables";
 import { ANTHROPIC_KEY_UNREADABLE, openKey } from "#/modules/anthropic-key";
 import { mintRepoToken } from "#/modules/github-app";
@@ -78,7 +77,7 @@ export class Outbound extends WorkerEntrypoint<Bindings, OutboundProps> {
   }
 
   async #meteredMessages(request: Request, headers: Headers): Promise<Response> {
-    const sandboxes = sandboxesOf(this.env, this.ctx.props.path ?? "lite");
+    const sandboxes = this.env.SANDBOX_FULL;
     const sandbox = sandboxes.get(sandboxes.idFromString(this.ctx.props.sandboxId));
     const body = parseMessagesBody(await request.text());
     if (body === null) return blocked("the request is not a messages call");

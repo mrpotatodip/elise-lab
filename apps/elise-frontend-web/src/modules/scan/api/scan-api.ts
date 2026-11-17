@@ -63,8 +63,8 @@ export const createScan = createServerFn({ method: "POST" })
 const RECORDED_PAGE = 100;
 
 // -----
-// Lite scans record their findings in Neon; the full skill does not, so
-// its findings.json is the only source. A missing file means nothing was
+// A scan records its findings in Neon, except an older full-Skill scan,
+// whose findings.json is the only source. A missing file means nothing was
 // saved. Any other failure is raised, not shown as "No findings".
 // -----
 async function readFindings(auth: EngineAuth, scanId: string): Promise<Finding[]> {

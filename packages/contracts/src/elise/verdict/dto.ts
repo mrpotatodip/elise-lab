@@ -47,7 +47,8 @@ export const VerdictSchema = z.object({
   basis: z.literal("ai_audit").optional(),
   commit: z.string(),
   reasons: z.array(z.object({ code: z.enum(VERDICT_REASON_VALUES), message: z.string() })),
-  scans: z.object({ required: z.number().int(), counted: z.number().int(), ids: z.array(z.string()) }),
+  // Weight, not a count: a quick scan adds 0.5 (VERDICT_SCAN_WEIGHTS). Before scan profiles both were integers, and an old dashboard rejects a half.
+  scans: z.object({ required: z.number().min(0), counted: z.number().min(0), ids: z.array(z.string()) }),
   limits: z.object({ critical: z.number().int(), high: z.number().int(), medium: z.number().int() }),
   counts: SeverityCountsSchema.extend({ needsValidation: z.number().int().min(0) }),
   open: z.array(VerdictOpenSchema),

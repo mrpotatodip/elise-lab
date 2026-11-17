@@ -5,7 +5,7 @@ import type { HoldResult, SettleResult } from "#/modules/credit";
 import type { GithubAccess } from "#/modules/github-installs";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { MonthSpend } from "#/modules/usage";
-import type { ScanSandbox } from "#/modules/scan-sandbox";
+import type { FullScanSandbox } from "#/modules/scan-sandbox";
 import type { PasswordResetEmail, QueuedEmail } from "#/modules/auth/types";
 import type { InviteEmail } from "#/modules/team/types";
 import type { ScanParams } from "#/schemas";
@@ -14,11 +14,9 @@ export type Bindings = {
   ENVIRONMENT: string;
   MODEL: string;
   EFFORT: string;
-  MAX_BUDGET_USD: string;
-  MAX_BUDGET_OWN_KEY_USD: string;
+  MAX_BUDGET_FULL_USD: string;
   MAX_ACTIVE_SCANS: string;
   MAX_ACTIVE_FULL_SCANS: string;
-  MAX_GLOBAL_LITE_SCANS: string;
   MAX_GLOBAL_FULL_SCANS: string;
   MONTHLY_BUDGET_USD: string;
   BUDGET_ALLOWANCE_USD: string;
@@ -46,9 +44,7 @@ export type Bindings = {
   EMAIL: SendEmail;
   INVITE_EMAIL_QUEUE: Queue<QueuedEmail>;
   REPORTS: R2Bucket;
-  SANDBOX: DurableObjectNamespace<ScanSandbox>;
-  SANDBOX_FULL: DurableObjectNamespace<ScanSandbox>;
-  SCAN_WORKFLOW: Workflow<ScanParams>;
+  SANDBOX_FULL: DurableObjectNamespace<FullScanSandbox>;
   SCAN_WORKFLOW_FULL: Workflow<ScanParams>;
 };
 

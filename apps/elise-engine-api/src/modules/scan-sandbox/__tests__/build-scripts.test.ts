@@ -3,7 +3,7 @@ import type { ScanOptions } from "#/schemas";
 import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox/constants";
 import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt, phaseAgentFiles } from "#/modules/scan-sandbox/utils";
 
-const options: ScanOptions = { skill: "lite", model: "claude-haiku-5-5", effort: "low", profile: "quick", maxBudgetUsd: 1 };
+const options: ScanOptions = { skill: "full", model: "claude-haiku-5-5", effort: "low", profile: "quick", maxBudgetUsd: 1 };
 
 describe("buildAgentScript", () => {
   it("takes an atomic lock first, so a retry starts no second agent", () => {
@@ -24,7 +24,7 @@ describe("buildAgentScript", () => {
     expect(script).toContain("--model claude-haiku-5-5 --effort low --max-budget-usd 1");
   });
 
-  it("gives a Phase its own prompt, log, exit file and lock, and its allowance as the cap", () => {
+  it("gives a Phase its own prompt, log, exit file and lock, and what the pool still holds as the cap", () => {
     const script = buildAgentScript({ ...options, skill: "full" }, phaseAgentFiles("hunt"), 1.25);
 
     expect(script.startsWith("mkdir /workspace/agent-hunt.lock 2>/dev/null || exit 0")).toBe(true);
@@ -71,19 +71,11 @@ describe("buildCloneScript", () => {
 });
 
 describe("buildAgentPrompt", () => {
-  it("points a lite scan at the prior findings only when there are some", () => {
-    expect(buildAgentPrompt(options)).not.toContain("prior-findings.json");
-    expect(buildAgentPrompt(options, 3)).toContain("3 unresolved findings in /workspace/prior-findings.json");
-  });
-
-  it("names the lite skill for the lite option", () => {
-    expect(buildAgentPrompt(options)).toContain("security-audit-lite");
-  });
-
-  it("names the full skill and the profile for the full option, and sets no count of agents", () => {
-    const prompt = buildAgentPrompt({ ...options, skill: "full", profile: "deep" });
+  it.each(["lite", "full"] as const)("names the full skill and the profile whatever the options' skill (%s), and sets no count of agents", (skill) => {
+    const prompt = buildAgentPrompt({ ...options, skill, profile: "deep" });
 
     expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
+    expect(prompt).not.toContain("security-audit-lite");
     expect(prompt).toContain("Profile: deep");
     expect(prompt).not.toContain("agent invocations");
   });
@@ -121,7 +113,7 @@ describe("buildAgentPrompt", () => {
 
   it("has the agent run the validators in the container and the app run them on a Runner", () => {
     const full: ScanOptions = { ...options, skill: "full" };
-    const onRunner = buildAgentPrompt(full, 0, { repoDir: "./repo", outDir: "./out", priorPath: "./prior-findings.json", networkRule: "do not use the network", validatedBy: "runner" });
+    const onRunner = buildAgentPrompt(full, { repoDir: "./repo", outDir: "./out", networkRule: "do not use the network", validatedBy: "runner" });
 
     expect(buildAgentPrompt(full)).toContain("run the skill's validators");
     expect(onRunner).toContain("Do not run the validators or any node command");

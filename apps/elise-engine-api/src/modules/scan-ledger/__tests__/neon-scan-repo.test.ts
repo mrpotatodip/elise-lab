@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { scanFindings, scanRunnerJobs, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
+import { scanFindings, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanParams } from "#/schemas";
 import { neonScanRepo } from "#/modules/scan-ledger";
@@ -170,6 +170,21 @@ describe("neonScanRepo", () => {
     expect(refused).toMatchObject({ _tag: "Conflict", message: "This repo already has an active scan: win-full" });
   });
 
+  it("says which live scans of the account are on a Runner, so a limit can count them apart", async () => {
+    const repo = neonScanRepo(test.http);
+    await queue(repo, paramsFor(acme, "act-cloud"));
+    await queue(repo, paramsFor(acme, "act-on-runner"));
+    const [runner] = await test.raw.insert(tenantRunners).values({ tenantId: acme, name: "desk", createdBy: acmePartyId }).returning();
+    await test.raw
+      .insert(scanRunnerJobs)
+      .values({ tenantId: acme, scanId: "act-on-runner", runnerId: runner.id, state: "queued", repoUrl: "https://github.com/octocat/act-on-runner", prompt: "p", optionsJson: "{}", priorsJson: "[]" });
+
+    const active = await Effect.runPromise(repo.activeSince(acme, Date.now()));
+
+    expect(active.find((scan) => scan.scanId === "act-on-runner")?.runner).toEqual({ id: runner.id, name: "desk" });
+    expect(active.find((scan) => scan.scanId === "act-cloud")?.runner ?? null).toBeNull();
+  });
+
   it("counts the live scans of every account on each path, and leaves out a scan that is on a Runner", async () => {
     const repo = neonScanRepo(test.http);
     const before = await Effect.runPromise(repo.activeCounts(Date.now()));
@@ -276,6 +291,32 @@ describe("neonScanRepo", () => {
     });
     expect((await Effect.runPromise(repo.get(acme, "sum-full")))?.summary).toBeNull();
     expect((await Effect.runPromise(repo.get(acme, "sum-running")))?.summary).toBeNull();
+  });
+
+  it("sums what a succeeded profile scan recorded, zeros when it found nothing, and nothing for a full scan recorded before the partial column", async () => {
+    const repo = neonScanRepo(test.http);
+    const full = { ...paramsFor(acme, "x").options, skill: "full" as const };
+    for (const id of ["sum-profile", "sum-profile-clean", "sum-full-old"]) {
+      await queue(repo, { ...paramsFor(acme, id), options: full });
+      await Effect.runPromise(repo.mark(acme, id, { status: "succeeded", error: null }));
+    }
+    await test.raw.update(scans).set({ partial: false }).where(eq(scans.id, "sum-profile-clean"));
+    await test.raw.update(scans).set({ partial: true }).where(eq(scans.id, "sum-profile"));
+    await test.raw.insert(scanFindings).values([
+      { tenantId: acme, scanId: "sum-profile", findingId: "auth/x", fingerprint: "d".repeat(64), status: "confirmed", severity: "critical", title: "t", class: "full-audit", origin: "new" },
+      { tenantId: acme, scanId: "sum-profile", findingId: "cfg/y", fingerprint: "e".repeat(64), status: "needs_validation", severity: null, title: "t", class: "full-audit", origin: "new" },
+    ]);
+
+    expect((await Effect.runPromise(repo.get(acme, "sum-profile")))?.summary).toEqual({
+      total: 2,
+      severity: { critical: 1, high: 0, medium: 0, low: 0, informational: 0 },
+      needsValidation: 1,
+      new: 2,
+      carried: 0,
+      recheck: null,
+    });
+    expect((await Effect.runPromise(repo.get(acme, "sum-profile-clean")))?.summary).toMatchObject({ total: 0, needsValidation: 0, recheck: null });
+    expect((await Effect.runPromise(repo.get(acme, "sum-full-old")))?.summary).toBeNull();
   });
 
   it("keeps a scan that was closed as failed from being brought back by a slow workflow", async () => {

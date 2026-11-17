@@ -2,7 +2,9 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { authUser, scanRunnerJobs, scans } from "@repo/db-elise";
-import { RUNNER_JOB_QUEUE_TIMEOUT_MS } from "@repo/contracts/elise";
+import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/elise";
+import { SCAN_PROFILE_CAPS_USD } from "#/constants";
+import { RUNNER_MAX_BUDGET_USD } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
 import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
@@ -48,8 +50,8 @@ const newScan = async () => {
   return scanId;
 };
 
-const queue = async (scanId: string, over: Partial<ScanParams> = {}, at = NOW) => {
-  await runnerSandbox(test.http, paramsFor(scanId, over), over.runnerId ?? runnerId, () => at).launchAgent(OPTIONS, []);
+const queue = async (scanId: string, over: Partial<ScanParams> = {}, at = NOW, options: ScanOptions = OPTIONS) => {
+  await runnerSandbox(test.http, paramsFor(scanId, over), over.runnerId ?? runnerId, () => at).launchAgent(options, []);
   return scanId;
 };
 
@@ -89,6 +91,19 @@ describe("claiming a job", () => {
     expect(claimed).toMatchObject({ scanId: first, repo: "https://github.com/octocat/Hello-World", ref: null, skill: "lite", model: "claude-sonnet-5-5", maxBudgetUsd: 2 });
     expect(claimed?.prompt).toContain("./repo");
     expect(again?.scanId).not.toBe(first);
+  });
+
+  it("carries the Scan's profile and the cap the table gives it, next to the Runner's own ceiling", async () => {
+    await queue(await newScan(), {}, NOW, { ...OPTIONS, profile: "deep", maxBudgetUsd: RUNNER_MAX_BUDGET_USD });
+    const claimed = await run(claimJobSvc(test.http, runnerId));
+
+    expect(claimed).toMatchObject({ profile: "deep", profileCapUsd: SCAN_PROFILE_CAPS_USD.deep, maxBudgetUsd: RUNNER_MAX_BUDGET_USD });
+  });
+
+  it("still parses a job from before profiles, with no profile or cap", () => {
+    const oldJob = { scanId: "s1", repo: "https://github.com/o/n", ref: null, skill: "lite", model: "claude-sonnet-5-5", effort: "high", maxBudgetUsd: 2, prompt: "audit ./repo", priorsJson: "" };
+
+    expect(RunnerJobSchema.parse(oldJob)).toEqual(oldJob);
   });
 
   it("fails a job whose options cannot be read and hands over the next one", async () => {

@@ -9,8 +9,8 @@ const dropRepoClaudeConfig = ["/.claude", "/CLAUDE.md", "/CLAUDE.local.md", "/.m
 
 // -----
 // One run of the agent. A lite Scan has one run with the default files
-// and its own cap. A Phase of a full Scan has files of its own and the
-// allowance of that Phase as its cap.
+// and its own cap. A Phase of a full Scan has files of its own and what
+// the Scan's pool still holds as its cap.
 // -----
 export function buildAgentScript(options: ScanOptions, files: AgentFiles = DEFAULT_AGENT_FILES, maxBudgetUsd: number = options.maxBudgetUsd): string {
   const agent = [

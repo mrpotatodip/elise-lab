@@ -11,11 +11,11 @@ import { DialogBody, DialogClose, DialogFooter } from "#/components/ui/dialog";
 import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
-import { RadioCard, RadioGroup } from "#/components/ui/radio-group";
 import { Segmented } from "#/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { cn } from "#/lib/utils";
+import { creditProfileHold, creditQuery } from "#/modules/credit";
 import { githubInstallationsQuery, githubReposQuery } from "#/modules/github";
 import { runnersQuery } from "#/modules/runner";
 import { usageBlockedNote, usageQuery, usageUsd } from "#/modules/usage";
@@ -27,8 +27,6 @@ import {
   SCAN_PRIVATE_BRANCH_FAILED,
   SCAN_PRIVATE_TRUNCATED,
   SCAN_PROFILE_OPTIONS,
-  SCAN_SKILL_OPTIONS,
-  SCAN_SKILL_SHORT,
   type ScanOption,
 } from "../constants";
 import { createScan } from "../api";
@@ -42,7 +40,6 @@ const INITIAL: CreateScanInput = {
   repo: "",
   model: "claude-sonnet-5-5",
   effort: "high",
-  skill: "lite",
   profile: "standard",
 };
 
@@ -95,7 +92,7 @@ type ScanNewFormProps = {
   repo?: string;
   startBranch?: string;
   startRef?: string;
-  startOptions?: Partial<Pick<CreateScanInput, "model" | "effort" | "skill" | "profile">>;
+  startOptions?: Partial<Pick<CreateScanInput, "model" | "effort" | "profile">>;
 };
 
 // -----
@@ -128,6 +125,8 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
   const [branchPick, setBranchPick] = useState(startRef ? SCAN_OTHER_BRANCH : (startBranch ?? SCAN_DEFAULT_BRANCH));
   const { data: list } = useQuery(scansQuery());
   const { data: usage } = useQuery(usageQuery());
+  const { data: credit } = useQuery(creditQuery());
+  const hold = creditProfileHold(credit, values.profile);
   const budgetSpent = usage !== undefined && usage.budgetApplies !== false && usage.remainingUsd <= 0;
   const { data: repoList } = useQuery(scanReposQuery());
   const { data: connected, isPending: connecting } = useQuery(githubReposQuery());
@@ -264,26 +263,22 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
               )}
             </div>
 
-            <div className="grid gap-3">
-              <RadioGroup aria-label="How thorough should the review be?" value={values.skill} onValueChange={(next) => form.setFieldValue("skill", SCAN_SKILL_OPTIONS.find((o) => o.value === next)?.value ?? "lite")} className="grid-cols-2">
-                {SCAN_SKILL_OPTIONS.map((option) => (
-                  <RadioCard key={option.value} value={option.value} title={option.label} description={SCAN_SKILL_SHORT[option.value]} />
-                ))}
-              </RadioGroup>
-              {values.skill === "full" && (
-                <div className="grid gap-1.5 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-sm font-medium">Coverage</span>
-                    <Segmented
-                      label="How much of the codebase should the full audit cover?"
-                      value={values.profile}
-                      options={SCAN_PROFILE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                      onChange={(next) => form.setFieldValue("profile", next)}
-                      className="w-full sm:w-72"
-                    />
-                  </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{SCAN_PROFILE_OPTIONS.find((option) => option.value === values.profile)?.description}</p>
-                </div>
+            <div className="grid gap-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm font-medium">Coverage</span>
+                <Segmented
+                  label="How much of the codebase should the audit cover?"
+                  value={values.profile}
+                  options={SCAN_PROFILE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                  onChange={(next) => form.setFieldValue("profile", next)}
+                  className="w-full sm:w-72"
+                />
+              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">{SCAN_PROFILE_OPTIONS.find((option) => option.value === values.profile)?.description}</p>
+              {hold !== null && runner === undefined && (
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  This audit may hold up to {usageUsd(hold)} of your credit while it runs. You pay only what it uses.
+                </p>
               )}
             </div>
 

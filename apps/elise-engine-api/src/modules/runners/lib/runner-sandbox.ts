@@ -39,7 +39,7 @@ export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: s
           runnerId,
           repoUrl: params.repo,
           ref: params.ref ?? null,
-          prompt: buildAgentPrompt(options, priors.length, RUNNER_PROMPT_PLACE),
+          prompt: buildAgentPrompt(options, RUNNER_PROMPT_PLACE),
           optionsJson: JSON.stringify(options),
           priorsJson: priors.length > 0 ? JSON.stringify(priors, null, 2) : "",
         }),
@@ -54,7 +54,7 @@ export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: s
       throw new Error("a Runner does not run a full scan in phases yet");
     },
 
-    endPhase: async () => {
+    capReached: async () => {
       throw new Error("a Runner does not run a full scan in phases yet");
     },
 

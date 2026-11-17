@@ -25,6 +25,7 @@ export const writeScanRecordEffect = (db: DbConnectType, record: ScanRecord): Ef
             priorsCarried: scan.priorsCarried,
             priorsClosed: scan.priorsClosed,
             priorsUnchecked: scan.priorsUnchecked,
+            partial: scan.partial,
             inputTokens: scan.inputTokens,
             outputTokens: scan.outputTokens,
             cacheReadTokens: scan.cacheReadTokens,

@@ -30,8 +30,8 @@ import usageRoutes from "#/modules/usage";
 import verdictRoutes from "#/modules/verdict";
 import type { AppEnv, AppDeps, Bindings } from "#/types/variables";
 
-export { FullScanSandbox, Outbound, ScanSandbox } from "#/modules/scan-sandbox";
-export { FullScanWorkflow, ScanWorkflow } from "#/modules/scan-workflow";
+export { FullScanSandbox, Outbound } from "#/modules/scan-sandbox";
+export { FullScanWorkflow } from "#/modules/scan-workflow";
 
 export const buildApp = (deps: AppDeps = realAppDeps) => {
   const app = new Hono<AppEnv>();

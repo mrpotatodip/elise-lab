@@ -21,6 +21,13 @@ const down = async () => {
 
 const NO_SPEND: MonthSpend = { spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: false, plan: null };
 
+// -----
+// An Account on its own key and no Plan: every new Scan in our cloud runs
+// the full Skill, and the platform's key needs a Plan, so a test that
+// starts a default Scan and cares about nothing else uses this.
+// -----
+const OWN: MonthSpend = { ...NO_SPEND, ownKey: true };
+
 let repo: ScanRepo;
 
 beforeEach(() => {
@@ -29,34 +36,24 @@ beforeEach(() => {
 
 describe("createScanSvc", () => {
   it("queues a scan with the defaults", async () => {
-    const { env, created } = fakeBindings();
-    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, NO_SPEND));
+    const { env, createdFull } = fakeBindings();
+    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
 
-    expect(queued).toMatchObject({ status: "queued", skill: "lite", profile: "quick", model: "claude-sonnet-5-5", maxBudgetUsd: 2 });
-    expect(created).toHaveLength(1);
-  });
-
-  it.each([
-    ["lite", { lite: 1, full: 0 }],
-    ["full", { lite: 0, full: 1 }],
-  ] as const)("starts a %s scan on the workflow of its path and no other", async (skill, expected) => {
-    const { env, created, createdFull } = fakeBindings();
-    await Effect.runPromise(createScanSvc(env, repo, "acme", { ...input, skill }, NO_SPEND));
-
-    expect({ lite: created.length, full: createdFull.length }).toEqual(expected);
+    expect(queued).toMatchObject({ status: "queued", skill: "full", profile: "quick", model: "claude-sonnet-5-5", maxBudgetUsd: 6 });
+    expect(createdFull).toHaveLength(1);
   });
 
   it("records the scan in the ledger before the workflow starts", async () => {
     const { env } = fakeBindings();
-    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, NO_SPEND));
+    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
 
     expect(await Effect.runPromise(repo.get("acme", queued.scanId))).toMatchObject({ status: "queued", repo: input.repo, step: null });
   });
 
   it("marks the scan failed when the workflow cannot start", async () => {
     // SAFETY: the service calls only create on the workflow.
-    const { env } = fakeBindings({ SCAN_WORKFLOW: { create: down } as never });
-    await Effect.runPromise(Effect.flip(createScanSvc(env, repo, "acme", input, NO_SPEND)));
+    const { env } = fakeBindings({ SCAN_WORKFLOW_FULL: { create: down } as never });
+    await Effect.runPromise(Effect.flip(createScanSvc(env, repo, "acme", input, OWN)));
     const [scan] = (await Effect.runPromise(repo.list("acme", 10))).scans;
 
     expect(scan).toMatchObject({ status: "failed" });
@@ -64,123 +61,114 @@ describe("createScanSvc", () => {
   });
 
   it("starts the workflow with the install GitHub access chose, asked for under the repo's own spelling", async () => {
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const asked: string[] = [];
     const github = { installationRowId: "7c1e4a52-9d3b-4f60-8a71-2b3c4d5e6f70", installationId: 42, repoId: 7, repo: "octocat/hello-world", isPrivate: true };
     const access: GithubAccess = { forRepo: (url) => Effect.sync(() => (asked.push(url), github)) };
 
-    await Effect.runPromise(createScanSvc(env, repo, "acme", { repo: "https://github.com/octocat/Hello-World.git" }, NO_SPEND, access));
+    await Effect.runPromise(createScanSvc(env, repo, "acme", { repo: "https://github.com/octocat/Hello-World.git" }, OWN, access));
 
     expect(asked).toEqual(["https://github.com/octocat/Hello-World"]);
-    expect(created[0]?.params.github).toEqual(github);
+    expect(createdFull[0]?.params.github).toEqual(github);
   });
 
   it("starts the workflow with no install when GitHub access has none", async () => {
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const access: GithubAccess = { forRepo: () => Effect.succeed(null) };
 
-    await Effect.runPromise(createScanSvc(env, repo, "acme", input, NO_SPEND, access));
+    await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN, access));
 
-    expect(created[0]?.params.github).toBeUndefined();
+    expect(createdFull[0]?.params.github).toBeUndefined();
   });
 
   it("queues nothing when GitHub access fails", async () => {
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const access: GithubAccess = { forRepo: () => Effect.fail(new ExternalError({ cause: "down" })) };
 
-    const error = await Effect.runPromise(Effect.flip(createScanSvc(env, repo, "acme", input, NO_SPEND, access)));
+    const error = await Effect.runPromise(Effect.flip(createScanSvc(env, repo, "acme", input, OWN, access)));
 
     expect(error._tag).toBe("ExternalError");
-    expect(created).toHaveLength(0);
+    expect(createdFull).toHaveLength(0);
     expect((await Effect.runPromise(repo.list("acme", 10))).scans).toEqual([]);
   });
 
   it("fails with DbError when the ledger is down", async () => {
-    const error = await Effect.runPromise(Effect.flip(createScanSvc(fakeBindings().env, brokenScanRepo, "acme", input, NO_SPEND)));
+    const error = await Effect.runPromise(Effect.flip(createScanSvc(fakeBindings().env, brokenScanRepo, "acme", input, OWN)));
 
     expect(error._tag).toBe("DbError");
   });
 
-  it("fails with Invalid when the dollar cap is above the ceiling", async () => {
-    const error = await Effect.runPromise(Effect.flip(createScanSvc(fakeBindings().env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 5 }, NO_SPEND)));
+  it("fails with Invalid when the dollar cap is above the profile's cap", async () => {
+    const error = await Effect.runPromise(Effect.flip(createScanSvc(fakeBindings().env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 7 }, OWN)));
 
     expect(error._tag).toBe("Invalid");
   });
 
-  it("fails with RateLimited at the active scan limit", async () => {
-    const { env } = fakeBindings({ MAX_ACTIVE_SCANS: "1" });
-    await Effect.runPromise(createScanSvc(env, repo, "acme", input, NO_SPEND));
-    const error = await Effect.runPromise(Effect.flip(createScanSvc(env, repo, "acme", input, NO_SPEND)));
-
-    expect(error).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS" });
-  });
-
   it("fails with ExternalError when the workflow cannot start", async () => {
     // SAFETY: the service calls only create on the workflow.
-    const { env } = fakeBindings({ SCAN_WORKFLOW: { create: down } as never });
-    const error = await Effect.runPromise(Effect.flip(createScanSvc(env, repo, "acme", input, NO_SPEND)));
+    const { env } = fakeBindings({ SCAN_WORKFLOW_FULL: { create: down } as never });
+    const error = await Effect.runPromise(Effect.flip(createScanSvc(env, repo, "acme", input, OWN)));
 
     expect(error._tag).toBe("ExternalError");
   });
 
   describe("the limits of each path", () => {
-    const start =(env: ReturnType<typeof fakeBindings>["env"], account: string, name: string, skill: "lite" | "full") =>
-      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, { ...repoOf(name), skill }, NO_SPEND)));
-    const startOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string, skill: "lite" | "full") =>
-      Effect.runPromise(createScanSvc(env, repo, account, { ...repoOf(name), skill }, NO_SPEND));
+    const RUNNER = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
+    const start = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) => Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, repoOf(name), OWN)));
+    const startOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) => Effect.runPromise(createScanSvc(env, repo, account, repoOf(name), OWN));
+    const startOnRunner = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
+      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, NO_SPEND, undefined, undefined, () => Effect.succeed(true))));
+    const startOnRunnerOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
+      Effect.runPromise(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, NO_SPEND, undefined, undefined, () => Effect.succeed(true)));
 
-    it("counts the lite and the full scans of one account on their own", async () => {
+    it("counts the Scans of one account in our cloud on MAX_ACTIVE_FULL_SCANS, and a Scan on a Runner on MAX_ACTIVE_SCANS", async () => {
       const { env } = fakeBindings({ MAX_ACTIVE_SCANS: "1", MAX_ACTIVE_FULL_SCANS: "1" });
-      await startOk(env, "acme", "a", "full");
-      await startOk(env, "acme", "b", "lite");
+      await startOk(env, "acme", "a");
+      await startOnRunnerOk(env, "acme", "b");
 
-      expect(await start(env, "acme", "c", "full")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("full scans (limit 1)") });
-      expect(await start(env, "acme", "d", "lite")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("lite scans (limit 1)") });
+      expect(await start(env, "acme", "c")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("full scans (limit 1)") });
+      expect(await startOnRunner(env, "acme", "d")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("Runner scans (limit 1)") });
     });
 
-    it.each([
-      ["lite", { MAX_GLOBAL_LITE_SCANS: "1" }],
-      ["full", { MAX_GLOBAL_FULL_SCANS: "1" }],
-    ] as const)("refuses a %s scan with a busy message when the global cap is full, with no queue", async (skill, cap) => {
-      const { env, created, createdFull } = fakeBindings(cap);
-      await startOk(env, "other", "a", skill);
-      const before = created.length + createdFull.length;
+    it("stores a Scan on a Runner as full, starts it on the full workflow and counts it on MAX_ACTIVE_SCANS only", async () => {
+      const { env, createdFull } = fakeBindings({ MAX_ACTIVE_SCANS: "1", MAX_ACTIVE_FULL_SCANS: "0", MAX_GLOBAL_FULL_SCANS: "0" });
+      const queued = await startOnRunnerOk(env, "acme", "a");
 
-      const error = await start(env, "acme", "b", skill);
-
-      expect(error).toMatchObject({ _tag: "RateLimited", code: "SCAN_WORKER_BUSY", message: expect.stringContaining("Try again in a few minutes") });
-      expect(created.length + createdFull.length).toBe(before);
+      expect(queued).toMatchObject({ status: "queued", skill: "full" });
+      expect(await Effect.runPromise(repo.get("acme", queued.scanId))).toMatchObject({ skill: "full" });
+      expect(createdFull).toHaveLength(1);
+      expect(await startOnRunner(env, "acme", "b")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("Runner scans (limit 1)") });
+      expect(await startOnRunnerOk(env, "other", "c")).toMatchObject({ status: "queued" });
     });
 
-    it("lets a lite scan in when only the full cap is full, and the other way round", async () => {
-      const { env } = fakeBindings({ MAX_GLOBAL_LITE_SCANS: "1", MAX_GLOBAL_FULL_SCANS: "1" });
-      await startOk(env, "other", "a", "full");
-      await startOk(env, "acme", "b", "lite");
+    it("does not use up the place of a full Scan in our cloud, nor the platform's", async () => {
+      const { env, createdFull } = fakeBindings({ MAX_GLOBAL_FULL_SCANS: "1" });
+      await startOnRunnerOk(env, "other", "a");
+      await startOnRunnerOk(env, "acme", "b");
+      await startOk(env, "acme", "c");
 
-      expect(await start(env, "acme", "c", "full")).toMatchObject({ code: "SCAN_WORKER_BUSY" });
-      expect(await start(env, "other", "d", "lite")).toMatchObject({ code: "SCAN_WORKER_BUSY" });
+      expect(createdFull).toHaveLength(3);
+      expect(await start(env, "someone", "d")).toMatchObject({ code: "SCAN_WORKER_BUSY" });
     });
 
-    it("does not count a scan on a Runner against the global caps, which a Runner scan does not meet", async () => {
-      const { env } = fakeBindings({ MAX_GLOBAL_LITE_SCANS: "0" });
-      const queued = await Effect.runPromise(
-        createScanSvc(env, repo, "acme", { ...repoOf("a"), runner_id: "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4" }, NO_SPEND, undefined, undefined, () => Effect.succeed(true)),
-      );
+    it("is not held back by a full Scan of its Account in our cloud", async () => {
+      const { env } = fakeBindings({ MAX_ACTIVE_SCANS: "1" });
+      await startOk(env, "acme", "a");
 
-      expect(queued.status).toBe("queued");
+      expect(await startOnRunnerOk(env, "acme", "b")).toMatchObject({ status: "queued", skill: "full" });
     });
   });
 
   it("dies, and does not fail, when the default model in the config is not on the list", async () => {
     const { env } = fakeBindings({ MODEL: "not-a-model" });
-    const exit = await Effect.runPromiseExit(createScanSvc(env, repo, "acme", input, NO_SPEND));
+    const exit = await Effect.runPromiseExit(createScanSvc(env, repo, "acme", input, OWN));
 
     expect(Exit.isFailure(exit) && Cause.isDie(exit.cause)).toBe(true);
   });
 
   it("refuses a scan that could pass the monthly budget", async () => {
     const { env } = fakeBindings();
-    const spend = { ...NO_SPEND, spentUsd: 19 };
+    const spend = onPlan({}, { spentUsd: 19, budgetOverrideUsd: 20 });
     const error = await Effect.runPromise(Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", input, spend)));
 
     expect(error).toMatchObject({ _tag: "RateLimited", code: "MONTHLY_BUDGET_EXCEEDED" });
@@ -188,7 +176,7 @@ describe("createScanSvc", () => {
 
   it("lets a scan through when its cap still fits the budget", async () => {
     const { env } = fakeBindings();
-    const spend = { ...NO_SPEND, spentUsd: 17 };
+    const spend = { ...OWN, spentUsd: 13 };
     const queued = await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", input, spend));
 
     expect(queued.status).toBe("queued");
@@ -196,7 +184,7 @@ describe("createScanSvc", () => {
 
   it("uses the account's own budget when it has one", async () => {
     const { env } = fakeBindings();
-    const spend = { ...NO_SPEND, spentUsd: 19, budgetOverrideUsd: 100 };
+    const spend = { ...OWN, spentUsd: 19, budgetOverrideUsd: 100 };
     const queued = await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", input, spend));
 
     expect(queued.status).toBe("queued");
@@ -234,8 +222,9 @@ describe("createScanSvc: the plan", () => {
   };
 
   it.each([
-    ["no plan, billing not enforced", NO_SPEND, "false", "queued"],
-    ["no plan, billing enforced", NO_SPEND, "true", "NO_ACTIVE_PLAN"],
+    ["no plan and no own key, billing not enforced", NO_SPEND, "false", "NO_ACTIVE_PLAN"],
+    ["no plan and no own key, billing enforced", NO_SPEND, "true", "NO_ACTIVE_PLAN"],
+    ["no plan and an own key, billing not enforced", OWN, "false", "queued"],
     ["an active plan", onPlan({}), "true", "queued"],
     ["a canceled plan", onPlan({ status: "canceled" }), "false", "NO_ACTIVE_PLAN"],
     ["a past due plan inside the grace period", onPlan({ status: "past_due", pastDueSince: new Date(Date.now() - 3 * DAY) }), "true", "queued"],
@@ -249,8 +238,8 @@ describe("createScanSvc: the plan", () => {
 
   it.each([
     ["a platform plan with credit for the hold", onPlan({ creditBalanceUsd: 49 }), "queued"],
-    ["a platform plan with exactly the hold left", onPlan({ creditBalanceUsd: 3 }), "queued"],
-    ["a platform plan a cent short of the hold", onPlan({ creditBalanceUsd: 2.99 }), "INSUFFICIENT_CREDIT"],
+    ["a platform plan with exactly the hold left", onPlan({ creditBalanceUsd: 9 }), "queued"],
+    ["a platform plan a cent short of the hold", onPlan({ creditBalanceUsd: 8.99 }), "INSUFFICIENT_CREDIT"],
     ["a platform plan with no credit", onPlan({ creditBalanceUsd: 0 }), "INSUFFICIENT_CREDIT"],
     ["a platform plan, whatever the month's spend", onPlan({}, { spentUsd: 500, platformSpentUsd: 500 }), "queued"],
     ["an account plan with the account's own key", onPlan(BYOK, { ownKey: true }), "queued"],
@@ -258,7 +247,7 @@ describe("createScanSvc: the plan", () => {
     ["an account plan with its last allowed scan", onPlan(BYOK, { ownKey: true, scans: 299 }), "queued"],
     ["an account plan with its allowance used", onPlan(BYOK, { ownKey: true, scans: 300 }), "SCAN_ALLOWANCE_EXCEEDED"],
     ["a budget the admin set, counted in credit", onPlan({}, { spentUsd: 5, budgetOverrideUsd: 10 }), "MONTHLY_BUDGET_EXCEEDED"],
-    ["a budget the admin set, with room in credit", onPlan({}, { spentUsd: 4, budgetOverrideUsd: 10 }), "queued"],
+    ["a budget the admin set, with room in credit", onPlan({}, { spentUsd: 4, budgetOverrideUsd: 16 }), "queued"],
   ])("with %s the scan is %s", async (_name, spend, expected) => {
     expect(await outcome(spend, "true")).toBe(expected);
   });
@@ -287,13 +276,13 @@ describe("createScanSvc: the plan", () => {
   });
 
   it("fails a scan whose hold lost the race and does not start it", async () => {
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     const mem = memoryScanRepo();
     const failure = await Effect.runPromise(Effect.flip(createScanSvc(env, mem.repo, "acme", input, onPlan({}), undefined, raced)));
 
     expect(failure).toMatchObject({ _tag: "RateLimited", code: "INSUFFICIENT_CREDIT" });
     expect([...mem.rows.values()].map((row) => row.status)).toEqual(["failed"]);
-    expect(created).toEqual([]);
+    expect(createdFull).toEqual([]);
   });
 
   it("gives the hold back when the workflow cannot start", async () => {
@@ -303,7 +292,7 @@ describe("createScanSvc: the plan", () => {
       return Effect.succeed({ settled: true, chargeUsd: 0 });
     };
     // SAFETY: the service calls only create on the workflow.
-    const { env } = fakeBindings({ SCAN_WORKFLOW: { create: down } as never });
+    const { env } = fakeBindings({ SCAN_WORKFLOW_FULL: { create: down } as never });
     const mem = memoryScanRepo();
     await Effect.runPromise(Effect.flip(createScanSvc(env, mem.repo, "acme", input, onPlan({}), undefined, hold, undefined, release)));
 
@@ -311,47 +300,45 @@ describe("createScanSvc: the plan", () => {
   });
 
   it.each([
-    ["no plan and no own key", NO_SPEND, "platform"],
     ["no plan and an own key", { ...NO_SPEND, ownKey: true }, "account"],
     ["a platform plan, even with an own key saved", onPlan({}, { ownKey: true }), "platform"],
     ["an account plan with its own key", onPlan(BYOK, { ownKey: true }), "account"],
   ])("with %s the scan uses the %s key", async (_name, spend, expected) => {
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", input, spend, undefined, hold));
 
-    expect(created[0].params.keySource).toBe(expected);
+    expect(createdFull[0].params.keySource).toBe(expected);
   });
 });
 
-const OWN: MonthSpend = { ...NO_SPEND, ownKey: true };
 const outcomeOf = (spend: MonthSpend, body: CreateScanBody = input) => {
   const { env } = fakeBindings();
   return Effect.runPromise(
-    createScanSvc(env, memoryScanRepo().repo, "acme", body, spend).pipe(
+    createScanSvc(env, memoryScanRepo().repo, "acme", body, spend, undefined, hold).pipe(
       Effect.match({ onSuccess: () => "queued", onFailure: (failure) => (failure._tag === "RateLimited" ? failure.code : failure._tag) }),
     ),
   );
 };
 
-describe("createScanSvc: the per-scan ceiling and the monthly budget by key", () => {
+describe("createScanSvc: the cap of a profile and the monthly budget by key", () => {
   it.each([
-    ["the platform's key, above its ceiling", NO_SPEND, 5, "Invalid"],
-    ["the platform's key, at its ceiling", NO_SPEND, 2, "queued"],
-    ["the account's own key, above the platform's ceiling", OWN, 5, "queued"],
-    ["the account's own key, above its own ceiling", OWN, 11, "Invalid"],
+    ["the platform's key, above the profile's cap", onPlan({}), 7, "Invalid"],
+    ["the platform's key, at the profile's cap", onPlan({}), 6, "queued"],
+    ["the account's own key, above the profile's cap", OWN, 7, "Invalid"],
+    ["the account's own key, at the profile's cap", OWN, 6, "queued"],
   ])("a request for a limit on %s: the scan is %s", async (_name, spend, limit, expected) => {
     expect(await outcomeOf(spend, { ...input, max_budget_usd: limit })).toBe(expected);
   });
 
-  it("defaults the limit of a scan on the account's own key to its own ceiling", async () => {
-    const { env, created } = fakeBindings();
+  it("defaults the limit of a scan on the account's own key to its profile's cap", async () => {
+    const { env, createdFull } = fakeBindings();
     await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", input, OWN));
 
-    expect(created[0].params.options.maxBudgetUsd).toBe(10);
+    expect(createdFull[0].params.options.maxBudgetUsd).toBe(6);
   });
 
   it.each([
-    ["no plan, the platform's key, over the default budget", { ...NO_SPEND, spentUsd: 19.5 }, "MONTHLY_BUDGET_EXCEEDED"],
+    ["a platform plan, over a budget the admin set", onPlan({}, { spentUsd: 19.5, budgetOverrideUsd: 20 }), "MONTHLY_BUDGET_EXCEEDED"],
     ["no plan, the account's own key, over the default budget", { ...OWN, spentUsd: 500 }, "queued"],
     ["no plan, the account's own key, over a budget the admin set", { ...OWN, spentUsd: 500, budgetOverrideUsd: 10 }, "MONTHLY_BUDGET_EXCEEDED"],
   ])("with %s the scan is %s", async (_name, spend, expected) => {
@@ -386,11 +373,31 @@ describe("createScanSvc: a Runner", () => {
     expect(await outcome(spend, connected)).toBe(expected);
   });
 
+  it("never refuses a scan on a runner for lack of a plan, and stores it full on the full workflow", async () => {
+    const { env, createdFull } = fakeBindings();
+    const mem = memoryScanRepo();
+    const queued = await Effect.runPromise(createScanSvc(env, mem.repo, "acme", onRunner, NO_SPEND, undefined, hold, connected));
+
+    expect(queued.skill).toBe("full");
+    expect(mem.rows.get(queued.scanId)?.skill).toBe("full");
+    expect(createdFull).toHaveLength(1);
+  });
+
+  it("keeps the Runner's own ceiling and takes no credit, no Plan and no monthly budget", async () => {
+    held.length = 0;
+    const { env, createdFull } = fakeBindings({ BILLING_ENFORCED: "true" });
+    const spend = onPlan({ creditBalanceUsd: 0 }, { spentUsd: 500, budgetOverrideUsd: 10 });
+    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, profile: "deep" }, spend, undefined, hold, connected));
+
+    expect(held).toEqual([]);
+    expect(createdFull[0].params).toMatchObject({ runnerId: RUNNER, keySource: "account", options: { skill: "full", profile: "deep", maxBudgetUsd: 50 } });
+  });
+
   it("gives a scan on a runner the safety cap by default and refuses a limit above it", async () => {
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, NO_SPEND, undefined, hold, connected));
 
-    expect(created[0].params.options.maxBudgetUsd).toBe(50);
+    expect(createdFull[0].params.options.maxBudgetUsd).toBe(50);
     expect(await outcome(NO_SPEND, connected, { ...onRunner, max_budget_usd: 60 })).toBe("Invalid");
   });
 
@@ -407,29 +414,29 @@ describe("createScanSvc: a Runner", () => {
 
   it("starts the workflow with the runner, takes no hold and uses no platform key", async () => {
     held.length = 0;
-    const { env, created } = fakeBindings();
+    const { env, createdFull } = fakeBindings();
     await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, onPlan({}), undefined, hold, connected));
 
     expect(held).toEqual([]);
-    expect(created[0].params).toMatchObject({ runnerId: RUNNER, keySource: "account" });
+    expect(createdFull[0].params).toMatchObject({ runnerId: RUNNER, keySource: "account" });
   });
 
   it("refuses a private repository, which only the container can read", async () => {
-    const { env, created } = fakeBindings();
-    const github = { installationRowId: "7c1e4a52-9d3b-4f60-8a71-2b3c4d5e6f70", installationId: 42, repoId: 7, repo: "octocat/hello-world", isPrivate: true };
+    const { env, createdFull } = fakeBindings();
+    const github ={ installationRowId: "7c1e4a52-9d3b-4f60-8a71-2b3c4d5e6f70", installationId: 42, repoId: 7, repo: "octocat/hello-world", isPrivate: true };
     const access: GithubAccess = { forRepo: () => Effect.succeed(github) };
     const failure = await Effect.runPromise(Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, NO_SPEND, access, hold, connected)));
 
     expect(failure).toMatchObject({ _tag: "Invalid" });
-    expect(created).toEqual([]);
+    expect(createdFull).toEqual([]);
   });
 });
 
 describe("createScanSvc: the ref", () => {
   const paramsOf = async (ref: string | undefined) => {
-    const { env, created } = fakeBindings();
-    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...input, ref }, NO_SPEND));
-    return created[0].params;
+    const { env, createdFull } = fakeBindings();
+    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...input, ref }, OWN));
+    return createdFull[0].params;
   };
 
   it("keeps a branch, a tag and a commit as they were typed, and leaves it to the clone to tell which", async () => {
@@ -464,25 +471,19 @@ describe("detailScanSvc", () => {
 
   it("keeps the saved status when the workflow lookup fails", async () => {
     // SAFETY: the service calls only create and get on the workflow.
-    const { env } = fakeBindings({ SCAN_WORKFLOW: { create: async () => undefined, get: down } as never });
-    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, NO_SPEND));
+    const { env } = fakeBindings({ SCAN_WORKFLOW_FULL: { create: async () => undefined, get: down } as never });
+    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
     const status = await Effect.runPromise(detailScanSvc(env, repo, "acme", queued.scanId));
 
     expect(status.status).toBe("queued");
   });
 
-  // -----
-  // A full scan that started before the two paths existed is on the
-  // original workflow. The full one does not know it, so asking there
-  // fails and the original is asked next.
-  // -----
-  it("finds a full scan that started on the original workflow", async () => {
+  it("fails a scan whose workflow errored", async () => {
     // SAFETY: the service calls only create and get on the workflow.
     const { env } = fakeBindings({
-      SCAN_WORKFLOW: { create: async () => undefined, get: async () => ({ status: async () => ({ status: "errored", error: { name: "Error", message: "boom" } }) }) } as never,
-      SCAN_WORKFLOW_FULL: { create: async () => undefined, get: down } as never,
+      SCAN_WORKFLOW_FULL: { create: async () => undefined, get: async () => ({ status: async () => ({ status: "errored", error: { name: "Error", message: "boom" } }) }) } as never,
     });
-    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", { ...input, skill: "full" }, NO_SPEND));
+    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
     const status = await Effect.runPromise(detailScanSvc(env, repo, "acme", queued.scanId));
 
     expect(status).toMatchObject({ status: "failed", error: "boom" });
@@ -490,7 +491,7 @@ describe("detailScanSvc", () => {
 
   it("lists the files a scan saved, with their sizes", async () => {
     const { env } = fakeBindings();
-    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, NO_SPEND));
+    const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
     await Effect.runPromise(
       repo.addFiles("acme", queued.scanId, [{ name: "REPORT.md", r2Key: "k", sizeBytes: 7, contentType: "text/markdown; charset=utf-8" }]),
     );

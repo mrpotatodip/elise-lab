@@ -9,6 +9,9 @@ const COMMIT = "a".repeat(40);
 const scan = (id: string, day: number, overrides: Partial<JudgedScan> = {}): JudgedScan => ({
   id,
   createdAt: new Date(Date.UTC(2026, 10, day)),
+  skill: "lite",
+  profile: "quick",
+  partial: null,
   priorsGiven: 0,
   priorsUnchecked: 0,
   ...overrides,

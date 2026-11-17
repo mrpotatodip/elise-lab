@@ -3,6 +3,7 @@ import { ScanUsageSchema, type ScanUsage } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import type { ScanParams, ScanState } from "#/schemas";
 import type { ScanPatch } from "#/modules/scan-ledger";
+import { SCAN_RECORDS_RECORDED_SKILL } from "#/modules/scan-records";
 import { saveScanFilesEffect } from "#/modules/scan-store";
 import type { FullPhase } from "#/modules/scan-sandbox";
 import {
@@ -60,11 +61,13 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
   };
 
   // -----
-  // One Phase of a full Scan: start it, wait for it within its own time
-  // slot, and close it. A Phase that ended with an error after the meter
-  // turned a call away ran out of its slice: it did not fail, so the Scan
-  // goes on and the next Phase starts with its own money. Any other
-  // failure, and a Phase that outruns its time slot, fails the Scan.
+  // One Phase of a full Scan: start it and wait for it within its own
+  // time slot. The Phases share one pool, the Scan's Budget cap. A Phase
+  // that ended well goes on, even if it reached the cap (a Partial Scan).
+  // A Phase that ended with an error after the meter turned a call away
+  // ran out of money, and the Scan fails with an error that says so: no
+  // later Phase could make a call. Any other failure, and a Phase that
+  // outruns its time slot, fails the Scan.
   // -----
   const runPhase = async (phase: FullPhase) => {
     await step.do(`launch-${phase}`, { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_LAUNCH_TIMEOUT }, async () => {
@@ -81,12 +84,14 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
         return polled.state === "failed" ? { state: "failed" as const, error: polled.error } : { state: polled.state };
       });
     }
-    const ended = await step.do(`end-${phase}`, () => sandbox.endPhase(phase));
     if (outcome.state === "running") {
       const tail = await step.do(`log-tail-${phase}`, () => sandbox.agentLogTail());
       throw new Error(`the ${phase} phase timed out after ${minutes} minutes: ${tail}`);
     }
-    if (outcome.state === "failed" && !ended.exhausted) throw new Error(outcome.error ?? `the ${phase} phase failed`);
+    if (outcome.state !== "failed") return;
+    const reached = await step.do(`cap-${phase}`, () => sandbox.capReached());
+    if (reached) throw new Error(`the budget cap of $${params.options.maxBudgetUsd} was reached during the ${phase} phase: ${outcome.error ?? "the agent stopped"}`);
+    throw new Error(outcome.error ?? `the ${phase} phase failed`);
   };
 
   let usage: ScanUsage | null = null;
@@ -120,9 +125,12 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     // -----
     // Its own step, so a retry of the launch gives the agent
     // the same list. The list is saved with the scan: recording
-    // judges the answer against what was asked.
+    // judges the answer against what was asked. Only a Scan of
+    // the recorded skill is given one: the History is frozen at
+    // the end of the lite era, so a profile Scan reads none.
     // -----
     const priors = await step.do("read-priors", async () => {
+      if (params.options.skill !== SCAN_RECORDS_RECORDED_SKILL) return [];
       const found = await deps.readPriors(params);
       if (found.length === 0) return found;
       const saved = await runEffect(saveScanFilesEffect(reports, params.accountId, params.scanId, { "prior-findings.json": JSON.stringify(found) }));

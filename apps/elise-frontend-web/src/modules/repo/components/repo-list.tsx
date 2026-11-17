@@ -54,7 +54,7 @@ export function RepoList() {
 
   return (
     <>
-      <RepoSummaryStrip repos={data.repos} />
+      <RepoSummaryStrip repos={data.repos} byHand />
       <Card>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <div className="grid gap-1.5">

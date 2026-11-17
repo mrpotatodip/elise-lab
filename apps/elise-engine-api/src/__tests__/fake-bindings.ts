@@ -13,7 +13,6 @@ type WorkflowStatus = { status: string; error?: { name: string; message: string 
 
 export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: WorkflowStatus = { status: "running" }) {
   const store = new Map<string, string>();
-  const created: Created[] = [];
   const createdFull: Created[] = [];
 
   const reports = {
@@ -47,7 +46,6 @@ export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: 
     },
     get: async () => ({ status: async () => workflowStatus }),
   });
-  const workflow = workflowInto(created);
   const workflowFull = workflowInto(createdFull);
 
   // SAFETY: the routes under test read only the bindings listed here.
@@ -55,11 +53,9 @@ export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: 
     ENVIRONMENT: "production",
     MODEL: "claude-sonnet-5-5",
     EFFORT: "high",
-    MAX_BUDGET_USD: "2",
-    MAX_BUDGET_OWN_KEY_USD: "10",
+    MAX_BUDGET_FULL_USD: "18",
     MAX_ACTIVE_SCANS: "3",
     MAX_ACTIVE_FULL_SCANS: "1",
-    MAX_GLOBAL_LITE_SCANS: "30",
     MAX_GLOBAL_FULL_SCANS: "3",
     MONTHLY_BUDGET_USD: "20",
     BUDGET_ALLOWANCE_USD: "1000",
@@ -71,10 +67,9 @@ export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: 
     AUTH_BASE_URL: "http://localhost",
     AUTH_TRUSTED_ORIGINS: "http://localhost",
     REPORTS: reports,
-    SCAN_WORKFLOW: workflow,
     SCAN_WORKFLOW_FULL: workflowFull,
     ...overrides,
   } as never;
 
-  return { env, store, created, createdFull };
+  return { env, store, createdFull };
 }

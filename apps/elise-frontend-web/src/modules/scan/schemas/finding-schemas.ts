@@ -8,8 +8,9 @@ const SeveritySchema = z.enum(SEVERITIES);
 const PlaceSchema = z.object({ file: z.string(), line: z.number() });
 
 // -----
-// The lite skill writes a flat finding, the full skill a nested one
-// (see apps/elise-engine-api/skills/*/). Both reduce to this shape.
+// An old lite Scan wrote a flat finding, a Scan on a profile writes a nested
+// one (see apps/elise-engine-api/skills/*/). Both reduce to this shape;
+// __tests__/finding-schemas.test.ts covers both.
 // -----
 const LiteFindingSchema = z
   .object({

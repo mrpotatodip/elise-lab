@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { RunnerJob, RunnerJobResultBody } from "@repo/contracts/elise";
-import { SCAN_REPORT_FILES } from "#/constants";
+import { SCAN_PROFILE_CAPS_USD, SCAN_REPORT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
 import { NotFound, type DbError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
@@ -45,6 +45,8 @@ export const claimJobSvc = (db: DbConnectType, runnerId: string): Effect.Effect<
       skill: options.value.skill,
       model: options.value.model,
       effort: options.value.effort,
+      profile: options.value.profile,
+      profileCapUsd: SCAN_PROFILE_CAPS_USD[options.value.profile],
       maxBudgetUsd: options.value.maxBudgetUsd,
       prompt: row.prompt,
       priorsJson: row.priorsJson,

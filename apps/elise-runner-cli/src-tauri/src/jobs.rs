@@ -142,6 +142,10 @@ struct Job {
     skill: String,
     model: String,
     effort: String,
+    // The cap the server gives the Scan's profile. An older Worker sends none. The profile's name
+    // is also in the job, and in the prompt; the app has no use for it, so it is not read.
+    #[serde(default)]
+    profile_cap_usd: Option<f64>,
     max_budget_usd: f64,
     prompt: String,
     priors_json: String,
@@ -299,10 +303,22 @@ async fn execute(app: &AppHandle, job: &Job, work: &Path) -> Result<Report, Stri
 
     install_skill(app, skill_dir, work)?;
     write_agent_settings(work)?;
-    run_agent(work, job).await?;
-    let report = collect(work)?;
+    let end = run_agent(work, job).await?;
+    // -----
+    // A scan whose budget ran out ends as a Partial Scan when the audit had already written its
+    // report, with the files it left (the engine reads the report's `PARTIAL:` line). `claude` stops
+    // the run the moment its limit is hit and tells the skill nothing, so a report is there only when
+    // the skill wrote one before that. Without one the error says the cap was reached, not that a
+    // file is missing.
+    // -----
+    let capped = end == AgentEnd::CapReached;
+    let report = match collect(work) {
+        Ok(report) => report,
+        Err(_) if capped => return Err(cap_reached_message(budget_for(job))),
+        Err(error) => return Err(error),
+    };
     if job.skill == "full" {
-        validate_full(app, work).await?;
+        validate_full(app, work).await.map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
     }
     Ok(report)
 }
@@ -398,7 +414,7 @@ fn write_agent_settings(work: &Path) -> Result<(), String> {
 fn agent_args(job: &Job) -> Vec<String> {
     let mut args: Vec<String> = ["--print", "--output-format", "json", "--no-session-persistence", "--setting-sources", "project"].map(String::from).to_vec();
     args.extend(["--model".to_string(), job.model.clone(), "--effort".to_string(), job.effort.clone()]);
-    args.extend(["--max-budget-usd".to_string(), budget_of(job.max_budget_usd).to_string()]);
+    args.extend(["--max-budget-usd".to_string(), budget_for(job).to_string()]);
     args.extend(["--permission-mode", "acceptEdits", "--allowedTools", ALLOWED_TOOLS, "--"].map(String::from));
     args.push(job.prompt.clone());
     args
@@ -512,7 +528,7 @@ async fn validate_full(app: &AppHandle, work: &Path) -> Result<(), String> {
     Ok(())
 }
 
-async fn run_agent(work: &Path, job: &Job) -> Result<(), String> {
+async fn run_agent(work: &Path, job: &Job) -> Result<AgentEnd, String> {
     let claude = find_claude().ok_or("Claude Code is not installed on this computer, or this app cannot find it. Install it from https://claude.com/claude-code and sign in, then start the scan again.")?;
     let bin_dir = claude.parent().map(Path::to_path_buf).unwrap_or_default();
     let path = format!("{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", bin_dir.display());
@@ -540,12 +556,40 @@ async fn run_agent(work: &Path, job: &Job) -> Result<(), String> {
             return Err("The audit ran longer than 40 minutes, so this runner stopped it.".into());
         }
     };
-    if status.success() {
-        return Ok(());
+    let stdout = fs::read_to_string(work.join("agent.log")).unwrap_or_default();
+    if let Ok(end) = agent_end(status.success(), &stdout, job.skill == "full") {
+        return Ok(end);
     }
     let stderr = fs::read_to_string(work.join("agent.err")).unwrap_or_default();
-    let stdout = fs::read_to_string(work.join("agent.log")).unwrap_or_default();
     Err(format!("claude exited {}: {} {}", status.code().unwrap_or(-1), tail(stderr.trim(), 1500), tail(stdout.trim(), 1500)))
+}
+
+// -----
+// How the agent ended. It ran out of its budget when its own JSON result says so, whatever exit
+// code `claude` gives; only a full job has that path, because only a full job has a cap of its own
+// kind. Anything else that is not a clean exit is a failure (Err), for the caller to describe.
+// -----
+#[derive(Debug, PartialEq)]
+enum AgentEnd {
+    Finished,
+    CapReached,
+}
+
+fn agent_end(success: bool, log: &str, full: bool) -> Result<AgentEnd, ()> {
+    if full && log.contains("\"subtype\":\"error_max_budget_usd\"") {
+        return Ok(AgentEnd::CapReached);
+    }
+    if success {
+        Ok(AgentEnd::Finished)
+    } else {
+        Err(())
+    }
+}
+
+// The scan's error when the budget ran out before a report was written. It is the whole answer: the
+// engine ends the scan as failed with this sentence, and the dashboard shows it.
+fn cap_reached_message(budget_usd: f64) -> String {
+    format!("The Budget cap was reached (${budget_usd}) before the audit wrote its report, so there is nothing to send. Start the scan again with a profile that has a larger cap, or on a smaller repository.")
 }
 
 // -----
@@ -613,6 +657,20 @@ fn tail(text: &str, max: usize) -> String {
     text.chars().skip(count - max).collect()
 }
 
+// -----
+// What the agent may spend on this scan. A Runner has no meter on the server, so the agent's own
+// `--max-budget-usd` is the only stop, as one run with no Phases. A full job takes the lower of
+// its profile's cap and the budget the server sent (the Runner's own ceiling there), and both
+// are held to this app's ceiling; a number that is not positive is left out. A job that does not
+// say full, or an older Worker that sends no cap, uses the server's budget alone.
+// -----
+fn budget_for(job: &Job) -> f64 {
+    let positive = |value: f64| (value.is_finite() && value > 0.0).then_some(value);
+    let cap = if job.skill == "full" { job.profile_cap_usd.and_then(positive) } else { None };
+    let asked = [positive(job.max_budget_usd), cap].into_iter().flatten().fold(f64::INFINITY, f64::min);
+    budget_of(asked)
+}
+
 // The server's budget, held to the ceiling. A value that is not a positive number gets the ceiling.
 fn budget_of(asked: f64) -> f64 {
     if asked.is_finite() && asked > 0.0 {
@@ -670,10 +728,86 @@ mod tests {
             skill: "lite".into(),
             model: "claude-haiku-5-5".into(),
             effort: "low".into(),
+            profile_cap_usd: None,
             max_budget_usd: 1.0,
             prompt: "Use the security-audit-lite skill".into(),
             priors_json: String::new(),
         }
+    }
+
+    fn full_job(profile_cap_usd: Option<f64>, max_budget_usd: f64) -> Job {
+        Job {
+            skill: "full".into(),
+            profile_cap_usd,
+            max_budget_usd,
+            ..test_job()
+        }
+    }
+
+    // An old Worker sends neither profile field and a new one sends both: the job must read either way.
+    #[test]
+    fn a_job_reads_with_or_without_the_profile_fields() {
+        let base = r#""scanId":"s1","repo":"https://github.com/o/n","ref":null,"skill":"full","model":"m","effort":"high","maxBudgetUsd":50,"prompt":"p","priorsJson":"""#;
+        let old: Job = serde_json::from_str(&format!("{{{base}}}")).unwrap();
+        let new: Job = serde_json::from_str(&format!("{{{base},\"profile\":\"deep\",\"profileCapUsd\":18}}")).unwrap();
+
+        assert_eq!(old.profile_cap_usd, None);
+        assert_eq!(new.profile_cap_usd, Some(18.0));
+    }
+
+    // The Runner has no meter on the server: the agent's own limit is the only stop. A full job stops
+    // at the lower of its profile's cap and the Runner's own ceiling, whichever the server sent.
+    #[test]
+    fn a_full_job_stops_at_the_lower_of_its_cap_and_the_ceiling() {
+        for (job, expected) in [
+            (full_job(Some(12.0), 50.0), 12.0),
+            (full_job(Some(12.0), 8.0), 8.0),
+            (full_job(Some(120.0), 90.0), BUDGET_CAP_USD),
+            (full_job(None, 20.0), 20.0),
+            (full_job(Some(f64::NAN), 20.0), 20.0),
+            (full_job(Some(6.0), 0.0), 6.0),
+            (full_job(Some(-1.0), f64::NAN), BUDGET_CAP_USD),
+        ] {
+            assert_eq!(budget_for(&job), expected);
+        }
+    }
+
+    // A job that does not say full runs the lite way, whatever cap the server sent along.
+    #[test]
+    fn a_lite_job_ignores_the_profile_cap() {
+        let job = Job { profile_cap_usd: Some(6.0), max_budget_usd: 20.0, ..test_job() };
+
+        assert_eq!(budget_for(&job), 20.0);
+    }
+
+    #[test]
+    fn the_agent_is_started_with_that_budget() {
+        let args = agent_args(&full_job(Some(12.0), 50.0));
+        let at = args.iter().position(|a| a == "--max-budget-usd").expect("--max-budget-usd must be passed");
+
+        assert_eq!(args[at + 1], "12");
+    }
+
+    // The agent reports its own end in its JSON result. Hitting the limit is told apart from any other
+    // failure, whatever exit code `claude` gives.
+    #[test]
+    fn the_end_of_the_agent_tells_its_budget_limit_from_a_failure() {
+        let capped = r#"{"type":"result","subtype":"error_max_budget_usd","is_error":true}"#;
+        let fine = r#"{"type":"result","subtype":"success","is_error":false}"#;
+
+        assert_eq!(agent_end(true, fine, true), Ok(AgentEnd::Finished));
+        assert_eq!(agent_end(false, capped, true), Ok(AgentEnd::CapReached));
+        assert_eq!(agent_end(true, capped, true), Ok(AgentEnd::CapReached));
+        assert_eq!(agent_end(false, fine, true), Err(()));
+        assert_eq!(agent_end(false, capped, false), Err(()), "a lite job has no budget-limit path");
+    }
+
+    #[test]
+    fn the_cap_error_names_the_cap_and_says_nothing_was_written() {
+        let said = cap_reached_message(12.0);
+
+        assert!(said.contains("$12"), "{said}");
+        assert!(said.contains("cap was reached"), "{said}");
     }
 
     // The person's own settings would add their allow rules to ALLOWED_TOOLS. What the agent is
