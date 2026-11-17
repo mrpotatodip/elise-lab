@@ -141,14 +141,16 @@ describe("a Branch's findings are the merge of its Scans", () => {
     expect((await mainBranch())?.open.total).toBe(1);
   });
 
-  it("adds nothing for a failed Scan, a Scan of a tag or of an old commit, or a rejected record", async () => {
+  it("adds nothing for a failed Scan, a Scan of a tag or of an old commit, an old lite Scan, or a rejected record", async () => {
     await recordScan("s1", { findings: [confirmed("a", "problem a"), rejected("x")] });
     await recordScan("failed", { status: "failed", findings: [confirmed("f", "failed problem")] });
     await recordScan("tag", { read: { name: null, ref: "v1.0.0" }, findings: [confirmed("t", "tag problem")] });
     await recordScan("old", { read: { name: null, ref: "1".repeat(40) }, findings: [confirmed("o", "old commit problem")] });
+    await recordScan("lite", { findings: [confirmed("l", "lite problem")] });
+    await test.raw.update(scans).set({ skill: "lite" }).where(eq(scans.id, ownId("lite")));
 
     expect(await titlesOf()).toEqual(["problem a"]);
-    expect((await mainBranch())?.open.total).toBe(1);
+    expect((await mainBranch())?.open).toMatchObject({ total: 1, unchecked: 0 });
   });
 
   it("counts a Scan of the commit that is the latest of one Branch, and not of one that is the latest of two", async () => {
@@ -170,23 +172,51 @@ describe("a Branch's findings are the merge of its Scans", () => {
     expect((await test.raw.select({ partial: scans.partial }).from(scans).where(eq(scans.id, ownId("partial"))))[0].partial).toBe(true);
   });
 
-  it("keeps a problem the older path closed closed, and shows one it recorded as regressed as back", async () => {
-    await recordScan("s1", { findings: [confirmed("a", "problem a"), confirmed("b", "problem b"), confirmed("c", "problem c")] });
-    await recordScan("s2", { findings: [confirmed("a", "problem a"), confirmed("b", "problem b"), confirmed("c", "problem c")] });
+  it("keeps a problem the older path closed closed, shows one it recorded as regressed as back, and one it closed before a Scan saw it again as back", async () => {
+    const titles = ["problem a", "problem b", "problem c", "problem d"];
+    await recordScan("s1", { findings: titles.map((title, index) => confirmed(`${index}`, title)) });
+    await recordScan("s2", { findings: titles.map((title, index) => confirmed(`${index}`, title)) });
     const byTitle = new Map((await listed()).map((finding) => [finding.title, finding.fingerprint]));
     const [branch] = await test.raw.select({ id: scanRepoBranches.id }).from(scanRepoBranches).where(eq(scanRepoBranches.repoId, repoId));
     const row = { tenantId, repoId, branchId: branch.id, firstSeenScanId: ownId("s1"), lastSeenScanId: ownId("s2") } as const;
     await test.raw.insert(scanRepoFindings).values([
       { ...row, fingerprint: byTitle.get("problem a") ?? "", state: "fixed_by_code", fixedInScanId: ownId("s2") },
       { ...row, fingerprint: byTitle.get("problem b") ?? "", state: "regressed" },
+      { ...row, fingerprint: byTitle.get("problem d") ?? "", state: "fixed_by_code", fixedInScanId: ownId("s1"), updatedAt: new Date(Date.UTC(2026, 9, 1)) },
     ]);
 
     expect((await seen()).map((finding) => [finding.title, finding.state])).toEqual([
       ["problem a", "fixed_by_code"],
       ["problem b", "regressed"],
       ["problem c", "open"],
+      ["problem d", "regressed"],
     ]);
-    expect((await mainBranch())?.open).toMatchObject({ total: 2, regressed: 1 });
+    expect((await mainBranch())?.open).toMatchObject({ total: 3, regressed: 2 });
+  });
+
+  it("shows a problem marked fixed as back when a later Scan sees it, and counts it open", async () => {
+    await recordScan("s1", { findings: [confirmed("a", "problem a")] });
+    const [decided] = await listed();
+    await test.raw.insert(scanFindingTriage).values({ tenantId, repoId, fingerprint: decided.fingerprint, status: "fixed", updatedAt: new Date(Date.UTC(2026, 10, 1, 0, tick, 30)) });
+    await recordScan("s2", { findings: [confirmed("a", "problem a")] });
+
+    expect(await listed()).toMatchObject([{ title: "problem a", state: "regressed", triage: null }]);
+    expect((await mainBranch())?.open).toMatchObject({ total: 1, regressed: 1 });
+  });
+
+  it.each([
+    ["a Partial Scan", { report: "PARTIAL: money ran out; 3 units were not covered." }, null],
+    ["a Scan that met no profile", {}, "none"],
+  ] as const)("leaves the earlier Scan as the latest when %s follows it", async (_kind, saved, profileMet) => {
+    await recordScan("s1", { findings: [confirmed("a", "problem a"), confirmed("b", "problem b")] });
+    await recordScan("s2", { ...saved, findings: [confirmed("a", "problem a")] });
+    if (profileMet) await test.raw.update(scans).set({ profileMet }).where(eq(scans.id, ownId("s2")));
+
+    expect((await seen()).map((finding) => [finding.title, finding.unchecked])).toEqual([
+      ["problem a", false],
+      ["problem b", false],
+    ]);
+    expect((await mainBranch())?.open).toMatchObject({ total: 2, unchecked: 0 });
   });
 
   it("gives the same open count on the Branch, on the repository list and in the list itself", async () => {

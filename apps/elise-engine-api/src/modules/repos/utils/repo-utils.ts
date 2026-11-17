@@ -1,4 +1,26 @@
-import type { FindingTriageStatusValue, RepoFinding, RepoOpen, SeverityCounts } from "@repo/contracts/elise";
+import type { FindingTriageStatusValue, RepoFinding, RepoFindingStateValue, RepoOpen, SeverityCounts } from "@repo/contracts/elise";
+
+type StateInput = {
+  history: { state: RepoFindingStateValue; updatedAt: Date } | null;
+  triage: { status: FindingTriageStatusValue; updatedAt: Date } | null;
+  seenAt: Date;
+};
+
+// -----
+// The state of a Branch's finding, from the frozen History, a
+// person's decision and the newest Scan that saw it. A problem
+// closed (by the History, or marked fixed by a person) before a
+// Scan saw it again came back: it is `regressed`, and the
+// "fixed" decision no longer stands, as in the Verdict. Every
+// other decision stands.
+// -----
+export const branchStateOf = ({ history, triage, seenAt }: StateInput) => {
+  const seen = seenAt.getTime();
+  const closedByHistory = history?.state === "fixed_by_code" && history.updatedAt.getTime() < seen;
+  const markedFixedBefore = triage?.status === "fixed" && triage.updatedAt.getTime() < seen;
+  const state: RepoFindingStateValue = closedByHistory || markedFixedBefore ? "regressed" : (history?.state ?? "open");
+  return { state, decisionStands: !markedFixedBefore };
+};
 
 // -----
 // The columns the open counts need, so a count does not
