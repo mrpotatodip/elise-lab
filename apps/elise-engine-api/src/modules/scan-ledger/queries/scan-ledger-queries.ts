@@ -1,11 +1,11 @@
 import { and, asc, eq, gt, inArray, ne, notExists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, toDbError, type DbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanStatus } from "#/schemas";
-import type { ScanPage, ScanRepo } from "#/modules/scan-ledger/types";
+import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
 import { canonicalRepo, displayRepoUrl, liveScansSql, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
@@ -17,7 +17,7 @@ const ACTIVE_SCAN_CONFLICT = "This repo already has an active scan";
 // has a job row once its Workflow has queued the job, a few seconds
 // after it starts.
 // -----
-const runnersOf = (db: DbConnectType, ids: string[]) =>
+const runnersOf = (db: AppDbType, ids: string[]) =>
   Effect.tryPromise({
     try: () =>
       db
@@ -32,7 +32,7 @@ const runnersOf = (db: DbConnectType, ids: string[]) =>
 // The rows with their files, the Runner a scan ran on and, for a
 // scan whose findings are recorded, the counts of what it found.
 // -----
-const withFiles = (db: DbConnectType, rows: ScanRow[]): Effect.Effect<ScanStatus[], DbError> =>
+const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], DbError> =>
   rows.length === 0
     ? Effect.succeed([])
     : Effect.gen(function* () {
@@ -67,10 +67,61 @@ const withFiles = (db: DbConnectType, rows: ScanRow[]): Effect.Effect<ScanStatus
       });
 
 // -----
-// A scan id starts with an inverted timestamp, so
-// ascending ids are newest first and an id is a cursor.
+// The reads a route makes, on any client: the owner
+// connection, or a withTenant transaction that holds them
+// to one Account. A scan id starts with an inverted
+// timestamp, so ascending ids are newest first and an id
+// is a cursor.
 // -----
+export const scanReads = (db: AppDbType): ScanReads => ({
+  list: (accountId, limit, cursor, filter): Effect.Effect<ScanPage, DbError> =>
+    Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(scans)
+          .where(
+            and(
+              eq(scans.tenantId, accountId),
+              cursor ? gt(scans.id, cursor) : undefined,
+              filter?.repoId ? eq(scans.repoId, filter.repoId) : undefined,
+              filter?.status ? eq(scans.status, filter.status) : undefined,
+            ),
+          )
+          .orderBy(asc(scans.id))
+          .limit(limit + 1),
+      catch: toDbError,
+    }).pipe(
+      Effect.flatMap((rows) =>
+        withFiles(db, rows.slice(0, limit)).pipe(
+          Effect.map((page) => ({ scans: page, nextCursor: rows.length > limit ? rows[limit - 1].id : null })),
+        ),
+      ),
+    ),
+
+  get: (accountId, scanId) =>
+    Effect.tryPromise({
+      try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))),
+      catch: toDbError,
+    }).pipe(
+      Effect.flatMap((rows) => withFiles(db, rows)),
+      Effect.map((found) => found[0] ?? null),
+    ),
+
+  file: (accountId, scanId, name) =>
+    Effect.tryPromise({
+      try: () =>
+        db
+          .select({ r2Key: scanFiles.r2Key, contentType: scanFiles.contentType })
+          .from(scanFiles)
+          .where(and(eq(scanFiles.tenantId, accountId), eq(scanFiles.scanId, scanId), eq(scanFiles.name, name))),
+      catch: toDbError,
+    }).pipe(Effect.map((rows) => rows[0] ?? null)),
+});
+
 export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
+  ...scanReads(db),
+
   // -----
   // Insert or find the repo's record. The unique index
   // on (account, canonical) settles a race between two
@@ -214,40 +265,6 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
           catch: toDbError,
         }).pipe(Effect.asVoid),
 
-  list: (accountId, limit, cursor, filter): Effect.Effect<ScanPage, DbError> =>
-    Effect.tryPromise({
-      try: () =>
-        db
-          .select()
-          .from(scans)
-          .where(
-            and(
-              eq(scans.tenantId, accountId),
-              cursor ? gt(scans.id, cursor) : undefined,
-              filter?.repoId ? eq(scans.repoId, filter.repoId) : undefined,
-              filter?.status ? eq(scans.status, filter.status) : undefined,
-            ),
-          )
-          .orderBy(asc(scans.id))
-          .limit(limit + 1),
-      catch: toDbError,
-    }).pipe(
-      Effect.flatMap((rows) =>
-        withFiles(db, rows.slice(0, limit)).pipe(
-          Effect.map((page) => ({ scans: page, nextCursor: rows.length > limit ? rows[limit - 1].id : null })),
-        ),
-      ),
-    ),
-
-  get: (accountId, scanId) =>
-    Effect.tryPromise({
-      try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))),
-      catch: toDbError,
-    }).pipe(
-      Effect.flatMap((rows) => withFiles(db, rows)),
-      Effect.map((found) => found[0] ?? null),
-    ),
-
   // -----
   // Callers count these scans and add up their budget caps, so the
   // rows come back with no files and no finding counts: a queued or
@@ -287,14 +304,4 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
         full: rows.filter((row) => row.skill === "full").reduce((sum, row) => sum + Number(row.total), 0),
       })),
     ),
-
-  file: (accountId, scanId, name) =>
-    Effect.tryPromise({
-      try: () =>
-        db
-          .select({ r2Key: scanFiles.r2Key, contentType: scanFiles.contentType })
-          .from(scanFiles)
-          .where(and(eq(scanFiles.tenantId, accountId), eq(scanFiles.scanId, scanId), eq(scanFiles.name, name))),
-      catch: toDbError,
-    }).pipe(Effect.map((rows) => rows[0] ?? null)),
 });

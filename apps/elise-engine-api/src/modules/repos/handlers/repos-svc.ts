@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { Invalid, NotFound, type Conflict, type DbError } from "#/lib/effect-query";
 import type { RepoBranchList, RepoDetail, RepoFindingList, RepoFindingsQuery, RepoList, ScanDiff } from "@repo/contracts/elise";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import { REPOS_HISTORY_LIMIT } from "#/modules/repos/constants";
 import { addBranchesEffect, isCommitId, listBranchesEffect, normalizeBranchName } from "#/modules/branches";
@@ -47,7 +47,7 @@ export const listRepoFindingsSvc = (db: DbConnectType, accountId: string, repoId
     return { findings: wanted.slice(offset, end), nextCursor: wanted.length > end ? String(end) : null };
   });
 
-export const scanDiffSvc = (db: DbConnectType, accountId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
+export const scanDiffSvc = (db: AppDbType, accountId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
   scanDiffEffect(db, accountId, scanId);
 
 const branchNamesOf = (names: string[]): Effect.Effect<string[], Invalid> =>

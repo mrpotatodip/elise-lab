@@ -47,3 +47,8 @@ export type ScanRepo = {
   activeCounts: (nowMs: number) => Effect.Effect<ActiveCounts, DbError>;
   file: (accountId: string, scanId: string, name: string) => Effect.Effect<ScanFileRef | null, DbError>;
 };
+
+// -----
+// The reads a route makes as one Account, inside withTenant.
+// -----
+export type ScanReads = Pick<ScanRepo, "list" | "get" | "file">;

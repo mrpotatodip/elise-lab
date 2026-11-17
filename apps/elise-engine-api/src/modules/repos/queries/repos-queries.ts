@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, isNotNull, lt, max, sql } from "dri
 import { Effect } from "effect";
 import { REPO_LIMIT_PER_TENANT, type DiffEntry, type Repo, type RepoBranch, type RepoFinding, type ScanDiff } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepoBranches, scanRepoFindings, scanRepos, scans } from "@repo/db-elise/schema";
-import type { DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
@@ -316,7 +316,7 @@ const entryOf = (row: { fingerprint: string; status: DiffEntry["status"]; severi
 //   notRechecked in the previous list, missing from this
 //                one with no evidence it was fixed
 // -----
-export const scanDiffEffect = (db: DbConnectType, tenantId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
+export const scanDiffEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
   Effect.gen(function* () {
     const [scan] = yield* Effect.tryPromise({
       try: () => db.select().from(scans).where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId))),

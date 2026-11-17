@@ -26,7 +26,7 @@ export type TenantDbType = Parameters<Parameters<ReturnType<typeof createTenantD
 // The HTTP client and a withTenant transaction both satisfy it,
 // so a service takes this one type and a route can pass either.
 // -----
-export type AppDbType = Pick<PgDatabase<PgQueryResultHKT, typeof schema>, "select" | "insert" | "update" | "delete">;
+export type AppDbType = Pick<PgDatabase<PgQueryResultHKT, typeof schema>, "select" | "selectDistinctOn" | "insert" | "update" | "delete">;
 
 // -----
 // Runs a job as one account on the elise_app role over

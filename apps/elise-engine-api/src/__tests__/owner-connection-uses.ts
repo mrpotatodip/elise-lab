@@ -46,7 +46,6 @@ export const OWNER_CONNECTION_USES = {
   "modules/scan-workflow/lib/full-scan-workflow.ts": 8,
   "modules/scan-workflow/lib/settle-scan-credit.ts": 4,
   "modules/scans/api/create-scan.ts": 2,
-  "modules/scans/api/diff-scan.ts": 2,
   "modules/sign-up/api/create-account.ts": 2,
   "modules/team/api/accept-team-invite.ts": 2,
   "modules/team/api/create-team-invite.ts": 2,

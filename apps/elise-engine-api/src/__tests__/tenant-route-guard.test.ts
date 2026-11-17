@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { scanFindingComments, scanFindings, scans } from "@repo/db-elise/schema";
+import { scanFiles, scanFindingComments, scanFindings, scans } from "@repo/db-elise/schema";
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OWNER_CONNECTION_USES } from "#/__tests__/owner-connection-uses";
@@ -38,6 +38,7 @@ beforeAll(async () => {
   await seedRepo(test, tenantId);
   const otherRepoId = await seedRepo(test, otherTenantId);
   await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"));
+  await test.raw.insert(scanFiles).values({ tenantId: otherTenantId, scanId: "theirs", name: "REPORT.md", r2Key: `accounts/${otherTenantId}/scans/theirs/REPORT.md`, sizeBytes: 8, contentType: "text/markdown; charset=utf-8" });
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
   await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs, to delete or edit" });
