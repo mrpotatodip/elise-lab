@@ -10,6 +10,10 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
+// -----
+// Owner role: the token names the Runner, and the Runner
+// names its Account.
+// -----
 app.post("/jobs/:scanId/result", reportJobDoc, zValidator("param", RunnerJobParamSchema), zValidator("json", RunnerJobResultBodySchema), async (c) => {
   const runner = await runnerOf(c);
   const { scanId } = c.req.valid("param");

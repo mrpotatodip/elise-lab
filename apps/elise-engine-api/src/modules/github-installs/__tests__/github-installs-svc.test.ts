@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { accessAuditLog, authUser, tenantGithubInstallations } from "@repo/db-elise/schema";
 import type { ConnectGithubBody } from "@repo/contracts/elise";
-import { asTenant, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { GithubInstallationInfo } from "#/modules/github-app";
 import { connectGithubSvc, disconnectGithubSvc, githubConnectUrlSvc, listGithubBranchesSvc, listGithubInstallationsSvc, listGithubReposSvc } from "#/modules/github-installs/handlers";
 import { neonInstallationRepo, type GithubPort } from "#/modules/github-installs";
@@ -72,9 +72,9 @@ const bodyWith = async (state?: string): Promise<ConnectGithubBody> => ({
 });
 
 const connect = (port: GithubPort | null, body: ConnectGithubBody, accountId = acme.tenantId, userId = "ada") =>
-  asTenant(test, accountId, (db) => connectGithubSvc(db, port, SECRET, accountId, userId, body, NOW));
+  asTenantEffect(test, accountId, (db) => connectGithubSvc(db, port, SECRET, accountId, userId, body, NOW));
 
-const disconnect = (accountId: string, userId: string, id: string) => asTenant(test, accountId, (db) => disconnectGithubSvc(db, accountId, userId, id));
+const disconnect = (accountId: string, userId: string, id: string) => asTenantEffect(test, accountId, (db) => disconnectGithubSvc(db, accountId, userId, id));
 
 const rows = () => test.raw.select().from(tenantGithubInstallations);
 

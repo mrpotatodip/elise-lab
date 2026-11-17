@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { accessAuditLog, authUser, tenantAnthropicKeys } from "@repo/db-elise/schema";
-import { asTenant, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { getAnthropicKeySvc, removeAnthropicKeySvc, setAnthropicKeySvc } from "#/modules/anthropic-key/handlers";
 import { findSealedKeyEffect } from "#/modules/anthropic-key/queries";
 import { openKey } from "#/modules/anthropic-key/utils";
@@ -40,8 +40,8 @@ afterAll(async () => {
 const accepts = async () => true;
 const refuses = async () => false;
 const set = (check: (apiKey: string) => Promise<boolean>, apiKey = KEY, secret: string | null = SECRET) =>
-  asTenant(test, acme.tenantId, (db) => setAnthropicKeySvc(secret ?? undefined, db, check, acme.tenantId, userId, apiKey));
-const remove = () => asTenant(test, acme.tenantId, (db) => removeAnthropicKeySvc(db, acme.tenantId, userId));
+  asTenantEffect(test, acme.tenantId, (db) => setAnthropicKeySvc(secret ?? undefined, db, check, acme.tenantId, userId, apiKey));
+const remove = () => asTenantEffect(test, acme.tenantId, (db) => removeAnthropicKeySvc(db, acme.tenantId, userId));
 const auditOf = (accountId: string) => test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, accountId));
 
 describe("setAnthropicKeySvc", () => {

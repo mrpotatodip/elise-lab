@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { accessAuditLog, authUser } from "@repo/db-elise";
-import type { PoolDbType } from "#/lib/db-connection";
+import type { AppDbType } from "#/lib/db-connection";
 import type { AuditDb, AuditEntry } from "#/modules/audit-trail/types";
 
 // -----
@@ -24,7 +24,7 @@ export const insertAuditEntry = (db: AuditDb, entry: AuditEntry): Promise<void> 
 // The Party behind a login: who the audit row
 // names as the actor.
 // -----
-export const actorPartyOf = (db: Pick<PoolDbType, "select">, userId: string): Promise<string | null> =>
+export const actorPartyOf = (db: Pick<AppDbType, "select">, userId: string): Promise<string | null> =>
   db
     .select({ partyId: authUser.partyId })
     .from(authUser)
