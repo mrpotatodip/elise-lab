@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { tenantCreditLedger, tenants } from "@repo/db-elise/schema";
-import type { AppDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
+import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { HoldResult, RenewResult, SettleResult } from "#/modules/credit/types";
 import { renewalGrantOf, roundUsd } from "#/modules/credit/utils";
@@ -30,8 +30,7 @@ export const balanceEffect = (db: AppDbType, tenantId: string): Effect.Effect<nu
 // Each of these locks the Account's row first, so two scans, or a
 // scan and a renewal, cannot read the same balance and both act on it.
 // -----
-type Tx = Parameters<Parameters<PoolDbType["transaction"]>[0]>[0];
-const lockedBalanceOf = async (tx: Tx, tenantId: string): Promise<number> => {
+const lockedBalanceOf = async (tx: AppDbType, tenantId: string): Promise<number> => {
   const [row] = await tx.select({ balance: sumOf(tenantId) }).from(tenants).where(eq(tenants.id, tenantId)).for("update");
   return Number(row?.balance ?? 0);
 };
@@ -39,9 +38,10 @@ const lockedBalanceOf = async (tx: Tx, tenantId: string): Promise<number> => {
 // -----
 // Takes the credit a new scan may spend, or says there is not
 // enough. A scan holds once: a second call for the same scan finds
-// its hold and takes nothing more.
+// its hold and takes nothing more. Inside withTenant the
+// transaction is a savepoint of the route's own.
 // -----
-export const holdCreditEffect = (db: PoolDbType, input: { tenantId: string; scanId: string; holdUsd: number }): Effect.Effect<HoldResult, DbError> =>
+export const holdCreditEffect = (db: AppTxDbType, input: { tenantId: string; scanId: string; holdUsd: number }): Effect.Effect<HoldResult, DbError> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -68,7 +68,7 @@ export const holdCreditEffect = (db: PoolDbType, input: { tenantId: string; scan
 // charge in one row. A scan with no hold (its Account used its own
 // key, or it ran before credit) takes nothing. A scan settles once.
 // -----
-export const settleCreditEffect = (db: PoolDbType, input: { tenantId: string; scanId: string; chargeUsd: number }): Effect.Effect<SettleResult, DbError> =>
+export const settleCreditEffect = (db: AppTxDbType, input: { tenantId: string; scanId: string; chargeUsd: number }): Effect.Effect<SettleResult, DbError> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {

@@ -18,17 +18,27 @@ import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
 // -----
 export type RunnerConnected = (runnerId: string) => Effect.Effect<boolean, DbError>;
 
-export const createScanSvc = (
+// -----
+// A Scan whose row, and hold if it takes one, are written but
+// whose Workflow has not started.
+// -----
+export type QueuedScan = { params: ScanParams; holdUsd: number };
+
+// -----
+// Everything a new Scan writes: the checks, the Scan row and the
+// credit hold. POST /scans runs it in one withTenant transaction,
+// so a refusal after the row is written leaves no row and no hold.
+// -----
+export const queueScanSvc = (
   env: CreateScanEnv,
-  repo: ScanRepo,
+  repo: Pick<ScanRepo, "ensureRepo" | "create" | "mark" | "activeSince" | "activeCounts">,
   accountId: string,
   input: CreateScanBody,
   spend: MonthSpend,
   access?: GithubAccess,
   hold?: HoldCredit,
   runnerConnected?: RunnerConnected,
-  release?: ReleaseCredit,
-): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
+): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
     // -----
     // The per-scan ceiling follows who pays. A scan on a Runner runs
@@ -180,20 +190,47 @@ export const createScanSvc = (
         });
       }
     }
-    // -----
-    // A scan whose workflow never starts is never settled by one, so
-    // its hold is given back here.
-    // -----
-    yield* Effect.tryPromise({ try: () => env.SCAN_WORKFLOW_FULL.create({ id: params.scanId, params }), catch: toExternalError }).pipe(
-      Effect.tapError((error) =>
-        Effect.all(
-          [
-            repo.mark(accountId, params.scanId, { status: "failed", error: `could not start the workflow: ${String(error.cause)}` }).pipe(Effect.ignore),
-            holdUsd > 0 && release ? release(params.scanId).pipe(Effect.ignore) : Effect.void,
-          ],
-          { discard: true },
-        ),
-      ),
-    );
-    return { scanId: params.scanId, status: "queued" as const, ...options };
+    return { params, holdUsd };
   });
+
+// -----
+// A scan whose workflow never starts is never settled by one: it
+// is marked failed and its hold is given back.
+// -----
+export const abandonScanSvc = (repo: Pick<ScanRepo, "mark">, queued: QueuedScan, error: string, release?: ReleaseCredit): Effect.Effect<void> =>
+  Effect.all(
+    [
+      repo.mark(queued.params.accountId, queued.params.scanId, { status: "failed", error }).pipe(Effect.ignore),
+      queued.holdUsd > 0 && release ? release(queued.params.scanId).pipe(Effect.ignore) : Effect.void,
+    ],
+    { discard: true },
+  );
+
+// -----
+// Starts the Workflow of a queued Scan. The Workflow reads the
+// Scan row and its hold, so it starts only once they are
+// committed; abandon runs when it will not start.
+// -----
+export const startScanSvc = (env: CreateScanEnv, queued: QueuedScan, abandon: (error: string) => Effect.Effect<void>): Effect.Effect<ScanQueued, ExternalError> =>
+  Effect.tryPromise({ try: () => env.SCAN_WORKFLOW_FULL.create({ id: queued.params.scanId, params: queued.params }), catch: toExternalError }).pipe(
+    Effect.tapError((error) => abandon(`could not start the workflow: ${String(error.cause)}`)),
+    Effect.as({ scanId: queued.params.scanId, status: "queued" as const, ...queued.params.options }),
+  );
+
+// -----
+// Queue and start on one connection, for the service tests.
+// -----
+export const createScanSvc = (
+  env: CreateScanEnv,
+  repo: ScanRepo,
+  accountId: string,
+  input: CreateScanBody,
+  spend: MonthSpend,
+  access?: GithubAccess,
+  hold?: HoldCredit,
+  runnerConnected?: RunnerConnected,
+  release?: ReleaseCredit,
+): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
+  queueScanSvc(env, repo, accountId, input, spend, access, hold, runnerConnected).pipe(
+    Effect.flatMap((queued) => startScanSvc(env, queued, (error) => abandonScanSvc(repo, queued, error, release))),
+  );

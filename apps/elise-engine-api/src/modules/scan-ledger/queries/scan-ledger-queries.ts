@@ -1,11 +1,11 @@
 import { and, asc, eq, gt, inArray, ne, notExists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
-import type { AppDbType, DbConnectType } from "#/lib/db-connection";
+import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, toDbError, type DbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
-import type { ScanStatus } from "#/schemas";
-import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
+import type { ScanParams, ScanStatus } from "#/schemas";
+import type { ActiveCounts, ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
 import { canonicalRepo, displayRepoUrl, liveScansSql, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
@@ -137,7 +137,77 @@ export const scanReads = (db: AppDbType): ScanReads => ({
     }).pipe(Effect.map((rows) => rows[0] ?? null)),
 });
 
-export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
+// -----
+// What a new scan writes, in order: first close what a scan of
+// this repo that stalled still holds (its credit hold, given back
+// with no charge, and its Runner job, cancelled so a late report
+// is refused), then expire it, then insert. The unique index on
+// active scans refuses a second live scan.
+// -----
+const createStatements = (db: AppDbType, params: ScanParams, repoId: string, nowMs: number) => {
+  const stalled = db.select({ id: scans.id }).from(scans).where(and(eq(scans.repoId, repoId), stalledScansSql(nowMs)));
+  return [
+    db
+      .insert(tenantCreditLedger)
+      .select(
+        db
+          .select({
+            id: sql<string>`gen_random_uuid()`.as("id"),
+            tenantId: tenantCreditLedger.tenantId,
+            kind: sql<string>`'scan_settle'`.as("kind"),
+            amountUsd: sql<string>`-${tenantCreditLedger.amountUsd}`.as("amount_usd"),
+            scanId: tenantCreditLedger.scanId,
+            idempotencyKey: sql<string | null>`null`.as("idempotency_key"),
+            note: sql<string>`'the scan stalled and was closed by a newer request'`.as("note"),
+            createdAt: sql<Date>`now()`.as("created_at"),
+          })
+          .from(tenantCreditLedger)
+          .where(and(eq(tenantCreditLedger.kind, "scan_hold"), inArray(tenantCreditLedger.scanId, stalled))),
+      )
+      .onConflictDoNothing(),
+    db
+      .update(scanRunnerJobs)
+      .set({ state: "cancelled", finishedAt: new Date() })
+      .where(and(inArray(scanRunnerJobs.scanId, stalled), inArray(scanRunnerJobs.state, ["queued", "claimed"]))),
+    db
+      .update(scans)
+      .set({ status: "failed", step: null, finishedAt: new Date(), error: "the scan stalled and was closed by a newer request", updatedAt: new Date() })
+      .where(and(eq(scans.repoId, repoId), stalledScansSql(nowMs))),
+    db.insert(scans).values({
+      id: params.scanId,
+      tenantId: params.accountId,
+      repo: params.repo,
+      repoId,
+      ref: params.ref ?? null,
+      status: "queued",
+      skill: params.options.skill,
+      model: params.options.model,
+      effort: params.options.effort,
+      profile: params.options.profile,
+      maxBudgetUsd: params.options.maxBudgetUsd.toFixed(2),
+      keySource: params.keySource ?? "platform",
+      installationId: params.github?.installationRowId ?? null,
+      githubRepoId: params.github?.repoId ?? null,
+      isPrivate: params.github?.isPrivate ?? null,
+      createdAt: new Date(params.createdAt),
+    }),
+    ...(params.github ? [db.update(scanRepos).set({ isPrivate: params.github.isPrivate }).where(eq(scanRepos.id, repoId))] : []),
+  ] as const;
+};
+
+const createErrorOf = (cause: unknown): DbError | Conflict => (pgErrorCode(cause) === PG_UNIQUE_VIOLATION ? new Conflict({ message: ACTIVE_SCAN_CONFLICT }) : toDbError(cause));
+
+// -----
+// A second live scan of the repo: the Conflict names the one
+// that is running.
+// -----
+const activeConflictOf = (db: AppDbType, repoId: string) => (): Effect.Effect<never, DbError | Conflict> =>
+  Effect.tryPromise({
+    try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"]))).limit(1),
+    catch: toDbError,
+  }).pipe(Effect.flatMap(([active]) => Effect.fail(new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT }))));
+
+const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> => ({
   ...scanReads(db),
 
   // -----
@@ -158,77 +228,6 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
       },
       catch: toDbError,
     }),
-
-  // -----
-  // One batch is one transaction: first close what a scan of
-  // this repo that stalled still holds (its credit hold, given
-  // back with no charge, and its Runner job, cancelled so a late
-  // report is refused), then expire it, then insert. The unique
-  // index on active scans refuses a second live scan, and the
-  // answer names the one that is running.
-  // -----
-  create: (params, repoId, nowMs) => {
-    const stalled = db.select({ id: scans.id }).from(scans).where(and(eq(scans.repoId, repoId), stalledScansSql(nowMs)));
-    return Effect.tryPromise({
-      try: () =>
-        db.batch([
-          db
-            .insert(tenantCreditLedger)
-            .select(
-              db
-                .select({
-                  id: sql<string>`gen_random_uuid()`.as("id"),
-                  tenantId: tenantCreditLedger.tenantId,
-                  kind: sql<string>`'scan_settle'`.as("kind"),
-                  amountUsd: sql<string>`-${tenantCreditLedger.amountUsd}`.as("amount_usd"),
-                  scanId: tenantCreditLedger.scanId,
-                  idempotencyKey: sql<string | null>`null`.as("idempotency_key"),
-                  note: sql<string>`'the scan stalled and was closed by a newer request'`.as("note"),
-                  createdAt: sql<Date>`now()`.as("created_at"),
-                })
-                .from(tenantCreditLedger)
-                .where(and(eq(tenantCreditLedger.kind, "scan_hold"), inArray(tenantCreditLedger.scanId, stalled))),
-            )
-            .onConflictDoNothing(),
-          db
-            .update(scanRunnerJobs)
-            .set({ state: "cancelled", finishedAt: new Date() })
-            .where(and(inArray(scanRunnerJobs.scanId, stalled), inArray(scanRunnerJobs.state, ["queued", "claimed"]))),
-          db
-            .update(scans)
-            .set({ status: "failed", step: null, finishedAt: new Date(), error: "the scan stalled and was closed by a newer request", updatedAt: new Date() })
-            .where(and(eq(scans.repoId, repoId), stalledScansSql(nowMs))),
-          db.insert(scans).values({
-          id: params.scanId,
-          tenantId: params.accountId,
-          repo: params.repo,
-          repoId,
-          ref: params.ref ?? null,
-          status: "queued",
-          skill: params.options.skill,
-          model: params.options.model,
-          effort: params.options.effort,
-          profile: params.options.profile,
-          maxBudgetUsd: params.options.maxBudgetUsd.toFixed(2),
-          keySource: params.keySource ?? "platform",
-          installationId: params.github?.installationRowId ?? null,
-          githubRepoId: params.github?.repoId ?? null,
-          isPrivate: params.github?.isPrivate ?? null,
-          createdAt: new Date(params.createdAt),
-        }),
-          ...(params.github ? [db.update(scanRepos).set({ isPrivate: params.github.isPrivate }).where(eq(scanRepos.id, repoId))] : []),
-        ]),
-      catch: (cause) => (pgErrorCode(cause) === PG_UNIQUE_VIOLATION ? new Conflict({ message: ACTIVE_SCAN_CONFLICT }) : toDbError(cause)),
-    }).pipe(
-      Effect.catchTag("Conflict", () =>
-        Effect.tryPromise({
-          try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"]))).limit(1),
-          catch: toDbError,
-        }).pipe(Effect.flatMap(([active]) => Effect.fail(new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT })))),
-      ),
-      Effect.asVoid,
-    );
-  },
 
   mark: (accountId, scanId, patch) => {
     const ended = patch.status === "succeeded" || patch.status === "failed";
@@ -284,26 +283,64 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
         }).pipe(Effect.asVoid),
 
   activeSince: (accountId, nowMs) => activeScansEffect(db, accountId, nowMs),
+});
 
-  // -----
-  // How many live scans each path holds, over every Account. It
-  // is the global cap's count, so it is the one read here that crosses
-  // Accounts, and it returns counts only. A scan on a Runner runs on the
-  // person's computer and holds no Sandbox of ours, so it is left out.
-  // -----
-  activeCounts: (nowMs) =>
+// -----
+// How many live scans each path holds, over every Account. It is
+// the global cap's count, so it is the one read here that crosses
+// Accounts, and it returns counts only: it runs on the owner role,
+// since a withTenant transaction sees one Account's scans. A scan
+// on a Runner runs on the person's computer and holds no Sandbox
+// of ours, so it is left out.
+// -----
+export const activeCountsEffect = (db: DbConnectType, nowMs: number): Effect.Effect<ActiveCounts, DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select({ skill: scans.skill, total: sql<string>`count(*)` })
+        .from(scans)
+        .where(and(liveScansSql(nowMs), notExists(db.select({ one: sql`1` }).from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scans.id)))))
+        .groupBy(scans.skill),
+    catch: toDbError,
+  }).pipe(
+    Effect.map((rows) => ({
+      lite: rows.filter((row) => row.skill !== "full").reduce((sum, row) => sum + Number(row.total), 0),
+      full: rows.filter((row) => row.skill === "full").reduce((sum, row) => sum + Number(row.total), 0),
+    })),
+  );
+
+// -----
+// For the Workflow, on the owner connection: one batch is one
+// transaction.
+// -----
+export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
+  ...scanWrites(db),
+  create: (params, repoId, nowMs) =>
+    Effect.tryPromise({ try: () => db.batch(createStatements(db, params, repoId, nowMs)), catch: createErrorOf }).pipe(
+      Effect.catchTag("Conflict", activeConflictOf(db, repoId)),
+      Effect.asVoid,
+    ),
+  activeCounts: (nowMs) => activeCountsEffect(db, nowMs),
+});
+
+// -----
+// For POST /scans, inside a withTenant transaction. The writes of
+// a new scan run under a savepoint, so a refused insert rolls back
+// alone and the Conflict can still name the running scan.
+// -----
+export const tenantScanRepo = (db: AppTxDbType): Omit<ScanRepo, "activeCounts"> => ({
+  ...scanWrites(db),
+  create: (params, repoId, nowMs) =>
     Effect.tryPromise({
       try: () =>
-        db
-          .select({ skill: scans.skill, total: sql<string>`count(*)` })
-          .from(scans)
-          .where(and(liveScansSql(nowMs), notExists(db.select({ one: sql`1` }).from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scans.id)))))
-          .groupBy(scans.skill),
-      catch: toDbError,
-    }).pipe(
-      Effect.map((rows) => ({
-        lite: rows.filter((row) => row.skill !== "full").reduce((sum, row) => sum + Number(row.total), 0),
-        full: rows.filter((row) => row.skill === "full").reduce((sum, row) => sum + Number(row.total), 0),
-      })),
-    ),
+        db.transaction(async (savepoint) => {
+          const [settleStalled, cancelJobs, expireStalled, insertScan, ...markPrivate] = createStatements(savepoint, params, repoId, nowMs);
+          await settleStalled;
+          await cancelJobs;
+          await expireStalled;
+          await insertScan;
+          await Promise.all(markPrivate);
+        }),
+      catch: createErrorOf,
+    }).pipe(Effect.catchTag("Conflict", activeConflictOf(db, repoId))),
 });

@@ -105,7 +105,12 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /scans/:scanId": { kind: "run", path: "/scans/theirs", expect: "not-found" },
   "GET /scans/:scanId/diff": { kind: "run", path: "/scans/theirs/diff", expect: "not-found" },
   "GET /scans/:scanId/files/:file": { kind: "run", path: "/scans/theirs/files/REPORT.md", expect: "not-found" },
-  "POST /scans": pending(82),
+  // -----
+  // The stranger, on a key of its own, scans the repo the other
+  // Account has a live Scan of: that Scan and its repo row are not
+  // the caller's, so the answer is "created", not 409 or 429.
+  // -----
+  "POST /scans": { kind: "run", path: "/scans", method: "POST", body: { repo: OTHER_REPO }, as: "stranger", expect: "created" },
   "GET /files": pending(81),
   "GET /repos/:repoId/verdict": pending(81),
   "GET /usage": { kind: "run", path: "/usage", expect: "own", own: { budgetUsd: 20, spentUsd: 0, reservedUsd: 0, remainingUsd: 20, scans: 0 } },

@@ -105,12 +105,15 @@ beforeAll(async () => {
   const other = await seedTenant(test, "other");
   otherTenantId = other.tenantId;
   await test.raw.insert(tenantRunners).values({ id: OTHER_RUNNER_ID, tenantId: otherTenantId, name: OTHER_RUNNER_NAME, createdBy: other.partyId });
-  strangerId = (await seedTenant(test, "stranger")).tenantId;
+  const stranger = await seedTenant(test, "stranger");
+  strangerId = stranger.tenantId;
+  await test.raw.insert(tenantAnthropicKeys).values({ tenantId: strangerId, sealedKey: "strangers", lastFour: "mine", updatedBy: stranger.partyId });
   await seedRepo(test, tenantId);
   const otherRepoId = await seedRepo(test, otherTenantId);
   await test.raw.insert(scanRepos).values({ id: OTHER_REPO_ID, tenantId: otherTenantId, canonical: "octocat/spoon-knife", url: OTHER_SECOND_REPO, defaultBranch: "main" });
   await test.raw.insert(scanRepoBranches).values({ tenantId: otherTenantId, repoId: OTHER_REPO_ID, name: "main" });
   await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"));
+  await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs-live", new Date().toISOString(), { status: "running", skill: "full" }));
   await test.raw.insert(scanFiles).values({ tenantId: otherTenantId, scanId: "theirs", name: "REPORT.md", r2Key: `accounts/${otherTenantId}/scans/theirs/REPORT.md`, sizeBytes: 8, contentType: "text/markdown; charset=utf-8" });
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });

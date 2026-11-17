@@ -7,7 +7,7 @@
 // no longer uses the owner connection must leave the list.
 // -----
 export const OWNER_CONNECTION_USES = {
-  "lib/app-deps.ts": 15,
+  "lib/app-deps.ts": 8,
   "lib/auth.ts": 2,
   "lib/db-connection.ts": 1,
   "modules/files/api/files.ts": 2,
@@ -22,7 +22,6 @@ export const OWNER_CONNECTION_USES = {
   "modules/scan-records/types/scan-records-types.ts": 1,
   "modules/scan-workflow/lib/full-scan-workflow.ts": 8,
   "modules/scan-workflow/lib/settle-scan-credit.ts": 4,
-  "modules/scans/api/create-scan.ts": 2,
   "modules/sign-up/api/create-account.ts": 2,
   "modules/team/api/accept-team-invite.ts": 2,
   "modules/team/api/preview-team-invite.ts": 2,

@@ -1,0 +1,73 @@
+import { and, eq } from "drizzle-orm";
+import { platformMasterPlans, scans, tenantAnthropicKeys, tenantCreditLedger, tenants, tenantSubscriptions } from "@repo/db-elise/schema";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
+import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
+import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { tenantRouteApp } from "#/__tests__/tenant-route-harness";
+
+const REPO = "https://github.com/octocat/Hello-World";
+const ErrorBodySchema = z.object({ error: z.object({ code: z.string() }) });
+
+let test: TestDb;
+const app = tenantRouteApp(() => test);
+
+// -----
+// One Account per case: "pro" has a platform Plan and credit,
+// "broke" the Plan and no credit, "capped" credit and a $1
+// Monthly budget, "own" no Plan and a key of its own.
+// -----
+const accountOf = new Map<string, string>();
+
+beforeAll(async () => {
+  test = await openTestDb();
+  const [pro] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "pro"));
+  for (const name of ["pro", "broke", "capped", "own"]) {
+    const { tenantId, partyId } = await seedTenant(test, name);
+    accountOf.set(name, tenantId);
+    if (name === "own") await test.raw.insert(tenantAnthropicKeys).values({ tenantId, sealedKey: "sealed", lastFour: "mine", updatedBy: partyId });
+    else await test.raw.insert(tenantSubscriptions).values({ tenantId, planId: pro.id, status: "active", source: "grant" });
+    if (name === "pro" || name === "capped") await test.raw.insert(tenantCreditLedger).values({ tenantId, kind: "topup", amountUsd: "100.0000", idempotencyKey: `${name}-topup` });
+    if (name === "capped") await test.raw.update(tenants).set({ monthlyScanBudgetUsd: "1.00" }).where(eq(tenants.id, tenantId));
+  }
+});
+
+afterAll(async () => {
+  await test.close();
+});
+
+const postAs = async (name: string) => {
+  const { env, createdFull } = fakeBindings();
+  const accountId = accountOf.get(name) ?? "";
+  const headers = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountId, "content-type": "application/json" };
+  const res = await app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify({ repo: REPO }) }), env, testExecutionContext);
+  const rows = await test.raw.select({ id: scans.id }).from(scans).where(eq(scans.tenantId, accountId));
+  const holds = await test.raw
+    .select({ amountUsd: tenantCreditLedger.amountUsd })
+    .from(tenantCreditLedger)
+    .where(and(eq(tenantCreditLedger.tenantId, accountId), eq(tenantCreditLedger.kind, "scan_hold")));
+  return { res, rows, holds, started: createdFull.length };
+};
+
+describe("POST /scans as one Account", () => {
+  it("writes the Scan row and its credit hold, then starts the Workflow", async () => {
+    const { res, rows, holds, started } = await postAs("pro");
+
+    expect({ status: res.status, rows: rows.length, holds: holds.map((hold) => hold.amountUsd), started }).toEqual({ status: 201, rows: 1, holds: ["-9.0000"], started: 1 });
+  });
+
+  it.each([
+    ["credit", "broke", "INSUFFICIENT_CREDIT"],
+    ["the Monthly budget", "capped", "MONTHLY_BUDGET_EXCEEDED"],
+  ])("leaves no row and no hold for a Scan refused for %s", async (_name, account, code) => {
+    const { res, rows, holds, started } = await postAs(account);
+
+    expect({ status: res.status, code: ErrorBodySchema.parse(await res.json()).error.code, rows: rows.length, holds: holds.length, started }).toEqual({ status: 429, code, rows: 0, holds: 0, started: 0 });
+  });
+
+  it("takes no hold for a Scan on the Account's own key", async () => {
+    const { res, rows, holds, started } = await postAs("own");
+
+    expect({ status: res.status, rows: rows.length, holds: holds.length, started }).toEqual({ status: 201, rows: 1, holds: 0, started: 1 });
+  });
+});

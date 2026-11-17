@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { scanRunnerJobs, tenantRunners, type TScanRunnerJob } from "@repo/db-elise";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { JobReport, NewRunnerJob } from "#/modules/runners/types";
 
@@ -84,7 +84,7 @@ export const cancelRunnerJobEffect = (db: DbConnectType, scanId: string, now: Da
 // -----
 // A Runner of the Account that has paired and is not removed.
 // -----
-export const findConnectedRunnerEffect = (db: DbConnectType, tenantId: string, runnerId: string): Effect.Effect<boolean, DbError> =>
+export const findConnectedRunnerEffect = (db: AppDbType, tenantId: string, runnerId: string): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
