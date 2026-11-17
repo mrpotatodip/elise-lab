@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { RunnerParamSchema } from "@repo/contracts/elise";
-import { dbConnect } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { requirePower } from "#/lib/require-power";
 import { zValidator } from "#/lib/zod-validator";
@@ -14,7 +13,7 @@ const app = new Hono<AppEnv>();
 app.delete("/:runnerId", removeRunnerDoc, requirePower("company:runners:delete"), zValidator("header", AccountHeaderSchema), zValidator("param", RunnerParamSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
   const { runnerId } = c.req.valid("param");
-  const data = await runEffect(removeRunnerSvc(dbConnect(c.env.DATABASE_URL), accountId, runnerId));
+  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(removeRunnerSvc(db, accountId, runnerId)));
   return c.json({ data, error: null });
 });
 
