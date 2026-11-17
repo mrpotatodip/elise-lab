@@ -9,7 +9,6 @@ let timer: ReturnType<typeof setInterval> | undefined;
 const subscribe = (onChange: () => void) => {
   listeners.add(onChange);
   if (listeners.size === 1) {
-    now = Date.now();
     timer = setInterval(() => {
       now = Date.now();
       for (const listener of listeners) listener();
@@ -21,6 +20,14 @@ const subscribe = (onChange: () => void) => {
   };
 };
 
-const read = () => now;
+// -----
+// With no subscriber the timer is stopped, so the first render after a
+// pause would read a stale time. Reading refreshes it then, at most once a
+// tick, so two reads in one render still return the same value.
+// -----
+const read = () => {
+  if (listeners.size === 0 && Date.now() - now >= TICK_MS) now = Date.now();
+  return now;
+};
 
 export const useNow = () => useSyncExternalStore(subscribe, read, read);
