@@ -3,10 +3,11 @@ import { Effect } from "effect";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, toDbError, type DbError } from "#/lib/effect-query";
+import { scanArchivesEffect } from "#/modules/archives/queries";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
 import type { ActiveCounts, ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
-import { canonicalRepo, displayRepoUrl, liveScansSql, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
+import { displayRepoUrlOf, liveScansSql, repoIdentityOf, sameRepoIdentity, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
 
@@ -74,12 +75,14 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
           catch: toDbError,
         });
         const runners = yield* runnersOf(db, ids);
+        const archives = yield* scanArchivesEffect(db, ids);
         return rows.map((row) =>
           scanRowToStatus(
             row,
             files.filter((file) => file.scanId === row.id).map(({ name, sizeBytes, contentType }) => ({ name, sizeBytes, contentType })),
             summaryOf(row, counts.filter((count) => count.scanId === row.id)),
             runners.find((runner) => runner.scanId === row.id) ?? null,
+            archives.get(row.id) ?? null,
           ),
         );
       });
@@ -208,18 +211,21 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> =>
 
   // -----
   // Insert or find the repo's record. The unique index
-  // on (account, canonical) settles a race between two
-  // first scans of the same repo.
+  // on (account, provider, host, canonical) settles a
+  // race between two first scans of the same repo.
   // -----
-  ensureRepo: (accountId, url) =>
+  ensureRepo: (accountId, url, provider) =>
     Effect.tryPromise({
       try: async () => {
-        const canonical = canonicalRepo(url);
-        await db.insert(scanRepos).values({ tenantId: accountId, canonical, url: displayRepoUrl(url) }).onConflictDoNothing();
+        const identity = repoIdentityOf(url, provider);
+        await db
+          .insert(scanRepos)
+          .values({ tenantId: accountId, ...identity, url: displayRepoUrlOf(url, provider) })
+          .onConflictDoNothing();
         const [row] = await db
           .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url })
           .from(scanRepos)
-          .where(and(eq(scanRepos.tenantId, accountId), eq(scanRepos.canonical, canonical)));
+          .where(sameRepoIdentity(accountId, identity));
         return row;
       },
       catch: toDbError,

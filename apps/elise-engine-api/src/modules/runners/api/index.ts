@@ -11,3 +11,4 @@ export { default as listRunnersAPI } from "./list-runners";
 export { default as removeRunnerAPI } from "./remove-runner";
 export { default as claimJobAPI } from "./claim-job";
 export { default as reportJobAPI } from "./report-job";
+export { default as jobArchiveAPI } from "./job-archive";

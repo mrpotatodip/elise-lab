@@ -5,7 +5,7 @@ import { cn } from "#/lib/utils"
 type SegmentedProps<T extends string> = {
   label: string
   value: T
-  options: readonly { value: T; label: string; icon?: ReactNode }[]
+  options: readonly { value: T; label: string; icon?: ReactNode; disabled?: boolean }[]
   onChange: (value: T) => void
   className?: string
 }
@@ -38,10 +38,11 @@ function Segmented<T extends string>({ label, value, options, onChange, classNam
           key={option.value}
           className={cn(
             "relative flex h-8 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-            option.value === value ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            option.value === value ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            option.disabled && "cursor-not-allowed opacity-50 hover:text-muted-foreground"
           )}
         >
-          <input type="radio" name={name} value={option.value} checked={option.value === value} onChange={() => onChange(option.value)} className="sr-only" />
+          <input type="radio" name={name} value={option.value} checked={option.value === value} disabled={option.disabled} onChange={() => onChange(option.value)} className="sr-only" />
           {option.icon}
           {option.label}
         </label>

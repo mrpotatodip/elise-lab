@@ -1,10 +1,14 @@
 import { z } from "zod";
 import { FINDING_TRIAGE_STATUS_VALUES, REPO_BRANCH_LIMIT, REPO_FINDING_STATE_VALUES, FINDING_SEVERITY_VALUES } from "@repo/contracts/elise";
+import { DEFAULT_SOURCE_PROVIDER_ENTRY } from "#/providers/registry";
 
 export { REPO_BRANCH_LIMIT, REPO_LIMIT_PER_TENANT, RepoDetailSchema, RepoFindingListSchema, RepoListSchema, RepoParamSchema } from "@repo/contracts/elise";
 export type { Repo, RepoBranch, RepoFinding } from "@repo/contracts/elise";
 
-export const REPO_URL_PATTERN = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/;
+const { address } = DEFAULT_SOURCE_PROVIDER_ENTRY;
+
+export const REPO_URL_PATTERN = address.pattern;
+export const REPO_URL_EXAMPLE = address.example;
 export const BRANCH_NAME_PATTERN = /^[A-Za-z0-9_][\w./-]{0,99}$/;
 const COMMIT_ID = /^[0-9a-f]{40}$/i;
 
@@ -25,7 +29,7 @@ const BranchNameSchema = z.string().superRefine((name, ctx) => {
   if (error) ctx.addIssue({ code: "custom", message: error });
 });
 
-const REPO_URL_MESSAGE = "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name.";
+const REPO_URL_MESSAGE = address.message;
 
 export const AddRepoInputSchema = z.object({
   repo: z.string().regex(REPO_URL_PATTERN, REPO_URL_MESSAGE),

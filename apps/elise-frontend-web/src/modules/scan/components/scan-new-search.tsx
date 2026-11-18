@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Globe, Link2, Lock, Search } from "lucide-react";
 import { Input } from "#/components/ui/input";
 import { Skeleton } from "#/components/ui/skeleton";
+import type { GitSourceProvider } from "#/providers/port";
 import { scanRepoPickMatches, type ScanRepoPick } from "../utils";
 
 export function ScanRepoIcon({ pick }: { pick: ScanRepoPick }) {
@@ -14,6 +15,7 @@ export function ScanRepoIcon({ pick }: { pick: ScanRepoPick }) {
 }
 
 type ScanNewSearchProps = {
+  provider: GitSourceProvider;
   picks: readonly ScanRepoPick[];
   loading?: boolean;
   onPick: (pick: ScanRepoPick) => void;
@@ -28,12 +30,18 @@ type ScanNewSearchProps = {
 // rows as one list. Until the GitHub connection's repositories have arrived
 // the list cannot tell which scanned repositories are private, so it shows
 // placeholders instead of rows that would move; a pasted link needs no list
-// and shows at once.
+// and shows at once. The field reads a link by the chosen provider's rules,
+// and lists only that provider's repositories.
 // -----
-export function ScanNewSearch({ picks, loading = false, onPick, hint }: ScanNewSearchProps) {
+export function ScanNewSearch({ provider, picks, loading = false, onPick, hint }: ScanNewSearchProps) {
   const [query, setQuery] = useState("");
   const wrap = useRef<HTMLDivElement>(null);
-  const matches = scanRepoPickMatches(picks, query);
+  const matches = scanRepoPickMatches(picks, query, provider.id);
+  // -----
+  // Only a provider that lists repositories (github) knows which are
+  // private; another provider's rows claim neither.
+  // -----
+  const knowsPrivacy = provider.capabilities.canListRepos;
   const shown = loading ? matches.filter((item) => item.fromLink) : matches;
   const rows = [...shown.filter((item) => !item.isPrivate), ...shown.filter((item) => item.isPrivate)];
 
@@ -54,7 +62,7 @@ export function ScanNewSearch({ picks, loading = false, onPick, hint }: ScanNewS
           data-stop
           aria-label="Find a repository"
           className="h-11 pl-9"
-          placeholder="Search your repositories or paste a GitHub link"
+          placeholder={provider.address.searchPlaceholder}
           autoComplete="off"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -79,10 +87,10 @@ export function ScanNewSearch({ picks, loading = false, onPick, hint }: ScanNewS
             </div>
           ))}
         {!loading && rows.length === 0 && (
-          <p className="px-3 py-6 text-center text-sm leading-relaxed text-muted-foreground">{query.trim() === "" ? "Paste the link to a public GitHub repository to scan it." : "No repository matches. Paste the link to a public one to scan it."}</p>
+          <p className="px-3 py-6 text-center text-sm leading-relaxed text-muted-foreground">{query.trim() === "" ? provider.address.emptyNote : `No repository matches. ${provider.address.emptyNote}`}</p>
         )}
         {rows.map((row, index) => {
-          const group = row.fromLink ? null : row.isPrivate ? "Private" : "Public";
+          const group = row.fromLink || !knowsPrivacy ? null : row.isPrivate ? "Private" : "Public";
           const startsGroup = group !== null && rows.slice(0, index).every((item) => item.fromLink || (item.isPrivate ? "Private" : "Public") !== group);
           return (
             <div key={row.url} className="grid gap-0.5">
@@ -98,7 +106,7 @@ export function ScanNewSearch({ picks, loading = false, onPick, hint }: ScanNewS
                   <span className="truncate text-sm font-medium">{row.fromLink ? `Scan ${row.label}` : row.label}</span>
                   <span className="truncate text-xs text-muted-foreground">{row.note}</span>
                 </span>
-                <span className="text-xs text-muted-foreground">{row.isPrivate ? "Private" : "Public"}</span>
+                {knowsPrivacy && <span className="text-xs text-muted-foreground">{row.isPrivate ? "Private" : "Public"}</span>}
               </button>
             </div>
           );

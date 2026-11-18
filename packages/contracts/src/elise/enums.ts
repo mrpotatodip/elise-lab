@@ -114,3 +114,23 @@ export const RUNNER_JOB_PHASE_VALUES = ["recon", "hunt", "check", "report"] as c
 
 export type ScanStepValue = (typeof SCAN_STEP_VALUES)[number];
 export type RunnerJobPhaseValue = (typeof RUNNER_JOB_PHASE_VALUES)[number];
+
+// -----
+// Where the code of a Scan comes from (docs/adr/0008-git-providers.md).
+// A Repo is known by (provider, host, path); upload has no host. A
+// request without a provider means github. Twin of the CHECK on
+// scan_repos.provider.
+// -----
+export const SOURCE_PROVIDER_VALUES = ["github", "gitlab", "gitlab-sh", "upload"] as const;
+
+export type SourceProviderValue = (typeof SOURCE_PROVIDER_VALUES)[number];
+
+export const DEFAULT_SOURCE_PROVIDER = "github" satisfies SourceProviderValue;
+
+// -----
+// What a Runner job reads: a git clone, or an uploaded zip (an
+// archive). Not a database enum: only the job carries it.
+// -----
+export const RUNNER_JOB_SOURCE_VALUES = ["git", "archive"] as const;
+
+export type RunnerJobSourceValue = (typeof RUNNER_JOB_SOURCE_VALUES)[number];

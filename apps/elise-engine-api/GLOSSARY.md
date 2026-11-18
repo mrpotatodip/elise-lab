@@ -63,7 +63,7 @@ One of the four runs of a full Scan, in order: `recon`, `hunt`, `check` and `rep
 _Avoid_: Step (that is cloning, auditing or saving), stage
 
 **Runner**:
-A program on a person's computer (`apps/elise-runner-cli`) that claims a Scan and runs it there: it clones the repo, runs `claude` on the person's own login under its own permission rules, and sends back what the agent wrote. There are two: the desktop app (a window and a tray) and the headless Runner (`elise-runner`, a command line for a server or a terminal, on macOS and Linux). Both run Scans through one shared core (`elise-runner-core`), so a Runner Scan behaves the same whichever runs it. To Elise a headless Runner is a Runner like any other: it shows in the Runners list and is picked in the dashboard the same way. A Runner gets its Runner token one of three ways: a Runner login (the headless Runner's `elise-runner login`, approved on the dashboard), a pairing code (`pair <code>`, and the desktop app's Add a Runner), or `ELISE_RUNNER_TOKEN` set from outside, for CI and containers. On one computer the two are two Runners, each holding its own token (separate keychain entries), and neither reads or changes the other's. A Runner Scan takes no credit. It has no server meter: the Runner holds the Pool itself, through the agent's own `--max-budget-usd`. ADR 0006 holds the rules.
+A program on a person's computer (`apps/elise-runner-cli`) that claims a Scan and runs it there: it clones the repo (or unpacks the Archive of an Upload app, which only a Runner that reports it can read), runs `claude` on the person's own login under its own permission rules, and sends back what the agent wrote. There are two: the desktop app (a window and a tray) and the headless Runner (`elise-runner`, a command line for a server or a terminal, on macOS and Linux). Both run Scans through one shared core (`elise-runner-core`), so a Runner Scan behaves the same whichever runs it. To Elise a headless Runner is a Runner like any other: it shows in the Runners list and is picked in the dashboard the same way. A Runner gets its Runner token one of three ways: a Runner login (the headless Runner's `elise-runner login`, approved on the dashboard), a pairing code (`pair <code>`, and the desktop app's Add a Runner), or `ELISE_RUNNER_TOKEN` set from outside, for CI and containers. On one computer the two are two Runners, each holding its own token (separate keychain entries), and neither reads or changes the other's. A Runner Scan takes no credit. It has no server meter: the Runner holds the Pool itself, through the agent's own `--max-budget-usd`. ADR 0006 holds the rules.
 _Avoid_: Worker (that is the Cloudflare Worker), agent (that is the program it starts), CLI (a headless Runner is a Runner, not a separate kind of thing)
 
 **Runner login**:
@@ -90,15 +90,27 @@ A file a Scan saved. Its bytes are in R2; its row in `scan_files` (Neon) holds t
 
 **File**:
 An entry in the Account's Files list (`GET /files`): one of the written Scan files (`REPORT.md`, `FINDINGS-DETAIL.md`, `NEEDS-VALIDATION.md`) with the Repo, Branch and Scan it came from. The machine-readable Scan files are not listed there.
-_Avoid_: Document, upload (no one uploads a File)
+_Avoid_: Document, upload (no one uploads a File; the zips of an Upload app are Archives)
 
 **Report**:
 The `REPORT.md` file the agent writes for people to read.
 _Avoid_: Output, result
 
 **Repo**:
-One repo an Account scans, kept once per Account (`scan_repos`) however its URL was typed: `owner/name` in lowercase, without `.git` or a trailing slash. It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos.
+One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included.
 _Avoid_: Project, target
+
+**Provider**:
+Where the code of a Scan comes from: `github`, `gitlab`, `gitlab-sh` or `upload`. The user picks it first, and each Provider is its own flow with its own address or file rules, contract schemas and dashboard screens. Core knows only the `SourceProvider` port and one registry, and lint fails when core reads a Provider's folder or one Provider reads another. A request with no `provider` means `github`. On a Runner the clone happens on the user's computer with their own git login, so EliseLAB stores no token for any Provider. `gitlab-sh` takes only hosts the user listed in their own Runner settings: a host that only the job names is refused. ADR 0008 (git providers) holds the rules.
+_Avoid_: Source (too loose), host (that is the server inside an address)
+
+**Upload app**:
+A named app whose code comes from zips the user uploaded, not from a git host: a Repo with Provider `upload`, the name as its path, no host and one hidden Branch named `upload`. The name is unique inside an Account. All its zips are versions of the same code and share one History, with the Archive's content hash standing in for the commit.
+_Avoid_: Project, upload (as a noun for the zip: that is an Archive)
+
+**Archive**:
+One stored zip of an Upload app: an ID, a label, its R2 key under the Account, size, content hash and upload time. A Scan of an Upload app reads one Archive, chosen by ID, and a link row records which. An Archive can be scanned many times or never. Limits: 50 MB zipped, 250 MB unpacked, 20,000 files, 20 path levels, 20 per app and 500 MB per Account. One no Scan has read is deleted 30 days after upload. Removing an Archive or an app deletes its files and rows, and past Scans stay in the History with a note that the file is gone. The server serves the zip only to the Runner that claimed that job.
+_Avoid_: Upload (the act), bundle, snapshot
 
 **Branch**:
 A line of code of a Repo (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a Scan of it succeeds and the Repo has a free slot, or when a person adds it. Its findings are the merge of every succeeded full Scan of the Branch, of any profile and age: one finding per fingerprint, with the words of the newest Scan that saw it, first seen at the oldest Scan and last seen at the newest. An old `lite` Scan adds nothing, because its fingerprints are made another way. A Scan never closes a problem, so one the latest Scan did not see stays open and is "not in the latest Scan" (ADR 0004). The latest Scan is the newest one with a Verdict weight: a Partial Scan, a Scan that met no profile and an older full Scan whose findings were never recorded are never the latest Scan. A Scan never reopens a problem either: one that the History closed stays closed, and a person's decision, `fixed` included, stands, even when a later Scan sees the problem again. The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row.

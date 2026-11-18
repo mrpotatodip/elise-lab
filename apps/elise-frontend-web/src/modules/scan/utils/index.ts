@@ -1,5 +1,7 @@
 export * from "./scan-activity";
+export * from "./scan-archive-note";
 export * from "./scan-branch-scans";
+export * from "./scan-create-body";
 export * from "./scan-finding-prompt";
 export * from "./scan-plan-summary";
 export * from "./scan-profile-note";

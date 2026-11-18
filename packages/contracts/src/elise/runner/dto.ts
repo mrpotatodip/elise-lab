@@ -3,13 +3,15 @@ import {
   RUNNER_JOB_ERROR_MAX,
   RUNNER_JOB_FILE_MAX,
   RUNNER_JOB_LOG_MAX,
+  RUNNER_JOB_SOURCE_NAME_MAX,
+  RUNNER_JOB_SOURCES_MAX,
   RUNNER_LOGIN_DEVICE_CODE_MAX,
   RUNNER_LOGIN_FIELD_MAX,
   RUNNER_LOGIN_USER_CODE_MAX,
   RUNNER_NAME_MAX,
   RUNNER_PAIRING_CODE_MAX,
 } from "../constants";
-import { RUNNER_JOB_PHASE_VALUES } from "../enums";
+import { RUNNER_JOB_PHASE_VALUES, type RunnerJobSourceValue } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 
 export const RunnerIdSchema = z.uuid();
@@ -95,9 +97,32 @@ export const RunnerPhasePromptSchema = z.object({
   prompt: z.string(),
 });
 
+// -----
+// What a job reads. git: clone repo at ref. archive: download the
+// uploaded zip with this id, which the Worker serves only to the
+// Runner that claimed the job. A job without a source is git: an
+// older Worker sends none. An archive job goes only to a Runner
+// whose claim listed archive in its sources.
+// -----
+export const RunnerJobSourceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("git" satisfies RunnerJobSourceValue) }),
+  z.object({ kind: z.literal("archive" satisfies RunnerJobSourceValue), archiveId: z.uuid() }),
+]);
+
+// -----
+// What a Runner sends when it asks for a job: the job sources it
+// can read. An older Runner sends no body, which reads as git
+// only. A name this Worker does not know is ignored, not refused,
+// so a newer Runner still gets its jobs.
+// -----
+export const RunnerClaimBodySchema = z.object({
+  sources: z.array(z.string().max(RUNNER_JOB_SOURCE_NAME_MAX)).max(RUNNER_JOB_SOURCES_MAX).optional(),
+});
+
 export const RunnerJobSchema = z.object({
   scanId: z.string(),
   repo: z.string(),
+  source: RunnerJobSourceSchema.optional(),
   ref: z.string().nullable(),
   skill: z.string(),
   model: z.string(),
@@ -206,7 +231,9 @@ export type RunnerState = z.infer<typeof RunnerStateSchema>;
 export type Runner = z.infer<typeof RunnerSchema>;
 export type Runners = z.infer<typeof RunnersSchema>;
 export type RunnerPhasePrompt = z.infer<typeof RunnerPhasePromptSchema>;
+export type RunnerJobSource = z.infer<typeof RunnerJobSourceSchema>;
 export type RunnerJob = z.infer<typeof RunnerJobSchema>;
+export type RunnerClaimBody = z.infer<typeof RunnerClaimBodySchema>;
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;
 export type StartRunnerLoginBody = z.infer<typeof StartRunnerLoginBodySchema>;
 export type StartedRunnerLogin = z.infer<typeof StartedRunnerLoginSchema>;

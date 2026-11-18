@@ -1,11 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, ExternalLink, FolderGit2, GitBranch } from "lucide-react";
+import { ChevronRight, ExternalLink, FileArchive, FolderGit2, GitBranch } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import { useHydrated } from "#/lib/use-hydrated";
 import { useNow } from "#/lib/use-now";
 import { SCAN_PROFILE_OPTIONS } from "../constants";
 import type { ScanStatus } from "../schemas";
-import { scanDuration } from "../utils";
+import { scanArchiveNote, scanDuration } from "../utils";
 import { ScanStatusBadge } from "./scan-status-badge";
 import { ScanTime } from "./scan-time";
 
@@ -27,6 +27,36 @@ const githubUrl = (repo: string) => repo.replace(/\.git$/, "").replace(/\/$/, ""
 // -----
 function ScanBranchRow({ scan }: { scan: ScanStatus }) {
   const label = scan.branch ?? scan.ref;
+  const zip = scanArchiveNote(scan.archive);
+
+  // -----
+  // An upload Scan read one zip of an app: the chip names the zip (or says
+  // the file is gone) and leads to the app's History. It has no page
+  // elsewhere to open.
+  // -----
+  if (zip !== null) {
+    const chip = (
+      <>
+        <FileArchive aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+        <span className="truncate" title={zip}>
+          {zip}
+        </span>
+      </>
+    );
+    return (
+      <div className="flex min-w-0 items-center gap-2">
+        {scan.branchId ? (
+          <Link to="/repos/$repoId/branches/$branchId" params={{ repoId: scan.repoId, branchId: scan.branchId }} className={CHIP_LINK} title="Open this app's history">
+            {chip}
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            <span className="sr-only">, open this app's history</span>
+          </Link>
+        ) : (
+          <span className={CHIP}>{chip}</span>
+        )}
+      </div>
+    );
+  }
 
   if (!label && !scan.commitSha) return null;
 
@@ -115,7 +145,11 @@ function ScanStatusLine({ scan }: { scan: ScanStatus }) {
         </>
       )}
       <span aria-hidden="true">·</span>
-      {commit ? (
+      {scan.archive ? (
+        <span title="The SHA-256 of the zip, which stands in for its commit">
+          Zip hash <span className="font-mono text-foreground">{scan.archive.contentSha256.slice(0, 7)}</span>
+        </span>
+      ) : commit ? (
         <span>
           Commit{" "}
           <a

@@ -111,10 +111,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![runner_status, pair_runner, accept_pairing, decline_pairing, unpair_runner, runner_activity])
         .setup(|app| {
             // The work loop asks Elise for scans for as long as the app runs.
+            // The Runner's own settings (the GitLab servers it may clone from) are a file in the
+            // app's config folder, which only the person edits.
+            let settings_file = app.path().app_config_dir()?.join("settings.json");
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let tools = move || find_tools(&handle);
-                scan::work_loop(&STORE, &tools, &on_event).await
+                scan::work_loop(&STORE, &tools, &settings_file, &on_event).await
             });
             let open = MenuItem::with_id(app, "open", "Open Elise Runner", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;

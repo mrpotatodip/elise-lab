@@ -1,10 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { scanActivity } from "#/modules/scan/utils/scan-activity";
+import { scanArchiveNote } from "#/modules/scan/utils/scan-archive-note";
 import { scanFindingPrompt, scanFindingsPrompt } from "#/modules/scan/utils/scan-finding-prompt";
 import { scanPlanSummary } from "#/modules/scan/utils/scan-plan-summary";
 import { scanRepoName } from "#/modules/scan/utils/scan-repo-name";
 import { scanSidebarItems } from "#/modules/scan/utils/scan-sidebar";
 import { scanSuccessRate } from "#/modules/scan/utils/scan-success-rate";
+
+describe("scanArchiveNote", () => {
+  const hash = "3ff652db2f06f3e24d5eb0824d3e1ee38401754fe10663f374417be55ce39061";
+
+  it.each([
+    ["a git Scan", null, null],
+    ["a Scan of a stored zip", { id: "0d6f7a1e-9c1b-4f7e-8a43-5b2e9d4c7a10", label: "app-1.2.zip", contentSha256: hash }, "app-1.2.zip"],
+    ["a Scan whose zip was removed", { id: null, label: "app-1.2.zip", contentSha256: hash }, "app-1.2.zip (file removed)"],
+  ])("names the zip of %s", (_, archive, note) => {
+    expect(scanArchiveNote(archive)).toBe(note);
+  });
+});
 
 describe("scanSuccessRate", () => {
   it("is null before any scan finishes", () => {
@@ -20,6 +33,10 @@ describe("scanSuccessRate", () => {
 describe("scanRepoName", () => {
   it("splits a GitHub URL into owner and name", () => {
     expect(scanRepoName("https://github.com/honojs/hono.git", "id")).toEqual({ owner: "honojs", name: "hono" });
+  });
+
+  it("names an upload app by its name, which no git provider reads", () => {
+    expect(scanRepoName("Billing API", "s1")).toEqual({ owner: "", name: "Billing API" });
   });
 
   it("falls back to the scan id when the repo is missing", () => {
@@ -111,6 +128,23 @@ describe("scanPlanSummary", () => {
     ["deep", "exhaustive audit"],
   ] as const)("names the %s profile in plain words", (profile, words) => {
     expect(scanPlanSummary({ ...base, profile })).toContain(`${words} of honojs/hono with Claude Sonnet 5.5`);
+  });
+
+  it("names the upload app and the zip the Scan reads", () => {
+    const plan = { ...base, provider: "upload", repo: "Billing API", archiveId: "0d6f7a1e-9c1b-4f7e-8a43-5b2e9d4c7a10", runnerId: "6f1c1f8e-2b7a-4c55-9a0e-6f3d2f6b1a01" } as const;
+    expect(scanPlanSummary(plan, "Studio Mac", "billing-1.3.zip")).toContain("balanced audit of Billing API (zip billing-1.3.zip) with Claude Sonnet 5.5. It runs on Studio Mac");
+  });
+
+  it("reads a repository by the provider the plan names, groups inside groups included", () => {
+    expect(scanPlanSummary({ ...base, provider: "gitlab", repo: "https://gitlab.com/acme/platform/api" })).toContain("of acme/platform/api with");
+  });
+
+  it.each([
+    ["github", "https://gitlab.com/acme/api"],
+    ["gitlab", "https://github.com/honojs/hono"],
+    ["upload", "https://gitlab.com/acme/api"],
+  ] as const)("starts nothing when the %s plan holds %s", (provider, repo) => {
+    expect(scanPlanSummary({ ...base, provider, repo })).toBeNull();
   });
 });
 

@@ -23,6 +23,7 @@ import {
 } from "../schemas";
 import { EngineError, engineFetch, engineJson, jsonPost, type EngineAuth } from "#/lib/engine-client";
 import { engineAuth } from "#/modules/auth/server/session";
+import { scanCreateBodyOf } from "../utils";
 
 export const fetchScans = createServerFn({ method: "GET" })
   .validator(ScanCursorInputSchema)
@@ -52,13 +53,7 @@ export const fetchScanFile = createServerFn({ method: "GET" })
 
 export const createScan = createServerFn({ method: "POST" })
   .validator(CreateScanInputSchema)
-  .handler(async ({ data }) => {
-    // -----
-    // The engine names it runner_id, like max_budget_usd.
-    // -----
-    const { runnerId, ...scan } = data;
-    return engineJson(ScanQueuedSchema, "/scans", jsonPost(JSON.stringify({ ...scan, runner_id: runnerId })), await engineAuth());
-  });
+  .handler(async ({ data }) => engineJson(ScanQueuedSchema, "/scans", jsonPost(JSON.stringify(scanCreateBodyOf(data))), await engineAuth()));
 
 const RECORDED_PAGE = 100;
 

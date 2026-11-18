@@ -149,6 +149,11 @@ function VerdictRescan({ verdict, repoId, repoUrl }: { verdict: Verdict; repoId:
   const { data: list } = useQuery(scansQuery());
   const last = list?.scans.find((scan) => scan.scanId === scans.ids[0]);
   if (!needsScan) return null;
+  // -----
+  // An upload app's commit is a zip's hash, which no ref can name: the
+  // missing scan starts from the app's zip list instead.
+  // -----
+  if (last?.archive) return <ScanNewDialog label="Run the missing scan" size="sm" repo={repoUrl} provider="upload" repoId={repoId} />;
   return (
     <div className="flex flex-wrap items-start gap-3">
       {last && <ScanVerdictRun repoId={repoId} repoUrl={repoUrl} commit={verdict.commit} last={last} />}

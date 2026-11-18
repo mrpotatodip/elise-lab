@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ACCEPTED_RISK_MAX_DAYS } from "../constants";
-import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STEP_VALUES } from "../enums";
+import { ScanArchiveRefSchema } from "../upload/dto";
+import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STEP_VALUES, SOURCE_PROVIDER_VALUES } from "../enums";
 
 export const SCAN_MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"] as const;
 // Opus is not offered for new scans, but a stored scan may still carry it.
@@ -121,6 +122,7 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   usage: ScanUsageSchema.nullish(),
   summary: ScanSummarySchema.nullish(),
   runner: ScanRunnerSchema.nullish(),
+  archive: ScanArchiveRefSchema.nullish(),
 });
 
 export const ScanListSchema = z.object({
@@ -330,9 +332,16 @@ export const RepoOpenSchema = z.object({
 // isPrivate is what GitHub said at the last scan request: null when
 // no connected install covered the repo. It is optional so an older
 // engine that does not send it still parses.
+// provider and host, with canonical as the path, are the Repo's
+// identity; host is null for an upload app. Optional so an older
+// engine still parses: a Repo without them is github on github.com.
 // -----
+export const SourceProviderSchema = z.enum(SOURCE_PROVIDER_VALUES);
+
 export const RepoSchema = z.object({
   id: z.uuid(),
+  provider: SourceProviderSchema.optional(),
+  host: z.string().nullable().optional(),
   url: z.string(),
   canonical: z.string(),
   isPrivate: z.boolean().nullable().optional(),

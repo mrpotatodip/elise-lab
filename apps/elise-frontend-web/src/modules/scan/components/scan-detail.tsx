@@ -129,14 +129,18 @@ export function ScanDetail({ scanId }: { scanId: string }) {
         badges={<GithubPrivateBadge isPrivate={scan.isPrivate} />}
         below={<ScanHeaderMeta scan={scan} />}
       >
-        <ScanNewDialog
-          label={scan.branch ? "Scan this branch again" : "Scan again"}
-          size="default"
-          variant="outline"
-          repo={scan.repo}
-          startBranch={scan.branch ?? undefined}
-          startRef={scan.branch ? undefined : (scan.ref ?? undefined)}
-        />
+        {scan.archive ? (
+          <ScanNewDialog label="Scan a zip again" size="default" variant="outline" repo={scan.repo} provider="upload" repoId={scan.repoId} />
+        ) : (
+          <ScanNewDialog
+            label={scan.branch ? "Scan this branch again" : "Scan again"}
+            size="default"
+            variant="outline"
+            repo={scan.repo}
+            startBranch={scan.branch ?? undefined}
+            startRef={scan.branch ? undefined : (scan.ref ?? undefined)}
+          />
+        )}
       </ShellPageHeader>
 
       <ScanStatusNotice scan={scan} />

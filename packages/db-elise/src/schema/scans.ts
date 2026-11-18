@@ -24,6 +24,7 @@ import {
   SCAN_KEY_SOURCE_VALUES,
   SCAN_STATE_VALUES,
   SCAN_STEP_VALUES,
+  SOURCE_PROVIDER_VALUES,
   type FindingOriginValue,
   type FindingSeverityValue,
   type FindingStatusValue,
@@ -33,6 +34,7 @@ import {
   type ScanKeySourceValue,
   type ScanStateValue,
   type ScanStepValue,
+  type SourceProviderValue,
 } from "@repo/contracts/elise";
 import { parties } from "./party";
 import { tenants } from "./tenant";
@@ -42,10 +44,12 @@ const inList = (values: readonly string[]) => sql.raw(values.map((value) => `'${
 
 // -----
 // One row per repo an Account scans, so a repo has
-// one history however its URL was spelled. canonical
-// is owner/name in lowercase, without .git or a
-// trailing slash. url keeps the first spelling seen,
-// minus those two.
+// one history however its URL was spelled. Its
+// identity is (provider, host, canonical), so a gitlab
+// acme/app and a github acme/app are two Repos.
+// canonical is the path (owner/name for github) in
+// lowercase, without .git or a trailing slash. url
+// keeps the first spelling seen, minus those two.
 // -----
 export const scanRepos = pgTable(
   "scan_repos",
@@ -54,16 +58,23 @@ export const scanRepos = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    provider: text("provider").notNull().default("github"),
+    provider: text("provider").$type<SourceProviderValue>().notNull().default("github"),
+    // Lowercase. Null only for an upload app, which has no host. The default keeps a row written without it a github one.
+    host: text("host").default("github.com"),
     canonical: text("canonical").notNull(),
     url: text("url").notNull(),
     defaultBranch: text("default_branch"),
     // Last answer GitHub gave at a Scan request. For display only: each Scan keeps its own.
     isPrivate: boolean("is_private"),
+    // Set when a person removes an upload app: its zips are deleted, and the row stays so its Scans keep their History. Adding the app again clears it.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
-    uqTenantCanonical: uniqueIndex("uq_scan_repos_tenant_canonical").on(t.tenantId, t.canonical),
+    chkProvider: check("scan_repos_provider", sql`${t.provider} in (${inList(SOURCE_PROVIDER_VALUES)})`),
+    chkHost: check("scan_repos_host", sql`${t.host} = lower(${t.host})`),
+    // A constraint, not an index: only a constraint takes NULLS NOT DISTINCT in drizzle, and two upload apps of one name both have a null host.
+    uqTenantIdentity: unique("uq_scan_repos_tenant_identity").on(t.tenantId, t.provider, t.host, t.canonical).nullsNotDistinct(),
     uqIdTenant: uniqueIndex("uq_scan_repos_id_tenant").on(t.id, t.tenantId),
   }),
 );

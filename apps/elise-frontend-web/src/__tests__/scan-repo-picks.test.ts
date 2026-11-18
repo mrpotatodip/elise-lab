@@ -3,7 +3,7 @@ import type { GithubRepo } from "#/modules/github";
 import type { KnownRepo } from "#/modules/scan/utils/scan-known-repos";
 import { scanRepoLinkPick, scanRepoPickMatches, scanRepoPicks } from "#/modules/scan/utils/scan-repo-picks";
 
-const known = (over: Partial<KnownRepo>): KnownRepo => ({ repoId: "r1", url: "https://github.com/acme/api", label: "acme/api", last: "succeeded", running: false, isPrivate: false, ...over });
+const known = (over: Partial<KnownRepo>): KnownRepo => ({ provider: "github", repoId: "r1", url: "https://github.com/acme/api", label: "acme/api", last: "succeeded", running: false, isPrivate: false, ...over });
 const connected = (over: Partial<GithubRepo>): GithubRepo => ({ installationId: "7", fullName: "acme/api", url: "https://github.com/acme/api", private: false, ...over });
 
 describe("scanRepoPicks", () => {
@@ -33,6 +33,13 @@ describe("scanRepoPicks", () => {
   it("says a repository with a queued or running scan is running", () => {
     expect(scanRepoPicks([known({ running: true })], [])[0]).toMatchObject({ running: true, note: "A scan is running now" });
   });
+
+  it("lists only the chosen provider's repositories, and GitHub connections only under github", () => {
+    const repos = [known({}), known({ provider: "gitlab", repoId: "r2", url: "https://gitlab.com/acme/platform/api", label: "acme/platform/api" })];
+    const github = [connected({ fullName: "acme/web", url: "https://github.com/acme/web" })];
+    expect(scanRepoPicks(repos, github, "gitlab").map((item) => [item.provider, item.label])).toEqual([["gitlab", "acme/platform/api"]]);
+    expect(scanRepoPicks(repos, github, "github").map((item) => item.label)).toEqual(["acme/api", "acme/web"]);
+  });
 });
 
 describe("scanRepoLinkPick", () => {
@@ -46,6 +53,25 @@ describe("scanRepoLinkPick", () => {
 
   it.each(["honojs", "https://gitlab.com/a/b", "https://github.com/a/b/tree/main", ""])("does not read %j as a repository", (text) => {
     expect(scanRepoLinkPick(text)).toBeNull();
+  });
+
+  it.each([
+    ["gitlab", "https://gitlab.com/acme/platform/api", "https://gitlab.com/acme/platform/api", "acme/platform/api"],
+    ["gitlab", "gitlab.com/acme/platform/api.git", "https://gitlab.com/acme/platform/api", "acme/platform/api"],
+    ["gitlab", "https://gitlab.com/acme/api/-/tree/main", "https://gitlab.com/acme/api", "acme/api"],
+    ["gitlab-sh", "https://Git.Example.com/team/api/-/tree/dev", "https://git.example.com/team/api", "git.example.com/team/api"],
+  ] as const)("reads a %s link %s as that provider's repository", (provider, text, url, label) => {
+    expect(scanRepoLinkPick(text, provider)).toMatchObject({ provider, url, label, isPrivate: false, fromLink: true });
+  });
+
+  it.each([
+    ["gitlab", "https://github.com/acme/api"],
+    ["gitlab", "https://git.example.com/acme/api"],
+    ["gitlab-sh", "https://gitlab.com/acme/api"],
+    ["gitlab-sh", "ssh://git.example.com/acme/api"],
+    ["upload", "https://gitlab.com/acme/api"],
+  ] as const)("does not read a link under %s when it belongs elsewhere: %s", (provider, text) => {
+    expect(scanRepoLinkPick(text, provider)).toBeNull();
   });
 });
 

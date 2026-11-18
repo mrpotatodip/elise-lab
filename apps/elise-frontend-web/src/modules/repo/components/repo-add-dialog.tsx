@@ -14,7 +14,7 @@ import { GithubRepoPicker } from "#/modules/github";
 import { scanKeys } from "#/modules/scan";
 import { addRepo } from "../api";
 import { repoKeys } from "../hooks";
-import { AddRepoDetailsSchema, AddRepoInputSchema, REPO_BRANCH_LIMIT } from "../schemas";
+import { AddRepoDetailsSchema, AddRepoInputSchema, REPO_BRANCH_LIMIT, REPO_URL_EXAMPLE } from "../schemas";
 
 type BranchRow = { id: string; name: string };
 
@@ -61,7 +61,7 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
           {(field) => (
         <div className="grid gap-2">
           <Label htmlFor="add-repo-url">Link to the GitHub repository</Label>
-          <Input id="add-repo-url" name={field.name} autoComplete="off" placeholder="https://github.com/owner/name" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "add-repo-url", "add-repo-help")} />
+          <Input id="add-repo-url" name={field.name} autoComplete="off" placeholder={REPO_URL_EXAMPLE} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "add-repo-url", "add-repo-help")} />
           <FieldError id="add-repo-url" message={fieldMessage(field)} />
           <p id="add-repo-help" className="text-xs text-muted-foreground">
             Paste the link to a public GitHub repository, or to a private one you connected. Adding it does not scan it, and nothing is checked on GitHub. Private repository?{" "}

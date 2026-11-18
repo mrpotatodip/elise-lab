@@ -8,7 +8,7 @@ import { DataTable } from "#/components/ui/data-table";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { scanRepoBranchesQuery } from "../hooks";
 import type { ScanStatus } from "../schemas";
-import { scanBranchScans, scanFailure, scanNoSummaryText, scanPlural } from "../utils";
+import { scanArchiveNote, scanBranchScans, scanFailure, scanNoSummaryText, scanPlural } from "../utils";
 import { ScanSeverityDots } from "./scan-severity-dots";
 import { ScanStatusBadge } from "./scan-status-badge";
 import { ScanTime } from "./scan-time";
@@ -19,7 +19,21 @@ type BranchScanRow = ScanStatus & { current: boolean };
 
 const column = dataTableColumns<BranchScanRow>();
 
-const columns = column.columns([
+// -----
+// An upload app's Scans read zips, not commits: the column names the
+// zip, or says the file was removed.
+// -----
+const versionColumn = (zip: boolean) =>
+  zip
+    ? column.display({ id: "commit", header: "Zip", meta: { cell: "text-xs text-muted-foreground" }, cell: ({ row }) => scanArchiveNote(row.original.archive) ?? "-" })
+    : column.display({
+        id: "commit",
+        header: "Commit",
+        meta: { cell: "font-mono text-xs text-muted-foreground" },
+        cell: ({ row }) => (row.original.commitSha ? row.original.commitSha.slice(0, 7) : "-"),
+      });
+
+const columnsOf = (zip: boolean) => column.columns([
   column.display({
     id: "started",
     header: "Started",
@@ -36,12 +50,7 @@ const columns = column.columns([
       ),
   }),
   column.display({ id: "status", header: "Status", cell: ({ row }) => <ScanStatusBadge status={row.original.status} /> }),
-  column.display({
-    id: "commit",
-    header: "Commit",
-    meta: { cell: "font-mono text-xs text-muted-foreground" },
-    cell: ({ row }) => (row.original.commitSha ? row.original.commitSha.slice(0, 7) : "-"),
-  }),
+  versionColumn(zip),
   column.display({
     id: "findings",
     header: "Findings",
@@ -68,8 +77,11 @@ const columns = column.columns([
   }),
 ]);
 
-function BranchScansTable({ rows }: { rows: BranchScanRow[] }) {
-  const table = useTable({ features: dataTableFeatures, columns, data: rows, getRowId: (item) => item.scanId });
+const COLUMNS = columnsOf(false);
+const ZIP_COLUMNS = columnsOf(true);
+
+function BranchScansTable({ rows, zip }: { rows: BranchScanRow[]; zip: boolean }) {
+  const table = useTable({ features: dataTableFeatures, columns: zip ? ZIP_COLUMNS : COLUMNS, data: rows, getRowId: (item) => item.scanId });
 
   return <DataTable table={table} rowProps={(row) => ({ className: "relative", "aria-current": row.original.current ? "page" : undefined })} />;
 }
@@ -92,20 +104,24 @@ export function ScanBranchScans({ scan }: { scan: ScanStatus }) {
   if (scans.length < 2) return null;
   const branchId = scan.branchId;
   const rows = scans.map((item) => ({ ...item, current: item.scanId === scan.scanId }));
+  const zip = Boolean(scan.archive);
+  const where = zip ? "app" : "branch";
 
   return (
     <Card>
       <CardHeader className="gap-1.5 pb-7">
-        <CardTitle>Scans of this branch</CardTitle>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The latest scans of {scan.branch ?? "this branch"}. Open one to read its report.</p>
+        <CardTitle>Scans of this {where}</CardTitle>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          The latest scans of {zip ? "this app, across its zips" : (scan.branch ?? "this branch")}. Open one to read its report.
+        </p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
-        <BranchScansTable rows={rows} />
+        <BranchScansTable rows={rows} zip={zip} />
         {more > 0 && (
           <p className="border-t px-6 py-3 text-sm leading-relaxed text-muted-foreground">
-            {scanPlural(more, "older scan", "older scans")} of this branch.{" "}
+            {scanPlural(more, "older scan", "older scans")} of this {where}.{" "}
             <Link to="/repos/$repoId/branches/$branchId" params={{ repoId: scan.repoId, branchId }} className="rounded-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              See the branch history
+              See the {where} history
             </Link>
           </p>
         )}

@@ -3,6 +3,7 @@
 // person's own login (their Claude subscription), and sends back what the agent wrote.
 
 use crate::engine::{client, engine_url, Envelope};
+use crate::providers::{clone_address, label_of, read_archive, Settings, JOB_SOURCES};
 use crate::store::{TokenStore, TOKEN_VARIABLE};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -123,7 +124,11 @@ git -C repo rev-parse --abbrev-ref HEAD > repo.branch
 #[serde(rename_all = "camelCase")]
 pub struct Job {
     scan_id: String,
+    // The repository's address for a git job; an upload app's name for an archive job.
     repo: String,
+    // What the job reads. An older engine sends none: a git clone.
+    #[serde(default)]
+    source: Source,
     #[serde(rename = "ref")]
     git_ref: Option<String>,
     skill: String,
@@ -140,6 +145,16 @@ pub struct Job {
     #[serde(default)]
     phase_prompts: Vec<PhasePrompt>,
     priors_json: String,
+}
+
+// git: clone `repo`. archive: download the zip of an upload Scan from Elise, which serves it only to
+// the Runner that claimed the job, so the zip's id is not needed to ask for it.
+#[derive(Deserialize, Default, Debug, PartialEq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum Source {
+    #[default]
+    Git,
+    Archive {},
 }
 
 #[derive(Deserialize)]
@@ -233,13 +248,14 @@ impl Stop {
     }
 }
 
-pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, on_event: OnEvent<'_>) {
+// The settings file is read again for every job, so a host added to it counts from the next Scan.
+pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, settings_file: &Path, on_event: OnEvent<'_>) {
     let never = Stop::never();
     loop {
         if let Some(token) = store.token() {
             match claim(&token).await {
                 Claimed::Job(job) => {
-                    run_job(&token, *job, tools, on_event, &never).await;
+                    run_job(&token, *job, tools, &Settings::load(settings_file), on_event, &never).await;
                     continue;
                 }
                 Claimed::Removed => store.forget(),
@@ -256,6 +272,7 @@ pub async fn claim(token: &str) -> Claimed {
     let answer = client()
         .post(format!("{}/runners/claim", engine_url()))
         .bearer_auth(token)
+        .json(&serde_json::json!({ "sources": JOB_SOURCES }))
         .send()
         .await;
     let Ok(response) = answer else {
@@ -272,13 +289,13 @@ pub async fn claim(token: &str) -> Claimed {
     }
 }
 
-pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEvent<'_>, stop: &Stop) {
-    let label = repo_label(&job.repo);
+pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Settings, on_event: OnEvent<'_>, stop: &Stop) {
+    let label = label_of(&job.repo);
     on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
 
     let work = std::env::temp_dir().join(format!("eliselab-runner-{}", job.scan_id));
     let ended = match tools() {
-        Ok(tools) => execute(&tools, &job, &work, on_event, stop).await,
+        Ok(tools) => execute(token, &tools, &job, settings, &work, on_event, stop).await,
         Err(error) => Err(error),
     };
     let ended = ended.map_err(|error| blame_the_stop_for_any_failure_after_it(stop, error));
@@ -352,20 +369,25 @@ async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
 }
 
 // -----
-// One scan from clone to report. Every Err is a sentence that goes to the dashboard as the
-// scan's error, so it says what to do.
+// One scan from clone (or the upload's zip) to report. Every Err is a sentence that goes to the
+// dashboard as the scan's error, so it says what to do. An archive job runs no git at all; its
+// unpacked `repo` gets the same clean-up as a clone (`strip_untrusted`, in `audit`).
 // -----
-async fn execute(tools: &Tools, job: &Job, work: &Path, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
-    if !safe_repo_url(&job.repo) {
-        return Err("This runner only clones public https://github.com/owner/name repositories.".into());
-    }
-    let git_ref = job.git_ref.clone().unwrap_or_default();
-    if !git_ref.is_empty() && !safe_ref(&git_ref) {
-        return Err("That branch, tag or commit name is not one this runner will fetch.".into());
-    }
+async fn execute(token: &str, tools: &Tools, job: &Job, settings: &Settings, work: &Path, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
     if !job.scan_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
         return Err("The scan id is not one this runner will use.".into());
     }
+    let clone = match job.source {
+        Source::Git => {
+            let address = clone_address(&job.repo, settings)?;
+            let git_ref = job.git_ref.clone().unwrap_or_default();
+            if !git_ref.is_empty() && !safe_ref(&git_ref) {
+                return Err("That branch, tag or commit name is not one this runner will fetch.".into());
+            }
+            Some((address.clone_url, git_ref))
+        }
+        Source::Archive {} => None,
+    };
     skill_dir_of(job)?;
 
     let _ = fs::remove_dir_all(work);
@@ -374,7 +396,13 @@ async fn execute(tools: &Tools, job: &Job, work: &Path, on_event: OnEvent<'_>, s
         fs::write(work.join("prior-findings.json"), &job.priors_json).map_err(|e| format!("Could not save the earlier findings: {e}"))?;
     }
 
-    clone_repo(work, &job.repo, &git_ref, stop).await?;
+    match clone {
+        Some((clone_url, git_ref)) => clone_repo(work, &clone_url, &git_ref, stop).await?,
+        None => tokio::select! {
+            read = read_archive(token, &job.scan_id, work) => read?,
+            _ = stop.stopped() => return Err(STOPPED.to_string()),
+        },
+    }
     audit(tools, job, work, MINUTE, on_event, stop).await
 }
 
@@ -1034,26 +1062,6 @@ fn budget_of(asked: f64) -> f64 {
     }
 }
 
-fn repo_label(url: &str) -> String {
-    url.trim_start_matches("https://github.com/").trim_end_matches('/').trim_end_matches(".git").to_string()
-}
-
-// Only a public GitHub repository over https: a forged answer must not make this computer
-// clone from somewhere else or run a git transport that executes commands.
-fn safe_repo_url(url: &str) -> bool {
-    let Some(rest) = url.strip_prefix("https://github.com/") else {
-        return false;
-    };
-    let rest = rest.trim_end_matches('/');
-    let rest = rest.strip_suffix(".git").unwrap_or(rest);
-    let mut parts = rest.split('/');
-    let part_ok = |part: &str| !part.is_empty() && part.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
-    match (parts.next(), parts.next(), parts.next()) {
-        (Some(owner), Some(name), None) => part_ok(owner) && part_ok(name),
-        _ => false,
-    }
-}
-
 fn safe_ref(name: &str) -> bool {
     !name.is_empty() && name.len() <= 200 && !name.starts_with('-') && name.chars().all(|c| c.is_ascii_alphanumeric() || "._/-".contains(c))
 }
@@ -1078,6 +1086,7 @@ mod tests {
         Job {
             scan_id: "s1".into(),
             repo: "https://github.com/octocat/Hello-World".into(),
+            source: Source::Git,
             git_ref: None,
             skill: "lite".into(),
             model: "claude-haiku-5-5".into(),
@@ -1108,6 +1117,17 @@ mod tests {
 
         assert_eq!(old.profile_cap_usd, None);
         assert_eq!(new.profile_cap_usd, Some(18.0));
+    }
+
+    // An older Worker sends no source (git); a newer one names git or archive, with the zip's id.
+    #[test]
+    fn a_job_reads_its_source_and_a_job_without_one_is_git() {
+        let base = r#""scanId":"s1","repo":"Billing app","ref":null,"skill":"full","model":"m","effort":"high","maxBudgetUsd":50,"prompt":"p","priorsJson":"""#;
+        let read = |extra: &str| serde_json::from_str::<Job>(&format!("{{{base}{extra}}}")).unwrap().source;
+
+        assert_eq!(read(""), Source::Git);
+        assert_eq!(read(r#","source":{"kind":"git"}"#), Source::Git);
+        assert_eq!(read(r#","source":{"kind":"archive","archiveId":"7a2e1d0c-3b4f-4a51-8c62-9d03e4f5a6b7"}"#), Source::Archive {});
     }
 
     // The Runner has no meter on the server: the agent's own limit is the only stop. A full job stops

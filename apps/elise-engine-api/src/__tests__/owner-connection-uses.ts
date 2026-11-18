@@ -18,6 +18,10 @@ export const OWNER_CONNECTION_USES = {
   },
   "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
   "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },
+  "modules/archives/api/run-upload-retention.ts": {
+    uses: 2,
+    reason: "The daily cron has no request and no Account: the upload retention sweep crosses Accounts, and touches only upload rows",
+  },
   "modules/me/api/get-me.ts": { uses: 2, reason: "Lists the Accounts a person belongs to, across Accounts" },
   "modules/runners/api/claim-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/disconnect-runner.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
@@ -25,6 +29,7 @@ export const OWNER_CONNECTION_USES = {
   "modules/runners/api/check-runner-login.ts": { uses: 2, reason: "A device code is looked up before its Account is known" },
   "modules/runners/api/start-runner-login.ts": { uses: 2, reason: "A Runner starts a login with no session and no Account" },
   "modules/runners/api/enroll-runner.ts": { uses: 2, reason: "A pairing code is looked up before its Account is known" },
+  "modules/runners/api/job-archive.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account; the zip is served only for the job that Runner claimed" },
   "modules/runners/api/report-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/runner-me.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/lib/runner-of.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },

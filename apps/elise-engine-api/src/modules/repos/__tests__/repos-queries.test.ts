@@ -123,6 +123,34 @@ describe("listReposEffect", () => {
   });
 });
 
+// -----
+// A Repo is known by (provider, host, path). A row written
+// without them, as every Repo before providers was, is a
+// github one on github.com.
+// -----
+describe("Repo identity", () => {
+  it("reads a Repo stored without a provider or host as github on github.com", async () => {
+    const [repo] = await run(listReposEffect(test.http, tenantId));
+
+    expect({ provider: repo.provider, host: repo.host }).toEqual({ provider: "github", host: "github.com" });
+  });
+
+  it("keeps a gitlab Repo and a github Repo with the same path apart in one Account, and still refuses a second github one", async () => {
+    const both = (await seedTenant(test, "both")).tenantId;
+    await test.raw.insert(scanRepos).values({ tenantId: both, canonical: "acme/app", url: "https://github.com/acme/app" });
+    await test.raw.insert(scanRepos).values({ tenantId: both, provider: "gitlab", host: "gitlab.com", canonical: "acme/app", url: "https://gitlab.com/acme/app" });
+
+    const listed = await run(listReposEffect(test.http, both));
+    const again = await test.raw.insert(scanRepos).values({ tenantId: both, canonical: "acme/app", url: "https://github.com/acme/app" }).onConflictDoNothing().returning();
+
+    expect(listed.map((repo) => [repo.provider, repo.host, repo.canonical]).toSorted()).toEqual([
+      ["github", "github.com", "acme/app"],
+      ["gitlab", "gitlab.com", "acme/app"],
+    ]);
+    expect(again).toEqual([]);
+  });
+});
+
 describe("listRepoFindingsSvc", () => {
   it("returns every problem, worst first, with its state and who decided what", async () => {
     const page = await run(listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 50 }));
