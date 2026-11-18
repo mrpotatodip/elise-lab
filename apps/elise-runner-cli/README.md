@@ -12,11 +12,15 @@ Elise Runner is a small desktop app (Tauri 2, Rust and TypeScript) that runs a s
 
 The page never holds the API token. Rust keeps it in the system keychain and makes every call to Elise. The page asks Rust through Tauri commands in `src/api.ts` and draws what comes back.
 
+The folder is one Cargo workspace (`Cargo.toml`, one `Cargo.lock`, one `target`). Everything a Runner does apart from drawing a window is in the core crate, `elise-runner-core`, which has no Tauri dependency. The desktop app is a thin shell over it: window, tray and commands. It tells the core where `claude`, `node` and the bundled skills are (`Tools`, from the app's resource folder), and turns the core's events (claimed, Phase started and ended with its cost and what is left of the pool, repair started, result sent, ended) into its activity.
+
 | Path | What it is |
 | --- | --- |
 | `src/` | The page: `main.ts`, `views.ts`, `api.ts` (the Tauri commands), `copy.ts` (every string the user reads). |
-| `src-tauri/src/runner.rs` | Pairing, unpairing and the keychain. |
-| `src-tauri/src/jobs.rs` | The work loop: clone, run `claude` with a fixed tool allowlist, validate the output, upload. |
+| `core/src/pairing.rs` | Enroll a code, accept or decline it, the Runner's status, unpairing. |
+| `core/src/store.rs` | Where the token is kept: the keychain, under a service name the program picks. |
+| `core/src/scan.rs` | The work loop: claim, clone, run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
+| `src-tauri/src/lib.rs` | The desktop app: the commands, the pending pairing, the activity, the tray. |
 
 A scan uses your Claude login but not your Claude Code settings. The app writes its own settings file and the audit skill into the scan's work folder and tells `claude` to load only that (`--setting-sources project`), so an allow rule you keep for daily work, such as `curl`, cannot widen what the agent may do. Your `~/.claude` folder is neither read nor changed.
 
@@ -24,7 +28,7 @@ A job says which audit to run (`lite` or `full`). A full job that carries `phase
 
 A job with no `phasePrompts` (an older engine) is one run of `claude` on the single prompt, for up to 40 minutes. It stops at the same cap through `--max-budget-usd`. A job with no `profileCapUsd` (an older Worker) uses the budget it sends. When the limit is hit and the audit had already written `REPORT.md`, the files are sent and the Scan ends as a Partial Scan; otherwise the Scan ends with an error that says the cap was reached.
 
-The Rust tests (`cargo test` in `src-tauri`) run a Scan after the clone against a stub `claude` and `node`.
+The Rust tests (`cargo test --workspace` in this folder) run a Scan after the clone against a stub `claude` and `node`, in the core, on a plain tokio runtime.
 
 The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The activity is `idle`, `running` or `finished`.
 
@@ -33,7 +37,7 @@ The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The
 ```bash
 pnpm --filter elise-runner-cli app:dev     # tauri dev
 pnpm --filter elise-runner-cli app:build   # tauri build
-pnpm --filter elise-runner-cli check       # tsc --noEmit
+pnpm --filter elise-runner-cli check       # tsc --noEmit, then cargo test --workspace
 ```
 
-You need a Rust toolchain for `app:dev` and `app:build`. `check` only type-checks the TypeScript and does not touch Rust.
+You need a Rust toolchain for `app:dev`, `app:build` and `check`. `pnpm check:apps` and the pre-commit check run `check` for this folder, so a commit that touches it runs the Rust tests.

@@ -1,43 +1,112 @@
-mod jobs;
-mod runner;
+// The desktop Runner: a window, a tray and the commands the page calls, over the shared core
+// (`elise-runner-core`), which pairs, keeps the token and runs the Scans. The page never talks to the
+// API and never sees the token.
 
-use jobs::Activity;
-use runner::{PairingOffer, RunnerError, RunnerStatus};
+use elise_runner_core::pairing::{self, Enrolled, RunnerError, RunnerStatus};
+use elise_runner_core::scan::{self, Event, Tools};
+use elise_runner_core::store::KeychainStore;
+use serde::Serialize;
+use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager, WindowEvent,
+    AppHandle, Manager, WindowEvent,
 };
+
+// The desktop app's token, in the keychain under its own service name.
+static STORE: KeychainStore = KeychainStore::new("com.eliselab.runner");
+
+// A pairing Elise has issued and the person has not accepted yet. It lives in memory only: it is
+// not in the keychain, so the work loop cannot use it, and quitting the app loses it.
+static PENDING: Mutex<Option<Enrolled>> = Mutex::new(None);
+
+fn take_pending() -> Option<Enrolled> {
+    PENDING.lock().expect("the pending pairing is not poisoned").take()
+}
+
+// What the page is asked to confirm: the account that made the code and the name it gave this
+// runner. The token stays in Rust.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PairingOffer {
+    name: String,
+    account_name: String,
+}
+
+// What the window shows about the work, made from the core's events. The page asks for it.
+#[derive(Clone, Serialize)]
+#[serde(tag = "state", rename_all = "lowercase", rename_all_fields = "camelCase")]
+enum Activity {
+    Idle,
+    Running { repo: String },
+    Finished { ok: bool, repo: String, message: String },
+}
+
+static ACTIVITY: Mutex<Activity> = Mutex::new(Activity::Idle);
+
+fn on_event(event: Event) {
+    let next = match event {
+        Event::Claimed { repo, .. } => Activity::Running { repo },
+        Event::Ended { ok, repo, message } => Activity::Finished { ok, repo, message },
+        _ => return,
+    };
+    *ACTIVITY.lock().expect("the activity is not poisoned") = next;
+}
+
+// Where `claude`, `node` and the bundled skills are on this computer.
+fn find_tools(app: &AppHandle) -> Result<Tools, String> {
+    let skills = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?
+        .join("skills");
+    Ok(Tools::locate(skills))
+}
 
 // Each function below is something the web page can call with `invoke("name")`.
 #[tauri::command]
 async fn runner_status() -> RunnerStatus {
-    runner::status().await
+    pairing::status(&STORE).await
 }
 
+// Trades a code for a token and holds it until the person accepts the account it belongs to. A
+// second code entered before the first was answered replaces it; the first is revoked.
 #[tauri::command]
 async fn pair_runner(code: String) -> Result<PairingOffer, RunnerError> {
-    runner::pair(&code).await
+    let enrolled = pairing::enroll(&code).await?;
+    let offer = PairingOffer {
+        name: enrolled.name.clone(),
+        account_name: enrolled.account_name.clone(),
+    };
+    let earlier = PENDING.lock().expect("the pending pairing is not poisoned").replace(enrolled);
+    if let Some(earlier) = earlier {
+        pairing::decline(earlier).await;
+    }
+    Ok(offer)
 }
 
 #[tauri::command]
 async fn accept_pairing() -> Result<RunnerStatus, RunnerError> {
-    runner::accept_pairing().await
+    let pending = take_pending().ok_or(RunnerError::PairingLost)?;
+    pairing::accept(&STORE, pending).await
 }
 
 #[tauri::command]
 async fn decline_pairing() -> Result<RunnerStatus, RunnerError> {
-    runner::decline_pairing().await
+    if let Some(pending) = take_pending() {
+        pairing::decline(pending).await;
+    }
+    Ok(RunnerStatus::Unpaired)
 }
 
 #[tauri::command]
 async fn unpair_runner() -> Result<RunnerStatus, RunnerError> {
-    runner::unpair().await
+    pairing::unpair(&STORE).await
 }
 
 #[tauri::command]
 fn runner_activity() -> Activity {
-    jobs::activity()
+    ACTIVITY.lock().expect("the activity is not poisoned").clone()
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -52,8 +121,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![runner_status, pair_runner, accept_pairing, decline_pairing, unpair_runner, runner_activity])
         .setup(|app| {
             // The work loop asks Elise for scans for as long as the app runs.
-            tauri::async_runtime::spawn(jobs::work_loop(app.handle().clone()));
-            let open =MenuItem::with_id(app, "open", "Open Elise Runner", true, None::<&str>)?;
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let tools = move || find_tools(&handle);
+                scan::work_loop(&STORE, &tools, &on_event).await
+            });
+            let open = MenuItem::with_id(app, "open", "Open Elise Runner", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &quit])?;
 

@@ -2,16 +2,15 @@
 // scan was started on this runner, it clones the repository, runs `claude` with the
 // person's own login (their Claude subscription), and sends back what the agent wrote.
 
-use crate::runner;
+use crate::engine::{client, engine_url, Envelope};
+use crate::store::TokenStore;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
 use tokio::process::Command;
 use tokio::time::{sleep, timeout};
 
@@ -119,34 +118,10 @@ git -C repo rev-parse HEAD > repo.sha
 git -C repo rev-parse --abbrev-ref HEAD > repo.branch
 "#;
 
-// What the window shows about the work. Rust keeps it; the page asks for it.
-#[derive(Clone, Serialize)]
-#[serde(tag = "state", rename_all = "lowercase", rename_all_fields = "camelCase")]
-pub enum Activity {
-    Idle,
-    Running { repo: String },
-    Finished { ok: bool, repo: String, message: String },
-}
-
-static ACTIVITY: Mutex<Activity> = Mutex::new(Activity::Idle);
-
-pub fn activity() -> Activity {
-    ACTIVITY.lock().expect("the activity is not poisoned").clone()
-}
-
-fn set_activity(next: Activity) {
-    *ACTIVITY.lock().expect("the activity is not poisoned") = next;
-}
-
+// A job Elise handed this Runner: one Scan to run.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Envelope<T> {
-    data: T,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Job {
+pub struct Job {
     scan_id: String,
     repo: String,
     #[serde(rename = "ref")]
@@ -173,14 +148,21 @@ struct PhasePrompt {
     prompt: String,
 }
 
-// Where the programs and the audit skill are: plain values, so a test passes a stub `claude`, a stub
-// `node` and a skills folder. `None` is a program this computer does not have; the Scan says so when
-// it first needs it.
-struct Tools {
-    claude: Option<PathBuf>,
-    node: Option<PathBuf>,
+// Where the programs and the audit skill are: plain values the program using the core passes in, so
+// a test passes a stub `claude`, a stub `node` and a skills folder. `None` is a program this computer
+// does not have; the Scan says so when it first needs it.
+pub struct Tools {
+    pub claude: Option<PathBuf>,
+    pub node: Option<PathBuf>,
     // The folder that holds `security-audit` and `security-audit-lite`.
-    skills: PathBuf,
+    pub skills: PathBuf,
+}
+
+impl Tools {
+    // `claude` and `node` where this computer has them, and the skills from `skills`.
+    pub fn locate(skills: PathBuf) -> Tools {
+        Tools { claude: find_claude(), node: find_node(), skills }
+    }
 }
 
 #[derive(Serialize)]
@@ -201,25 +183,43 @@ struct Report {
     files: BTreeMap<String, String>,
 }
 
-enum Claimed {
+// What asking Elise for work gave.
+pub enum Claimed {
     Job(Box<Job>),
     Nothing,
     Offline,
+    // Elise rejected the token: the Runner was removed.
     Removed,
 }
 
+// What a Scan tells the program running it, in order: the desktop app turns it into its activity,
+// a terminal program into log lines. `repo` is `owner/name`. The repair run ends as a
+// `PhaseEnded` named `repair`. Money is in dollars; `pool_left_usd` is what the Phases after may spend.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    Claimed { scan_id: String, repo: String },
+    PhaseStarted { phase: String },
+    PhaseEnded { phase: String, cost_usd: Option<f64>, pool_left_usd: f64 },
+    RepairStarted,
+    ResultSent { sent: bool },
+    Ended { ok: bool, repo: String, message: String },
+}
+
+pub type OnEvent<'a> = &'a (dyn Fn(Event) + Send + Sync);
+
 // -----
-// The loop. It runs for as long as the app does and does nothing until the computer is paired.
+// The loop. It runs for as long as the program does and does nothing until the computer is paired.
+// `tools` is asked once per claimed Scan, so a `claude` installed while the program runs is found.
 // -----
-pub async fn work_loop(app: AppHandle) {
+pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, on_event: OnEvent<'_>) {
     loop {
-        if let Some(token) = runner::token() {
+        if let Some(token) = store.token() {
             match claim(&token).await {
                 Claimed::Job(job) => {
-                    handle(&app, &token, *job).await;
+                    run_job(&token, *job, tools, on_event).await;
                     continue;
                 }
-                Claimed::Removed => runner::forget_token(),
+                Claimed::Removed => store.forget(),
                 Claimed::Nothing | Claimed::Offline => {}
             }
         }
@@ -227,9 +227,12 @@ pub async fn work_loop(app: AppHandle) {
     }
 }
 
-async fn claim(token: &str) -> Claimed {
-    let answer = runner::client()
-        .post(format!("{}/runners/claim", runner::engine_url()))
+// Where `claude`, `node` and the Skill are, or a sentence for the dashboard saying why not.
+pub type FindTools<'a> = &'a (dyn Fn() -> Result<Tools, String> + Send + Sync);
+
+pub async fn claim(token: &str) -> Claimed {
+    let answer = client()
+        .post(format!("{}/runners/claim", engine_url()))
         .bearer_auth(token)
         .send()
         .await;
@@ -247,22 +250,24 @@ async fn claim(token: &str) -> Claimed {
     }
 }
 
-async fn handle(app: &AppHandle, token: &str, job: Job) {
+// One claimed Scan from clone to report, told as it goes through `on_event`.
+pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEvent<'_>) {
     let label = repo_label(&job.repo);
-    set_activity(Activity::Running { repo: label.clone() });
+    on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
 
     let work = std::env::temp_dir().join(format!("eliselab-runner-{}", job.scan_id));
-    let ended = match find_tools(app) {
-        Ok(tools) => execute(&tools, &job, &work).await,
+    let ended = match tools() {
+        Ok(tools) => execute(&tools, &job, &work, on_event).await,
         Err(error) => Err(error),
     };
     let report = ended.unwrap_or_else(|error| failed_report(&work, error));
     let ok = report.state == "succeeded";
     let message = report.error.clone().unwrap_or_default();
     let sent = send_report(token, &job.scan_id, &report).await;
+    on_event(Event::ResultSent { sent });
     tidy(&work, &report, sent);
 
-    set_activity(Activity::Finished {
+    on_event(Event::Ended {
         ok: ok && sent,
         repo: label,
         message: match (ok, sent) {
@@ -293,20 +298,10 @@ fn tidy(work: &Path, report: &Report, sent: bool) {
     }
 }
 
-// Where `claude`, `node` and the bundled skills are on this computer.
-fn find_tools(app: &AppHandle) -> Result<Tools, String> {
-    let skills = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?
-        .join("skills");
-    Ok(Tools { claude: find_claude(), node: find_node(), skills })
-}
-
 async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
     for attempt in 1..=REPORT_TRIES {
-        let answer = runner::client()
-            .post(format!("{}/runners/jobs/{}/result", runner::engine_url(), scan_id))
+        let answer = client()
+            .post(format!("{}/runners/jobs/{}/result", engine_url(), scan_id))
             .bearer_auth(token)
             .json(report)
             .send()
@@ -328,7 +323,7 @@ async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
 // One scan from clone to report. Every Err is a sentence that goes to the dashboard as the
 // scan's error, so it says what to do.
 // -----
-async fn execute(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> {
+async fn execute(tools: &Tools, job: &Job, work: &Path, on_event: OnEvent<'_>) -> Result<Report, String> {
     if !safe_repo_url(&job.repo) {
         return Err("This runner only clones public https://github.com/owner/name repositories.".into());
     }
@@ -348,7 +343,7 @@ async fn execute(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String
     }
 
     clone_repo(work, &job.repo, &git_ref).await?;
-    audit(tools, job, work, MINUTE).await
+    audit(tools, job, work, MINUTE, on_event).await
 }
 
 fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
@@ -363,13 +358,13 @@ fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
 // Everything after the clone: the agent's settings and skill, the run or the four Phases, the
 // validators and the files to send. The work folder holds `repo`, `out` and what the clone left.
 // -----
-async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
+async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>) -> Result<Report, String> {
     strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
     install_skill(tools, skill_dir_of(job)?, work)?;
     write_agent_settings(work)?;
 
     if job.skill == "full" && !job.phase_prompts.is_empty() {
-        return run_phases(tools, job, work, minute).await;
+        return run_phases(tools, job, work, minute, on_event).await;
     }
 
     let end = run_agent(tools, work, job, &job.prompt, budget_for(job), None, AGENT_TIMEOUT).await?.end?;
@@ -402,13 +397,13 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Resul
 // agent gets one repair run (`repair`); a failure of the environment ends the Scan without one.
 // The files of the Phases that ended stay in the work folder when a later one fails.
 // -----
-async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
+async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>) -> Result<Report, String> {
     let names: Vec<&str> = job.phase_prompts.iter().map(|p| p.phase.as_str()).collect();
     if names != PHASES.map(|(phase, _)| phase) {
         return Err(format!("The job's Phases ({}) are not the four this runner runs: recon, hunt, check and report. Update the Elise Runner app.", names.join(", ")));
     }
     let mut spent = Spent::default();
-    let ran = run_each_phase(tools, job, work, &mut spent, minute).await;
+    let ran = run_each_phase(tools, job, work, &mut spent, minute, on_event).await;
     // The engine reads the last JSON object of the log as the Scan's usage: the sum, a failed Scan's too.
     if let Some(sum) = spent.sum_line() {
         append_to_log(work, &format!("{sum}\n"));
@@ -417,19 +412,20 @@ async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> 
     collect(work).map_err(|error| format!("The report phase ended. {error}"))
 }
 
-async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration) -> Result<(), String> {
+async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, on_event: OnEvent<'_>) -> Result<(), String> {
     let cap = budget_for(job);
     for (prompt, (phase, minutes)) in job.phase_prompts.iter().zip(PHASES) {
         let left = money(cap - spent.cost);
         if left <= 0.0 {
             return Err(phase_cap_message(phase, cap));
         }
+        on_event(Event::PhaseStarted { phase: phase.to_string() });
         let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32)).await?;
-        settle(run, spent, phase, cap)?;
+        settle_told(run, spent, phase, cap, on_event)?;
         if phase == VALIDATED_AFTER {
             match validate_full(tools, work).await {
                 Ok(()) => {}
-                Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, &error).await?,
+                Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, &error, on_event).await?,
                 Err(CheckFailure::Environment(error)) => return Err(error),
             }
         }
@@ -458,6 +454,14 @@ fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(),
     Ok(())
 }
 
+// `settle`, telling what the run cost and what is left of the pool, whether or not the Scan goes on.
+fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event: OnEvent<'_>) -> Result<(), String> {
+    let cost_usd = run.result.as_ref().and_then(cost_of);
+    let settled = settle(run, spent, phase, cap);
+    on_event(Event::PhaseEnded { phase: phase.to_string(), cost_usd, pool_left_usd: money(cap - spent.cost) });
+    settled
+}
+
 // -----
 // The validators failed on what the check Phase left. The agent gets one more run, short, on a prompt
 // this app builds from the validator's own words: fix what is named, in the files named, and stop.
@@ -466,15 +470,16 @@ fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(),
 // the cap error. Any other way this goes wrong, the run failing or the validators failing again,
 // ends the Scan as a failed validation did before: with the check Phase's error. One repair at most.
 // -----
-async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, error: &str) -> Result<(), String> {
+async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, error: &str, on_event: OnEvent<'_>) -> Result<(), String> {
     let cap = budget_for(job);
     let left = money(cap - spent.cost);
     if left <= 0.0 {
         return Err(phase_cap_message(REPAIR, cap));
     }
     let failed = format!("The {VALIDATED_AFTER} phase left files that did not pass the check. {error}");
+    on_event(Event::RepairStarted);
     let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32)).await.map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
-    settle(run, spent, REPAIR, cap).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
+    settle_told(run, spent, REPAIR, cap, on_event).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
     validate_full(tools, work).await.map_err(|again| format!("The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}", again.message()))
 }
 
@@ -1292,7 +1297,14 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     // The same, with a minute of a Phase's slot as short as a test needs.
     #[cfg(unix)]
     fn scan_in(stage: &Stage, job: &Job, minute: Duration) -> Report {
-        match tauri::async_runtime::block_on(audit(&stage.tools, job, &stage.work, minute)) {
+        scan_told(stage, job, minute, &|_| {})
+    }
+
+    // The same, telling `on_event` what happens, on a plain runtime as a program using the core would.
+    #[cfg(unix)]
+    fn scan_told(stage: &Stage, job: &Job, minute: Duration, on_event: OnEvent<'_>) -> Report {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        match runtime.block_on(audit(&stage.tools, job, &stage.work, minute, on_event)) {
             Ok(report) => report,
             Err(error) => failed_report(&stage.work, error),
         }
@@ -1538,6 +1550,38 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert_eq!(sum["duration_ms"], 5000);
         assert_eq!(sum["usage"]["input_tokens"], 50);
         assert_eq!(sum["usage"]["cache_creation_input_tokens"], 200);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // What a terminal Runner logs: each Phase and the repair run as they start and end, with what each
+    // cost and what is left of the $12 pool after it.
+    #[cfg(unix)]
+    #[test]
+    fn the_scan_tells_each_phase_and_the_repair_with_its_cost_and_the_pool_left() {
+        let stage = stage("events");
+        fs::write(stage.work.join("repair.txt"), "cost=1").unwrap();
+        let job = phased_job(["phase=recon cost=1.5", "phase=hunt cost=4", "phase=check invalid=1 cost=2.5", "phase=report cost=1"]);
+        let told = std::sync::Mutex::new(Vec::new());
+
+        scan_told(&stage, &job, MINUTE, &|event| told.lock().unwrap().push(event));
+
+        let started = |phase: &str| Event::PhaseStarted { phase: phase.into() };
+        let ended = |phase: &str, cost: f64, left: f64| Event::PhaseEnded { phase: phase.into(), cost_usd: Some(cost), pool_left_usd: left };
+        assert_eq!(
+            told.into_inner().unwrap(),
+            [
+                started("recon"),
+                ended("recon", 1.5, 10.5),
+                started("hunt"),
+                ended("hunt", 4.0, 6.5),
+                started("check"),
+                ended("check", 2.5, 4.0),
+                Event::RepairStarted,
+                ended("repair", 1.0, 3.0),
+                started("report"),
+                ended("report", 1.0, 2.0),
+            ]
+        );
         let _ = fs::remove_dir_all(&stage.root);
     }
 
