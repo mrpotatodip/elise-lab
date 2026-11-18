@@ -2,20 +2,19 @@
 // scan was started on this runner, it clones the repository, runs `claude` with the
 // person's own login (their Claude subscription), and sends back what the agent wrote.
 
-use crate::runner;
+use crate::engine::{client, engine_url, Envelope};
+use crate::store::{TokenStore, TOKEN_VARIABLE};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
 use tokio::process::Command;
 use tokio::time::{sleep, timeout};
 
-const POLL_EVERY: Duration = Duration::from_secs(5);
+pub const POLL_EVERY: Duration = Duration::from_secs(5);
 const CLONE_TIMEOUT: Duration = Duration::from_secs(300);
 // A job with one prompt (an older engine) is one run of the agent under this limit.
 const AGENT_TIMEOUT: Duration = Duration::from_secs(40 * 60);
@@ -53,7 +52,7 @@ const ALLOWED_TOOLS: &str = "Bash(cd:*) Bash(pwd:*) Bash(mkdir:*) Bash(ls:*) Bas
 // Their user, local and plugin settings and `~/.claude/skills` are not loaded.
 // This file grants nothing; it only denies: programs that start others or use the network, git
 // commands that reach a remote, web fetches, the places credentials live, and edits to itself.
-const AGENT_DENY_RULES: [&str; 33] = [
+const AGENT_DENY_RULES: [&str; 34] = [
     "Bash(curl:*)",
     "Bash(wget:*)",
     "Bash(nc:*)",
@@ -85,6 +84,7 @@ const AGENT_DENY_RULES: [&str; 33] = [
     "Read(~/.config/**)",
     "Read(~/.claude/**)",
     "Read(//etc/**)",
+    "Read(//proc/**)",
     "Edit(.claude/**)",
     "Write(.claude/**)",
 ];
@@ -119,34 +119,9 @@ git -C repo rev-parse HEAD > repo.sha
 git -C repo rev-parse --abbrev-ref HEAD > repo.branch
 "#;
 
-// What the window shows about the work. Rust keeps it; the page asks for it.
-#[derive(Clone, Serialize)]
-#[serde(tag = "state", rename_all = "lowercase", rename_all_fields = "camelCase")]
-pub enum Activity {
-    Idle,
-    Running { repo: String },
-    Finished { ok: bool, repo: String, message: String },
-}
-
-static ACTIVITY: Mutex<Activity> = Mutex::new(Activity::Idle);
-
-pub fn activity() -> Activity {
-    ACTIVITY.lock().expect("the activity is not poisoned").clone()
-}
-
-fn set_activity(next: Activity) {
-    *ACTIVITY.lock().expect("the activity is not poisoned") = next;
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Envelope<T> {
-    data: T,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Job {
+pub struct Job {
     scan_id: String,
     repo: String,
     #[serde(rename = "ref")]
@@ -173,14 +148,17 @@ struct PhasePrompt {
     prompt: String,
 }
 
-// Where the programs and the audit skill are: plain values, so a test passes a stub `claude`, a stub
-// `node` and a skills folder. `None` is a program this computer does not have; the Scan says so when
-// it first needs it.
-struct Tools {
-    claude: Option<PathBuf>,
-    node: Option<PathBuf>,
+pub struct Tools {
+    pub claude: Option<PathBuf>,
+    pub node: Option<PathBuf>,
     // The folder that holds `security-audit` and `security-audit-lite`.
-    skills: PathBuf,
+    pub skills: PathBuf,
+}
+
+impl Tools {
+    pub fn locate(skills: PathBuf) -> Tools {
+        Tools { claude: find_claude(), node: find_node(), skills }
+    }
 }
 
 #[derive(Serialize)]
@@ -201,25 +179,70 @@ struct Report {
     files: BTreeMap<String, String>,
 }
 
-enum Claimed {
+pub enum Claimed {
     Job(Box<Job>),
     Nothing,
     Offline,
     Removed,
 }
 
-// -----
-// The loop. It runs for as long as the app does and does nothing until the computer is paired.
-// -----
-pub async fn work_loop(app: AppHandle) {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    Claimed { scan_id: String, repo: String },
+    PhaseStarted { phase: String },
+    PhaseEnded { phase: String, cost_usd: Option<f64>, pool_left_usd: f64 },
+    RepairStarted,
+    ResultSent { sent: bool },
+    Ended { ok: bool, repo: String, message: String, kept: Option<PathBuf> },
+}
+
+pub type OnEvent<'a> = &'a (dyn Fn(Event) + Send + Sync);
+
+pub struct Stopper(tokio::sync::watch::Sender<bool>);
+
+#[derive(Clone)]
+pub struct Stop(tokio::sync::watch::Receiver<bool>);
+
+pub const STOPPED: &str = "The Scan ended because the Runner was stopped (Ctrl-C or a stop signal) while it ran. The agent was stopped and its log so far is attached; the work folder on the Runner's computer keeps what the Scan wrote. Start the scan again.";
+
+impl Stopper {
+    pub fn new() -> (Stopper, Stop) {
+        let (sender, receiver) = tokio::sync::watch::channel(false);
+        (Stopper(sender), Stop(receiver))
+    }
+
+    pub fn stop(&self) {
+        self.0.send_replace(true);
+    }
+}
+
+impl Stop {
+    pub fn never() -> Stop {
+        Stopper::new().1
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        *self.0.borrow()
+    }
+
+    pub async fn stopped(&self) {
+        let mut receiver = self.0.clone();
+        if receiver.wait_for(|stopped| *stopped).await.is_err() {
+            std::future::pending::<()>().await;
+        }
+    }
+}
+
+pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, on_event: OnEvent<'_>) {
+    let never = Stop::never();
     loop {
-        if let Some(token) = runner::token() {
+        if let Some(token) = store.token() {
             match claim(&token).await {
                 Claimed::Job(job) => {
-                    handle(&app, &token, *job).await;
+                    run_job(&token, *job, tools, on_event, &never).await;
                     continue;
                 }
-                Claimed::Removed => runner::forget_token(),
+                Claimed::Removed => store.forget(),
                 Claimed::Nothing | Claimed::Offline => {}
             }
         }
@@ -227,9 +250,11 @@ pub async fn work_loop(app: AppHandle) {
     }
 }
 
-async fn claim(token: &str) -> Claimed {
-    let answer = runner::client()
-        .post(format!("{}/runners/claim", runner::engine_url()))
+pub type FindTools<'a> = &'a (dyn Fn() -> Result<Tools, String> + Send + Sync);
+
+pub async fn claim(token: &str) -> Claimed {
+    let answer = client()
+        .post(format!("{}/runners/claim", engine_url()))
         .bearer_auth(token)
         .send()
         .await;
@@ -247,22 +272,24 @@ async fn claim(token: &str) -> Claimed {
     }
 }
 
-async fn handle(app: &AppHandle, token: &str, job: Job) {
+pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEvent<'_>, stop: &Stop) {
     let label = repo_label(&job.repo);
-    set_activity(Activity::Running { repo: label.clone() });
+    on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
 
     let work = std::env::temp_dir().join(format!("eliselab-runner-{}", job.scan_id));
-    let ended = match find_tools(app) {
-        Ok(tools) => execute(&tools, &job, &work).await,
+    let ended = match tools() {
+        Ok(tools) => execute(&tools, &job, &work, on_event, stop).await,
         Err(error) => Err(error),
     };
+    let ended = ended.map_err(|error| blame_the_stop_for_any_failure_after_it(stop, error));
     let report = ended.unwrap_or_else(|error| failed_report(&work, error));
     let ok = report.state == "succeeded";
     let message = report.error.clone().unwrap_or_default();
     let sent = send_report(token, &job.scan_id, &report).await;
-    tidy(&work, &report, sent);
+    on_event(Event::ResultSent { sent });
+    let kept = tidy(&work, &report, sent);
 
-    set_activity(Activity::Finished {
+    on_event(Event::Ended {
         ok: ok && sent,
         repo: label,
         message: match (ok, sent) {
@@ -270,7 +297,16 @@ async fn handle(app: &AppHandle, token: &str, job: Job) {
             (true, true) => "The report was sent to Elise.".to_string(),
             (false, true) => message,
         },
+        kept,
     });
+}
+
+fn blame_the_stop_for_any_failure_after_it(stop: &Stop, error: String) -> String {
+    if stop.is_stopped() {
+        STOPPED.to_string()
+    } else {
+        error
+    }
 }
 
 // What a scan that ended in an error sends: the error, and the agent's log, which carries what the
@@ -287,26 +323,17 @@ fn failed_report(work: &Path, error: String) -> Report {
 
 // A finished scan cleans up after itself. A failed one keeps its folder, so the agent's own log and
 // the files of the Phases that finished can be read.
-fn tidy(work: &Path, report: &Report, sent: bool) {
+fn tidy(work: &Path, report: &Report, sent: bool) -> Option<PathBuf> {
     if report.state == "succeeded" && sent {
         let _ = fs::remove_dir_all(work);
     }
-}
-
-// Where `claude`, `node` and the bundled skills are on this computer.
-fn find_tools(app: &AppHandle) -> Result<Tools, String> {
-    let skills = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?
-        .join("skills");
-    Ok(Tools { claude: find_claude(), node: find_node(), skills })
+    work.is_dir().then(|| work.to_path_buf())
 }
 
 async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
     for attempt in 1..=REPORT_TRIES {
-        let answer = runner::client()
-            .post(format!("{}/runners/jobs/{}/result", runner::engine_url(), scan_id))
+        let answer = client()
+            .post(format!("{}/runners/jobs/{}/result", engine_url(), scan_id))
             .bearer_auth(token)
             .json(report)
             .send()
@@ -328,7 +355,7 @@ async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
 // One scan from clone to report. Every Err is a sentence that goes to the dashboard as the
 // scan's error, so it says what to do.
 // -----
-async fn execute(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String> {
+async fn execute(tools: &Tools, job: &Job, work: &Path, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
     if !safe_repo_url(&job.repo) {
         return Err("This runner only clones public https://github.com/owner/name repositories.".into());
     }
@@ -347,8 +374,8 @@ async fn execute(tools: &Tools, job: &Job, work: &Path) -> Result<Report, String
         fs::write(work.join("prior-findings.json"), &job.priors_json).map_err(|e| format!("Could not save the earlier findings: {e}"))?;
     }
 
-    clone_repo(work, &job.repo, &git_ref).await?;
-    audit(tools, job, work, MINUTE).await
+    clone_repo(work, &job.repo, &git_ref, stop).await?;
+    audit(tools, job, work, MINUTE, on_event, stop).await
 }
 
 fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
@@ -363,16 +390,16 @@ fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
 // Everything after the clone: the agent's settings and skill, the run or the four Phases, the
 // validators and the files to send. The work folder holds `repo`, `out` and what the clone left.
 // -----
-async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
+async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
     strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
     install_skill(tools, skill_dir_of(job)?, work)?;
     write_agent_settings(work)?;
 
     if job.skill == "full" && !job.phase_prompts.is_empty() {
-        return run_phases(tools, job, work, minute).await;
+        return run_phases(tools, job, work, minute, on_event, stop).await;
     }
 
-    let end = run_agent(tools, work, job, &job.prompt, budget_for(job), None, AGENT_TIMEOUT).await?.end?;
+    let end = run_agent(tools, work, job, &job.prompt, budget_for(job), None, AGENT_TIMEOUT, stop).await?.end?;
     // -----
     // A scan whose budget ran out ends as a Partial Scan when the audit had already written its
     // report, with the files it left (the engine reads the report's `PARTIAL:` line). `claude` stops
@@ -387,7 +414,7 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Resul
         Err(error) => return Err(error),
     };
     if job.skill == "full" {
-        validate_full(tools, work).await.map_err(CheckFailure::message).map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
+        validate_full(tools, work, stop).await.map_err(CheckFailure::message).map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
     }
     Ok(report)
 }
@@ -402,13 +429,13 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Resul
 // agent gets one repair run (`repair`); a failure of the environment ends the Scan without one.
 // The files of the Phases that ended stay in the work folder when a later one fails.
 // -----
-async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> Result<Report, String> {
+async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
     let names: Vec<&str> = job.phase_prompts.iter().map(|p| p.phase.as_str()).collect();
     if names != PHASES.map(|(phase, _)| phase) {
         return Err(format!("The job's Phases ({}) are not the four this runner runs: recon, hunt, check and report. Update the Elise Runner app.", names.join(", ")));
     }
     let mut spent = Spent::default();
-    let ran = run_each_phase(tools, job, work, &mut spent, minute).await;
+    let ran = run_each_phase(tools, job, work, &mut spent, minute, on_event, stop).await;
     // The engine reads the last JSON object of the log as the Scan's usage: the sum, a failed Scan's too.
     if let Some(sum) = spent.sum_line() {
         append_to_log(work, &format!("{sum}\n"));
@@ -417,19 +444,20 @@ async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration) -> 
     collect(work).map_err(|error| format!("The report phase ended. {error}"))
 }
 
-async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration) -> Result<(), String> {
+async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<(), String> {
     let cap = budget_for(job);
     for (prompt, (phase, minutes)) in job.phase_prompts.iter().zip(PHASES) {
         let left = money(cap - spent.cost);
         if left <= 0.0 {
             return Err(phase_cap_message(phase, cap));
         }
-        let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32)).await?;
-        settle(run, spent, phase, cap)?;
+        on_event(Event::PhaseStarted { phase: phase.to_string() });
+        let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32), stop).await?;
+        settle_told(run, spent, phase, cap, on_event)?;
         if phase == VALIDATED_AFTER {
-            match validate_full(tools, work).await {
+            match validate_full(tools, work, stop).await {
                 Ok(()) => {}
-                Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, &error).await?,
+                Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, &error, on_event, stop).await?,
                 Err(CheckFailure::Environment(error)) => return Err(error),
             }
         }
@@ -458,6 +486,13 @@ fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(),
     Ok(())
 }
 
+fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event: OnEvent<'_>) -> Result<(), String> {
+    let cost_usd = run.result.as_ref().and_then(cost_of);
+    let settled = settle(run, spent, phase, cap);
+    on_event(Event::PhaseEnded { phase: phase.to_string(), cost_usd, pool_left_usd: money(cap - spent.cost) });
+    settled
+}
+
 // -----
 // The validators failed on what the check Phase left. The agent gets one more run, short, on a prompt
 // this app builds from the validator's own words: fix what is named, in the files named, and stop.
@@ -466,16 +501,18 @@ fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(),
 // the cap error. Any other way this goes wrong, the run failing or the validators failing again,
 // ends the Scan as a failed validation did before: with the check Phase's error. One repair at most.
 // -----
-async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, error: &str) -> Result<(), String> {
+#[allow(clippy::too_many_arguments)]
+async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, error: &str, on_event: OnEvent<'_>, stop: &Stop) -> Result<(), String> {
     let cap = budget_for(job);
     let left = money(cap - spent.cost);
     if left <= 0.0 {
         return Err(phase_cap_message(REPAIR, cap));
     }
     let failed = format!("The {VALIDATED_AFTER} phase left files that did not pass the check. {error}");
-    let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32)).await.map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
-    settle(run, spent, REPAIR, cap).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
-    validate_full(tools, work).await.map_err(|again| format!("The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}", again.message()))
+    on_event(Event::RepairStarted);
+    let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32), stop).await.map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
+    settle_told(run, spent, REPAIR, cap, on_event).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
+    validate_full(tools, work, stop).await.map_err(|again| format!("The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}", again.message()))
 }
 
 // The repair run's whole prompt: no skill, no earlier files to read, only what the validator said.
@@ -485,7 +522,7 @@ fn repair_prompt(error: &str) -> String {
 }
 
 // The words for a run in an error: a Phase, or the repair run.
-fn run_label(phase: &str) -> String {
+pub fn run_label(phase: &str) -> String {
     if phase == REPAIR {
         "the repair run".to_string()
     } else {
@@ -595,7 +632,7 @@ fn strip_untrusted(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-async fn clone_repo(work: &Path, repo: &str, git_ref: &str) -> Result<(), String> {
+async fn clone_repo(work: &Path, repo: &str, git_ref: &str, stop: &Stop) -> Result<(), String> {
     let mut command = Command::new("sh");
     command
         .arg("-c")
@@ -607,8 +644,11 @@ async fn clone_repo(work: &Path, repo: &str, git_ref: &str) -> Result<(), String
         .env("GIT_ALLOW_PROTOCOL", "https")
         .env("GIT_TERMINAL_PROMPT", "0")
         .kill_on_drop(true);
-    let output = timeout(CLONE_TIMEOUT, command.output())
-        .await
+    let output = tokio::select! {
+        output = timeout(CLONE_TIMEOUT, command.output()) => output,
+        _ = stop.stopped() => return Err(STOPPED.to_string()),
+    };
+    let output = output
         .map_err(|_| "Cloning took longer than 5 minutes.".to_string())?
         .map_err(|e| format!("Could not run git: {e}. Is Git installed on this computer?"))?;
     if output.status.success() {
@@ -734,7 +774,7 @@ fn find_node() -> Option<PathBuf> {
 // The scripts run from the app's own bundle, not from ~/.claude/skills: the agent has run
 // by now and could have changed a copy there.
 // -----
-async fn validate_full(tools: &Tools, work: &Path) -> Result<(), CheckFailure> {
+async fn validate_full(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), CheckFailure> {
     use CheckFailure::{Content, Environment};
     let node = tools.node.as_ref().ok_or_else(|| Environment("Node.js is not installed on this computer, or this app cannot find it. A full audit is checked with Node.js: install it from https://nodejs.org, then start the scan again.".to_string()))?;
     let skill = tools.skills.join("security-audit");
@@ -755,7 +795,11 @@ async fn validate_full(tools: &Tools, work: &Path) -> Result<(), CheckFailure> {
             .env("PATH", "/usr/bin:/bin")
             .stdin(Stdio::null())
             .kill_on_drop(true);
-        let output = match timeout(VALIDATE_TIMEOUT, command.output()).await {
+        let ran = tokio::select! {
+            ran = timeout(VALIDATE_TIMEOUT, command.output()) => ran,
+            _ = stop.stopped() => return Err(Environment(STOPPED.to_string())),
+        };
+        let output = match ran {
             Ok(result) => result.map_err(|e| Environment(format!("Could not run the check on {file}: {e}")))?,
             Err(_) => return Err(Environment(format!("The check on {file} did not finish in a minute, so this runner stopped it."))),
         };
@@ -796,7 +840,11 @@ struct AgentRun {
 // adds its output to `agent.log`, the whole Scan's log, which the engine reads the cost from; a
 // single run writes `agent.log` itself. `Err` here is a run that did not start; one that outran its
 // limit or failed is `Ok` with its `end` an `Err` and whatever result it left, so its spend counts.
-async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_usd: f64, phase: Option<&str>, limit: Duration) -> Result<AgentRun, String> {
+#[allow(clippy::too_many_arguments)]
+async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_usd: f64, phase: Option<&str>, limit: Duration, stop: &Stop) -> Result<AgentRun, String> {
+    if stop.is_stopped() {
+        return Err(STOPPED.to_string());
+    }
     let named = |what: &str| match phase {
         Some(phase) => format!("{} {what}", capitalized(&run_label(phase))),
         None => format!("The audit {what}"),
@@ -819,23 +867,27 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
         // The person's own login does the work. A key in the environment would be used instead.
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("ANTHROPIC_AUTH_TOKEN")
+        .env_remove(TOKEN_VARIABLE)
         .stdin(Stdio::null())
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(err))
         .kill_on_drop(true);
     let mut child = command.spawn().map_err(|e| format!("Could not start Claude Code: {e}"))?;
 
-    let status = match timeout(limit, child.wait()).await {
+    let waited = tokio::select! {
+        waited = timeout(limit, child.wait()) => waited.map_err(|_| named(&format!("ran longer than {} minutes, so this runner stopped it.", limit.as_secs() / 60))),
+        _ = stop.stopped() => Err(STOPPED.to_string()),
+    };
+    let status = match waited {
         Ok(status) => status.map_err(|e| format!("Claude Code stopped unexpectedly: {e}"))?,
-        Err(_) => {
+        Err(why) => {
             let _ = child.kill().await;
             // What the killed run left in its log still says what it spent.
             let stdout = fs::read_to_string(work.join(&log_name)).unwrap_or_default();
             if phase.is_some() {
                 append_to_log(work, &stdout);
             }
-            let end = Err(named(&format!("ran longer than {} minutes, so this runner stopped it.", limit.as_secs() / 60)));
-            return Ok(AgentRun { end, result: last_result(&stdout), stdout });
+            return Ok(AgentRun { end: Err(why), result: last_result(&stdout), stdout });
         }
     };
     let stdout = fs::read_to_string(work.join(&log_name)).unwrap_or_default();
@@ -1292,7 +1344,13 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     // The same, with a minute of a Phase's slot as short as a test needs.
     #[cfg(unix)]
     fn scan_in(stage: &Stage, job: &Job, minute: Duration) -> Report {
-        match tauri::async_runtime::block_on(audit(&stage.tools, job, &stage.work, minute)) {
+        scan_told(stage, job, minute, &|_| {})
+    }
+
+    #[cfg(unix)]
+    fn scan_told(stage: &Stage, job: &Job, minute: Duration, on_event: OnEvent<'_>) -> Report {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        match runtime.block_on(audit(&stage.tools, job, &stage.work, minute, on_event, &Stop::never())) {
             Ok(report) => report,
             Err(error) => failed_report(&stage.work, error),
         }
@@ -1538,6 +1596,36 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert_eq!(sum["duration_ms"], 5000);
         assert_eq!(sum["usage"]["input_tokens"], 50);
         assert_eq!(sum["usage"]["cache_creation_input_tokens"], 200);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_scan_tells_each_phase_and_the_repair_with_its_cost_and_the_pool_left() {
+        let stage = stage("events");
+        fs::write(stage.work.join("repair.txt"), "cost=1").unwrap();
+        let job = phased_job(["phase=recon cost=1.5", "phase=hunt cost=4", "phase=check invalid=1 cost=2.5", "phase=report cost=1"]);
+        let told = std::sync::Mutex::new(Vec::new());
+
+        scan_told(&stage, &job, MINUTE, &|event| told.lock().unwrap().push(event));
+
+        let started = |phase: &str| Event::PhaseStarted { phase: phase.into() };
+        let ended = |phase: &str, cost: f64, left: f64| Event::PhaseEnded { phase: phase.into(), cost_usd: Some(cost), pool_left_usd: left };
+        assert_eq!(
+            told.into_inner().unwrap(),
+            [
+                started("recon"),
+                ended("recon", 1.5, 10.5),
+                started("hunt"),
+                ended("hunt", 4.0, 6.5),
+                started("check"),
+                ended("check", 2.5, 4.0),
+                Event::RepairStarted,
+                ended("repair", 1.0, 3.0),
+                started("report"),
+                ended("report", 1.0, 2.0),
+            ]
+        );
         let _ = fs::remove_dir_all(&stage.root);
     }
 

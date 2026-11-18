@@ -1,0 +1,16 @@
+[package]
+name = "elise-runner-core"
+version = "0.1.0"
+description = "What every Elise Runner does apart from drawing a window: pairing, the token store, the claim loop and the Scan"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+tokio = { version = "1.54.1", features = ["process", "time", "sync", "macros"] }
+
+[dev-dependencies]
+# The Scan tests run on a plain runtime of their own.
+tokio = { version = "1.54.1", features = ["process", "time", "sync", "macros", "rt"] }

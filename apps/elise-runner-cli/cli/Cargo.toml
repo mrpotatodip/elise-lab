@@ -1,0 +1,17 @@
+[package]
+name = "elise-runner-cli"
+version = "0.1.0"
+description = "The headless Elise Runner: pairs and runs Scans from a terminal"
+edition = "2021"
+
+[[bin]]
+name = "elise-runner"
+path = "src/main.rs"
+
+[dependencies]
+elise-runner-core = { path = "../core" }
+dirs = "7"
+tokio = { version = "1.54.1", features = ["rt", "time", "signal", "macros"] }
+
+[dev-dependencies]
+serde_json = "1"
