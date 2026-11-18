@@ -3,6 +3,7 @@ import { ChevronRight, ExternalLink, FolderGit2, GitBranch } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import { useHydrated } from "#/lib/use-hydrated";
 import { useNow } from "#/lib/use-now";
+import { SCAN_PROFILE_OPTIONS } from "../constants";
 import type { ScanStatus } from "../schemas";
 import { scanDuration } from "../utils";
 import { ScanStatusBadge } from "./scan-status-badge";
@@ -76,8 +77,8 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
 
 // -----
 // What the run was, in one line, so the page opens as calm as the branch
-// page: the status, when it started, how long it took, and the commit it read.
-// Kind of review, model and effort are in Run details, lower down.
+// page: the status, when it started, how long it took, the coverage it asked
+// for, and the commit it read. Model and effort are in Run details, lower down.
 // -----
 function RunningFor({ since }: { since: string }) {
   const hydrated = useHydrated();
@@ -89,6 +90,7 @@ function RunningFor({ since }: { since: string }) {
 function ScanStatusLine({ scan }: { scan: ScanStatus }) {
   const duration = scanDuration(scan.usage?.durationMs);
   const commit = scan.commitSha?.slice(0, 7);
+  const coverage = scan.skill === "full" ? SCAN_PROFILE_OPTIONS.find((option) => option.value === scan.profile)?.label : undefined;
 
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-relaxed text-muted-foreground">
@@ -106,13 +108,26 @@ function ScanStatusLine({ scan }: { scan: ScanStatus }) {
           </>
         )}
       </span>
+      {coverage && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>Coverage {coverage}</span>
+        </>
+      )}
       <span aria-hidden="true">·</span>
       {commit ? (
-        <a href={`${githubUrl(scan.repo)}/commit/${scan.commitSha}`} target="_blank" rel="noreferrer" className="inline-flex min-h-6 items-center gap-1 font-mono text-[13px] underline-offset-4 hover:underline">
-          Read commit {commit}
-          <ExternalLink aria-hidden="true" className="size-3" />
-          <span className="sr-only">, opens the commit on GitHub</span>
-        </a>
+        <span>
+          Commit{" "}
+          <a
+            href={`${githubUrl(scan.repo)}/commit/${scan.commitSha}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-sm font-mono text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {commit}
+            <span className="sr-only"> (opens on GitHub)</span>
+          </a>
+        </span>
       ) : (
         <span>{scan.ref ? `Scanning ${scan.ref}` : "Scanning the default branch"}</span>
       )}

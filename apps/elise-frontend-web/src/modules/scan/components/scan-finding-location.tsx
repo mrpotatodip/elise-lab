@@ -1,4 +1,4 @@
-type FindingLocationProps = {
+type ScanFindingLocationProps = {
   file: string | null;
   line: number | null;
 };
@@ -8,7 +8,7 @@ type FindingLocationProps = {
 // from the start so its last folders stay visible. The full path is the
 // tooltip, so a deep path never stretches the row.
 // -----
-export function FindingLocation({ file, line }: FindingLocationProps) {
+export function ScanFindingLocation({ file, line }: ScanFindingLocationProps) {
   if (!file) return <span className="text-muted-foreground">-</span>;
   const slash = file.lastIndexOf("/");
   const name = file.slice(slash + 1);

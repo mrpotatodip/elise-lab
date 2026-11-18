@@ -15,6 +15,7 @@ const RouteNamesSchema = z.object({
   repoId: z.string().optional(),
   branchId: z.string().optional(),
   commit: z.string().optional(),
+  startedAt: z.string().optional(),
   branches: z.array(SidebarBranchSchema).optional(),
 });
 

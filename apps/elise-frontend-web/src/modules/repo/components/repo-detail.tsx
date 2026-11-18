@@ -18,8 +18,8 @@ import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
 import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
-import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup, findingStatusKey } from "#/modules/finding";
-import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
+import { FindingDecisionNote, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup, findingStatusKey } from "#/modules/finding";
+import { ScanFindingLocation, ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCell, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
 import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
@@ -34,7 +34,7 @@ const unratedOf = (summary: { total: number; severity: Record<string, number> })
 const FILTER_VALUES = ["action", "decided", "scan", "all"] as const satisfies readonly FindingFilter[];
 
 const FILTER_COPY = {
-  action: { label: "Needs action", note: "Problems found on this branch that nobody has resolved yet." },
+  action: { label: "Needs action", note: "Unresolved problems on this branch." },
   decided: { label: "Decided by a person", note: "Marked fixed, dismissed or accepted by someone on your team." },
   scan: { label: "Fixed by a scan", note: "An earlier scan checked the code and the problem was gone." },
   all: { label: "Every finding", note: "Every problem any scan of this branch found." },
@@ -163,7 +163,7 @@ const whereColumn = findingColumn.display({
   id: "where",
   header: "Where",
   meta: { head: "whitespace-nowrap" },
-  cell: ({ row }) => <FindingLocation file={row.original.finding.file} line={row.original.finding.line} />,
+  cell: ({ row }) => <ScanFindingLocation file={row.original.finding.file} line={row.original.finding.line} />,
 });
 
 const decisionColumn = findingColumn.display({
@@ -294,7 +294,12 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
           <CardTitle id="branch-findings-title">Findings on this branch</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {FILTER_COPY[filter].note}
-            {findings.length > 0 ? " Select a row for the impact, evidence and fix." : ""}
+            {findings.length > 0 && (
+              <>
+                <br />
+                Open a row for details.
+              </>
+            )}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
@@ -523,7 +528,12 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
       </ShellPageHeader>
 
-      {current && <RepoSummaryStrip branch={open} />}
+      {current && (
+        <RepoSummaryStrip
+          branch={open}
+          verdict={current.latestCommit && <ScanVerdictCell repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} branchOpen={open.total} findingsHref="#branch-findings" />}
+        />
+      )}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">
@@ -533,8 +543,6 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
           </AlertDescription>
         </Alert>
       )}
-
-      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} findingsHref="#branch-findings" />}
 
       {current ? (
         <Suspense key={current.name} fallback={<RepoFindingsSkeleton />}>
