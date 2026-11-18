@@ -13,7 +13,7 @@ import { removeRunner } from "../api";
 import { RUNNER_STATE_COPY } from "../constants";
 import { runnerKeys, runnersQuery } from "../hooks";
 import type { Runner } from "../schemas";
-import { runnerDetail } from "../utils";
+import { runnerAddedBy, runnerDetail } from "../utils";
 import { RunnerAddDialog } from "./runner-add-dialog";
 import { RunnerRemoveDialog } from "./runner-remove-dialog";
 
@@ -28,7 +28,7 @@ const columns = column.columns([
     cell: ({ row }) => (
       <>
         <span className="block font-medium">{row.original.runner.name}</span>
-        <span className="block text-xs text-muted-foreground">{runnerDetail(row.original.runner)}</span>
+        <span className="block text-xs text-muted-foreground">{[runnerDetail(row.original.runner), runnerAddedBy(row.original.runner)].filter(Boolean).join(" ")}</span>
       </>
     ),
   }),

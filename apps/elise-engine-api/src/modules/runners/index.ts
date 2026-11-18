@@ -1,12 +1,17 @@
 import { Hono } from "hono";
 import type { AppEnv } from "#/types/variables";
-import { claimJobAPI, createRunnerAPI, disconnectRunnerAPI, enrollRunnerAPI, listRunnersAPI, removeRunnerAPI, reportJobAPI, runnerMeAPI } from "./api";
+import { approveRunnerLoginAPI, checkRunnerLoginAPI, claimJobAPI, createRunnerAPI, denyRunnerLoginAPI, disconnectRunnerAPI, enrollRunnerAPI, listRunnersAPI, lookupRunnerLoginAPI, removeRunnerAPI, reportJobAPI, runnerMeAPI, startRunnerLoginAPI } from "./api";
 
 const app = new Hono<AppEnv>();
 
 app.route("/", createRunnerAPI);
 app.route("/", listRunnersAPI);
 app.route("/", enrollRunnerAPI);
+app.route("/", startRunnerLoginAPI);
+app.route("/", lookupRunnerLoginAPI);
+app.route("/", approveRunnerLoginAPI);
+app.route("/", denyRunnerLoginAPI);
+app.route("/", checkRunnerLoginAPI);
 app.route("/", claimJobAPI);
 app.route("/", reportJobAPI);
 app.route("/", runnerMeAPI);
