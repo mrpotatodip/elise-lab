@@ -16,7 +16,10 @@ const inList = (values: readonly string[]) => sql.raw(values.map((value) => `'${
 // Account's own Anthropic key, no credit). monthly_scan_allowance is
 // the most scans a UTC month allows, null for no limit. max_members
 // is how many people the Account may hold. Change a price, a credit
-// or a cap by updating the row, with no deploy.
+// or a cap by updating the row, with no deploy. enabled false means
+// not offered: the plans list skips the row, and the Accounts that
+// hold it keep it. Rows are referenced by subscriptions, so none is
+// deleted.
 // -----
 export const platformMasterPlans = pgTable(
   "platform_master_plans",

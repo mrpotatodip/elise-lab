@@ -71,6 +71,23 @@ export const PlanDetailsSchema = z.object({
 export type PlanDetails = z.infer<typeof PlanDetailsSchema>;
 
 // -----
+// GET /usage/plan/offers: the plans an Account may pick, cheapest
+// first. A plan the operator has marked not offered is not in it.
+// Today that is the Runner plan alone.
+// -----
+export const PlanOfferSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  monthlyPriceUsd: z.number().min(0),
+  includedCreditUsd: z.number().min(0),
+  maxMembers: z.number().int().min(1),
+});
+
+export const PlanOffersSchema = z.array(PlanOfferSchema);
+
+export type PlanOffer = z.infer<typeof PlanOfferSchema>;
+
+// -----
 // GET /usage/credit/entries: the account's credit history, newest
 // first. amountUsd is signed: credit added is positive, credit a scan
 // took is negative. A scan shows as one entry, its real charge; a

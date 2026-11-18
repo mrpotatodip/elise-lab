@@ -41,9 +41,12 @@ export const OTHER_RUNNER_NAME = "runner-of-the-other";
 // -----
 // Routes that name no Account of their own: sign-in, the
 // invite link (its token is the credential), the Runner's
-// own token routes, and the developer docs.
+// own token routes, the developer docs, and the plans list (the
+// platform's catalogue: the same rows for every Account, none of
+// them an Account's own).
 // -----
 export const NOT_TENANT_ROUTES: readonly string[] = [
+  "GET /usage/plan/offers",
   "GET /auth/*",
   "POST /auth/*",
   "POST /sign-up",

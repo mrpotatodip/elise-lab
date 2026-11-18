@@ -1,10 +1,34 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import type { PlanDetails } from "@repo/contracts/elise";
+import type { PlanDetails, PlanOffer } from "@repo/contracts/elise";
 import { partyRoles, platformMasterPlans, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
+
+// -----
+// The plans an Account may pick: the rows of the catalogue not
+// marked not offered (enabled false), cheapest first. Rows stay
+// when they stop being offered, because subscriptions point at them.
+// -----
+export const offeredPlansEffect = (db: AppDbType): Effect.Effect<PlanOffer[], DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const rows = await db
+        .select({
+          key: platformMasterPlans.key,
+          label: platformMasterPlans.label,
+          price: platformMasterPlans.monthlyPriceUsd,
+          credit: platformMasterPlans.includedCreditUsd,
+          maxMembers: platformMasterPlans.maxMembers,
+        })
+        .from(platformMasterPlans)
+        .where(eq(platformMasterPlans.enabled, true))
+        .orderBy(asc(platformMasterPlans.monthlyPriceUsd));
+      return rows.map((row) => ({ key: row.key, label: row.label, monthlyPriceUsd: Number(row.price), includedCreditUsd: Number(row.credit), maxMembers: row.maxMembers }));
+    },
+    catch: toDbError,
+  });
 
 // -----
 // What the Plan page shows: the plan, how the subscription stands,
