@@ -19,7 +19,7 @@ import { ScanSeverityBadge } from "./scan-severity-badge";
 
 export const VERDICT_COPY = {
   pass: { title: "Passed the scan policy", note: "Scanned enough times and nothing open is over the limits. An AI audit can miss problems, so this is advice and not proof that the commit is safe.", variant: "success", Icon: CircleCheck },
-  fail: { title: "Do not ship yet", note: "Some open problems block this commit. Decide on each one, or an account admin can accept the risk with a note.", variant: "destructive", Icon: OctagonX },
+  fail: { title: "Do not ship yet", note: "This commit does not meet the scan policy.", variant: "destructive", Icon: OctagonX },
   cannot_tell: { title: "Cannot tell yet", note: "This is not a failure. This commit needs more scans before the answer can be yes or no.", variant: "warning", Icon: CircleHelp },
 } as const;
 
@@ -170,7 +170,7 @@ function FindingRows({ title, hint, findings, decide, collapsed = false }: Findi
   );
 }
 
-type Check = { label: string; detail: string; state: "ok" | "fail" | "wait" };
+type Check = { label: string; detail: string; state: "ok" | "fail" | "wait"; problem: string };
 
 const HISTORY_CODES = new Set(["unchecked_priors", "too_many_priors"]);
 
@@ -194,16 +194,19 @@ function verdictChecks(verdict: Verdict): Check[] {
       label: `Scans of this commit that add up to ${scans.required}`,
       detail: missing === 0 ? `The scans of this commit add up to ${scans.counted}.` : `${scans.counted} of ${scans.required} so far. Run ${scanPlural(verdictScansToRun(missing), "more scan", "more scans")} of this exact commit. Each finished scan counts 1, but a scan that ran out of money or did none of the work it asked for counts 0.`,
       state: missing === 0 ? "ok" : "wait",
+      problem: `${scans.counted} of ${scans.required} scans so far`,
     },
     {
       label: "Earlier problems re-checked",
       detail: historyReason ? historyReason.message : "The scans checked every problem that was already open.",
       state: historyReason ? "fail" : scans.counted === 0 ? "wait" : "ok",
+      problem: "earlier problems not re-checked yet",
     },
     {
       label: "Nothing open blocks this commit",
       detail: `${over.length > 0 ? `${over.join(", ")}.` : openTotal === 0 ? "Nothing is open." : `${openTotal} open, all within the limits.`} Allowed: ${limits.critical} critical, ${limits.high} high, up to ${limits.medium} medium.`,
       state: over.length > 0 ? "fail" : "ok",
+      problem: over.join(", "),
     },
   ];
 }
@@ -241,7 +244,7 @@ function VerdictChecklist({ verdict }: { verdict: Verdict }) {
         <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         <span className="text-[15px] font-semibold">Why this answer?</span>
         <span className="max-w-copy text-sm leading-relaxed text-foreground">
-          {checks.length - unmet.length} of {checks.length} checks met{unmet.length > 0 ? `. Not met: ${unmet.map((check) => check.label.toLowerCase()).join(", ")}.` : "."}
+          {checks.length - unmet.length} of {checks.length} checks met{unmet.length > 0 ? `. Blocking: ${unmet.map((check) => check.problem).join("; ")}.` : "."}
         </span>
       </summary>
       <div className="grid gap-3 border-t px-4 py-3">

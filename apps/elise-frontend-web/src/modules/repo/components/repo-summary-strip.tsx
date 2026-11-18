@@ -1,21 +1,25 @@
 import { Card } from "#/components/ui/card";
 import { ShellStatCell as Cell } from "#/modules/shell";
 import { ScanSeverityDots, scanPlural } from "#/modules/scan";
-import type { Repo } from "../schemas";
+import type { Repo, RepoBranch } from "../schemas";
 import { repoTotals } from "../utils";
+
+type RepoSummaryStripProps = { repos: readonly Repo[] } | { branch: RepoBranch["open"] };
 
 // -----
 // The same four answers as the repository summary, as one card with one lead
 // number instead of four equal tiles: most of the time three of them are 0, and
 // four boxes of equal weight hide the one that is not. No icon chips and no
 // tints: colour belongs to the findings themselves (the severity dots).
+// Given one branch's counts, it says the same four things about that branch.
 // -----
-export function RepoSummaryStrip({ repos }: { repos: readonly Repo[] }) {
-  const totals = repoTotals(repos);
+export function RepoSummaryStrip(props: RepoSummaryStripProps) {
+  const totals = "repos" in props ? repoTotals(props.repos) : props.branch;
   const notRated = totals.total - Object.values(totals.severity).reduce((sum, count) => sum + count, 0);
+  const where = "repos" in props ? `Across ${scanPlural(props.repos.length, "repository", "repositories")}.` : "On this branch.";
 
   return (
-    <section aria-label="Summary across repositories" className="grid gap-6">
+    <section aria-label={"repos" in props ? "Summary across repositories" : "Summary of this branch"} className="grid gap-6">
       <Card className="grid divide-y lg:grid-cols-4 lg:divide-x lg:divide-y-0">
         <Cell
           lead
@@ -23,7 +27,7 @@ export function RepoSummaryStrip({ repos }: { repos: readonly Repo[] }) {
           value={totals.total}
           note={
             totals.total === 0 ? (
-              `Across ${scanPlural(repos.length, "repository", "repositories")}. Nothing is open.`
+              `${where} Nothing is open.`
             ) : (
               <>
                 <ScanSeverityDots counts={totals.severity} />
@@ -39,7 +43,7 @@ export function RepoSummaryStrip({ repos }: { repos: readonly Repo[] }) {
         />
         <Cell label="Came back" value={totals.regressed} note={totals.regressed > 0 ? "Fixed before, reported again. Look at these first." : "Nothing that was fixed has returned."} />
         <Cell label="Needs a person" value={totals.needsValidation} note={totals.needsValidation > 0 ? "Likely but unverified. Check by hand before acting." : "Every open finding was verified."} />
-        <Cell label="Not in the latest full scan" value={totals.unchecked} note={totals.unchecked > 0 ? "Open findings the latest full scan of their branch did not see. They stay open until a person decides them." : "Every open finding is in the latest full scan of its branch."} />
+        <Cell label="Not in the latest full scan" value={totals.unchecked} note={totals.unchecked > 0 ? "The latest full scan did not see them. They stay open until a person decides them." : "Every open finding is in the latest full scan of its branch."} />
       </Card>
     </section>
   );

@@ -2,7 +2,7 @@ import { Suspense, useState, type ComponentProps } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
-import { ChevronRight, CircleAlert, ExternalLink, GitBranch, Search, ShieldCheck, Undo2 } from "lucide-react";
+import { ChevronRight, ExternalLink, GitBranch, Search, ShieldCheck, Undo2 } from "lucide-react";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -18,13 +18,14 @@ import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
 import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
-import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup } from "#/modules/finding";
+import { FindingDecisionNote, FindingLocation, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup, findingStatusKey } from "#/modules/finding";
 import { ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCard, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
 import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
+import { RepoSummaryStrip } from "./repo-summary-strip";
 
 const RECENT_SCAN_COUNT = 3;
 
@@ -33,7 +34,7 @@ const unratedOf = (summary: { total: number; severity: Record<string, number> })
 const FILTER_VALUES = ["action", "decided", "scan", "all"] as const satisfies readonly FindingFilter[];
 
 const FILTER_COPY = {
-  action: { label: "Needs action", note: "Problems any scan of this branch found that nobody has resolved. A scan never closes a problem, so one fixed in the code stays here until a person marks it." },
+  action: { label: "Needs action", note: "Problems found on this branch that nobody has resolved yet." },
   decided: { label: "Decided by a person", note: "Marked fixed, dismissed or accepted by someone on your team." },
   scan: { label: "Fixed by a scan", note: "An earlier scan checked the code and the problem was gone." },
   all: { label: "Every finding", note: "Every problem any scan of this branch found." },
@@ -110,7 +111,17 @@ const severityColumn = findingColumn.display({
   id: "severity",
   header: "Severity",
   meta: { head: "whitespace-nowrap" },
-  cell: ({ row }) => <ScanSeverityBadge severity={row.original.finding.severity} />,
+  cell: ({ row }) => {
+    const { finding, blocks } = row.original;
+    const plainOpen = findingStatusKey(finding.state, finding.triage) === "open";
+    return (
+      <span className="grid justify-items-start gap-1.5">
+        <ScanSeverityBadge severity={finding.severity} />
+        {plainOpen ? <span className="sr-only">Open</span> : <FindingStatusBadge state={finding.state} triage={finding.triage} />}
+        {blocks && <Badge variant="destructive">Blocks shipping</Badge>}
+      </span>
+    );
+  },
 });
 
 const titleColumn = findingColumn.display({
@@ -148,21 +159,10 @@ const titleColumn = findingColumn.display({
   ),
 });
 
-const statusColumn = findingColumn.display({
-  id: "status",
-  header: "Status",
-  cell: ({ row }) => (
-    <span className="flex flex-wrap items-center gap-1.5">
-      <FindingStatusBadge state={row.original.finding.state} triage={row.original.finding.triage} />
-      {row.original.blocks && <Badge variant="destructive">Blocks shipping</Badge>}
-    </span>
-  ),
-});
-
 const whereColumn = findingColumn.display({
   id: "where",
   header: "Where",
-  meta: { cell: "max-w-[18rem]" },
+  meta: { head: "whitespace-nowrap" },
   cell: ({ row }) => <FindingLocation file={row.original.finding.file} line={row.original.finding.line} />,
 });
 
@@ -194,8 +194,7 @@ const openColumn = findingColumn.display({
   cell: () => <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />,
 });
 
-const findingColumnsWithStatus = findingColumn.columns([severityColumn, titleColumn, statusColumn, whereColumn, decisionColumn, openColumn]);
-const findingColumnsWithoutStatus = findingColumn.columns([severityColumn, titleColumn, whereColumn, decisionColumn, openColumn]);
+const findingColumns = findingColumn.columns([severityColumn, titleColumn, whereColumn, decisionColumn, openColumn]);
 
 type RecentScanRow = ScanStatus & { oneOff: boolean; notFull: boolean };
 
@@ -235,7 +234,7 @@ const recentScanColumns = scanColumn.columns([
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-medium tabular-nums">{scanPlural(scan.summary.total, "finding", "findings")}</span>
             <ScanSeverityDots counts={scan.summary.severity} />
-            {unratedOf(scan.summary) > 0 && <span className="text-xs text-muted-foreground">{unratedOf(scan.summary)} unrated</span>}
+            {unratedOf(scan.summary) > 0 && <span className="text-xs text-muted-foreground">{unratedOf(scan.summary)} not rated</span>}
             {scan.summary.new > 0 && <span className="text-xs text-muted-foreground">{scan.summary.new} new</span>}
             {scan.notFull && (
               <Badge variant="outline" title={NOT_FULL_COPY}>
@@ -284,11 +283,10 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
   const matching = query === "" ? inGroup : inGroup.filter((f) => [f.title, f.file ?? "", f.class].some((text) => text.toLowerCase().includes(query)));
   const findings = blockers.size === 0 ? matching : matching.toSorted((a, b) => Number(blockers.has(b.fingerprint)) - Number(blockers.has(a.fingerprint)));
   const selectedFinding = selected === undefined ? undefined : findings[selected];
-  const showStatus = filter === "action" || filter === "all";
   const emptyCopy = repoEmptyCopy(filter, hasNextPage);
   const starts: ScanStarts = new Map(history.map((scan) => [scan.scanId, scan.createdAt]));
   const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, starts), starts, blocks: blockers.has(finding.fingerprint), onSaved: decided }));
-  const table = useTable({ features: dataTableFeatures, columns: showStatus ? findingColumnsWithStatus : findingColumnsWithoutStatus, data: rows, getRowId: (row) => row.finding.id });
+  const table = useTable({ features: dataTableFeatures, columns: findingColumns, data: rows, getRowId: (row) => row.finding.id });
 
   return (
     <Card id="branch-findings" tabIndex={-1} aria-labelledby="branch-findings-title" className="scroll-mt-20 outline-none">      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-7">
@@ -296,7 +294,7 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
           <CardTitle id="branch-findings-title">Findings on this branch</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {FILTER_COPY[filter].note}
-            {findings.length > 0 ? (filter === "action" ? " Select a row for the impact, evidence and fix, and record your decision." : " Select a row to read the impact, evidence and fix.") : ""}
+            {findings.length > 0 ? " Select a row for the impact, evidence and fix." : ""}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
@@ -448,14 +446,9 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-relaxed text-muted-foreground">
                 {newestScan ? (
                   <>
-                    <ScanStatusBadge status={newestScan.status} />
-                    <span>
-                      Last scan <ScanTime value={newestScan.createdAt} />
-                      {notFull.has(newestScan.scanId) && " (not a full scan)"}
-                    </span>
-                    {notFull.has(newestScan.scanId) && (
+                    <ScanStatusBadge status={(fullScan ?? newestScan).status} />
+                    {notFull.has(newestScan.scanId) ? (
                       <>
-                        <span aria-hidden="true">·</span>
                         <span>
                           {fullScan ? (
                             <>
@@ -465,14 +458,39 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                             "No full scan yet"
                           )}
                         </span>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          Newer scan <ScanTime value={newestScan.createdAt} /> (not full)
+                        </span>
                       </>
+                    ) : (
+                      <span>
+                        Last scan <ScanTime value={newestScan.createdAt} />
+                      </span>
                     )}
                   </>
                 ) : (
                   <span>Never scanned</span>
                 )}
+                {current.latestCommit && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      Commit{" "}
+                      <a
+                        href={`${github}/commit/${current.latestCommit}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-sm font-mono text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {current.latestCommit.slice(0, 7)}
+                        <span className="sr-only"> (opens on GitHub)</span>
+                      </a>
+                    </span>
+                  </>
+                )}
                 <span aria-hidden="true">·</span>
-                <span>{scanPlural(branchScans.length, "scan", "scans")} of this branch</span>
+                <span>{scanPlural(branchScans.length, "scan", "scans")}</span>
               </p>
             ) : (
               <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
@@ -505,7 +523,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
       </ShellPageHeader>
 
-      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} findingsHref="#branch-findings" />}
+      {current && <RepoSummaryStrip branch={open} />}
 
       {open.regressed > 0 && (
         <Alert variant="destructive">
@@ -515,14 +533,8 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
           </AlertDescription>
         </Alert>
       )}
-      {open.unchecked > 0 && (
-        <Alert variant="warning">
-          <CircleAlert />
-          <AlertDescription>
-            <span className="font-medium">{scanPlural(open.unchecked, "open problem is", "open problems are")} not in the latest full scan.</span> No scan closes a problem, so {open.unchecked === 1 ? "it stays" : "they stay"} open until a person decides {open.unchecked === 1 ? "it" : "them"}.
-          </AlertDescription>
-        </Alert>
-      )}
+
+      {current?.latestCommit && <ScanVerdictCard repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} scope="branch" branchOpen={open.total} findingsHref="#branch-findings" />}
 
       {current ? (
         <Suspense key={current.name} fallback={<RepoFindingsSkeleton />}>
