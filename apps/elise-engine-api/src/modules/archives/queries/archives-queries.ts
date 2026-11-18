@@ -198,6 +198,17 @@ export const scanArchiveOfEffect = (db: AppDbType, scanId: string): Effect.Effec
   scanArchivesEffect(db, [scanId]).pipe(Effect.map((found) => found.get(scanId) ?? null));
 
 // -----
+// Where a zip's bytes are, or null once it is removed. Owner
+// role: the Runner's download asks by the zip its job links to,
+// after checking the Runner claimed that job.
+// -----
+export const archiveKeyEffect = (db: AppDbType, archiveId: string): Effect.Effect<string | null, DbError> =>
+  Effect.tryPromise({
+    try: () => db.select({ r2Key: scanUploadArchives.r2Key }).from(scanUploadArchives).where(eq(scanUploadArchives.id, archiveId)),
+    catch: toDbError,
+  }).pipe(Effect.map(([row]) => row?.r2Key ?? null));
+
+// -----
 // Deletes the row and gives back where its bytes are. The
 // links of the Scans that read it keep their label and hash,
 // and their archive_id turns null.

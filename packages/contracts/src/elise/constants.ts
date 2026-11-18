@@ -58,6 +58,8 @@ export const RUNNER_JOB_QUEUE_TIMEOUT_MS = 10 * 60 * 1000;
 export const RUNNER_JOB_ERROR_MAX = 4000;
 export const RUNNER_JOB_LOG_MAX = 200_000;
 export const RUNNER_JOB_FILE_MAX = 2_000_000;
+export const RUNNER_JOB_SOURCES_MAX = 10;
+export const RUNNER_JOB_SOURCE_NAME_MAX = 40;
 
 // -----
 // Groups and team invites: caps the form and the

@@ -9,12 +9,13 @@ import type { AppDeps, Bindings } from "#/types/variables";
 // -----
 export type CreateScanEnv = Pick<Bindings, "SCAN_WORKFLOW_FULL" | "MODEL" | "EFFORT" | "MAX_BUDGET_FULL_USD" | "MAX_ACTIVE_SCANS" | "MAX_ACTIVE_FULL_SCANS" | "MAX_GLOBAL_FULL_SCANS" | "MONTHLY_BUDGET_USD" | "BUDGET_ALLOWANCE_USD" | "BILLING_ENFORCED">;
 export type DetailScanEnv = Pick<Bindings, "SCAN_WORKFLOW_FULL">;
-export type SubmitScanDeps = Pick<AppDeps, "scanRepo" | "githubAccess" | "monthSpend" | "holdCredit" | "releaseCredit" | "runnerConnected" | "linkArchive">;
+export type SubmitScanDeps = Pick<AppDeps, "scanRepo" | "githubAccess" | "monthSpend" | "holdCredit" | "releaseCredit" | "connectedRunnerSources" | "linkArchive">;
 
 // -----
-// Whether a Runner of the Account has paired and is not removed.
+// The job sources a Runner of the Account last reported (git,
+// archive), or null when it has not paired or is removed.
 // -----
-export type RunnerConnected = (runnerId: string) => Effect.Effect<boolean, DbError>;
+export type RunnerSources = (runnerId: string) => Effect.Effect<string[] | null, DbError>;
 
 // -----
 // Records the zip a new upload Scan reads, in the Scan's own

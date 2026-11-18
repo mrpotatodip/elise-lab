@@ -91,15 +91,34 @@ export const claimJobDoc = describeRoute({
   summary: "Claim the next Scan waiting for this Runner",
   description: routeText({
     context:
-      "A paired Runner asks for work every few seconds. When a Scan was started on this Runner, the answer holds what to clone and the prompt to give the agent. With nothing waiting, `data` is null. Asking also records that the Runner is alive.",
+      "A paired Runner asks for work every few seconds. When a Scan was started on this Runner, the answer holds what to read (a git clone or an uploaded zip) and the prompt to give the agent. With nothing waiting, `data` is null. Asking also records that the Runner is alive. The optional body lists the job sources the Runner reads (`git`, `archive`); no body means `git` only.",
     steps: [
       "The Worker reads the bearer token and finds the Runner. A removed or unknown one is 401.",
-      "In one UPDATE the Worker takes this Runner's oldest queued Scan and marks it claimed, so a Scan is never claimed twice.",
-      "The Worker returns the repository, the ref, the model options, the prompt and the earlier findings, or null.",
+      "The Worker keeps the job sources the Runner listed, so an upload Scan can be refused before it is queued on a Runner that cannot read zips.",
+      "In one UPDATE the Worker takes this Runner's oldest queued Scan it can read and marks it claimed, so a Scan is never claimed twice. A Runner that does not list `archive` never gets an upload Scan.",
+      "An upload Scan whose zip was removed while it waited is failed with that reason, and the next one is taken.",
+      "The Worker returns the repository, the source, the ref, the model options, the prompt and the earlier findings, or null.",
     ],
-    example: ["Claim:", bash(`curl -X POST ${EXAMPLE_BASE_URL}/runners/claim \\`, '  -H "authorization: Bearer $RUNNER_TOKEN"')],
+    example: ["Claim:", bash(`curl -X POST ${EXAMPLE_BASE_URL}/runners/claim \\`, '  -H "authorization: Bearer $RUNNER_TOKEN" \\', '  -H "Content-Type: application/json" \\', `  -d '{"sources":["git","archive"]}'`)],
   }),
-  responses: { 200: jsonResponse("The Scan to run, or null.", envelope(RunnerJobSchema.nullable())), ...errorResponses(401) },
+  responses: { 200: jsonResponse("The Scan to run, or null.", envelope(RunnerJobSchema.nullable())), ...errorResponses(400, 401) },
+});
+
+export const jobArchiveDoc = describeRoute({
+  tags: ["runners"],
+  security: SERVICE_SECURITY,
+  summary: "Download the zip an upload Scan reads",
+  description: routeText({
+    context: "A Runner that claimed an upload Scan (its job's source is `archive`) downloads the zip here, then unpacks it in its own work folder.",
+    steps: [
+      "The Worker reads the bearer token and finds the Runner.",
+      "The Worker checks the Scan's job is claimed by this Runner and reads a zip. Any other Runner, a job not claimed, or a git job is 404.",
+      "A zip removed since the Scan started is 404, with a message that says so.",
+      "The answer is the zip itself (`application/zip`).",
+    ],
+    example: ["Download:", bash(`curl ${EXAMPLE_BASE_URL}/runners/jobs/$SCAN_ID/archive \\`, '  -H "authorization: Bearer $RUNNER_TOKEN" -o archive.zip')],
+  }),
+  responses: { 200: { description: "The zip." }, ...errorResponses(400, 401, 404) },
 });
 
 export const reportJobDoc = describeRoute({

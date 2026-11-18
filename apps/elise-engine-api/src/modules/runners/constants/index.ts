@@ -53,3 +53,5 @@ export const RUNNER_JOB_NOT_CONNECTED = "runner_id: this runner is not connected
 export const RUNNER_JOB_NOT_PICKED_UP = "The runner did not pick up this scan in time. Check that the EliseLAB Runner app is open and connected on that computer.";
 export const RUNNER_JOB_BAD_OPTIONS = "The scan's settings could not be read, so it was not run. Start a new scan.";
 export const RUNNER_JOB_NO_REPORT ="the audit finished without writing REPORT.md";
+export const RUNNER_JOB_ARCHIVE_REMOVED = "The zip this Scan reads was removed before the Runner could download it, so the Scan did not run. Upload the zip again and start a new Scan.";
+export const RUNNER_ARCHIVE_UNSUPPORTED = "runner_id: this Runner cannot read uploaded zips. Update the Elise Runner app on that computer and let it connect, then start the Scan again.";

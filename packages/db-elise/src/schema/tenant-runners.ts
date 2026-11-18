@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { partyPersons } from "./party";
 import { tenants } from "./tenant";
@@ -27,6 +28,13 @@ export const tenantRunners = pgTable(
       .references(() => partyPersons.partyId, { onDelete: "restrict" }),
     pairedAt: timestamp("paired_at", { withTimezone: true }),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    // -----
+    // The job sources (git, archive) the Runner said it reads when
+    // it last claimed a job. An older Runner says nothing, so it
+    // reads git only. An archive job is never handed to a Runner
+    // without archive here, and an upload Scan cannot start on one.
+    // -----
+    jobSources: text("job_sources").array().notNull().default(sql`'{git}'::text[]`),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

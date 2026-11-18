@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -19,6 +19,9 @@ struct State {
     revoked: Vec<String>,
     revokes_fail: bool,
     jobs: VecDeque<String>,
+    claims: Vec<String>,
+    archives: BTreeMap<String, Vec<u8>>,
+    archive_downloads: Vec<String>,
     results: Vec<(String, String)>,
     remove_after_result: bool,
     claims_held: bool,
@@ -85,6 +88,22 @@ impl Engine {
 
     pub fn queue_job(&self, job: String) {
         self.state.lock().unwrap().jobs.push_back(job);
+    }
+
+    // The zip an upload Scan's job downloads. A Scan with none answers as Elise does once the zip
+    // was removed.
+    pub fn serve_archive(&self, scan_id: &str, zip: Vec<u8>) {
+        self.state.lock().unwrap().archives.insert(scan_id.to_string(), zip);
+    }
+
+    // The bodies of the claims the Runner sent, as JSON (null for an empty body).
+    pub fn claims(&self) -> Vec<serde_json::Value> {
+        let state = self.state.lock().unwrap();
+        state.claims.iter().map(|body| if body.is_empty() { serde_json::Value::Null } else { serde_json::from_str(body).expect("a claim is JSON") }).collect()
+    }
+
+    pub fn archive_downloads(&self) -> Vec<String> {
+        self.state.lock().unwrap().archive_downloads.clone()
     }
 
     pub fn results(&self) -> Vec<(String, serde_json::Value)> {
@@ -171,7 +190,24 @@ pub fn job_at(scan_id: &str, repo: &str, phase_prompts: [&str; 4]) -> String {
     .to_string()
 }
 
-pub const REPO_URL: &str = "https://github.com/acme/widgets";
+// An upload Scan's job: the app's name as its repo, and an archive source.
+pub fn archive_job(scan_id: &str, app: &str, phase_prompts: [&str; 4]) -> String {
+    let mut job: serde_json::Value = serde_json::from_str(&job_at(scan_id, app, phase_prompts)).unwrap();
+    job["source"] = serde_json::json!({ "kind": "archive", "archiveId": "7a2e1d0c-3b4f-4a51-8c62-9d03e4f5a6b7" });
+    job.to_string()
+}
+
+// A zip of these files, deflated as zip tools write them.
+pub fn zip_of(files: &[(&str, &str)]) -> Vec<u8> {
+    let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    for (name, text) in files {
+        writer.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+        writer.write_all(text.as_bytes()).unwrap();
+    }
+    writer.finish().unwrap().into_inner()
+}
+
+pub const REPO_URL: &str ="https://github.com/acme/widgets";
 pub const REPO: &str = "acme/widgets";
 
 fn token_number(n: usize) -> String {
@@ -221,6 +257,11 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
     if request.path == "/runners/claim" {
         hold_while_claims_are_held(state);
     }
+    if let Some(zip) = archive_of(&request, &mut state.lock().unwrap()) {
+        let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/zip\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", zip.len());
+        let _ = stream.write_all(&zip);
+        return;
+    }
     let (status, body) = answer(&request, &mut state.lock().unwrap());
     let reason = if status == 200 { "OK" } else { "Error" };
     let _ = write!(
@@ -238,10 +279,26 @@ fn hold_while_claims_are_held(state: &Mutex<State>) {
     });
 }
 
-const REJECTED: (u16, &str) = (401, r#"{"data":null,"error":{"code":"unauthorized"}}"#);
+// The zip of a job, for a live token, when the engine has one for that Scan.
+fn archive_of(request: &Request, state: &mut State) -> Option<Vec<u8>> {
+    let live = request.bearer.as_ref().is_some_and(|token| state.live.contains(token));
+    let scan_id = request.path.strip_prefix("/runners/jobs/")?.strip_suffix("/archive")?.to_string();
+    if request.method != "GET" || !live {
+        return None;
+    }
+    state.archive_downloads.push(scan_id.clone());
+    state.archives.get(&scan_id).cloned()
+}
+
+pub const ARCHIVE_REMOVED: &str = "The zip this Scan reads was removed before the Runner could download it, so the Scan did not run.";
+
+const REJECTED: (u16, &str) =(401, r#"{"data":null,"error":{"code":"unauthorized"}}"#);
 
 fn answer(request: &Request, state: &mut State) -> (u16, String) {
     let live = request.bearer.as_ref().is_some_and(|token| state.live.contains(token));
+    if live && request.path == "/runners/claim" {
+        state.claims.push(request.body.clone());
+    }
     if state.no_login_routes && request.path.starts_with("/runners/login/") {
         return (404, r#"{"data":null,"error":{"code":"not_found"}}"#.to_string());
     }
@@ -299,6 +356,9 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             state.live.remove(&token);
             state.revoked.push(token);
             (200, r#"{"data":{"ok":true},"error":null}"#.to_string())
+        }
+        ("GET", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/archive") => {
+            (404, format!(r#"{{"data":null,"error":{{"code":"NOT_FOUND","message":"{ARCHIVE_REMOVED}"}}}}"#))
         }
         ("POST", "/runners/claim") if live => match state.jobs.pop_front() {
             Some(job) => (200, format!(r#"{{"data":{job},"error":null}}"#)),
@@ -575,7 +635,8 @@ case "$prompt" in
   *phase=recon*)
     env > "__RECORD__/env.txt"
     cp .claude/settings.json "__RECORD__/settings.json"
-    cp .claude/skills/security-audit/SKILL.md "__RECORD__/SKILL.md" ;;
+    cp .claude/skills/security-audit/SKILL.md "__RECORD__/SKILL.md"
+    (cd repo && find . -type f | sort) > "__RECORD__/repo.txt" ;;
 esac
 case "$prompt" in *stop=crash*) echo "the agent said: boom" >&2; exit 2 ;; esac
 case "$prompt" in

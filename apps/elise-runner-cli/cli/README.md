@@ -74,6 +74,8 @@ The Runner clones only `https://` addresses, with your own git login and no term
 
 Whether a private repository clones with your git login is not tested yet.
 
+An upload Scan reads a zip instead of a clone. Each claim tells Elise this Runner reads zips (`{"sources":["git","archive"]}`); an older Runner says nothing, and Elise refuses to start an upload Scan on it, asking to update it. The Runner downloads the zip of the job it claimed (Elise serves it to no other Runner) and unpacks it in the work folder: a path with `..` or an absolute path refuses the whole zip, links are skipped, and the limits are 50 MB of zip, 250 MB unpacked, 20,000 files and 20 path levels. When everything sits in one top folder, that folder is removed, so `app-1.2/src/a.rs` and `app-1.3/src/a.rs` are both `src/a.rs`. The same clean-up as after a clone follows. A zip removed while its Scan waited fails the Scan with that reason.
+
 A Scan uses your Claude login but not your Claude Code settings. It runs under its own settings and tool allowlist and never reads or changes your `~/.claude` folder. The agent does not get `ELISE_RUNNER_TOKEN`, and on Linux its settings deny reading `/proc`, so a hostile repository cannot make it copy the token into a report.
 
 A succeeded Scan's work folder is removed once its result is sent. A failed Scan's is kept and its path is printed on the last line, with the agent's log and the files of the Phases that finished.

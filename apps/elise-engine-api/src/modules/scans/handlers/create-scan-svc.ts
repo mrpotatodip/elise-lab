@@ -2,12 +2,12 @@ import { Effect } from "effect";
 import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
+import { RUNNER_ARCHIVE_UNSUPPORTED, RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
 import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
-import type { CreateScanEnv, LinkArchive, QueuedScan, RunnerConnected, SubmitScanDeps } from "#/modules/scans/types";
+import type { CreateScanEnv, LinkArchive, QueuedScan, RunnerSources, SubmitScanDeps } from "#/modules/scans/types";
 import { budgetCapOf, budgetRefusalHintOf, limitPathOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
@@ -32,7 +32,7 @@ export const queueScanSvc = (
   spend: MonthSpend,
   access?: GithubAccess,
   hold?: HoldCredit,
-  runnerConnected?: RunnerConnected,
+  runnerSources?: RunnerSources,
   linkArchive?: LinkArchive,
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
@@ -109,11 +109,15 @@ export const queueScanSvc = (
     // A Scan on a Runner runs on the person's own Claude, so it takes
     // no credit, needs no key of the Account's, and does not count
     // against the plan's allowance or the monthly budget. The Runner
-    // must belong to the Account and be paired.
+    // must belong to the Account and be paired. An archive Scan also
+    // needs a Runner that said it reads archives: an older one would
+    // never be handed the job, so the person is told to update it.
     // -----
     const runnerId = input.runner_id;
-    if (runnerId !== undefined && !(runnerConnected ? yield* runnerConnected(runnerId) : false)) {
-      return yield* new Invalid({ message: RUNNER_JOB_NOT_CONNECTED });
+    if (runnerId !== undefined) {
+      const sources = runnerSources ? yield* runnerSources(runnerId) : null;
+      if (sources === null) return yield* new Invalid({ message: RUNNER_JOB_NOT_CONNECTED });
+      if (provider.capabilities.isArchive && !sources.includes("archive")) return yield* new Invalid({ message: RUNNER_ARCHIVE_UNSUPPORTED });
     }
     const onRunner = runnerId !== undefined;
 
@@ -252,10 +256,10 @@ export const createScanSvc = (
   spend: MonthSpend,
   access?: GithubAccess,
   hold?: HoldCredit,
-  runnerConnected?: RunnerConnected,
+  runnerSources?: RunnerSources,
   release?: ReleaseCredit,
 ): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
-  queueScanSvc(env, repo, accountId, input, spend, access, hold, runnerConnected).pipe(
+  queueScanSvc(env, repo, accountId, input, spend, access, hold, runnerSources).pipe(
     Effect.flatMap((queued) => startScanSvc(env, queued, (error) => abandonScanSvc(repo, queued, error, release))),
   );
 
@@ -284,7 +288,7 @@ export const submitScanSvc = (
           spend,
           deps.githubAccess(env, accountId),
           (scanId, holdUsd) => deps.holdCredit(db, accountId, scanId, holdUsd),
-          (runnerId) => deps.runnerConnected(db, accountId, runnerId),
+          (runnerId) => deps.connectedRunnerSources(db, accountId, runnerId),
           (link) => deps.linkArchive(db, accountId, link),
         ),
       ),

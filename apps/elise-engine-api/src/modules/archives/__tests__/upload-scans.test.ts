@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { Effect } from "effect";
 import { platformMasterPlans, scanArchiveLinks, scans, scanUploadArchives, tenantSubscriptions } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -9,6 +10,7 @@ import { zipOf } from "#/__tests__/zip-fixture";
 
 let test: TestDb;
 const app = tenantRouteApp(() => test);
+const oldRunnerApp = tenantRouteApp(() => test, { connectedRunnerSources: () => Effect.succeed(["git"]) });
 const accountOf = new Map<string, string>();
 const { env, store } = fakeBindings();
 
@@ -85,6 +87,23 @@ describe("POST /scans for an upload app", () => {
     const res = await scanUpload("acme", body);
 
     expect({ status: res.status, message: ErrorSchema.parse(await res.json()).error.message }).toEqual({ status: 400, message: expect.stringContaining(field) });
+  });
+
+  it("refuses an upload Scan on a Runner that cannot read zips, telling the person to update it, and writes no Scan", async () => {
+    const appId = await newApp("acme", "Old runner");
+    const archiveId = await uploadZip("acme", appId, "app-1.0.zip");
+    const res = await oldRunnerApp.fetch(
+      new Request("http://localhost/scans", {
+        method: "POST",
+        headers: { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountOf.get("acme") ?? "", "content-type": "application/json" },
+        body: JSON.stringify({ provider: "upload", runner_id: RUNNER, repo: "Old runner", archive_id: archiveId }),
+      }),
+      env,
+      testExecutionContext,
+    );
+    const written = await test.raw.select({ id: scans.id }).from(scans).where(eq(scans.repoId, appId));
+
+    expect({ status: res.status, message: ErrorSchema.parse(await res.json()).error.message, written }).toEqual({ status: 400, message: expect.stringContaining("Update the Elise Runner"), written: [] });
   });
 
   it("refuses a zip on a GitHub Scan", async () => {

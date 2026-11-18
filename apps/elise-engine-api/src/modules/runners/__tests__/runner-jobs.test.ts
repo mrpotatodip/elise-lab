@@ -7,7 +7,7 @@ import { SCAN_PROFILE_CAPS_USD } from "#/constants";
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
-import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
+import { claimJobSvc, jobArchiveSvc, reportJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
 import { buildScanRecordSvc, writeScanRecordEffect } from "#/modules/scan-records";
@@ -15,7 +15,7 @@ import { saveScanFilesEffect } from "#/modules/scan-store";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { SCAN_SANDBOX_FULL_PHASES, buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox";
 import { monthSpendEffect } from "#/modules/usage";
-import { claimRunnerJobEffect, createRunnerEffect, claimPairingEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
+import { claimRunnerJobEffect, createRunnerEffect, claimPairingEffect, findConnectedRunnerEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
 
 let test: TestDb;
 let tenantId: string;
@@ -311,7 +311,93 @@ describe("the runner as a sandbox", () => {
   });
 });
 
-type LedgerUnit = { status: string; agent_id: string | null; unresolved: string[] };
+describe("an upload Scan on a Runner", () => {
+  const BOTH = ["git", "archive"];
+  const ZIP_BYTES = "zip-bytes";
+
+  const uploadScan = async (bucket = fakeBindings().env.REPORTS) => {
+    const scanId = await queue(await newScan());
+    const r2Key = `accounts/${tenantId}/uploads/${repoId}/${scanId}.zip`;
+    const [archive] = await test.raw.insert(scanUploadArchives).values({ tenantId, repoId, label: "app-1.3.zip", r2Key, sizeBytes: 9, contentSha256: "d".repeat(64) }).returning();
+    await test.raw.insert(scanArchiveLinks).values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: archive.contentSha256 });
+    await bucket.put(r2Key, ZIP_BYTES);
+    return { scanId, archiveId: archive.id };
+  };
+
+  const download = (scanId: string, by: string, bucket: R2Bucket) => Effect.runPromise(Effect.either(jobArchiveSvc(test.http, bucket, by, scanId)));
+
+  it("hands the job an archive source with the zip's id, and a git job a git source", async () => {
+    const { scanId, archiveId } = await uploadScan();
+    const gitScan = await queue(await newScan());
+    const first = await run(claimJobSvc(test.http, runnerId, BOTH));
+    const second = await run(claimJobSvc(test.http, runnerId, BOTH));
+
+    expect([first?.scanId, first?.source, second?.scanId, second?.source]).toEqual([scanId, { kind: "archive", archiveId }, gitScan, { kind: "git" }]);
+  });
+
+  it.each([
+    ["reports only git", ["git"]],
+    ["reports nothing", undefined],
+  ])("never hands an archive job to a Runner that %s, and hands it the git job queued after", async (_name, sources) => {
+    const { scanId } = await uploadScan();
+    const gitScan = await queue(await newScan());
+    const claimed = await run(claimJobSvc(test.http, runnerId, sources));
+
+    expect([claimed?.scanId, (await jobOf(scanId)).state]).toEqual([gitScan, "queued"]);
+  });
+
+  it("remembers what the Runner reported, so an upload Scan can be refused before it is queued", async () => {
+    const before = await run(findConnectedRunnerEffect(test.http, tenantId, runnerId));
+    await run(claimJobSvc(test.http, runnerId, ["archive", "git", "svn"]));
+    const after = await run(findConnectedRunnerEffect(test.http, tenantId, runnerId));
+    await run(claimJobSvc(test.http, runnerId));
+    const older = await run(findConnectedRunnerEffect(test.http, tenantId, runnerId));
+
+    expect([before, after, older]).toEqual([["git"], ["git", "archive"], ["git"]]);
+  });
+
+  it("fails a queued upload Scan whose zip was removed, saying so, and hands over the next job", async () => {
+    const { scanId, archiveId } = await uploadScan();
+    await test.raw.delete(scanUploadArchives).where(eq(scanUploadArchives.id, archiveId));
+    const next = await queue(await newScan());
+    const claimed = await run(claimJobSvc(test.http, runnerId, BOTH));
+
+    expect(claimed?.scanId).toBe(next);
+    expect(await jobOf(scanId)).toMatchObject({ state: "failed", error: expect.stringContaining("reads was removed") });
+  });
+
+  it("serves the zip only to the Runner that claimed the job", async () => {
+    const bucket = fakeBindings().env.REPORTS;
+    const { scanId } = await uploadScan(bucket);
+    const unclaimed = await download(scanId, runnerId, bucket);
+    await run(claimJobSvc(test.http, runnerId, BOTH));
+    const mine = await download(scanId, runnerId, bucket);
+    const other = await download(scanId, otherRunnerId, bucket);
+
+    expect(unclaimed).toMatchObject({ _tag: "Left", left: { _tag: "NotFound" } });
+    expect(mine).toMatchObject({ _tag: "Right", right: { body: ZIP_BYTES } });
+    expect(other).toMatchObject({ _tag: "Left", left: { _tag: "NotFound" } });
+  });
+
+  it("refuses the zip once it is removed, saying so", async () => {
+    const bucket = fakeBindings().env.REPORTS;
+    const { scanId, archiveId } = await uploadScan(bucket);
+    await run(claimJobSvc(test.http, runnerId, BOTH));
+    await test.raw.delete(scanUploadArchives).where(eq(scanUploadArchives.id, archiveId));
+
+    expect(await download(scanId, runnerId, bucket)).toMatchObject({ _tag: "Left", left: { _tag: "NotFound", message: expect.stringContaining("reads was removed") } });
+  });
+
+  it("refuses a git job's download", async () => {
+    const bucket = fakeBindings().env.REPORTS;
+    const scanId = await queue(await newScan());
+    await run(claimJobSvc(test.http, runnerId, BOTH));
+
+    expect(await download(scanId, runnerId, bucket)).toMatchObject({ _tag: "Left", left: { _tag: "NotFound" } });
+  });
+});
+
+type LedgerUnit ={ status: string; agent_id: string | null; unresolved: string[] };
 const ledgerUnit = (over: Partial<LedgerUnit>) => ({ status: "covered", agent_id: "hunter-inline", wave: 1, attempts: [], local_checks: [], result_fingerprints: [], unresolved: [], ...over });
 
 describe("the profile met after a Runner's result", () => {

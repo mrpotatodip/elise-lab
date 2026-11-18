@@ -1,15 +1,15 @@
 import { Effect } from "effect";
-import type { RunnerJob, RunnerJobResultBody } from "@repo/contracts/elise";
+import { RUNNER_JOB_SOURCE_VALUES, type RunnerJob, type RunnerJobResultBody } from "@repo/contracts/elise";
 import { SCAN_PROFILE_CAPS_USD, SCAN_REPORT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
-import { NotFound, type DbError } from "#/lib/effect-query";
+import { NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import { ScanOptionsSchema } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
 import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox";
-import { RUNNER_JOB_BAD_OPTIONS, RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_FOUND, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
-import { claimRunnerJobEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
-import { scanArchiveOfEffect } from "#/modules/archives/queries";
+import { RUNNER_JOB_ARCHIVE_REMOVED, RUNNER_JOB_BAD_OPTIONS, RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_FOUND, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
+import { claimRunnerJobEffect, readRunnerJobEffect, recordRunnerSourcesEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
+import { archiveKeyEffect, scanArchiveOfEffect } from "#/modules/archives/queries";
 import { sourceProviderOf } from "#/providers/registry";
 
 const UPLOAD_BRANCH = sourceProviderOf("upload").fixedBranch;
@@ -21,33 +21,44 @@ const UPLOAD_BRANCH = sourceProviderOf("upload").fixedBranch;
 // app that knows Phases runs them, an older one runs the prompt.
 // Asking also records that the Runner is alive, through the
 // authentication that comes before this.
-// A job whose options no longer parse is failed on the spot, so
-// the Scan ends with a reason and the Runner moves to the next
-// job instead of meeting the same row on every poll.
+// A job whose options no longer parse, or whose zip was removed
+// while it waited, is failed on the spot, so the Scan ends with a
+// reason and the Runner moves to the next job instead of meeting
+// the same row on every poll.
+// The Runner names the job sources it reads; an older one names
+// none and reads git only. They are kept on the Runner, so an
+// upload Scan can be refused before it is queued, and an archive
+// job goes only to a Runner that reads archives.
 // -----
-export const claimJobSvc = (db: DbConnectType, runnerId: string): Effect.Effect<RunnerJob | null, DbError> =>
+export const claimJobSvc = (db: DbConnectType, runnerId: string, reported?: readonly string[]): Effect.Effect<RunnerJob | null, DbError> =>
+  Effect.gen(function* () {
+    const sources = RUNNER_JOB_SOURCE_VALUES.filter((source) => source === "git" || reported?.includes(source));
+    yield* recordRunnerSourcesEffect(db, runnerId, sources);
+    return yield* claimNextJob(db, runnerId, sources.includes("archive"));
+  });
+
+const failClaimed = (db: DbConnectType, runnerId: string, scanId: string, error: string, now: Date): Effect.Effect<boolean, DbError> =>
+  reportRunnerJobEffect(db, { scanId, runnerId, state: "failed", error, commitSha: null, branch: null, usageJson: null, filesJson: "{}", now });
+
+const claimNextJob = (db: DbConnectType, runnerId: string, readsArchive: boolean): Effect.Effect<RunnerJob | null, DbError> =>
   Effect.gen(function* () {
     const now = new Date();
-    const row = yield* claimRunnerJobEffect(db, runnerId, now);
+    const row = yield* claimRunnerJobEffect(db, runnerId, now, readsArchive);
     if (row === null) return null;
     const options = yield* Effect.try(() => ScanOptionsSchema.parse(JSON.parse(row.optionsJson))).pipe(Effect.option);
     if (options._tag === "None") {
-      yield* reportRunnerJobEffect(db, {
-        scanId: row.scanId,
-        runnerId,
-        state: "failed",
-        error: RUNNER_JOB_BAD_OPTIONS,
-        commitSha: null,
-        branch: null,
-        usageJson: null,
-        filesJson: "{}",
-        now,
-      });
-      return yield* claimJobSvc(db, runnerId);
+      yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_BAD_OPTIONS, now);
+      return yield* claimNextJob(db, runnerId, readsArchive);
+    }
+    const archive = yield* scanArchiveOfEffect(db, row.scanId);
+    if (archive !== null && archive.id === null) {
+      yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_ARCHIVE_REMOVED, now);
+      return yield* claimNextJob(db, runnerId, readsArchive);
     }
     return {
       scanId: row.scanId,
       repo: row.repoUrl,
+      source: archive?.id ? { kind: "archive" as const, archiveId: archive.id } : { kind: "git" as const },
       ref: row.ref,
       skill: options.value.skill,
       model: options.value.model,
@@ -59,6 +70,26 @@ export const claimJobSvc = (db: DbConnectType, runnerId: string): Effect.Effect<
       phasePrompts: SCAN_SANDBOX_FULL_PHASES.map((phase) => ({ phase, prompt: buildPhasePrompt(options.value, phase, RUNNER_PROMPT_PLACE) })),
       priorsJson: row.priorsJson,
     };
+  });
+
+// -----
+// The zip of an upload Scan, for the Runner that claimed its job
+// and only while that job is claimed. Any other Runner, a job
+// that is not claimed, and a git job get the same NotFound, so a
+// Runner learns nothing about another's Scans. A zip removed
+// since (its link's archive id is null, or the bytes are gone)
+// says so.
+// -----
+export const jobArchiveSvc = (db: DbConnectType, reports: R2Bucket, runnerId: string, scanId: string): Effect.Effect<{ body: R2ObjectBody["body"] }, NotFound | DbError | ExternalError> =>
+  Effect.gen(function* () {
+    const job = yield* readRunnerJobEffect(db, scanId);
+    if (job === null || job.runnerId !== runnerId || job.state !== "claimed") return yield* new NotFound({ message: RUNNER_JOB_NOT_FOUND });
+    const archive = yield* scanArchiveOfEffect(db, scanId);
+    if (archive === null) return yield* new NotFound({ message: RUNNER_JOB_NOT_FOUND });
+    const key = archive.id === null ? null : yield* archiveKeyEffect(db, archive.id);
+    const object = key === null ? null : yield* Effect.tryPromise({ try: () => reports.get(key), catch: toExternalError });
+    if (object === null) return yield* new NotFound({ message: RUNNER_JOB_ARCHIVE_REMOVED });
+    return { body: object.body };
   });
 
 // -----

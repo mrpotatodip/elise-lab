@@ -30,7 +30,7 @@ export const realAppDeps: AppDeps = {
   githubAccess: (env, accountId) => githubAccessFor(env, neonInstallationRepo(dbConnect(env.DATABASE_URL)), accountId),
   monthSpend: (db, accountId) => monthSpendEffect(db, accountId, monthStartOf(new Date())),
   holdCredit: (db, accountId, scanId, holdUsd) => holdCreditEffect(db, { tenantId: accountId, scanId, holdUsd }),
-  runnerConnected: findConnectedRunnerEffect,
+  connectedRunnerSources: findConnectedRunnerEffect,
   linkArchive: linkScanArchiveEffect,
   releaseCredit: (db, accountId, scanId) => settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 }),
   sessionUserId,

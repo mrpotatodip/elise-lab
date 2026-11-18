@@ -7,6 +7,7 @@ mod address;
 mod github;
 mod gitlab;
 mod gitlab_sh;
+mod upload;
 
 use std::path::{Path, PathBuf};
 
@@ -61,6 +62,20 @@ pub fn clone_address(repo: &str, settings: &Settings) -> Result<Address, String>
     }
 }
 
+// The job sources this Runner reads, sent with every claim: Elise hands an `archive` job (an
+// upload Scan) only to a Runner that lists it.
+pub const JOB_SOURCES: [&str; 2] = ["git", "archive"];
+
+// An `archive` job (`upload`): the zip of the job this Runner claimed, downloaded into the work
+// folder and unpacked as `repo`. The zip itself is removed once unpacked.
+pub async fn read_archive(token: &str, scan_id: &str, work: &Path) -> Result<(), String> {
+    let zip = work.join("archive.zip");
+    upload::download(token, scan_id, &zip).await?;
+    let unpacked = upload::unpack(&zip, &work.join("repo"));
+    let _ = std::fs::remove_file(&zip);
+    unpacked
+}
+
 // What a job is called in the Runner's log: the repository's path, or the address as sent when it
 // does not read.
 pub fn label_of(repo: &str) -> String {
@@ -73,7 +88,7 @@ mod tests {
 
     // The provider modules, by file name. A new provider is one file, one `mod` line above and one
     // name here; the layout test fails until it is listed.
-    const PROVIDER_MODULES: [&str; 3] = ["github", "gitlab", "gitlab_sh"];
+    const PROVIDER_MODULES: [&str; 4] = ["github", "gitlab", "gitlab_sh", "upload"];
 
     // The first other provider a provider's source names as a module, if any.
     fn other_provider_named<'a>(source: &str, own: &str) -> Option<&'a str> {

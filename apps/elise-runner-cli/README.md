@@ -20,7 +20,8 @@ The folder is one Cargo workspace (`Cargo.toml`, one `Cargo.lock`, one `target`)
 | `core/src/pairing.rs` | Enroll a code, accept or decline it, the Runner's status, unpairing. |
 | `core/src/login.rs` | Log in through the browser: start a login, wait for approval, hand back the enrolled Runner. |
 | `core/src/store.rs` | Where the token is kept: the keychain (each program has its own service name), an owner-only file, or a token given from outside (read only). |
-| `core/src/scan.rs` | The work loop: claim, clone, run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
+| `core/src/scan.rs` | The work loop: claim, clone (or unpack an upload's zip), run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
+| `core/src/providers/` | Where a Scan's code comes from: one module per provider (`github`, `gitlab`, `gitlab_sh`, `upload`), the shared address rules in `address.rs`, and `mod.rs`, the only file that knows them all. A test fails when one provider's module names another's. |
 | `src-tauri/src/lib.rs` | The desktop app: the commands, the pending pairing, the activity, the tray. |
 | `cli/src/` | The headless Runner: `args.rs` (command line, help text), `browser.rs` (opens the login link), `store.rs` (which token store a run uses), `commands.rs` (one function per command, and the log of `run`), `tools.rs` (the built-in Skill, `claude` and `node`). |
 | `cli/tests/` | Process tests: the debug `elise-runner` run against a stub engine (`support/mod.rs`). |
