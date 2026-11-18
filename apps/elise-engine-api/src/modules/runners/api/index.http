@@ -27,6 +27,12 @@ Content-Type: application/json
 
 ###
 
+# Read a pending login by its user code. Any signed-in session.
+GET {{baseUrl}}/runners/login/lookup?code=K7QM-4TXD
+Authorization: Bearer <session-token>
+
+###
+
 # Approve a login. Needs the session of a member who holds company:runners:create in the account.
 POST {{baseUrl}}/runners/login/approve
 Authorization: Bearer <session-token>

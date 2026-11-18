@@ -21,6 +21,7 @@ export const OWNER_CONNECTION_USES = {
   "modules/me/api/get-me.ts": { uses: 2, reason: "Lists the Accounts a person belongs to, across Accounts" },
   "modules/runners/api/claim-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/disconnect-runner.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
+  "modules/runners/api/lookup-runner-login.ts": { uses: 2, reason: "A user code names a login before any Account is chosen" },
   "modules/runners/api/check-runner-login.ts": { uses: 2, reason: "A device code is looked up before its Account is known" },
   "modules/runners/api/start-runner-login.ts": { uses: 2, reason: "A Runner starts a login with no session and no Account" },
   "modules/runners/api/enroll-runner.ts": { uses: 2, reason: "A pairing code is looked up before its Account is known" },

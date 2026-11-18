@@ -1,5 +1,5 @@
 import { describeRoute } from "hono-openapi";
-import { ApprovedRunnerLoginSchema, RunnerLoginCheckSchema, StartedRunnerLoginSchema } from "@repo/contracts/elise";
+import { ApprovedRunnerLoginSchema, PendingRunnerLoginSchema, RunnerLoginCheckSchema, StartedRunnerLoginSchema } from "@repo/contracts/elise";
 import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, json, jsonResponse, routeText } from "#/lib/openapi";
 
 const RUNNER_ID = "5b3f0d7e-61a4-4c2f-9d58-2f7a1c9e4b10";
@@ -24,6 +24,27 @@ export const startRunnerLoginDoc = describeRoute({
     ],
   }),
   responses: { 200: jsonResponse("The codes and the link.", envelope(StartedRunnerLoginSchema)), ...errorResponses(400) },
+});
+
+export const lookupRunnerLoginDoc = describeRoute({
+  tags: ["runners"],
+  security: SERVICE_SECURITY,
+  summary: "Read a pending Runner login by its user code",
+  description: routeText({
+    context:
+      "The dashboard's device page shows what the terminal asked for before a member approves it: the suggested name, the OS and CPU and the IP that started the login. Any signed-in login may ask, because approving still needs the Power.",
+    steps: [
+      "The Worker checks the session.",
+      "The Worker finds a login with this user code that is pending and unexpired. The answer never holds a hash or the device code.",
+      "A code that is unknown, expired, approved or collected gets the same 403.",
+    ],
+    example: [
+      "Look up a login:",
+      bash(`curl "${EXAMPLE_BASE_URL}/runners/login/lookup?code=K7QM-4TXD" \\`, '  -H "authorization: Bearer $SESSION_TOKEN"'),
+      json(`{ "data": { "suggestedName": "build-box", "os": "linux 6.8", "cpu": "x64", "version": "0.1.0", "requestIp": "203.0.113.7", "expiresAt": "2026-11-11T09:10:00.000Z" }, "error": null }`),
+    ],
+  }),
+  responses: { 200: jsonResponse("The pending login.", envelope(PendingRunnerLoginSchema)), ...errorResponses(400, 401, 403) },
 });
 
 export const approveRunnerLoginDoc = describeRoute({

@@ -1,6 +1,7 @@
 export { default as createRunnerAPI } from "./create-runner";
 export { default as enrollRunnerAPI } from "./enroll-runner";
 export { default as startRunnerLoginAPI } from "./start-runner-login";
+export { default as lookupRunnerLoginAPI } from "./lookup-runner-login";
 export { default as approveRunnerLoginAPI } from "./approve-runner-login";
 export { default as checkRunnerLoginAPI } from "./check-runner-login";
 export { default as runnerMeAPI } from "./runner-me";

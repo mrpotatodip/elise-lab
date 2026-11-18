@@ -4,6 +4,7 @@ import {
   type ApprovedRunnerLogin,
   type ApproveRunnerLoginBody,
   type CheckRunnerLoginBody,
+  type PendingRunnerLogin,
   type RunnerLoginCheck,
   type StartedRunnerLogin,
   type StartRunnerLoginBody,
@@ -11,7 +12,7 @@ import {
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Forbidden, type DbError } from "#/lib/effect-query";
 import { RUNNER_LOGIN_INVALID, RUNNER_LOGIN_VERIFY_PATH } from "#/modules/runners/constants";
-import { approveLoginEffect, collectLoginEffect, startLoginEffect } from "#/modules/runners/queries";
+import { approveLoginEffect, collectLoginEffect, findPendingLoginEffect, startLoginEffect } from "#/modules/runners/queries";
 import { generateDeviceCode, generateRunnerToken, generateUserCode, hashDeviceCode, hashPairingCode, hashRunnerToken } from "#/modules/runners/utils";
 
 // -----
@@ -26,6 +27,19 @@ export const startRunnerLoginSvc = (db: DbConnectType, body: StartRunnerLoginBod
     const expiresAt = new Date(Date.now() + RUNNER_LOGIN_TTL_MS);
     yield* startLoginEffect(db, { userCodeHash, deviceCodeHash, suggestedName: body.name, os: body.os, cpu: body.cpu, runnerVersion: body.version, requestIp: origin.ip, expiresAt });
     return { userCode, verificationUrl: `${origin.dashboardUrl}${RUNNER_LOGIN_VERIFY_PATH}?code=${userCode}`, deviceCode, expiresAt: expiresAt.toISOString() };
+  });
+
+// -----
+// A signed-in member reads the login their terminal started, to
+// check it before approving. An unknown, expired or used code
+// gets the same refusal.
+// -----
+export const lookupRunnerLoginSvc = (db: DbConnectType, userCode: string): Effect.Effect<PendingRunnerLogin, Forbidden | DbError> =>
+  Effect.gen(function* () {
+    const userCodeHash = yield* Effect.promise(() => hashPairingCode(userCode));
+    const login = yield* findPendingLoginEffect(db, userCodeHash, new Date());
+    if (!login) return yield* Effect.fail(new Forbidden({ message: RUNNER_LOGIN_INVALID }));
+    return login;
   });
 
 export const approveRunnerLoginSvc = (db: AppDbType, accountId: string, userId: string, ip: string, body: ApproveRunnerLoginBody): Effect.Effect<ApprovedRunnerLogin, Forbidden | DbError> =>

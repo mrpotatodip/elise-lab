@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authUser, platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
 import { StartedRunnerLoginSchema, type StartRunnerLoginBody } from "@repo/contracts/elise";
 import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { approveRunnerLoginSvc, checkRunnerLoginSvc, claimJobSvc, runnerIdentitySvc, startRunnerLoginSvc } from "#/modules/runners/handlers";
+import { approveRunnerLoginSvc, checkRunnerLoginSvc, claimJobSvc, lookupRunnerLoginSvc, runnerIdentitySvc, startRunnerLoginSvc } from "#/modules/runners/handlers";
 import { hashPairingCode, hashRunnerToken } from "#/modules/runners/utils";
 
 let test: TestDb;
@@ -48,6 +48,34 @@ describe("starting a Runner login", () => {
     expect(JSON.stringify(row)).not.toContain(started.deviceCode);
     expect(JSON.stringify(row)).not.toContain(started.userCode);
     expect(JSON.stringify(row)).not.toContain(started.userCode.replace("-", ""));
+  });
+});
+
+describe("reading a pending login for the approval page", () => {
+  it("answers the suggested name, OS, CPU, version, requesting IP and expiry, in any spelling of the code, and nothing secret", async () => {
+    const started = await start();
+    const found = await run(lookupRunnerLoginSvc(test.http, started.userCode.toLowerCase().replace("-", "")));
+
+    expect(found).toMatchObject({ suggestedName: "build-box", os: "linux 6.8", cpu: "x64", version: "0.1.0", requestIp: "203.0.113.7", expiresAt: started.expiresAt });
+    expect(Object.keys(found).toSorted()).toEqual(["cpu", "expiresAt", "os", "requestIp", "suggestedName", "version"]);
+  });
+
+  it("refuses an unknown code, an approved login and an expired login alike", async () => {
+    const approvedLogin = await start();
+    await test.raw.update(platformRunnerDeviceLogins).set({ state: "approved" }).where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(approvedLogin.userCode)));
+    await test.raw.insert(platformRunnerDeviceLogins).values({
+      userCodeHash: await hashPairingCode("LOOK-EXPD"),
+      deviceCodeHash: await hashRunnerToken("lookup-expired-device-code"),
+      suggestedName: "old",
+      os: "linux",
+      cpu: "x64",
+      runnerVersion: "0.1.0",
+      requestIp: "203.0.113.7",
+      expiresAt: new Date(Date.now() - 1000),
+    });
+    const refusal = (code: string) => run(Effect.flip(lookupRunnerLoginSvc(test.http, code)).pipe(Effect.map((error) => error._tag)));
+
+    expect([await refusal("ZZZZ-ZZZZ"), await refusal(approvedLogin.userCode), await refusal("LOOK-EXPD")]).toEqual(["Forbidden", "Forbidden", "Forbidden"]);
   });
 });
 

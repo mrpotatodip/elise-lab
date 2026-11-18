@@ -46,6 +46,7 @@ describe("GET /openapi.json", () => {
       "GET /repos/{repoId}/findings",
       "GET /repos/{repoId}/verdict",
       "GET /runners",
+      "GET /runners/login/lookup",
       "GET /runners/me",
       "GET /scans",
       "GET /scans/{scanId}",

@@ -163,6 +163,19 @@ export const ApprovedRunnerLoginSchema = z.object({
   runnerId: RunnerIdSchema,
 });
 
+export const RunnerLoginLookupQuerySchema = z.object({
+  code: z.string().trim().min(1).max(RUNNER_LOGIN_USER_CODE_MAX),
+});
+
+export const PendingRunnerLoginSchema = z.object({
+  suggestedName: z.string(),
+  os: z.string(),
+  cpu: z.string(),
+  version: z.string(),
+  requestIp: z.string(),
+  expiresAt: z.iso.datetime(),
+});
+
 export const CheckRunnerLoginBodySchema = z.object({
   deviceCode: z.string().trim().min(1).max(RUNNER_LOGIN_DEVICE_CODE_MAX),
 });
@@ -187,5 +200,7 @@ export type StartRunnerLoginBody = z.infer<typeof StartRunnerLoginBodySchema>;
 export type StartedRunnerLogin = z.infer<typeof StartedRunnerLoginSchema>;
 export type ApproveRunnerLoginBody = z.infer<typeof ApproveRunnerLoginBodySchema>;
 export type ApprovedRunnerLogin = z.infer<typeof ApprovedRunnerLoginSchema>;
+export type RunnerLoginLookupQuery = z.infer<typeof RunnerLoginLookupQuerySchema>;
+export type PendingRunnerLogin = z.infer<typeof PendingRunnerLoginSchema>;
 export type CheckRunnerLoginBody = z.infer<typeof CheckRunnerLoginBodySchema>;
 export type RunnerLoginCheck = z.infer<typeof RunnerLoginCheckSchema>;

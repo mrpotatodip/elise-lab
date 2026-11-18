@@ -1,7 +1,7 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
-import type { RunnerIdentity } from "@repo/contracts/elise";
+import type { PendingRunnerLogin, RunnerIdentity } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf } from "#/modules/audit-trail";
@@ -17,6 +17,29 @@ export const startLoginEffect = (db: DbConnectType, login: NewRunnerLogin): Effe
     try: () => db.insert(platformRunnerDeviceLogins).values(login),
     catch: toDbError,
   }).pipe(Effect.asVoid);
+
+// -----
+// What the approval page shows: only a login that is pending and
+// unexpired, and never a hash or the device code.
+// -----
+export const findPendingLoginEffect = (db: DbConnectType, userCodeHash: string, now: Date): Effect.Effect<PendingRunnerLogin | null, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [login] = await db
+        .select({
+          suggestedName: platformRunnerDeviceLogins.suggestedName,
+          os: platformRunnerDeviceLogins.os,
+          cpu: platformRunnerDeviceLogins.cpu,
+          version: platformRunnerDeviceLogins.runnerVersion,
+          requestIp: platformRunnerDeviceLogins.requestIp,
+          expiresAt: platformRunnerDeviceLogins.expiresAt,
+        })
+        .from(platformRunnerDeviceLogins)
+        .where(and(eq(platformRunnerDeviceLogins.userCodeHash, userCodeHash), eq(platformRunnerDeviceLogins.state, "pending"), gt(platformRunnerDeviceLogins.expiresAt, now)));
+      return login ? { ...login, expiresAt: login.expiresAt.toISOString() } : null;
+    },
+    catch: toDbError,
+  });
 
 // -----
 // Approving is one UPDATE that matches only a login that is
