@@ -26,7 +26,7 @@ The folder is one Cargo workspace (`Cargo.toml`, one `Cargo.lock`, one `target`)
 
 The app has no Scan path of its own. The Scan path (the claim, the clone, the settings file the agent runs under, the four Phases on one Pool, the validators, the repair run, collecting and sending the files, stopping a Scan) is in the core, `core/src/scan.rs`, and the headless Runner runs the same code. Its rules are in `docs/adr/0006-full-worker-and-phase-budget.md`, under "Runner Scans". A Scan from this app uses your Claude login but not your Claude Code settings, and never reads or changes your `~/.claude` folder: that is the core's rule, not this app's. Quitting the app during a Scan kills `claude` and sends no result.
 
-The Rust tests (`cargo test --workspace` in this folder) run a Scan after the clone against a stub `claude` and `node`, in the core, on a plain tokio runtime, and run the debug `elise-runner` as a process against a stub engine with `ELISE_RUNNER_HOME` set to a temp folder, so no test touches a keychain.
+The Rust tests (`cargo test -p elise-runner-core -p elise-runner-cli` in this folder; the desktop crate is left out because it needs the system's GTK libraries to build, and has no tests) run a Scan after the clone against a stub `claude` and `node`, in the core, on a plain tokio runtime, and run the debug `elise-runner` as a process against a stub engine with `ELISE_RUNNER_HOME` set to a temp folder, so no test touches a keychain.
 
 The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The activity is `idle`, `running` or `finished`.
 
@@ -35,7 +35,7 @@ The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The
 ```bash
 pnpm --filter elise-runner-cli app:dev     # tauri dev
 pnpm --filter elise-runner-cli app:build   # tauri build
-pnpm --filter elise-runner-cli check       # tsc --noEmit, then cargo test --workspace
+pnpm --filter elise-runner-cli check       # tsc --noEmit, then cargo test for the core and the terminal program
 ```
 
 ## The headless Runner
