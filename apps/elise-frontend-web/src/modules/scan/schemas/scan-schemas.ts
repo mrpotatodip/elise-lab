@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "@repo/contracts/elise";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+
+const provider = sourceProviderOf(DEFAULT_SOURCE_PROVIDER_ID);
 
 export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS, RepoDetailSchema, RepoListSchema, RepoParamSchema, ScanListSchema, ScanQueuedSchema, ScanStateSchema, ScanStatusSchema } from "@repo/contracts/elise";
 export type { Repo, RepoBranch, ScanState, ScanStatus } from "@repo/contracts/elise";
 
 export const CreateScanInputSchema = z.object({
-  repo: z.string().regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/, "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name."),
+  repo: z.string().regex(provider.addressPattern, provider.addressMessage),
   model: z.enum(SCAN_MODELS),
   effort: z.enum(SCAN_EFFORTS),
   profile: z.enum(SCAN_PROFILES),

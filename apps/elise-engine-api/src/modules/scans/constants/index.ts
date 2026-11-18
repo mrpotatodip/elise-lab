@@ -1,7 +1,9 @@
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+
 // -----
 // Input
 // -----
-export const SCANS_GITHUB_REPO = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/;
+export const SCANS_REPO_ADDRESS = sourceProviderOf(DEFAULT_SOURCE_PROVIDER_ID).addressPattern;
 // -----
 // A ref reaches git as an argument, so it cannot start
 // with a dash, and it holds only what a branch, tag or

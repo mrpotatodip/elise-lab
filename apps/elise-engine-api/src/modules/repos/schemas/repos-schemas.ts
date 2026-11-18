@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { REPO_BRANCH_LIMIT } from "@repo/contracts/elise";
-import { SCANS_GIT_REF, SCANS_GITHUB_REPO } from "#/modules/scans/constants";
+import { SCANS_GIT_REF, SCANS_REPO_ADDRESS } from "#/modules/scans/constants";
 
 export const AddRepoBodySchema = z.object({
-  repo: z.string().regex(SCANS_GITHUB_REPO).meta({ example: "https://github.com/octocat/Hello-World" }),
+  repo: z.string().regex(SCANS_REPO_ADDRESS).meta({ example: "https://github.com/octocat/Hello-World" }),
   branches: z
     .array(z.string().regex(SCANS_GIT_REF))
     .max(REPO_BRANCH_LIMIT)

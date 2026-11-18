@@ -1,4 +1,5 @@
 import type { GithubRepo } from "#/modules/github";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
 import { CreateScanInputSchema } from "../schemas";
 import type { KnownRepo } from "./scan-known-repos";
 
@@ -27,9 +28,9 @@ const LAST_SCAN_NOTE = {
   failed: "Last scan failed",
 } as const;
 
-const LINK = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/i;
+const provider = sourceProviderOf(DEFAULT_SOURCE_PROVIDER_ID);
 
-const bare = (url: string) => url.toLowerCase().replace(/(\.git)?\/?$/, "");
+const bare =(url: string) => url.toLowerCase().replace(/(\.git)?\/?$/, "");
 
 export const scanRepoPickSame = (a: string, b: string) => bare(a) === bare(b);
 const sameRepo = scanRepoPickSame;
@@ -37,11 +38,10 @@ const sameRepo = scanRepoPickSame;
 const RepoLinkSchema = CreateScanInputSchema.pick({ repo: true });
 
 export function scanRepoLinkPick(text: string): ScanRepoPick | null {
-  const match = LINK.exec(text.trim());
-  if (!match) return null;
-  const url = `https://github.com/${match[1]}/${match[2]}`;
-  if (!RepoLinkSchema.safeParse({ repo: url }).success) return null;
-  return { url, label: `${match[1]}/${match[2]}`, note: "Public repository, from the link", isPrivate: false, running: false, repoId: null, connection: null, fromLink: true };
+  const link = provider.linkOf(text);
+  if (link === null) return null;
+  if (!RepoLinkSchema.safeParse({ repo: link.url }).success) return null;
+  return { url: link.url, label: link.label, note: "Public repository, from the link", isPrivate: false, running: false, repoId: null, connection: null, fromLink: true };
 }
 
 export function scanRepoPicks(known: readonly KnownRepo[], connected: readonly GithubRepo[]): ScanRepoPick[] {

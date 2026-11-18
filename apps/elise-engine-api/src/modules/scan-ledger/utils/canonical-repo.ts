@@ -1,15 +1,11 @@
-const GITHUB_PREFIX = /^https:\/\/github\.com\//;
-const GIT_SUFFIX = /(\.git)?\/?$/;
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+
+const provider = sourceProviderOf(DEFAULT_SOURCE_PROVIDER_ID);
 
 // -----
-// The same repo, however it was typed: owner/name
-// in lowercase, without the host, .git or a trailing
-// slash. Twin of the SQL in migration 0058_scan_repos.
+// Every Repo is a github one until Repos store their
+// provider: both read through the github provider.
 // -----
-export const canonicalRepo = (url: string): string => url.replace(GITHUB_PREFIX, "").replace(GIT_SUFFIX, "").toLowerCase();
+export const canonicalRepo = (url: string): string => provider.canonical(url);
 
-// -----
-// The URL as first typed, minus .git and a trailing
-// slash. It is what the repo record keeps for display.
-// -----
-export const displayRepoUrl = (url: string): string => url.replace(GIT_SUFFIX, "");
+export const displayRepoUrl = (url: string): string => provider.display(url);
