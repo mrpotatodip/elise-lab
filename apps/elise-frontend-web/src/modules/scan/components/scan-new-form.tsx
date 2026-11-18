@@ -31,9 +31,11 @@ import {
 } from "../constants";
 import { createScan } from "../api";
 import { scanKeys, scanReposQuery, scansQuery } from "../hooks";
-import { CreateScanInputSchema, type CreateScanInput } from "../schemas";
+import { DEFAULT_SOURCE_PROVIDER_ID, isGitSourceProvider, sourceProviderOf, sourceProviderOfAddress } from "#/providers/registry";
+import { CreateScanInputSchema, type CreateScanInput, type SourceProviderValue } from "../schemas";
 import { scanKnownRepos, scanPlanSummary, scanRepoChoices, scanRepoLinkPick, scanRepoPickSame, scanRepoPicks, type ScanRepoPick } from "../utils";
 import { ScanNewBranch, useScanBranches } from "./scan-new-branch";
+import { ScanNewProvider } from "./scan-new-provider";
 import { ScanNewSearch, ScanRepoIcon } from "./scan-new-search";
 
 const INITIAL: CreateScanInput = {
@@ -121,6 +123,14 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
     },
   });
   const values = useStore(form.store, (state) => state.values);
+  // -----
+  // The provider comes first. "Scan again" opens on the provider its
+  // address belongs to.
+  // -----
+  const [providerId, setProviderId] = useState<SourceProviderValue>(() => (repo === undefined ? undefined : sourceProviderOfAddress(repo)?.id) ?? DEFAULT_SOURCE_PROVIDER_ID);
+  const provider = sourceProviderOf(providerId);
+  const listsRepos = provider.capabilities.canListRepos;
+  const runnerOnly = !provider.capabilities.cloudScans;
   const [picked, setPicked] = useState<ScanRepoPick | null | undefined>(undefined);
   const [branchPick, setBranchPick] = useState(startRef ? SCAN_OTHER_BRANCH : (startBranch ?? SCAN_DEFAULT_BRANCH));
   const { data: list } = useQuery(scansQuery());
@@ -132,8 +142,8 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
   const { data: connected, isPending: connecting } = useQuery(githubReposQuery());
   const { data: installs } = useQuery(githubInstallationsQuery());
   const everyKnown = repoList ? scanRepoChoices(repoList.repos, list?.scans ?? []) : scanKnownRepos(list?.scans ?? []);
-  const picks = scanRepoPicks(everyKnown, connected ?? []);
-  const fromProp = repo === undefined ? null : (picks.find((item) => scanRepoPickSame(item.url, repo)) ?? scanRepoLinkPick(repo));
+  const picks = scanRepoPicks(everyKnown, connected ?? [], providerId);
+  const fromProp = repo === undefined ? null : (picks.find((item) => scanRepoPickSame(item.url, repo)) ?? scanRepoLinkPick(repo, providerId));
   // -----
   // The choice is remembered as a repository, not as the row that was clicked:
   // the list changes when the GitHub connection's repositories arrive (a
@@ -148,14 +158,17 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
   // -----
   // A scan can run on one of the account's connected runners: the person's own
   // computer, on their own Claude. Only a public repository can, because a private one
-  // needs the GitHub token that only Elise's container can make.
+  // needs the GitHub token that only Elise's container can make. A provider without
+  // cloud Scans (GitLab) runs only on a Runner, so it takes the first connected one
+  // until the person picks another, and starts nothing without one.
   // -----
   const { data: runners } = useQuery(runnersQuery());
   const connectedRunners = (runners ?? []).filter((item) => item.state === "connected");
-  const runner = isPrivate ? undefined : connectedRunners.find((item) => item.id === values.runnerId);
+  const runner = isPrivate ? undefined : (connectedRunners.find((item) => item.id === values.runnerId) ?? (runnerOnly ? connectedRunners[0] : undefined));
   const showRunner = !isPrivate && connectedRunners.length > 0;
+  const noRunner = runnerOnly && runners !== undefined && runner === undefined;
   const ref = typedBranch ? values.ref : branchPick === SCAN_DEFAULT_BRANCH ? undefined : branchPick;
-  const plan: CreateScanInput = { ...values, runnerId: runner?.id, repo: selected?.url ?? "", ref };
+  const plan: CreateScanInput = { ...values, provider: providerId, runnerId: runner?.id, repo: selected?.url ?? "", ref };
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -163,6 +176,11 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
     setPicked(next);
     setBranchPick(SCAN_DEFAULT_BRANCH);
     form.setFieldValue("ref", undefined);
+  };
+
+  const chooseProvider = (next: SourceProviderValue) => {
+    setProviderId(next);
+    choose(null);
   };
 
   const start = useMutation({
@@ -177,7 +195,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
   });
 
   const summary = scanPlanSummary(plan, runner?.name);
-  const chips = [runner?.name ?? "Elise's cloud", labelOf(SCAN_MODEL_OPTIONS, values.model), `${labelOf(SCAN_EFFORT_OPTIONS, values.effort)} effort`];
+  const chips = [runner?.name ?? (runnerOnly ? "No Runner connected" : "Elise's cloud"), labelOf(SCAN_MODEL_OPTIONS, values.model), `${labelOf(SCAN_EFFORT_OPTIONS, values.effort)} effort`];
 
   return (
     <form
@@ -191,22 +209,31 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
     >
       <DialogBody className="grid content-start gap-6">
         {selected === null ? (
-          <ScanNewSearch
-            picks={picks}
-            loading={connecting}
-            onPick={choose}
-            hint={
-              noConnection ? (
-                <p className="px-1 text-sm leading-relaxed text-muted-foreground">
-                  To scan a private repository, an admin connects GitHub on the{" "}
-                  <Link to="/connections" className="font-medium underline underline-offset-2">
-                    Connections
-                  </Link>{" "}
-                  page.
-                </p>
-              ) : undefined
-            }
-          />
+          <div className="grid gap-4">
+            <ScanNewProvider value={providerId} onChange={chooseProvider} />
+            {isGitSourceProvider(provider) && (
+              <ScanNewSearch
+                key={provider.id}
+                provider={provider}
+                picks={picks}
+                loading={listsRepos && connecting}
+                onPick={choose}
+                hint={
+                  provider.Help !== null ? (
+                    <provider.Help />
+                  ) : listsRepos && noConnection ? (
+                    <p className="px-1 text-sm leading-relaxed text-muted-foreground">
+                      To scan a private repository, an admin connects GitHub on the{" "}
+                      <Link to="/connections" className="font-medium underline underline-offset-2">
+                        Connections
+                      </Link>{" "}
+                      page.
+                    </p>
+                  ) : undefined
+                }
+              />
+            )}
+          </div>
         ) : (
           <div className="grid gap-6 animate-in fade-in-0 duration-200">
             <div className="grid gap-3">
@@ -215,7 +242,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                   <ScanRepoIcon pick={selected} />
                   <span className="grid min-w-0 flex-1">
                     <span className="truncate text-sm font-medium">{selected.label}</span>
-                    <span className="text-xs text-muted-foreground">{selected.isPrivate ? "Private repository" : "Public repository"}</span>
+                    <span className="text-xs text-muted-foreground">{selected.isPrivate ? "Private repository" : isGitSourceProvider(provider) ? provider.address.repoNote : provider.label}</span>
                   </span>
                   <Button type="button" variant="ghost" size="sm" onClick={() => choose(null)}>
                     Change
@@ -255,6 +282,17 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                     </div>
                   )}
                 </form.Field>
+              )}
+              {noRunner && (
+                <Alert>
+                  <AlertDescription>
+                    A {provider.label} audit runs only on one of your Runners, and none is connected. Add one under{" "}
+                    <Link to="/settings/providers" className="font-medium underline underline-offset-2">
+                      Settings, Providers
+                    </Link>
+                    .
+                  </AlertDescription>
+                </Alert>
               )}
               {selected.running && (
                 <output className="block rounded-md border border-status-warning/25 bg-status-warning-soft px-3 py-2 text-sm text-status-warning">
@@ -303,19 +341,21 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                       </Label>
                       <Select
                         value={runner?.id ?? RUN_IN_CLOUD}
-                        items={[{ value: RUN_IN_CLOUD, label: "Elise's cloud" }, ...connectedRunners.map((item) => ({ value: item.id, label: item.name }))]}
+                        items={[...(runnerOnly ? [] : [{ value: RUN_IN_CLOUD, label: "Elise's cloud" }]), ...connectedRunners.map((item) => ({ value: item.id, label: item.name }))]}
                         onValueChange={(next) => form.setFieldValue("runnerId", connectedRunners.find((item) => item.id === next)?.id)}
                       >
                         <SelectTrigger id="run-where" className="h-9">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={RUN_IN_CLOUD}>
-                            <span className="grid">
-                              <span>Elise&apos;s cloud</span>
-                              <span className="text-xs text-muted-foreground">Runs in an isolated container, and uses your plan&apos;s credit or key.</span>
-                            </span>
-                          </SelectItem>
+                          {!runnerOnly && (
+                            <SelectItem value={RUN_IN_CLOUD}>
+                              <span className="grid">
+                                <span>Elise&apos;s cloud</span>
+                                <span className="text-xs text-muted-foreground">Runs in an isolated container, and uses your plan&apos;s credit or key.</span>
+                              </span>
+                            </SelectItem>
+                          )}
                           {connectedRunners.map((item) => (
                             <SelectItem key={item.id} value={item.id}>
                               <span className="grid">
@@ -359,7 +399,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                     : `${usageUsd(usage.remainingUsd)} of this month's budget is left. Each audit stops at its own spend limit.`}
           </p>
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="submit" disabled={start.isPending || connecting || selected === null || selected.running || (budgetSpent && runner === undefined)}>
+          <Button type="submit" disabled={start.isPending || (listsRepos && connecting) || selected === null || selected.running || noRunner || (budgetSpent && runner === undefined)}>
             {start.isPending ? "Starting…" : "Start audit"}
           </Button>
         </div>

@@ -1,7 +1,9 @@
-import type { Repo, ScanState, ScanStatus } from "../schemas";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOfAddress } from "#/providers/registry";
+import type { Repo, ScanState, ScanStatus, SourceProviderValue } from "../schemas";
 import { scanRepoName } from "./scan-repo-name";
 
 export type KnownRepo = {
+  provider: SourceProviderValue;
   repoId: string;
   url: string;
   label: string;
@@ -25,7 +27,11 @@ export function scanKnownRepos(scans: readonly ScanStatus[]): KnownRepo[] {
       continue;
     }
     const { owner, name } = scanRepoName(scan.repo, scan.repoId);
-    known.set(scan.repoId, { repoId: scan.repoId, url: scan.repo, label: owner ? `${owner}/${name}` : name, last: scan.status, running: active, isPrivate: false });
+    // -----
+    // A scan names no provider, so its address tells.
+    // -----
+    const provider = sourceProviderOfAddress(scan.repo)?.id ?? DEFAULT_SOURCE_PROVIDER_ID;
+    known.set(scan.repoId, { provider, repoId: scan.repoId, url: scan.repo, label: owner ? `${owner}/${name}` : name, last: scan.status, running: active, isPrivate: false });
   }
   return [...known.values()];
 }
@@ -39,5 +45,5 @@ export function scanRepoChoices(repos: readonly Repo[], scans: readonly ScanStat
   const running = new Set(scans.filter((scan) => scan.status === "queued" || scan.status === "running").map((scan) => scan.repoId));
   return repos
     .toSorted((a, b) => (b.lastScanAt ?? "").localeCompare(a.lastScanAt ?? "") || a.canonical.localeCompare(b.canonical))
-    .map((repo) => ({ repoId: repo.id, url: repo.url, label: repo.canonical, last: repo.lastScanStatus, running: running.has(repo.id), isPrivate: repo.isPrivate === true }));
+    .map((repo) => ({ provider: repo.provider ?? DEFAULT_SOURCE_PROVIDER_ID, repoId: repo.id, url: repo.url, label: repo.canonical, last: repo.lastScanStatus, running: running.has(repo.id), isPrivate: repo.isPrivate === true }));
 }
