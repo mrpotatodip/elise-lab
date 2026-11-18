@@ -34,6 +34,7 @@ export const platformMasterPlans = pgTable(
     carryCapUsd: numeric("carry_cap_usd", { precision: 10, scale: 2 }),
     keySource: text("key_source").$type<ScanKeySourceValue>().notNull().default("platform"),
     monthlyScanAllowance: integer("monthly_scan_allowance"),
+    hostedScansAllowed: boolean("hosted_scans_allowed").notNull().default(true),
     stripePriceId: text("stripe_price_id"),
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

@@ -1,0 +1,2 @@
+ALTER TABLE "platform_master_plans" ADD COLUMN "hosted_scans_allowed" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+UPDATE "platform_master_plans" SET "hosted_scans_allowed" = false WHERE "key" = 'runner';
