@@ -1,5 +1,5 @@
 import { describeRoute } from "hono-openapi";
-import { ApprovedRunnerLoginSchema, PendingRunnerLoginSchema, RunnerLoginCheckSchema, StartedRunnerLoginSchema } from "@repo/contracts/elise";
+import { ApprovedRunnerLoginSchema, DeniedRunnerLoginSchema, PendingRunnerLoginSchema, RunnerLoginCheckSchema, StartedRunnerLoginSchema } from "@repo/contracts/elise";
 import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, json, jsonResponse, routeText } from "#/lib/openapi";
 
 const RUNNER_ID = "5b3f0d7e-61a4-4c2f-9d58-2f7a1c9e4b10";
@@ -67,15 +67,36 @@ export const approveRunnerLoginDoc = describeRoute({
   responses: { 200: jsonResponse("The login is approved.", envelope(ApprovedRunnerLoginSchema)), ...errorResponses(400, 401, 403) },
 });
 
+export const denyRunnerLoginDoc = describeRoute({
+  tags: ["runners"],
+  security: SERVICE_SECURITY,
+  summary: "Deny a Runner login",
+  description: routeText({
+    context: "A signed-in member who did not start the login, or does not want it, refuses it on the device page. The Runner's next check ends the wait.",
+    steps: [
+      "The Worker checks the session and that the Role in the account named by `x-account-id` holds `company:runners:create`, as for approve.",
+      "In the Account's transaction the Worker finds a login that is pending and unexpired and marks it denied, and writes one Audit trail entry with the same fields as an approval.",
+      "A code that matches no live login gets a 403 and nothing is kept.",
+    ],
+    example: [
+      "Deny:",
+      bash(`curl -X POST ${EXAMPLE_BASE_URL}/runners/login/deny \\`, '  -H "authorization: Bearer $SESSION_TOKEN" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}" \\`, '  -H "Content-Type: application/json" \\', `  -d '{"userCode":"K7QM-4TXD"}'`),
+      json(`{ "data": { "denied": true }, "error": null }`),
+    ],
+  }),
+  responses: { 200: jsonResponse("The login is denied.", envelope(DeniedRunnerLoginSchema)), ...errorResponses(400, 401, 403) },
+});
+
 export const checkRunnerLoginDoc = describeRoute({
   tags: ["runners"],
   summary: "Check a Runner login",
   description: routeText({
     context: "The Runner asks with its device code whether a member has approved it. No session is needed, because the device code is the proof.",
     steps: [
-      "While the login is pending the Worker answers `pending`: keep waiting.",
+      "A check sooner than the interval (5 seconds, plus 5 for each earlier one that was too early) gets `slow_down` with the new `interval` in seconds.",
+      "While the login is pending the Worker answers `pending`: keep waiting. A denied login answers `denied`. One past its 10 minutes answers `expired`, and an approval nobody collected loses its Runner.",
       "The first check after approval makes the token, saves its hash on the Runner, marks the login collected and returns the token, the Runner name and the Account name once.",
-      "A device code that is unknown, expired or already collected gets the same 403.",
+      "A device code that is unknown or already collected gets the same 403.",
     ],
     example: [
       "Check:",

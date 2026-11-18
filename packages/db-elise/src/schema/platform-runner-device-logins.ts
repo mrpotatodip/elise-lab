@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { RUNNER_LOGIN_STATE_VALUES, type RunnerLoginStateValue } from "@repo/contracts/elise";
 import { partyPersons } from "./party";
 import { tenantRunners } from "./tenant-runners";
@@ -14,6 +14,8 @@ const inList = (values: readonly string[]) => sql.raw(values.map((value) => `'${
 // hashes of the two codes are stored. Approving fills the Account,
 // the Runner row (made with no token), the approver and the approver's
 // IP; the first check after that makes the token and marks it collected.
+// Each check stamps last_checked_at, and one that comes sooner than
+// check_interval_seconds adds 5 seconds to it (RFC 8628 slow_down).
 // -----
 export const platformRunnerDeviceLogins = pgTable(
   "platform_runner_device_logins",
@@ -34,6 +36,8 @@ export const platformRunnerDeviceLogins = pgTable(
     approverIp: text("approver_ip"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     collectedAt: timestamp("collected_at", { withTimezone: true }),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    checkIntervalSeconds: integer("check_interval_seconds").notNull().default(5),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({

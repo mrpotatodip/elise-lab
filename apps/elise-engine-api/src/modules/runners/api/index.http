@@ -43,7 +43,17 @@ Content-Type: application/json
 
 ###
 
-# Check a login. The Runner sends this with its device code; no session. Pending until approved, then the token once.
+# Deny a login. Same Power as approve; the Runner's next check answers "denied".
+POST {{baseUrl}}/runners/login/deny
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "userCode": "K7QM-4TXD" }
+
+###
+
+# Check a login. The Runner sends this with its device code; no session. Pending until approved, then the token once. Too early: "slow_down" with the interval to keep.
 POST {{baseUrl}}/runners/login/check
 Content-Type: application/json
 

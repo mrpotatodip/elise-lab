@@ -6,6 +6,8 @@
 export const RUNNER_PAIRING_INVALID = "This pairing code is invalid or has expired";
 export const RUNNER_NOT_FOUND = "Runner not found";
 export const RUNNER_LOGIN_INVALID = "This login code is invalid or has expired";
+export const RUNNER_LOGIN_LIMITED = "Too many login requests; try again in a minute";
+export const RUNNER_LOGIN_CLEANUP_BATCH = 100;
 export const RUNNER_LOGIN_VERIFY_PATH = "/device";
 export const RUNNER_LOGIN_USER_CODE_LENGTH = 8;
 

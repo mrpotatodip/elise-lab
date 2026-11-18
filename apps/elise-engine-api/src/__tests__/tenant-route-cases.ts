@@ -159,5 +159,6 @@ export const CROSS_ACCOUNT_CASES = {
   // Account has a Runner of its own from here on.
   // -----
   "POST /runners/login/approve": serviceTest("modules/runners/__tests__/runner-login.test.ts"),
+  "POST /runners/login/deny": serviceTest("modules/runners/__tests__/runner-login.test.ts"),
   "POST /runners": { kind: "run", path: "/runners", method: "POST", body: { name: "Guard laptop" }, expect: "created" },
 } satisfies Record<string, CrossAccountCase>;

@@ -610,6 +610,13 @@
       "when": 1794972282713,
       "tag": "0086_runner_device_logins",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1794974645984,
+      "tag": "0087_runner_login_check_interval",
+      "breakpoints": true
     }
   ]
 }

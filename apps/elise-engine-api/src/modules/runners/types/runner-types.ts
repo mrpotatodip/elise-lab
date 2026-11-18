@@ -46,6 +46,14 @@ export type NewRunnerLogin = {
   expiresAt: Date;
 };
 
+export type RunnerLoginDenial = {
+  userCodeHash: string;
+  tenantId: string;
+  actorUserId: string;
+  approverIp: string;
+  now: Date;
+};
+
 export type RunnerLoginApproval = {
   userCodeHash: string;
   tenantId: string;

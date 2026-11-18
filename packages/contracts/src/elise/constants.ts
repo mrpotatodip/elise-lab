@@ -42,6 +42,14 @@ export const RUNNER_LOGIN_DEVICE_CODE_MAX = 128;
 export const RUNNER_LOGIN_FIELD_MAX = 120;
 
 // -----
+// How often the Runner may check a login, in seconds. A check
+// sooner than that is answered "slow_down", and each one adds the
+// step to the interval the Runner must keep (RFC 8628).
+// -----
+export const RUNNER_LOGIN_CHECK_INTERVAL_S = 5;
+export const RUNNER_LOGIN_SLOW_DOWN_STEP_S = 5;
+
+// -----
 // A Scan on a Runner: how long it may wait for the app to claim it,
 // and the most a report may carry (characters), so one Runner cannot
 // fill the database.

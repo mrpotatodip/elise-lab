@@ -184,7 +184,18 @@ export const CheckRunnerLoginBodySchema = z.object({
 export const RunnerLoginCheckSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("pending") }),
   EnrolledRunnerSchema.extend({ status: z.literal("approved") }),
+  z.object({ status: z.literal("denied") }),
+  z.object({ status: z.literal("expired") }),
+  z.object({ status: z.literal("slow_down"), interval: z.number().int().positive() }),
 ]);
+
+export const DenyRunnerLoginBodySchema = z.object({
+  userCode: z.string().trim().min(1).max(RUNNER_LOGIN_USER_CODE_MAX),
+});
+
+export const DeniedRunnerLoginSchema = z.object({
+  denied: z.literal(true),
+});
 
 export type CreateRunnerBody = z.infer<typeof CreateRunnerBodySchema>;
 export type EnrollRunnerBody = z.infer<typeof EnrollRunnerBodySchema>;
@@ -205,3 +216,5 @@ export type RunnerLoginLookupQuery = z.infer<typeof RunnerLoginLookupQuerySchema
 export type PendingRunnerLogin = z.infer<typeof PendingRunnerLoginSchema>;
 export type CheckRunnerLoginBody = z.infer<typeof CheckRunnerLoginBodySchema>;
 export type RunnerLoginCheck = z.infer<typeof RunnerLoginCheckSchema>;
+export type DenyRunnerLoginBody = z.infer<typeof DenyRunnerLoginBodySchema>;
+export type DeniedRunnerLogin = z.infer<typeof DeniedRunnerLoginSchema>;

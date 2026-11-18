@@ -4,8 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessAuditLog, authUser, platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
 import { StartedRunnerLoginSchema, type StartRunnerLoginBody } from "@repo/contracts/elise";
 import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { approveRunnerLoginSvc, checkRunnerLoginSvc, claimJobSvc, lookupRunnerLoginSvc, runnerIdentitySvc, startRunnerLoginSvc } from "#/modules/runners/handlers";
-import { hashPairingCode, hashRunnerToken } from "#/modules/runners/utils";
+import { approveRunnerLoginSvc, checkRunnerLoginSvc, claimJobSvc, denyRunnerLoginSvc, lookupRunnerLoginSvc, runnerIdentitySvc, startRunnerLoginSvc } from "#/modules/runners/handlers";
+import { hashDeviceCode, hashPairingCode, hashRunnerToken } from "#/modules/runners/utils";
 
 let test: TestDb;
 let tenantId: string;
@@ -21,6 +21,26 @@ const approve = (userCode: string, name = "Build box") => run(approveEffect(user
 const refusedApproval = (userCode: string) => run(Effect.flip(approveEffect(userCode, "Build box")).pipe(Effect.map((error) => error._tag)));
 const check = (deviceCode: string) => run(checkRunnerLoginSvc(test.http, { deviceCode }));
 const refusedCheck = (deviceCode: string) => run(Effect.flip(checkRunnerLoginSvc(test.http, { deviceCode })).pipe(Effect.map((error) => error._tag)));
+const denyEffect = (userCode: string) => asTenantEffect(test, tenantId, (db) => denyRunnerLoginSvc(db, tenantId, userId, "198.51.100.9", { userCode }));
+const refusedDenial = (userCode: string) => run(Effect.flip(denyEffect(userCode)).pipe(Effect.map((error) => error._tag)));
+const insertExpiredLogin = async (userCode: string, deviceCode: string) => {
+  const [row] = await test.raw
+    .insert(platformRunnerDeviceLogins)
+    .values({
+      userCodeHash: await hashPairingCode(userCode),
+      deviceCodeHash: await hashDeviceCode(deviceCode),
+      suggestedName: "old",
+      os: "linux",
+      cpu: "x64",
+      runnerVersion: "0.1.0",
+      requestIp: "203.0.113.7",
+      expiresAt: new Date(Date.now() - 1000),
+    })
+    .returning({ id: platformRunnerDeviceLogins.id });
+  return row?.id ?? "";
+};
+const expireLogin = (userCode: string) => hashPairingCode(userCode).then((hash) => test.raw.update(platformRunnerDeviceLogins).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(platformRunnerDeviceLogins.userCodeHash, hash)));
+const waitedLongEnough = (userCode: string) => hashPairingCode(userCode).then((hash) => test.raw.update(platformRunnerDeviceLogins).set({ lastCheckedAt: new Date(Date.now() - 60_000) }).where(eq(platformRunnerDeviceLogins.userCodeHash, hash)));
 const runnerCount = async () => (await test.raw.select({ n: count() }).from(tenantRunners))[0]?.n ?? 0;
 
 beforeAll(async () => {
@@ -146,20 +166,12 @@ describe("refusing a login", () => {
     expect(await runnerCount()).toBe(before);
   });
 
-  it("refuses an expired login on approval and on check", async () => {
+  it("refuses an expired login on approval and denial, and answers expired on check", async () => {
     const userCode = "ABCD-EFGH";
-    await test.raw.insert(platformRunnerDeviceLogins).values({
-      userCodeHash: await hashPairingCode(userCode),
-      deviceCodeHash: await hashRunnerToken("expired-device-code"),
-      suggestedName: "old",
-      os: "linux",
-      cpu: "x64",
-      runnerVersion: "0.1.0",
-      requestIp: "203.0.113.7",
-      expiresAt: new Date(Date.now() - 1000),
-    });
+    await insertExpiredLogin(userCode, "expired-device-code");
     expect(await refusedApproval(userCode)).toBe("Forbidden");
-    expect(await refusedCheck("expired-device-code")).toBe("Forbidden");
+    expect(await refusedDenial(userCode)).toBe("Forbidden");
+    expect(await check("expired-device-code")).toEqual({ status: "expired" });
   });
 
   it("refuses a device code nobody was given", async () => {
@@ -171,5 +183,93 @@ describe("refusing a login", () => {
     const approved = await approve(started.userCode);
     await test.raw.update(tenantRunners).set({ revokedAt: new Date() }).where(eq(tenantRunners.id, approved.runnerId));
     expect(await refusedCheck(started.deviceCode)).toBe("Forbidden");
+  });
+});
+
+describe("denying a login", () => {
+  it("ends the wait with denied, makes no Runner, and writes one Audit trail entry like an approval", async () => {
+    const started = await start();
+    const before = await runnerCount();
+    expect(await run(denyEffect(started.userCode.toLowerCase()))).toEqual({ denied: true });
+    const [login] = await test.raw.select().from(platformRunnerDeviceLogins).where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(started.userCode)));
+    const entries = await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, login?.id ?? ""));
+
+    expect(await check(started.deviceCode)).toEqual({ status: "denied" });
+    expect(await runnerCount()).toBe(before);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ action: "runner.login.deny", after: { tenantId, name: "build-box", requestIp: "203.0.113.7", approverIp: "198.51.100.9" } });
+  });
+
+  it("refuses an unknown, approved or already denied code, and a denied code cannot be approved", async () => {
+    const approvedLogin = await start();
+    await approve(approvedLogin.userCode);
+    const deniedLogin = await start();
+    await run(denyEffect(deniedLogin.userCode));
+
+    expect([await refusedDenial("ZZZZ-ZZZZ"), await refusedDenial(approvedLogin.userCode), await refusedDenial(deniedLogin.userCode), await refusedApproval(deniedLogin.userCode)]).toEqual([
+      "Forbidden",
+      "Forbidden",
+      "Forbidden",
+      "Forbidden",
+    ]);
+  });
+});
+
+describe("a login that expires", () => {
+  it("removes the Runner an uncollected approval made, on the next check, and keeps answering expired", async () => {
+    const started = await start();
+    const approved = await approve(started.userCode);
+    await expireLogin(started.userCode);
+
+    expect(await check(started.deviceCode)).toEqual({ status: "expired" });
+    expect(await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, approved.runnerId))).toHaveLength(0);
+    expect(await check(started.deviceCode)).toEqual({ status: "expired" });
+  });
+});
+
+describe("collecting once", () => {
+  it("gives a second check nothing, even after the interval", async () => {
+    const started = await start();
+    await approve(started.userCode);
+    expect((await check(started.deviceCode)).status).toBe("approved");
+    await waitedLongEnough(started.userCode);
+
+    expect(await refusedCheck(started.deviceCode)).toBe("Forbidden");
+  });
+});
+
+describe("checking too early", () => {
+  it("answers slow_down and adds 5 seconds to the interval each time, and keeps the answer once the Runner waits", async () => {
+    const started = await start();
+    expect(await check(started.deviceCode)).toEqual({ status: "pending" });
+    expect(await check(started.deviceCode)).toEqual({ status: "slow_down", interval: 10 });
+    expect(await check(started.deviceCode)).toEqual({ status: "slow_down", interval: 15 });
+    await waitedLongEnough(started.userCode);
+    expect(await check(started.deviceCode)).toEqual({ status: "pending" });
+  });
+});
+
+describe("cleaning up expired logins", () => {
+  it("deletes them with the Runner an uncollected approval made, and leaves live logins and collected Runners", async () => {
+    const dead = await start();
+    const deadApproved = await approve(dead.userCode);
+    await expireLogin(dead.userCode);
+    const collected = await start();
+    const collectedApproved = await approve(collected.userCode);
+    const collectedCheck = await check(collected.deviceCode);
+    await expireLogin(collected.userCode);
+    const live = await start();
+    await insertExpiredLogin("CLEA-NUPA", "cleanup-device-code");
+    await start();
+    const logins = await test.raw.select({ userCodeHash: platformRunnerDeviceLogins.userCodeHash }).from(platformRunnerDeviceLogins);
+    const hashes = logins.map((row) => row.userCodeHash);
+
+    expect(collectedCheck.status).toBe("approved");
+    expect(hashes).toContain(await hashPairingCode(live.userCode));
+    expect(hashes).not.toContain(await hashPairingCode(dead.userCode));
+    expect(hashes).not.toContain(await hashPairingCode(collected.userCode));
+    expect(hashes).not.toContain(await hashPairingCode("CLEA-NUPA"));
+    expect(await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, deadApproved.runnerId))).toHaveLength(0);
+    expect(await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, collectedApproved.runnerId))).toHaveLength(1);
   });
 });

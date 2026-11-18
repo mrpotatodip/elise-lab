@@ -1,0 +1,2 @@
+ALTER TABLE "platform_runner_device_logins" ADD COLUMN "last_checked_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "platform_runner_device_logins" ADD COLUMN "check_interval_seconds" integer DEFAULT 5 NOT NULL;
