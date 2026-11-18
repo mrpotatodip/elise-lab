@@ -88,6 +88,22 @@ describe("listing Runners", () => {
   });
 });
 
+describe("who added a Runner", () => {
+  it("names the person for a pairing code and for an approved login", async () => {
+    const owner = await seedTenant(test, "who-added");
+    const person = crypto.randomUUID();
+    await test.raw.insert(authUser).values({ id: person, name: "Ada", email: "who@example.com", emailVerified: true, partyId: owner.partyId });
+    await run(createRunnerEffect(test.http, { tenantId: owner.tenantId, actorUserId: person, name: "By code", codeHash: "who-code", expiresAt: SOON }));
+    await test.raw.insert(tenantRunners).values({ tenantId: owner.tenantId, name: "By login", pairingExpiresAt: SOON, createdBy: owner.partyId });
+
+    const listed = await run(listRunnersEffect(test.http, owner.tenantId, NOW));
+    expect(listed.map((runner) => [runner.name, runner.createdByName]).toSorted()).toEqual([
+      ["By code", "Ada Rossi"],
+      ["By login", "Ada Rossi"],
+    ]);
+  });
+});
+
 describe("removing a Runner", () => {
   it("stops a connected one, once, and only inside its own account", async () => {
     const other = await seedTenant(test, "third-account");

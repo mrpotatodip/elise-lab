@@ -64,6 +64,7 @@ export const RunnerSchema = z.object({
   expiresAt: z.iso.datetime().nullable(),
   pairedAt: z.iso.datetime().nullable(),
   lastSeenAt: z.iso.datetime().nullable(),
+  createdByName: z.string().nullable().optional(),
 });
 
 export const RunnersSchema = z.array(RunnerSchema);

@@ -4,7 +4,7 @@ import { platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
 import type { PendingRunnerLogin, RunnerIdentity } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
-import { actorPartyOf } from "#/modules/audit-trail";
+import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { identityOrNull } from "./runner-queries";
 import type { NewRunnerLogin, RunnerLoginApproval } from "#/modules/runners/types";
 
@@ -46,7 +46,8 @@ export const findPendingLoginEffect = (db: DbConnectType, userCodeHash: string, 
 // pending and unexpired, so two members cannot both win. It
 // then makes the Runner row with no token and links it. Run it
 // in the Account's transaction: null means no live login, and
-// the caller fails so nothing is kept.
+// the caller fails so nothing is kept. It writes one Audit trail
+// entry in that same transaction.
 // -----
 export const approveLoginEffect = (db: AppDbType, approval: RunnerLoginApproval): Effect.Effect<{ runnerId: string } | null, DbError> =>
   Effect.tryPromise({
@@ -63,7 +64,7 @@ export const approveLoginEffect = (db: AppDbType, approval: RunnerLoginApproval)
             gt(platformRunnerDeviceLogins.expiresAt, approval.now),
           ),
         )
-        .returning({ id: platformRunnerDeviceLogins.id, expiresAt: platformRunnerDeviceLogins.expiresAt });
+        .returning({ id: platformRunnerDeviceLogins.id, expiresAt: platformRunnerDeviceLogins.expiresAt, requestIp: platformRunnerDeviceLogins.requestIp });
       if (!login) return null;
       const [runner] = await db
         .insert(tenantRunners)
@@ -71,6 +72,13 @@ export const approveLoginEffect = (db: AppDbType, approval: RunnerLoginApproval)
         .returning({ id: tenantRunners.id });
       if (!runner) return null;
       await db.update(platformRunnerDeviceLogins).set({ runnerId: runner.id }).where(eq(platformRunnerDeviceLogins.id, login.id));
+      await insertAuditEntry(db, {
+        actorPartyId: createdBy,
+        action: "runner.login.approve",
+        subjectId: runner.id,
+        tenantId: approval.tenantId,
+        after: { name: approval.name, requestIp: login.requestIp, approverIp: approval.approverIp },
+      });
       return { runnerId: runner.id };
     },
     catch: toDbError,

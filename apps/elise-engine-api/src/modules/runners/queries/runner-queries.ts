@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { Effect } from "effect";
-import { tenantRunners, tenants } from "@repo/db-elise";
+import { partyPersons, tenantRunners, tenants } from "@repo/db-elise";
 import type { Runner, RunnerIdentity } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Forbidden, toDbError, type DbError } from "#/lib/effect-query";
@@ -63,11 +63,17 @@ export const claimPairingEffect = (db: DbConnectType, claim: PairingClaim): Effe
 // -----
 export const listRunnersEffect = (db: AppDbType, tenantId: string, now: Date): Effect.Effect<Runner[], DbError> =>
   Effect.tryPromise({
-    try: () => db.select().from(tenantRunners).where(and(eq(tenantRunners.tenantId, tenantId), isNull(tenantRunners.revokedAt))).orderBy(desc(tenantRunners.createdAt)),
+    try: () =>
+      db
+        .select({ runner: tenantRunners, firstName: partyPersons.firstName, lastName: partyPersons.lastName })
+        .from(tenantRunners)
+        .leftJoin(partyPersons, eq(partyPersons.partyId, tenantRunners.createdBy))
+        .where(and(eq(tenantRunners.tenantId, tenantId), isNull(tenantRunners.revokedAt)))
+        .orderBy(desc(tenantRunners.createdAt)),
     catch: toDbError,
   }).pipe(
     Effect.map((rows) =>
-      rows.map((row): Runner => {
+      rows.map(({ runner: row, firstName, lastName }): Runner => {
         const live = row.pairingExpiresAt !== null && row.pairingExpiresAt > now;
         return {
           id: row.id,
@@ -77,6 +83,7 @@ export const listRunnersEffect = (db: AppDbType, tenantId: string, now: Date): E
           expiresAt: row.pairingExpiresAt?.toISOString() ?? null,
           pairedAt: row.pairedAt?.toISOString() ?? null,
           lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+          createdByName: firstName === null ? null : `${firstName} ${lastName}`.trim(),
         };
       }),
     ),

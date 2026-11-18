@@ -1,7 +1,7 @@
 import { count, eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authUser, platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
+import { accessAuditLog, authUser, platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
 import { StartedRunnerLoginSchema, type StartRunnerLoginBody } from "@repo/contracts/elise";
 import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { approveRunnerLoginSvc, checkRunnerLoginSvc, claimJobSvc, lookupRunnerLoginSvc, runnerIdentitySvc, startRunnerLoginSvc } from "#/modules/runners/handlers";
@@ -91,6 +91,24 @@ describe("a Runner login from start to collection", () => {
     expect(created?.createdBy).toBeTruthy();
     const [login] = await test.raw.select().from(platformRunnerDeviceLogins).where(eq(platformRunnerDeviceLogins.runnerId, approved.runnerId));
     expect(login).toMatchObject({ state: "approved", tenantId, approverIp: "198.51.100.9" });
+  });
+});
+
+describe("the Audit trail of an approved login", () => {
+  it("writes one entry with the approver, the Account, the Runner name and both IPs, and none for a refused approval", async () => {
+    const started = await start();
+    const approved = await approve(started.userCode, "Audit box");
+    const entries = await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, approved.runnerId));
+    const [created] = await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, approved.runnerId));
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      actorPartyId: created?.createdBy,
+      action: "runner.login.approve",
+      after: { tenantId, name: "Audit box", requestIp: "203.0.113.7", approverIp: "198.51.100.9" },
+    });
+    await refusedApproval(started.userCode);
+    expect(await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, approved.runnerId))).toHaveLength(1);
   });
 });
 
