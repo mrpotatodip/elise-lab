@@ -1,19 +1,20 @@
 import { eq } from "drizzle-orm";
-import { platformMasterPlans, scanArchiveLinks, scans, tenantSubscriptions } from "@repo/db-elise/schema";
+import { platformMasterPlans, scanArchiveLinks, scans, scanUploadArchives, tenantSubscriptions } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { tenantRouteApp } from "#/__tests__/tenant-route-harness";
+import { zipOf } from "#/__tests__/zip-fixture";
 
 let test: TestDb;
 const app = tenantRouteApp(() => test);
 const accountOf = new Map<string, string>();
-const { env } = fakeBindings();
+const { env, store } = fakeBindings();
 
 const RUNNER = "5b3f0d7e-61a4-4c2f-9d58-2f7a1c9e4b10";
-const ZIP = new TextEncoder().encode("PK\u0003\u0004elise-test");
-const ZIP_SHA256 = "0ff74677210e7084975f07543108ee9e9d3b01732f6e7f38ddb98bc055ec271d";
+const ZIP = zipOf([{ name: "app/README.md", text: "elise-test" }]);
+const ZIP_SHA256 = "3ff652db2f06f3e24d5eb0824d3e1ee38401754fe10663f374417be55ce39061";
 const EnvelopeSchema = z.object({ data: z.unknown() });
 const IdSchema = z.object({ id: z.uuid() });
 const QueuedSchema = z.object({ scanId: z.string() });
@@ -114,5 +115,50 @@ describe("POST /scans for an upload app", () => {
     const detail = ScanArchiveSchema.parse(await dataOf(await send("acme", `/scans/${scanId}`)));
 
     expect({ removed: removed.status, archive: detail.archive }).toEqual({ removed: 200, archive: { id: null, label: "app-2.0.zip", contentSha256: ZIP_SHA256 } });
+  });
+});
+
+describe("DELETE /repos/:repoId for an upload app", () => {
+  it("deletes every zip of the app, file and row, leaves the Repo list, and keeps its Scans in the History with no file", async () => {
+    const appId = await newApp("acme", "Gone");
+    const archiveId = await uploadZip("acme", appId, "gone-1.0.zip");
+    await uploadZip("acme", appId, "gone-1.1.zip");
+    const { scanId } = QueuedSchema.parse(await dataOf(await scanUpload("acme", { repo: "Gone", archive_id: archiveId })));
+    const prefix = `accounts/${accountOf.get("acme")}/uploads/${appId}/`;
+    store.set(`${prefix}left-behind.zip`, "an object whose upload never committed");
+
+    const removed = await send("acme", `/repos/${appId}`, { method: "DELETE" });
+    const rows = await test.raw.select({ id: scanUploadArchives.id }).from(scanUploadArchives).where(eq(scanUploadArchives.repoId, appId));
+    const listed = z.object({ repos: z.array(IdSchema) }).parse(await dataOf(await send("acme", "/repos"))).repos.map((repo) => repo.id);
+    const detail = ScanArchiveSchema.parse(await dataOf(await send("acme", `/scans/${scanId}`)));
+    const uploadAfter = await send("acme", `/repos/${appId}/archives?label=again.zip`, { method: "POST", body: ZIP });
+
+    expect({
+      removed: removed.status,
+      rows,
+      files: [...store.keys()].filter((key) => key.startsWith(prefix)),
+      listed: listed.includes(appId),
+      archive: detail.archive,
+      uploadAfter: uploadAfter.status,
+    }).toEqual({ removed: 200, rows: [], files: [], listed: false, archive: { id: null, label: "gone-1.0.zip", contentSha256: ZIP_SHA256 }, uploadAfter: 404 });
+  });
+
+  it("finds the same app, empty, when it is added again", async () => {
+    const appId = await newApp("acme", "Back");
+    await send("acme", `/repos/${appId}`, { method: "DELETE" });
+
+    const again = await newApp("acme", "Back");
+    const listed = z.object({ repos: z.array(IdSchema) }).parse(await dataOf(await send("acme", "/repos"))).repos.map((repo) => repo.id);
+    const archives = z.object({ archives: z.array(z.unknown()) }).parse(await dataOf(await send("acme", `/repos/${appId}/archives`))).archives;
+
+    expect({ same: again === appId, listed: listed.includes(appId), archives }).toEqual({ same: true, listed: true, archives: [] });
+  });
+
+  it("removes no git Repo", async () => {
+    const repoId = IdSchema.parse(await dataOf(await send("acme", "/repos", { method: "POST", json: { repo: "https://github.com/octocat/Spoon-Knife" } }))).id;
+
+    const res = await send("acme", `/repos/${repoId}`, { method: "DELETE" });
+
+    expect(res.status).toBe(404);
   });
 });

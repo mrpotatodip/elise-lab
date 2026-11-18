@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, notExists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { ScanArchiveRef, UploadArchive } from "@repo/contracts/elise";
 import { scanArchiveLinks, scanRepos, scans, scanUploadArchives, type TScanUploadArchive } from "@repo/db-elise/schema";
@@ -19,7 +19,7 @@ export const archiveViewOf = (row: TScanUploadArchive): UploadArchive => ({
 
 // -----
 // The Account's upload app with this id. A git Repo is not
-// one, so it takes no zip.
+// one, so it takes no zip, and a removed app takes none either.
 // -----
 export const findUploadAppEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<{ id: string }, NotFound | DbError> =>
   Effect.tryPromise({
@@ -27,9 +27,34 @@ export const findUploadAppEffect = (db: AppDbType, tenantId: string, repoId: str
       db
         .select({ id: scanRepos.id })
         .from(scanRepos)
-        .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId), eq(scanRepos.provider, "upload"))),
+        .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId), eq(scanRepos.provider, "upload"), isNull(scanRepos.removedAt))),
     catch: toDbError,
   }).pipe(Effect.flatMap(([row]) => (row ? Effect.succeed(row) : Effect.fail(new NotFound({ message: UPLOAD_APP_NOT_FOUND })))));
+
+// -----
+// Removes an upload app: deletes its zips' rows, marks the app
+// removed and gives back where the zips' bytes are. The Repo row
+// stays, so its Scans and findings keep their History; the
+// links of those Scans keep each zip's label and hash.
+// -----
+export const removeUploadAppEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<string[], NotFound | DbError> =>
+  Effect.gen(function* () {
+    yield* findUploadAppEffect(db, tenantId, repoId);
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const deleted = await db
+          .delete(scanUploadArchives)
+          .where(and(eq(scanUploadArchives.tenantId, tenantId), eq(scanUploadArchives.repoId, repoId)))
+          .returning({ r2Key: scanUploadArchives.r2Key });
+        await db
+          .update(scanRepos)
+          .set({ removedAt: new Date() })
+          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
+        return deleted.map((row) => row.r2Key);
+      },
+      catch: toDbError,
+    });
+  });
 
 export const listArchivesEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<UploadArchive[], DbError> =>
   Effect.tryPromise({
@@ -41,6 +66,77 @@ export const listArchivesEffect = (db: AppDbType, tenantId: string, repoId: stri
         .orderBy(desc(scanUploadArchives.uploadedAt), desc(scanUploadArchives.id)),
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows.map(archiveViewOf)));
+
+// -----
+// How many zips the app holds and how many bytes of zips the
+// whole Account stores, for the limits a new zip must fit in.
+// -----
+export const archiveUsageEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<{ inApp: number; storedBytes: number }, DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select({
+          inApp: sql<number>`count(*) filter (where ${scanUploadArchives.repoId} = ${repoId})`.mapWith(Number),
+          storedBytes: sql<number>`coalesce(sum(${scanUploadArchives.sizeBytes}), 0)`.mapWith(Number),
+        })
+        .from(scanUploadArchives)
+        .where(eq(scanUploadArchives.tenantId, tenantId)),
+    catch: toDbError,
+  }).pipe(Effect.map(([usage]) => usage ?? { inApp: 0, storedBytes: 0 }));
+
+// -----
+// The retention sweep's queries run on the owner role across
+// Accounts: no request names one. Each deletes or reads only
+// upload rows.
+//
+// Deletes up to `limit` zips uploaded before `before` that no
+// Scan has read (no link points at them), oldest first, and gives
+// back where their bytes are.
+// -----
+export const deleteExpiredArchivesEffect = (db: AppDbType, before: Date, limit: number): Effect.Effect<string[], DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .delete(scanUploadArchives)
+        .where(
+          inArray(
+            scanUploadArchives.id,
+            db
+              .select({ id: scanUploadArchives.id })
+              .from(scanUploadArchives)
+              .where(
+                and(
+                  lt(scanUploadArchives.uploadedAt, before),
+                  notExists(db.select({ scanId: scanArchiveLinks.scanId }).from(scanArchiveLinks).where(eq(scanArchiveLinks.archiveId, scanUploadArchives.id))),
+                ),
+              )
+              .orderBy(asc(scanUploadArchives.uploadedAt))
+              .limit(limit),
+          ),
+        )
+        .returning({ r2Key: scanUploadArchives.r2Key }),
+    catch: toDbError,
+  }).pipe(Effect.map((rows) => rows.map((row) => row.r2Key)));
+
+export const sampleUploadAppsEffect = (db: AppDbType, limit: number): Effect.Effect<{ tenantId: string; id: string }[], DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select({ tenantId: scanRepos.tenantId, id: scanRepos.id })
+        .from(scanRepos)
+        .where(eq(scanRepos.provider, "upload"))
+        .orderBy(sql`random()`)
+        .limit(limit),
+    catch: toDbError,
+  });
+
+export const archiveKeysAmongEffect = (db: AppDbType, keys: readonly string[]): Effect.Effect<Set<string>, DbError> =>
+  keys.length === 0
+    ? Effect.succeed(new Set())
+    : Effect.tryPromise({
+        try: () => db.select({ r2Key: scanUploadArchives.r2Key }).from(scanUploadArchives).where(inArray(scanUploadArchives.r2Key, [...keys])),
+        catch: toDbError,
+      }).pipe(Effect.map((rows) => new Set(rows.map((row) => row.r2Key))));
 
 export type NewArchive = { id: string; tenantId: string; repoId: string; label: string; r2Key: string; sizeBytes: number; contentSha256: string };
 

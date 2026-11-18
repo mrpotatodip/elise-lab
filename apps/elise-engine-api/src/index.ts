@@ -9,7 +9,7 @@ import { rateLimitByIp } from "#/lib/rate-limit";
 import { openApiDocument, requireOpenApiEnabled, validationErrorResponse } from "#/lib/openapi-document";
 import { errorChainForLog } from "#/lib/redact-log";
 import { requireScanAccess } from "#/lib/require-scan-access";
-import archivesRoutes from "#/modules/archives";
+import archivesRoutes, { runUploadRetention } from "#/modules/archives";
 import authRoutes from "#/modules/auth";
 import filesRoutes from "#/modules/files";
 import findingCommentsRoutes from "#/modules/finding-comments";
@@ -115,6 +115,14 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
 export default {
   fetch: buildApp().app.fetch,
   queue: (batch: MessageBatch<QueuedEmail>, env: Bindings) => consumeQueuedEmails(batch, env),
+  // -----
+  // The daily cron (wrangler.jsonc "triggers"): deletes the zips
+  // no Scan has read 30 days after upload, and stored objects
+  // with no row.
+  // -----
+  scheduled: (_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
+    ctx.waitUntil(runUploadRetention(env, (promise) => ctx.waitUntil(promise)));
+  },
 };
 
 export type AppType = ReturnType<typeof buildApp>["routes"];

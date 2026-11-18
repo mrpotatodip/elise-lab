@@ -97,10 +97,20 @@ export const REPO_BRANCH_LIMIT = 25;
 
 // -----
 // Upload apps: the label a zip is listed under (the file name
-// the dashboard sends). The size, count and storage limits are
-// #233's.
+// the dashboard sends), and the limits of
+// docs/adr/0007-git-providers.md. The upload route checks all
+// of them against the zip's central directory; the Runner checks
+// the unpacked ones again while it unpacks. A zip no Scan has
+// read is deleted UPLOAD_ARCHIVE_RETENTION_DAYS after upload.
 // -----
 export const UPLOAD_ARCHIVE_LABEL_MAX = 120;
+export const UPLOAD_ARCHIVE_MAX_MB = 50;
+export const UPLOAD_UNPACKED_MAX_MB = 250;
+export const UPLOAD_FILES_MAX = 20_000;
+export const UPLOAD_PATH_DEPTH_MAX = 20;
+export const UPLOAD_ARCHIVES_PER_APP_MAX = 20;
+export const UPLOAD_STORAGE_PER_TENANT_MAX_MB = 500;
+export const UPLOAD_ARCHIVE_RETENTION_DAYS = 30;
 
 // -----
 // GitLab addresses (docs/adr/0007-git-providers.md). A path is

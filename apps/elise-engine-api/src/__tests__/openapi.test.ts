@@ -29,6 +29,7 @@ describe("GET /openapi.json", () => {
       "DELETE /github/installations/{id}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",
+      "DELETE /repos/{repoId}",
       "DELETE /repos/{repoId}/archives/{archiveId}",
       "DELETE /runners/me",
       "DELETE /runners/{runnerId}",

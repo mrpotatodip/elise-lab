@@ -27,15 +27,17 @@ export const uploadArchiveDoc = describeRoute({
     context: "The body is the zip itself. `label` is the name it is listed under, usually the file name.",
     steps: [
       "The Worker finds the upload app in the account, 404 if there is none.",
-      "It refuses a body that is not a zip.",
-      "It records the zip (its size and the SHA-256 of its bytes) and stores the bytes under the account.",
+      "It refuses a body over 50 MB (413), and a body that is not a zip.",
+      "From the zip's central directory, it refuses more than 20,000 files, a path more than 20 levels deep, or more than 250 MB unpacked (400).",
+      "It refuses a 21st zip in the app, or a zip that takes the account past 500 MB of stored zips (409).",
+      "It records the zip (its size and the SHA-256 of its bytes) and stores the bytes under the account. A zip no Scan has read is deleted 30 days after upload.",
     ],
     example: [
       "Upload a zip:",
       bash(`curl "${EXAMPLE_BASE_URL}/repos/${APP_ID}/archives?label=app-1.2.zip" \\`, AUTH, `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}" \\`, '  -H "content-type: application/zip" \\', "  --data-binary @app-1.2.zip"),
     ],
   }),
-  responses: { 201: jsonResponse("The stored zip.", envelope(UploadArchiveSchema)), ...errorResponses(400, 401, 403, 404) },
+  responses: { 201: jsonResponse("The stored zip.", envelope(UploadArchiveSchema)), ...errorResponses(400, 401, 403, 404, 409, 413) },
 });
 
 export const removeArchiveDoc = describeRoute({
@@ -48,4 +50,21 @@ export const removeArchiveDoc = describeRoute({
     example: ["Remove a zip:", bash(`curl -X DELETE ${EXAMPLE_BASE_URL}/repos/${APP_ID}/archives/${ARCHIVE_ID} \\`, AUTH, ACCOUNT)],
   }),
   responses: { 200: jsonResponse("The zip is removed.", envelope(UploadArchiveRemovedSchema)), ...errorResponses(400, 401, 403, 404) },
+});
+
+export const removeUploadAppDoc = describeRoute({
+  tags: ["repos"],
+  security: SERVICE_SECURITY,
+  summary: "Remove an upload app",
+  description: routeText({
+    context:
+      "Deletes every zip of an upload app, bytes and records, and takes the app off the repo list. Its Scans and findings stay in the History, each with a note that its file is gone. Adding the app again by name brings it back, empty. A git Repo cannot be removed here.",
+    steps: [
+      "The Worker finds the upload app in the account, 404 if there is none or it is a git Repo.",
+      "It deletes the zips' records and marks the app removed.",
+      "It deletes every object stored under the app.",
+    ],
+    example: ["Remove an upload app:", bash(`curl -X DELETE ${EXAMPLE_BASE_URL}/repos/${APP_ID} \\`, AUTH, ACCOUNT)],
+  }),
+  responses: { 200: jsonResponse("The app is removed.", envelope(UploadArchiveRemovedSchema)), ...errorResponses(400, 401, 403, 404) },
 });

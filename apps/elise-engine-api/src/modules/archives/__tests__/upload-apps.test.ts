@@ -5,6 +5,7 @@ import { z } from "zod";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { tenantRouteApp } from "#/__tests__/tenant-route-harness";
+import { zipOf } from "#/__tests__/zip-fixture";
 
 const DataSchema = z.object({ data: z.record(z.string(), z.unknown()) });
 
@@ -29,11 +30,11 @@ const call = async (account: string, path: string, init: { method?: string; json
 };
 
 // -----
-// A zip's first bytes, then some content; its SHA-256 was taken
-// with shasum.
+// A zip of one file; its SHA-256 was taken with Python's hashlib
+// on the same bytes.
 // -----
-const ZIP = new TextEncoder().encode("PK\u0003\u0004elise-test");
-const ZIP_SHA256 = "0ff74677210e7084975f07543108ee9e9d3b01732f6e7f38ddb98bc055ec271d";
+const ZIP = zipOf([{ name: "app/README.md", text: "elise-test" }]);
+const ZIP_SHA256 = "3ff652db2f06f3e24d5eb0824d3e1ee38401754fe10663f374417be55ce39061";
 const ArchiveSchema = z.object({ id: z.uuid(), label: z.string(), sizeBytes: z.number(), contentSha256: z.string() });
 const ArchivesSchema = z.object({ archives: z.array(ArchiveSchema) });
 const EnvelopeSchema = z.object({ data: z.unknown() });

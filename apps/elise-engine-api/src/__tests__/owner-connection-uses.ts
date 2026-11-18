@@ -18,6 +18,10 @@ export const OWNER_CONNECTION_USES = {
   },
   "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
   "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },
+  "modules/archives/api/run-upload-retention.ts": {
+    uses: 2,
+    reason: "The daily cron has no request and no Account: the upload retention sweep crosses Accounts, and touches only upload rows",
+  },
   "modules/me/api/get-me.ts": { uses: 2, reason: "Lists the Accounts a person belongs to, across Accounts" },
   "modules/runners/api/claim-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/disconnect-runner.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },

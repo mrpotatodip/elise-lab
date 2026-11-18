@@ -66,6 +66,8 @@ export const scanRepos = pgTable(
     defaultBranch: text("default_branch"),
     // Last answer GitHub gave at a Scan request. For display only: each Scan keeps its own.
     isPrivate: boolean("is_private"),
+    // Set when a person removes an upload app: its zips are deleted, and the row stays so its Scans keep their History. Adding the app again clears it.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({

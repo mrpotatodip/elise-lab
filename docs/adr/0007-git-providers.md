@@ -44,8 +44,29 @@ Where the code of a Scan comes from, for Scans that run on a Runner (`apps/elise
 - **One History per app**: the zips are versions of the same code. The Scan sits on the hidden Branch `upload`, and the content hash (SHA-256, 64 hex digits) stands in for the commit; the server sets both from the link, whatever the Runner reports, and the Verdict takes the hash as its `commit`. Removing a zip deletes its row and its R2 object, sets the link's `archive_id` to null and leaves its Scans and findings: the Scan's `archive` shows the label with no ID ("file removed").
 - The job carries an `archive` source. The Runner asks for that archive and the server serves it only to the Runner that claimed the job. The Runner unpacks it into its work folder, then runs the same clean-up it applies to a clone (`strip_untrusted`).
 - Unpacking keeps paths inside the work folder, skips symlinks, and stops at a cap on archive size, unpacked size, file count and path depth. **One top-level folder is removed**, so a finding keeps the same path between `app-1.2/` and `app-1.3/` and the History matches it.
-- Proposed limits, to revisit: 50 MB archive, 250 MB unpacked, 20,000 files, 20 path levels. Zips per app and storage per Account: not set.
-- Retention is not set. At least: delete an unclaimed upload after a time, and delete an upload when its app is removed.
+
+### Limits
+
+The numbers live in `@repo/contracts/elise` (`UPLOAD_*` constants). Each refusal names its limit.
+
+| Limit | Value | Where it is held |
+|---|---|---|
+| One zip | 50 MB | Upload route, before it reads the body (413) |
+| Unpacked size | 250 MB | Upload route, from the zip's central directory (400); the Runner again while it unpacks |
+| Files | 20,000 | Same as unpacked size |
+| Path depth | 20 levels (`a/b.ts` is 2), counted before the top folder is removed | Same as unpacked size |
+| Zips per app | 20 | Upload route (409) |
+| Stored zips per Account | 500 MB, the sum of the zips' sizes | Upload route (409) |
+| Repos per Account | 200, upload apps included; a removed app does not count | `POST /repos` (409) |
+
+The central directory is the zip's own claim, so the upload route's check is an early answer, not the guard: the Runner stops at the same limits while it unpacks, whatever the directory said.
+
+### Retention
+
+- **A zip no Scan has read is deleted 30 days after upload**, row and file. "Read" means a `scan_archive_links` row points at it. A zip a Scan read stays until a person removes it.
+- **Removing a zip** (`DELETE /repos/:repoId/archives/:archiveId`) deletes its row and its file.
+- **Removing an upload app** (`DELETE /repos/:repoId`, upload apps only) deletes every zip's row and every object under the app's R2 prefix, and sets `scan_repos.removed_at`. The Repo row stays, because deleting it would cascade to its Scans and findings: they stay in the History, each with its zip's label and no file. A removed app leaves the Repo list and takes no zip; adding it again by name brings it back, empty, with its History.
+- **The daily cron** (`scheduled` in the Worker, `triggers.crons` in `wrangler.jsonc`) runs the 30-day sweep on the owner role, up to 1000 zips a run, rows then files in one transaction. It also lists the objects under 50 random upload apps and deletes those a day old with no row: an upload writes its row and its file before it commits, so a failed commit can leave a file behind.
 - A Runner that does not know `archive` jobs must refuse them with a clear message. A minimum Runner version may be needed.
 
 ## Contracts and migrations
