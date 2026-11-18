@@ -77,7 +77,7 @@ export const queueScanSvc = (
     // -----
     const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true" || !ownKeyScan || input.runner_id !== undefined, new Date());
     if (block) return yield* new RateLimited(block);
-    if (spend.plan?.planKey === "runner" && input.runner_id === undefined) {
+    if (spend.plan?.hostedScansAllowed === false && input.runner_id === undefined) {
       return yield* new RateLimited({ code: "RUNNER_PLAN_HOSTED", message: RUNNER_PLAN_HOSTED_MESSAGE });
     }
 

@@ -21,6 +21,7 @@ const PRO: PlanState = {
   creditMarkup: 1.5,
   creditBalanceUsd: 100,
   monthlyScanAllowance: null,
+  hostedScansAllowed: true,
   maxMembers: 5,
   status: "active",
   pastDueSince: null,
@@ -77,7 +78,9 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
   });
 });
 
-const RUNNER: PlanState = { ...PRO, planKey: "runner", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0 };
+const RUNNER: PlanState = { ...PRO, planKey: "runner", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0, hostedScansAllowed: false };
+const RUNNER_ONLY_OTHER_KEY: PlanState = { ...RUNNER, planKey: "runner-team" };
+const RUNNER_KEY_HOSTED_OK: PlanState = { ...RUNNER, hostedScansAllowed: true };
 const RUNNER_ID = "5d1f0c52-8a37-4f0e-9b6a-2c4d7e8f9a01";
 const postWith = (env: Bindings, body: { repo: string; profile: string; runner_id?: string }) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
 
@@ -85,6 +88,8 @@ describe("POST /scans: the Runner plan runs Scans on a Runner only", () => {
   it.each([
     ["a Runner Scan on the Runner plan", { ...NO_SPEND, plan: RUNNER }, { runner_id: RUNNER_ID }, 201, null, 1],
     ["a hosted Scan on the Runner plan", { ...NO_SPEND, plan: RUNNER, ownKey: true }, {}, 429, "RUNNER_PLAN_HOSTED", 0],
+    ["a hosted Scan on a plan the catalogue marks Runner-only, whatever its key", { ...NO_SPEND, plan: RUNNER_ONLY_OTHER_KEY, ownKey: true }, {}, 429, "RUNNER_PLAN_HOSTED", 0],
+    ["a hosted Scan on a plan keyed runner that the catalogue allows", { ...NO_SPEND, plan: RUNNER_KEY_HOSTED_OK, ownKey: true }, {}, 201, null, 1],
     ["a Runner Scan with no plan", NO_SPEND, { runner_id: RUNNER_ID }, 429, "NO_ACTIVE_PLAN", 0],
     ["a hosted Scan with no plan", NO_SPEND, {}, 429, "NO_ACTIVE_PLAN", 0],
   ])("%s", async (_name, account, extra, status, code, started) => {

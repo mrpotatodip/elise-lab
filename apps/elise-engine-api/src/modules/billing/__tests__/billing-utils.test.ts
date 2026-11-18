@@ -9,6 +9,7 @@ const plan = (extra: Partial<PlanState>): PlanState => ({
   creditMarkup: 1.5,
   creditBalanceUsd: 49,
   monthlyScanAllowance: null,
+  hostedScansAllowed: true,
   maxMembers: 5,
   status: "active",
   pastDueSince: null,
