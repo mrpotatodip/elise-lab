@@ -77,6 +77,35 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
   });
 });
 
+const RUNNER: PlanState = { ...PRO, planKey: "runner", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0 };
+const RUNNER_ID = "5d1f0c52-8a37-4f0e-9b6a-2c4d7e8f9a01";
+const postWith = (env: Bindings, body: { repo: string; profile: string; runner_id?: string }) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
+
+describe("POST /scans: the Runner plan runs Scans on a Runner only", () => {
+  it.each([
+    ["a Runner Scan on the Runner plan", { ...NO_SPEND, plan: RUNNER }, { runner_id: RUNNER_ID }, 201, null, 1],
+    ["a hosted Scan on the Runner plan", { ...NO_SPEND, plan: RUNNER, ownKey: true }, {}, 429, "RUNNER_PLAN_HOSTED", 0],
+    ["a Runner Scan with no plan", NO_SPEND, { runner_id: RUNNER_ID }, 429, "NO_ACTIVE_PLAN", 0],
+    ["a hosted Scan with no plan", NO_SPEND, {}, 429, "NO_ACTIVE_PLAN", 0],
+  ])("%s", async (_name, account, extra, status, code, started) => {
+    spend = account;
+    const { env, createdFull } = fakeBindings();
+    const res = await postWith(env, { repo: REPO, profile: "quick", ...extra });
+
+    expect(res.status).toBe(status);
+    expect(z.object({ error: z.object({ code: z.string() }).nullable() }).parse(await res.json()).error?.code ?? null).toBe(code);
+    expect(createdFull).toHaveLength(started);
+  });
+
+  it("names the Runners page in the hosted refusal", async () => {
+    spend = { ...NO_SPEND, plan: RUNNER };
+    const { env } = fakeBindings();
+    const res = await post(env, { repo: REPO, profile: "quick" });
+
+    expect(ErrorBodySchema.parse(await res.json()).error.message).toContain("Runners");
+  });
+});
+
 describe("POST /scans: a full Scan on the platform's key needs a Plan", () => {
   it("refuses an Account with no Plan and no key of its own with NO_ACTIVE_PLAN", async () => {
     const { env, createdFull } = fakeBindings();
