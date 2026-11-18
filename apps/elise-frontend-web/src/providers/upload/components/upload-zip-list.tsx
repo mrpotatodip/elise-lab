@@ -64,6 +64,7 @@ export function UploadZipList({ repoId, selectedId, onSelect }: UploadZipListPro
   const remove = useMutation({
     mutationFn: (archiveId: string) => removeUploadArchive({ data: { repoId, archiveId } }),
     onSuccess: async () => {
+      setProblem(null);
       toast.success("Zip removed. The audits that read it stay in the History.");
       await queryClient.invalidateQueries({ queryKey: uploadKeys.archives(repoId) });
     },
