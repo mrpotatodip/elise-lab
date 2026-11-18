@@ -44,18 +44,6 @@ export const usageBlockedNote = (usage: { budgetUsd: number; spentUsd: number; r
     ? `Running scans hold ${usageUsd(usage.reservedUsd)} of this month's ${usageUsd(usage.budgetUsd)} budget, so no new audit can start until one finishes. An admin can raise the budget in Settings.`
     : `This month's ${usageUsd(usage.budgetUsd)} budget is spent, so no new audit can start. It resets on the 1st (UTC), or an admin can raise it in Settings.`;
 
-// -----
-// What the engine checks before it asks Anthropic: an API key
-// starts with sk-ant- and is not a few characters long. Whether
-// Anthropic accepts it only the engine can say.
-// -----
-export const anthropicKeyError = (input: string): string | undefined => {
-  const text = input.trim();
-  if (!text.startsWith("sk-ant-")) return "An Anthropic API key starts with sk-ant-.";
-  if (text.length < 20 || text.length > 300) return "That does not look like a full API key. Copy the whole key.";
-  return undefined;
-};
-
 const DOLLARS = /^\d{1,7}(\.\d{1,2})?$/;
 
 // -----
