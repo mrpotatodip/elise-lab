@@ -15,5 +15,6 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
       - run: pnpm install --frozen-lockfile
       - run: node scripts/check-changed.mjs --all

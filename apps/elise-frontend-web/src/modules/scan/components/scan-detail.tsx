@@ -17,10 +17,10 @@ import { ScanDiffSkeleton, ScanFindingsTableSkeleton } from "./scan-detail-skele
 import { ScanDiffCard } from "./scan-diff-card";
 import { ScanFindingsTable } from "./scan-findings-table";
 import { ScanHeaderMeta } from "./scan-header-meta";
+import { ScanMarkdown } from "./scan-markdown";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanRunDetails } from "./scan-run-details";
 import { ScanSummary } from "./scan-summary";
-import { ScanVerdictCard, type DecideFinding } from "./scan-verdict-card";
 
 const DEFAULT_FILE = "REPORT.md";
 
@@ -38,6 +38,7 @@ function ScanFileViewer({ scanId, file }: { scanId: string; file: string }) {
     );
   }
   if (data.trim() === "") return <p className="p-5 text-sm text-muted-foreground">{file} is empty.</p>;
+  if (file.endsWith(".md")) return <ScanMarkdown source={data} />;
   return <pre className="max-h-[70vh] overflow-auto bg-background/50 p-5 font-mono text-[13px] leading-relaxed whitespace-pre-wrap">{data}</pre>;
 }
 
@@ -98,20 +99,14 @@ function findingsDescription(scan: ScanStatus) {
   return `${scanPlural(summary.total, "finding", "findings")}: ${confirmed} confirmed, ${summary.needsValidation} need a person to check. Open a row for the impact, evidence and fix.`;
 }
 
-type ScanDetailProps = {
-  scanId: string;
-  Decision?: DecideFinding;
-};
-
 // -----
-// A scan report, laid out like the branch page it belongs to: a header with
-// the branch and one line about the run, then the answer, what changed, and
-// the findings, and last the things that matter less (the scans around it,
-// how it was set up, the files). `Decision` is the control that records a
-// decision on a verdict row, passed in because this module cannot import the
-// finding module; without it the answer is read-only.
+// A scan report: a header with the branch and one line about the run, then
+// what this scan found (its tiles, what changed, its findings), and last the
+// things that matter less (the scans around it, how it was set up, the files).
+// Whether the commit can ship is the branch page's answer, not one scan's, so
+// it is not repeated here.
 // -----
-export function ScanDetail({ scanId, Decision }: ScanDetailProps) {
+export function ScanDetail({ scanId }: { scanId: string }) {
   const { data: scan } = useSuspenseQuery(scanQuery(scanId));
   useRefreshOnFinish(scan.status);
   const [picked, setPicked] = useState(DEFAULT_FILE);
@@ -149,7 +144,6 @@ export function ScanDetail({ scanId, Decision }: ScanDetailProps) {
       {succeeded && (
         <>
           <ScanSummary scan={scan} />
-          {scan.commitSha && <ScanVerdictCard repoId={scan.repoId} commit={scan.commitSha} repoUrl={scan.repo} found={scan.summary?.total ?? 0} Decision={Decision} compactFindings={showFindings} />}
           {scan.skill === "lite" && scan.branchId && <ScanChangeAlerts scanId={scanId} />}
           {scan.skill === "lite" && scan.branchId && (
             <Suspense fallback={<ScanDiffSkeleton />}>

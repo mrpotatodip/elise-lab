@@ -86,6 +86,5 @@ export function prefetchScanReport(queryClient: QueryClient, scan: ScanStatus) {
   const hasFindings = scan.summary != null || (scan.files ?? []).includes("findings.json");
   if (hasFindings) void queryClient.query(scanFindingsQuery(scan.scanId)).catch(noop);
   if (scan.skill !== "lite") return;
-  if (scan.commitSha) void queryClient.query(verdictQuery(scan.repoId, scan.commitSha)).catch(noop);
   if (scan.branchId) void queryClient.query(scanDiffQuery(scan.scanId)).catch(noop);
 }

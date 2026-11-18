@@ -22,7 +22,7 @@ export function ScanSeverityBadge({ severity }: { severity: Severity | null }) {
   if (!severity)
     return (
       <Badge variant="outline" title="Not rated yet. A person has to check it and decide how serious it is.">
-        Unrated
+        Not rated
       </Badge>
     );
   return (

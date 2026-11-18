@@ -13,6 +13,7 @@ import { scanFindingsQuery } from "../hooks";
 import { SEVERITIES, type Finding } from "../schemas";
 import { scanFindingsPrompt } from "../utils";
 import { ScanFindingCopy } from "./scan-finding-copy";
+import { ScanFindingLocation } from "./scan-finding-location";
 import { ScanFindingSheet } from "./scan-finding-sheet";
 import { ScanSeverityBadge } from "./scan-severity-badge";
 
@@ -23,11 +24,24 @@ type FindingRow = { finding: Finding; selected: boolean; open: () => void };
 const column = dataTableColumns<FindingRow>();
 
 const columns = column.columns([
-  column.display({ id: "severity", header: "Severity", cell: ({ row }) => <ScanSeverityBadge severity={row.original.finding.severity} /> }),
+  column.display({
+    id: "severity",
+    header: "Severity",
+    meta: { head: "whitespace-nowrap" },
+    cell: ({ row }) => {
+      const { state, severity } = row.original.finding;
+      return (
+        <span className="grid justify-items-start gap-1.5">
+          <ScanSeverityBadge severity={severity} />
+          {state === "confirmed" ? <span className="sr-only">{SCAN_FINDING_STATE_COPY[state].label}</span> : <Badge variant={state === "needs_validation" ? "warning" : "neutral"}>{SCAN_FINDING_STATE_COPY[state].label}</Badge>}
+        </span>
+      );
+    },
+  }),
   column.display({
     id: "finding",
     header: "Finding",
-    meta: { head: "w-[42%]" },
+    meta: { head: "w-[50%]" },
     cell: ({ row }) => {
       const { finding, open } = row.original;
       if (!finding.detail) return <span className="font-medium">{finding.title}</span>;
@@ -46,16 +60,8 @@ const columns = column.columns([
   column.display({
     id: "where",
     header: "Where",
-    meta: { cell: "font-mono text-xs text-muted-foreground [overflow-wrap:normal]" },
-    cell: ({ row }) => (row.original.finding.place ? `${row.original.finding.place.file}:${row.original.finding.place.line}` : "-"),
-  }),
-  column.display({
-    id: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const { state } = row.original.finding;
-      return <Badge variant={state === "confirmed" ? "success" : state === "needs_validation" ? "warning" : "neutral"}>{SCAN_FINDING_STATE_COPY[state].label}</Badge>;
-    },
+    meta: { head: "whitespace-nowrap" },
+    cell: ({ row }) => <ScanFindingLocation file={row.original.finding.place?.file ?? null} line={row.original.finding.place?.line ?? null} />,
   }),
   column.display({
     id: "open",

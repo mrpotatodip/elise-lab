@@ -4,6 +4,7 @@ import { ShellStatCell } from "#/modules/shell";
 import { scanDiffQuery } from "../hooks";
 import { SEVERITIES, type ScanStatus } from "../schemas";
 import { scanCost, scanDuration, scanPlural, scanTokens } from "../utils";
+import { ScanSeverityDots } from "./scan-severity-dots";
 
 // -----
 // The same strip as the repository summary: one card, one lead number, no icon
@@ -15,7 +16,7 @@ export function ScanSummary({ scan }: { scan: ScanStatus }) {
   const { data: diff } = useQuery({ ...scanDiffQuery(scan.scanId), enabled: comparable && Boolean(summary) });
   if (!summary && !usage) return null;
 
-  const severityParts = summary ? SEVERITIES.filter((s) => summary.severity[s] > 0).map((s) => `${summary.severity[s]} ${s}`) : [];
+  const hasSeverity = summary ? SEVERITIES.some((s) => summary.severity[s] > 0) : false;
   const duration = scanDuration(usage?.durationMs);
   const tokens = usage ? usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens : 0;
 
@@ -28,7 +29,7 @@ export function ScanSummary({ scan }: { scan: ScanStatus }) {
               lead
               label="Findings"
               value={summary.total}
-              note={summary.total === 0 ? "Nothing was reported. That does not prove the code is safe." : severityParts.length > 0 ? `${severityParts.join(", ")} confirmed.` : "None confirmed yet."}
+              note={summary.total === 0 ? "Nothing was reported. That does not prove the code is safe." : hasSeverity ? <ScanSeverityDots counts={summary.severity} /> : "None confirmed yet."}
             />
             <ShellStatCell
               label="Needs a person"
