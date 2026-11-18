@@ -14,6 +14,7 @@ import { Label } from "#/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
+import { repoSiteName } from "#/lib/repo-site-name";
 import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
@@ -429,6 +430,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
   const olderScans = branchScans.length - recentScans.length;
   const newestScan = branchScans[0];
   const github = repo.url.replace(/\.git$/, "").replace(/\/$/, "");
+  const site = repoSiteName(repo.url);
   const notFull = current ? repoNotFullScanIds(current, branchScans) : new Set<string>();
   const fullScan = current?.fullScanId ? branchScans.find((scan) => scan.scanId === current.fullScanId) : undefined;
   const recentRows = recentScans.map((scan) => ({ ...scan, oneOff: Boolean(current && !scan.branchId && scan.commitSha), notFull: notFull.has(scan.scanId) }));
@@ -460,14 +462,14 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                         href={`${github}/tree/${encodeURI(current.name)}`}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label="Open this branch on GitHub"
+                        aria-label={`Open this branch on ${site}`}
                         className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     }
                   >
                     <ExternalLink aria-hidden="true" className="size-4" />
                   </TooltipTrigger>
-                  <TooltipContent>Open this branch on GitHub</TooltipContent>
+                  <TooltipContent>Open this branch on {site}</TooltipContent>
                 </Tooltip>
               </div>
             )}
@@ -519,7 +521,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                         className="rounded-sm font-mono text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {current.latestCommit.slice(0, 7)}
-                        <span className="sr-only"> (opens on GitHub)</span>
+                        <span className="sr-only"> (opens on {site})</span>
                       </a>
                     </span>
                   </>
@@ -552,7 +554,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
             className="inline-flex min-h-6 items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ExternalLink aria-hidden="true" className="size-3.5" />
-            Open on GitHub
+            Open on {site}
           </a>
         )}
         {isApp ? (
