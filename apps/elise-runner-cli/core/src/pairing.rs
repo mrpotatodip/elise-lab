@@ -1,13 +1,8 @@
-// Pairing with Elise. Enroll, accept and decline are separate calls: the desktop app holds an
-// enrolled pairing in memory until the person presses Connect, a terminal program answers in one
-// run. The token never leaves Rust: it goes from Elise to the store and back to Elise.
-
 use crate::engine::{client, engine_url, Envelope};
 use crate::store::TokenStore;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
-// What the Runner is to Elise. Serialized as `{ "state": "connected", "name": ..., "accountName": ... }`.
 #[derive(Serialize)]
 #[serde(tag = "state", rename_all = "lowercase", rename_all_fields = "camelCase")]
 pub enum RunnerStatus {
@@ -20,7 +15,6 @@ pub enum RunnerStatus {
     Connected { name: String, account_name: String },
 }
 
-// Why pairing or disconnecting failed. The desktop page turns each code into a sentence.
 #[derive(Serialize)]
 #[serde(tag = "code", rename_all = "snake_case")]
 pub enum RunnerError {
@@ -31,10 +25,6 @@ pub enum RunnerError {
     PairingLost,
 }
 
-// A token Elise has issued for a code, not accepted yet: it is in no store, so no Scan can run on
-// it. The account that made the code and the name it gave this Runner are what the person is asked
-// to confirm. A code can be handed to someone by a stranger, so it is `accept` or `decline`, never
-// silently kept.
 pub struct Enrolled {
     pub name: String,
     pub account_name: String,
@@ -61,8 +51,7 @@ struct EnrollBody<'a> {
     code: &'a str,
 }
 
-// Asks Elise who this runner is. Also the proof that the pairing still works. A token Elise
-// rejects is forgotten.
+// Asks Elise who this runner is. Also the proof that the pairing still works.
 pub async fn status(store: &dyn TokenStore) -> RunnerStatus {
     let Some(token) = store.token() else {
         return RunnerStatus::Unpaired;
@@ -91,7 +80,6 @@ pub async fn status(store: &dyn TokenStore) -> RunnerStatus {
     }
 }
 
-// Trades a pairing code for a token, held in the `Enrolled` until it is accepted or declined.
 pub async fn enroll(code: &str) -> Result<Enrolled, RunnerError> {
     let response = client()
         .post(format!("{}/runners/enroll", engine_url()))
@@ -125,8 +113,6 @@ async fn revoke(token: &str) -> bool {
     }
 }
 
-// The person accepted the account: the token goes to the store and the work loop may use it. A
-// token the store cannot keep is revoked, so it is not left alive.
 pub async fn accept(store: &dyn TokenStore, enrolled: Enrolled) -> Result<RunnerStatus, RunnerError> {
     if store.save(&enrolled.token).is_err() {
         revoke(&enrolled.token).await;
@@ -138,20 +124,13 @@ pub async fn accept(store: &dyn TokenStore, enrolled: Enrolled) -> Result<Runner
     })
 }
 
-// What became of the token a Runner held before it was paired again.
 #[derive(Debug, PartialEq)]
 pub enum Replaced {
-    // There was none.
     Nothing,
-    // Elise dropped it, or had already.
     Revoked,
-    // Elise could not be reached: the old Runner stays in the account's list until an admin
-    // removes it.
     StillLive,
 }
 
-// `accept` for a Runner that may already be paired: the new token is saved first, then the old one
-// is revoked with Elise, so no live token is left behind.
 pub async fn accept_replacing(
     store: &dyn TokenStore,
     enrolled: Enrolled,
@@ -167,16 +146,11 @@ pub async fn accept_replacing(
 }
 
 impl Enrolled {
-    // The token itself, out of the core. Only for a program asked to print it once
-    // (`elise-runner pair --print-token`); it is in no store.
     pub fn into_token(self) -> String {
         self.token
     }
 }
 
-// The person refused. Elise is told to drop the token; if it cannot be reached the token is
-// dropped here anyway, and a token nobody holds works for nobody. The runner then shows in the
-// account's list until an admin removes it.
 pub async fn decline(enrolled: Enrolled) -> RunnerStatus {
     revoke(&enrolled.token).await;
     RunnerStatus::Unpaired
@@ -188,18 +162,9 @@ pub async fn unpair(store: &dyn TokenStore) -> Result<RunnerStatus, RunnerError>
     let Some(token) = store.token() else {
         return Ok(RunnerStatus::Unpaired);
     };
-    let response = client()
-        .delete(format!("{}/runners/me", engine_url()))
-        .bearer_auth(&token)
-        .send()
-        .await
-        .map_err(|_| RunnerError::Unreachable)?;
-    // 401 means Elise already dropped it, which is what we wanted.
-    match response.status() {
-        StatusCode::OK | StatusCode::UNAUTHORIZED => {
-            store.forget();
-            Ok(RunnerStatus::Unpaired)
-        }
-        _ => Err(RunnerError::Unreachable),
+    if !revoke(&token).await {
+        return Err(RunnerError::Unreachable);
     }
+    store.forget();
+    Ok(RunnerStatus::Unpaired)
 }

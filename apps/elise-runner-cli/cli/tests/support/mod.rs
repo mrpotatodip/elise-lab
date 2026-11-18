@@ -1,8 +1,3 @@
-// The process-test harness: the debug `elise-runner` run against a stub engine on a local port,
-// with `ELISE_RUNNER_HOME` set to a temp folder so the token lands in the file store and no test
-// ever touches a keychain.
-
-// Each test file uses part of this harness.
 #![allow(dead_code)]
 
 use std::collections::{BTreeSet, VecDeque};
@@ -17,20 +12,17 @@ pub const CODE: &str = "PAIR-CODE-1";
 pub const RUNNER_NAME: &str = "build-box";
 pub const ACCOUNT_NAME: &str = "Acme Security";
 
-// What the stub engine knows: the tokens it issued that are still live, every token it was asked
-// to revoke, the jobs waiting to be claimed and the results Runners sent.
 #[derive(Default)]
 struct State {
     issued: usize,
     live: BTreeSet<String>,
     revoked: Vec<String>,
-    // Elise is down for revokes only: `DELETE /runners/me` answers 503.
     revokes_fail: bool,
     jobs: VecDeque<String>,
-    // (Scan ID, the result's JSON body), in the order they came.
     results: Vec<(String, String)>,
-    // An admin removes every Runner as soon as a result comes in.
     remove_after_result: bool,
+    claims_held: bool,
+    a_claim_was_held: bool,
 }
 
 pub struct Engine {
@@ -53,13 +45,11 @@ impl Engine {
         Engine { url, state }
     }
 
-    // A URL where nothing listens: Elise cannot be reached.
     pub fn unreachable_url() -> String {
         let listener = TcpListener::bind("127.0.0.1:0").expect("a free local port");
         format!("http://{}", listener.local_addr().unwrap())
     }
 
-    // The tokens issued so far, in order: `tokens()[0]` is the first pairing's.
     pub fn tokens(&self) -> Vec<String> {
         let issued = self.state.lock().unwrap().issued;
         (1..=issued).map(token_number).collect()
@@ -73,35 +63,41 @@ impl Engine {
         self.state.lock().unwrap().revoked.clone()
     }
 
-    // An admin removes every Runner in the dashboard: Elise rejects their tokens from now on.
     pub fn remove_all_runners(&self) {
         self.state.lock().unwrap().live.clear();
     }
 
-    // Elise answers revokes with an error from now on: an old token cannot be dropped.
     pub fn fail_revokes(&self) {
         self.state.lock().unwrap().revokes_fail = true;
     }
 
-    // A Scan started for this Runner, waiting to be claimed (see `job`).
     pub fn queue_job(&self, job: String) {
         self.state.lock().unwrap().jobs.push_back(job);
     }
 
-    // The results Runners sent: (Scan ID, the body as JSON).
     pub fn results(&self) -> Vec<(String, serde_json::Value)> {
         let state = self.state.lock().unwrap();
         state.results.iter().map(|(id, body)| (id.clone(), serde_json::from_str(body).expect("a result is JSON"))).collect()
     }
 
-    // The Runner is removed in the dashboard right after it sends its next result.
+    pub fn hold_claims(&self) {
+        self.state.lock().unwrap().claims_held = true;
+    }
+
+    pub fn wait_for_a_held_claim(&self) {
+        let held = until(|| self.state.lock().unwrap().a_claim_was_held);
+        assert!(held, "no claim reached the engine");
+    }
+
+    pub fn release_claims(&self) {
+        self.state.lock().unwrap().claims_held = false;
+    }
+
     pub fn remove_runners_after_the_next_result(&self) {
         self.state.lock().unwrap().remove_after_result = true;
     }
 }
 
-// A full job with the four Phases, as the engine hands it out. Each Phase prompt tells the stub
-// `claude` what to do (see `STUB_CLAUDE`).
 pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
     let phases: Vec<serde_json::Value> = ["recon", "hunt", "check", "report"]
         .iter()
@@ -172,6 +168,9 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
     let Some(request) = read_request(&stream) else {
         return;
     };
+    if request.path == "/runners/claim" {
+        hold_while_claims_are_held(state);
+    }
     let (status, body) = answer(&request, &mut state.lock().unwrap());
     let reason = if status == 200 { "OK" } else { "Error" };
     let _ = write!(
@@ -179,6 +178,14 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
+}
+
+fn hold_while_claims_are_held(state: &Mutex<State>) {
+    until(|| {
+        let mut state = state.lock().unwrap();
+        state.a_claim_was_held |= state.claims_held;
+        !state.claims_held
+    });
 }
 
 const REJECTED: (u16, &str) = (401, r#"{"data":null,"error":{"code":"unauthorized"}}"#);
@@ -227,7 +234,6 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
     }
 }
 
-// A temp folder of the test's own, used as `ELISE_RUNNER_HOME`.
 pub fn temp_home() -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let dir = std::env::temp_dir().join(format!(
@@ -246,8 +252,6 @@ pub struct Output {
     pub stderr: String,
 }
 
-// One Runner on this computer: its own home folder, pointed at one engine. Each run gets a clean
-// environment (no inherited token, home or URL) plus `env`.
 pub struct Runner {
     pub home: PathBuf,
     pub url: String,
@@ -260,7 +264,6 @@ impl Runner {
         Runner { home: temp_home(), url: engine.url.clone(), env: Vec::new(), engine: engine.state.clone() }
     }
 
-    // Runs the program and checks that no token the engine issued is in what it printed.
     pub fn run(&self, args: &[&str], stdin: &str) -> Output {
         let output = self.run_allowing_token(args, stdin);
         let issued = self.engine.lock().unwrap().issued;
@@ -275,10 +278,8 @@ impl Runner {
         output
     }
 
-    // Only for `pair --print-token`, the one command that prints the token.
     pub fn run_allowing_token(&self, args: &[&str], stdin: &str) -> Output {
         let mut child = self.command(args).spawn().expect("the elise-runner binary starts");
-        // A program that exits without reading its input closes the pipe; that is not a failure.
         let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
         let output = child.wait_with_output().unwrap();
         Output {
@@ -304,7 +305,6 @@ impl Runner {
         command
     }
 
-    // Starts the program and leaves it running, for a test that signals it while it works.
     pub fn start(&self, args: &[&str]) -> Running {
         let mut child = self.command(args).spawn().expect("the elise-runner binary starts");
         let collect = |mut pipe: Box<dyn Read + Send>| {
@@ -327,14 +327,10 @@ impl Runner {
         Running { child, stdout, stderr, issued }
     }
 
-    // The files in the Runner's home folder.
     pub fn home_files(&self) -> Vec<PathBuf> {
         std::fs::read_dir(&self.home).unwrap().map(|entry| entry.unwrap().path()).collect()
     }
 
-    // Puts stub programs on the Runner's PATH: a `git` that "clones" without the network, and
-    // those of `claude` and `node` named in `tools` (leave one out to have it missing). The
-    // Runner's temp folder, where Scans make their work folders, is a folder of the test's own.
     pub fn stub_tools(&mut self, tools: &[&str]) -> Stubs {
         let root = temp_home();
         let (bin, record, tmp) = (root.join("bin"), root.join("record"), root.join("tmp"));
@@ -356,7 +352,6 @@ impl Runner {
     }
 }
 
-// A program started with `Runner::start`, still running.
 pub struct Running {
     child: std::process::Child,
     stdout: Arc<Mutex<String>>,
@@ -365,19 +360,21 @@ pub struct Running {
 }
 
 impl Running {
-    // Waits, up to 20 seconds, for `text` on standard output.
     pub fn wait_for_output(&self, text: &str) {
         let ready = until(|| self.stdout.lock().unwrap().contains(text));
         assert!(ready, "no {text:?} in the output: {}", self.stdout.lock().unwrap());
     }
 
-    // Sends a signal by name (`INT`, `TERM`) to the program, not to the processes it started.
+    pub fn wait_for_error_output(&self, text: &str) {
+        let ready = until(|| self.stderr.lock().unwrap().contains(text));
+        assert!(ready, "no {text:?} in the error output: {}", self.stderr.lock().unwrap());
+    }
+
     pub fn signal(&self, name: &str) {
         let sent = Command::new("kill").args(["-s", name, &self.child.id().to_string()]).status().unwrap();
         assert!(sent.success(), "kill -s {name} failed");
     }
 
-    // Waits for the program to exit, up to 30 seconds, and checks no token is in what it printed.
     pub fn finish(mut self) -> Output {
         let mut status = None;
         until(|| {
@@ -388,7 +385,6 @@ impl Running {
             let _ = self.child.kill();
             panic!("the program did not exit: {}{}", self.stdout.lock().unwrap(), self.stderr.lock().unwrap());
         };
-        // The readers stop once the pipes close.
         std::thread::sleep(std::time::Duration::from_millis(100));
         let output = Output {
             code: status.code().expect("the program exited, not killed"),
@@ -402,7 +398,6 @@ impl Running {
     }
 }
 
-// Checks `done` every 50 milliseconds for up to 30 seconds; true when it came true.
 fn until(mut done: impl FnMut() -> bool) -> bool {
     for _ in 0..600 {
         if done() {
@@ -413,24 +408,20 @@ fn until(mut done: impl FnMut() -> bool) -> bool {
     false
 }
 
-// Whether a process with this ID is still running.
 pub fn alive(pid: u32) -> bool {
     Command::new("kill").args(["-0", &pid.to_string()]).stderr(Stdio::null()).status().unwrap().success()
 }
 
-// Where the stub `claude` writes what it saw, and the Runner's temp folder.
 pub struct Stubs {
     pub record: PathBuf,
     pub tmp: PathBuf,
 }
 
 impl Stubs {
-    // The work folder a Scan uses.
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
 
-    // Waits for a stub `claude` told `stop=wait` to be waiting, and returns its process ID.
     pub fn waiting_agent(&self) -> u32 {
         let file = self.record.join("waiting.pid");
         let ready = until(|| file.is_file());
@@ -445,7 +436,6 @@ fn executable(path: &std::path::Path, text: &str) {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
 
-// `git clone ... repo` makes the folder; `rev-parse` answers a commit and a branch.
 const STUB_GIT: &str = r#"#!/bin/sh
 case "$1" in
   clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
@@ -456,11 +446,6 @@ case "$1" in
 esac
 "#;
 
-// The stub agent reads what to do from its prompt: `phase=check` and `phase=report` write the
-// files a full audit leaves, `cost=1.5` is what its result reports, `stop=crash` fails, and
-// `stop=wait` prints a line, writes its process ID to `waiting.pid` and waits until it is killed. The
-// recon Phase records what the agent was given: its environment, its settings file and the Skill's
-// SKILL.md, in the record folder outside the work folder.
 const STUB_CLAUDE: &str = r#"#!/bin/sh
 for a in "$@"; do prompt="$a"; done
 case "$prompt" in
@@ -484,5 +469,4 @@ cost=$(printf '%s' "$prompt" | sed -n 's/.*cost=\([0-9.]*\).*/\1/p')
 printf '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":%s,"num_turns":1,"duration_ms":10,"usage":{}}\n' "${cost:-0}"
 "#;
 
-// The validators pass.
 const STUB_NODE: &str = "#!/bin/sh\nexit 0\n";

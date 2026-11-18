@@ -1,6 +1,3 @@
-// One function per command. Each prints what a person needs and returns the exit code. The token
-// never appears in what they print; `pair --print-token` is the one exception, asked for.
-
 use crate::store::{Store, TOKEN_VARIABLE};
 use crate::tools::Skill;
 use crate::Exit;
@@ -16,10 +13,7 @@ The line above is this Runner's token. It is a credential: anyone who has it can
 this Runner until the Runner is removed in Elise. Copies stay wherever it is pasted (shell history,
 CI variables, container settings).";
 
-// `pair <code>`: enroll, show the account and the Runner name, confirm, then save the token (or,
-// with `print_token`, print it and save nothing). Declining revokes the token Elise issued.
 pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Exit {
-    // Under --print-token standard output carries the token alone; everything else goes to stderr.
     let say = |line: &str| {
         if print_token {
             eprintln!("{line}");
@@ -35,14 +29,17 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
         return Exit::Error;
     }
 
-    // The Runner this computer is paired as now, if any: pairing replaces it.
     let previous = if print_token || store.tokens().token().is_none() {
         None
     } else {
-        Some(match pairing::status(store.tokens()).await {
-            RunnerStatus::Connected { name, account_name } => format!("\"{name}\" in {account_name}"),
-            _ => "this computer's earlier Runner".to_string(),
-        })
+        match pairing::status(store.tokens()).await {
+            RunnerStatus::Connected { name, account_name } => Some(format!("\"{name}\" in {account_name}")),
+            RunnerStatus::Revoked => {
+                say("This computer's old token was no longer valid in Elise, so it was removed.");
+                None
+            }
+            _ => Some("this computer's earlier Runner".to_string()),
+        }
     };
 
     let enrolled = match pairing::enroll(code).await {
@@ -58,10 +55,7 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
     };
     say(&format!("Account: {}\nRunner:  {}", enrolled.account_name, enrolled.name));
     if let Some(previous) = &previous {
-        // Only reached when the token was still known to Elise or could not be checked.
-        if store.tokens().token().is_some() {
-            say(&format!("This computer is already paired as {previous}. Pairing replaces it."));
-        }
+        say(&format!("This computer is already paired as {previous}. Pairing replaces it."));
     }
 
     if !yes && !confirm(&format!("Connect this computer to {} as \"{}\"?", enrolled.account_name, enrolled.name)) {
@@ -95,7 +89,6 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
     }
 }
 
-// Asks y/N on the terminal. Anything but yes, including no answer at all, is no.
 fn confirm(question: &str) -> bool {
     eprint!("{question} [y/N] ");
     let _ = std::io::stderr().flush();
@@ -106,7 +99,6 @@ fn confirm(question: &str) -> bool {
     matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
-// `status`: what Elise says this Runner is, and where its token is kept.
 pub async fn status(store: &Store) -> Exit {
     let place = store.describe();
     match pairing::status(store.tokens()).await {
@@ -133,8 +125,6 @@ pub async fn status(store: &Store) -> Exit {
     }
 }
 
-// `unpair`: Elise drops the token, then it is forgotten here. If Elise cannot be reached the token
-// is kept, so the command can be run again.
 pub async fn unpair(store: &Store) -> Exit {
     if store.is_read_only() {
         eprintln!(
@@ -162,14 +152,6 @@ pub async fn unpair(store: &Store) -> Exit {
     }
 }
 
-// `run [--once]`: claims Scans and runs them through the core, logging each step on standard output.
-// Without `--once` it polls until stopped, as the desktop app does. With `--once` it claims at most
-// one Scan: 0 when it succeeded and its result was sent, 1 when not, 6 when there was nothing to
-// claim. Either way, a token Elise rejects is forgotten and the program exits with 4.
-// Ctrl-C (SIGINT) or SIGTERM with no Scan running exits at once with 0. During a Scan the core stops
-// the agent, reports the Scan as failed because the Runner was stopped and keeps its work folder,
-// and the program exits with 1. It returns rather than exiting, so the built-in Skill's folder is
-// removed on the way out.
 pub async fn run(store: &Store, once: bool) -> Exit {
     let Some(stop) = stop_on_signal() else {
         eprintln!("Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.");
@@ -195,9 +177,8 @@ pub async fn run(store: &Store, once: bool) -> Exit {
             eprintln!("This computer is not paired. Pair it with `elise-runner pair <code>`.");
             return Exit::Unpaired;
         };
-        // A claim is not cut short: a Scan Elise handed out just as the Runner stopped is still
-        // reported, as failed, so it never stays running.
-        match scan::claim(&token).await {
+        let claimed_even_if_stopped_meanwhile = scan::claim(&token).await;
+        match claimed_even_if_stopped_meanwhile {
             Claimed::Job(job) => {
                 offline = false;
                 scan::run_job(&token, *job, &find_tools, &on_event, &stop).await;
@@ -206,6 +187,16 @@ pub async fn run(store: &Store, once: bool) -> Exit {
                 }
                 continue;
             }
+            Claimed::Removed => {
+                store.tokens().forget();
+                if store.is_read_only() {
+                    eprintln!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.");
+                } else {
+                    eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
+                }
+                return Exit::Revoked;
+            }
+            _ if stop.is_stopped() => return stopped_idle(),
             Claimed::Nothing if once => {
                 println!("Nothing to claim.");
                 return Exit::NothingToClaim;
@@ -221,15 +212,6 @@ pub async fn run(store: &Store, once: bool) -> Exit {
                 }
                 offline = true;
             }
-            Claimed::Removed => {
-                store.tokens().forget();
-                if store.is_read_only() {
-                    eprintln!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.");
-                } else {
-                    eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
-                }
-                return Exit::Revoked;
-            }
         }
         tokio::select! {
             _ = sleep(scan::POLL_EVERY) => {}
@@ -238,10 +220,6 @@ pub async fn run(store: &Store, once: bool) -> Exit {
     }
 }
 
-// Catches Ctrl-C (SIGINT) and SIGTERM, what systemd and Docker send, from now on: the first one fires
-// the returned `Stop`. tokio keeps the handlers for the life of the process, so later signals are
-// ignored and cannot end the program before a stopped Scan is reported. None when the signals
-// cannot be caught.
 fn stop_on_signal() -> Option<Stop> {
     let mut interrupt = signal(SignalKind::interrupt()).ok()?;
     let mut terminate = signal(SignalKind::terminate()).ok()?;
@@ -257,31 +235,27 @@ fn stop_on_signal() -> Option<Stop> {
     Some(stop)
 }
 
-// Turns the core's events into plain log lines, each with the repo and the Scan ID, and remembers
-// how the last Scan ended.
 #[derive(Default)]
 struct ScanLog {
-    // `owner/name` and the Scan ID of the Scan running now.
-    current: Mutex<Option<(String, String)>>,
+    current_repo_and_scan_id: Mutex<Option<(String, String)>>,
     succeeded: Mutex<bool>,
 }
 
 impl ScanLog {
     fn tell(&self, event: Event) {
-        let mut current = self.current.lock().expect("the log is not poisoned");
+        let mut current = self.current_repo_and_scan_id.lock().expect("the log is not poisoned");
         if let Event::Claimed { scan_id, repo } = &event {
             *current = Some((repo.clone(), scan_id.clone()));
         }
         let (repo, scan_id) = current.clone().unwrap_or_default();
         let line = match event {
             Event::Claimed { .. } => "Scan claimed".to_string(),
-            Event::PhaseStarted { phase } => format!("{phase} phase started"),
+            Event::PhaseStarted { phase } => format!("{} started", scan::run_label(&phase)),
             Event::PhaseEnded { phase, cost_usd, pool_left_usd } => {
-                let name = if phase == "repair" { "repair run".to_string() } else { format!("{phase} phase") };
                 let spent = cost_usd.map(dollars).unwrap_or_else(|| "an unknown amount".to_string());
-                format!("{name} ended: spent {spent}, {} left of the Pool", dollars(pool_left_usd))
+                format!("{} ended: spent {spent}, {} left of the Pool", scan::run_label(&phase), dollars(pool_left_usd))
             }
-            Event::RepairStarted => "repair run started: the check failed, the agent gets one run to fix it".to_string(),
+            Event::RepairStarted => "the repair run started: the check failed, the agent gets one run to fix it".to_string(),
             Event::ResultSent { sent: true } => "result sent to Elise".to_string(),
             Event::ResultSent { sent: false } => "the result could not be sent to Elise".to_string(),
             Event::Ended { ok, message, kept, .. } => {
@@ -302,7 +276,6 @@ impl ScanLog {
     }
 }
 
-// Dollars with the cents, and the fractions of a cent a small run costs: `$1.50`, `$0.0034`.
 fn dollars(usd: f64) -> String {
     let text = format!("{usd:.4}");
     let text = text.trim_end_matches('0');

@@ -1,6 +1,3 @@
-// `elise-runner run` and `run --once`, run as a process against a stub engine, with stub `claude`,
-// `node` and `git` on its PATH.
-
 mod support;
 
 use support::{alive, job, Engine, Runner, CODE};
@@ -24,7 +21,6 @@ fn run_once_with_nothing_to_claim_exits_with_code_6() {
     assert!(engine.results().is_empty());
 }
 
-// The Scan a person would start: a pool of $12 and four Phases that spend 1.5, 4, 2.5 and 1.
 const PLAIN: [&str; 4] = ["phase=recon cost=1.5", "phase=hunt cost=4", "phase=check cost=2.5", "phase=report cost=1"];
 
 #[test]
@@ -49,14 +45,14 @@ fn run_once_runs_a_claimed_scan_sends_its_report_logs_each_step_and_removes_the_
         log,
         [
             "[acme/widgets scan_1] Scan claimed",
-            "[acme/widgets scan_1] recon phase started",
-            "[acme/widgets scan_1] recon phase ended: spent $1.50, $10.50 left of the Pool",
-            "[acme/widgets scan_1] hunt phase started",
-            "[acme/widgets scan_1] hunt phase ended: spent $4.00, $6.50 left of the Pool",
-            "[acme/widgets scan_1] check phase started",
-            "[acme/widgets scan_1] check phase ended: spent $2.50, $4.00 left of the Pool",
-            "[acme/widgets scan_1] report phase started",
-            "[acme/widgets scan_1] report phase ended: spent $1.00, $3.00 left of the Pool",
+            "[acme/widgets scan_1] the recon phase started",
+            "[acme/widgets scan_1] the recon phase ended: spent $1.50, $10.50 left of the Pool",
+            "[acme/widgets scan_1] the hunt phase started",
+            "[acme/widgets scan_1] the hunt phase ended: spent $4.00, $6.50 left of the Pool",
+            "[acme/widgets scan_1] the check phase started",
+            "[acme/widgets scan_1] the check phase ended: spent $2.50, $4.00 left of the Pool",
+            "[acme/widgets scan_1] the report phase started",
+            "[acme/widgets scan_1] the report phase ended: spent $1.00, $3.00 left of the Pool",
             "[acme/widgets scan_1] result sent to Elise",
             "[acme/widgets scan_1] Scan succeeded.",
         ]
@@ -84,7 +80,6 @@ fn run_once_with_a_failed_scan_reports_it_keeps_the_work_folder_and_exits_with_c
     assert!(last.ends_with(&format!("Work folder kept: {}", work.display())), "{last}");
 }
 
-// A Scan on a computer without `claude` or `node` fails at once, telling the dashboard which.
 #[test]
 fn a_missing_claude_or_node_is_reported_as_a_failed_scan_naming_it() {
     for (present, missing) in [("node", "`claude`"), ("claude", "`node`")] {
@@ -103,13 +98,10 @@ fn a_missing_claude_or_node_is_reported_as_a_failed_scan_naming_it() {
     }
 }
 
-// An admin removed the Runner in the dashboard: the next claim is rejected, the token is forgotten
-// and the program exits with 4. Without `--once` the Runner first runs the Scan it was given.
 #[test]
 fn a_token_elise_rejects_on_claim_is_forgotten_and_the_program_exits_with_code_4() {
-    // (arguments, Scans run before the rejection)
-    let cases: [(&[&str], usize); 2] = [(&["run", "--once"], 0), (&["run"], 1)];
-    for (args, scans) in cases {
+    let args_and_scans_run_before_the_rejection: [(&[&str], usize); 2] = [(&["run", "--once"], 0), (&["run"], 1)];
+    for (args, scans) in args_and_scans_run_before_the_rejection {
         let engine = Engine::start();
         let mut runner = paired(&engine);
         runner.stub_tools(&["claude", "node"]);
@@ -129,8 +121,6 @@ fn a_token_elise_rejects_on_claim_is_forgotten_and_the_program_exits_with_code_4
     }
 }
 
-// What the agent is given: the Skill built into the binary (no folder beside it), the Runner's own
-// settings, which deny reading the process folder, and an environment without the Runner's token.
 #[test]
 fn the_agent_gets_the_built_in_skill_and_the_runners_settings_but_never_the_token() {
     let engine = Engine::start();
@@ -154,9 +144,6 @@ fn the_agent_gets_the_built_in_skill_and_the_runners_settings_but_never_the_toke
     assert_eq!(read("SKILL.md"), std::fs::read_to_string(skill).unwrap());
 }
 
-// Ctrl-C (SIGINT) or a stop signal (SIGTERM, what systemd and Docker send) during a Scan: the agent
-// is stopped, the Scan is reported failed with what its log holds so far, the work folder is kept
-// and printed, and the program exits with 1. Both signals do the same.
 #[test]
 fn a_stop_signal_during_a_scan_stops_the_agent_reports_the_scan_failed_and_exits_with_code_1() {
     for signal in ["INT", "TERM"] {
@@ -186,7 +173,6 @@ fn a_stop_signal_during_a_scan_stops_the_agent_reports_the_scan_failed_and_exits
     }
 }
 
-// With no Scan running, a stop signal ends the program at once with 0.
 #[test]
 fn a_stop_signal_with_no_scan_running_exits_at_once_with_code_0() {
     for signal in ["INT", "TERM"] {
@@ -204,4 +190,23 @@ fn a_stop_signal_with_no_scan_running_exits_at_once_with_code_0() {
         assert!(asked.elapsed() < std::time::Duration::from_secs(2), "{signal}: took {:?}", asked.elapsed());
         assert!(engine.results().is_empty(), "{signal}");
     }
+}
+
+#[test]
+fn run_once_stopped_while_its_claim_is_in_flight_exits_with_code_0() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    runner.stub_tools(&["claude", "node"]);
+    engine.hold_claims();
+    let running = runner.start(&["run", "--once"]);
+    engine.wait_for_a_held_claim();
+
+    running.signal("TERM");
+    running.wait_for_error_output("Stopping.");
+    engine.release_claims();
+    let output = running.finish();
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    assert!(output.stderr.contains("No Scan was running"), "{}", output.stderr);
+    assert!(engine.results().is_empty());
 }

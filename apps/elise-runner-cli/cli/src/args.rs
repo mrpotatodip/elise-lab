@@ -1,5 +1,3 @@
-// The command line. Small enough to read by hand: four commands and three flags.
-
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Pair { code: String, yes: bool, print_token: bool },
@@ -13,7 +11,6 @@ pub enum Parsed {
     Command(Command),
     Help,
     Version,
-    // What is wrong with the command line, in one sentence.
     Usage(String),
 }
 

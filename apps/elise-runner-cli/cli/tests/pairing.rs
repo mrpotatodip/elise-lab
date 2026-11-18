@@ -1,5 +1,3 @@
-// `elise-runner pair`, `status` and `unpair`, run as a process against a stub engine.
-
 mod support;
 
 use support::{Engine, Runner, ACCOUNT_NAME, CODE, RUNNER_NAME};
@@ -51,6 +49,22 @@ fn pairing_again_saves_the_new_token_and_revokes_the_old_one() {
 }
 
 #[test]
+fn pairing_again_after_elise_rejected_the_old_token_says_it_was_removed_before_asking() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+    runner.run(&["pair", CODE, "--yes"], "");
+    engine.remove_all_runners();
+
+    let again = runner.run(&["pair", CODE], "y\n");
+
+    assert_eq!(again.code, 0, "{}{}", again.stdout, again.stderr);
+    let first_line = again.stdout.lines().next().unwrap_or_default();
+    assert_eq!(first_line, "This computer's old token was no longer valid in Elise, so it was removed.");
+    assert!(!again.stdout.contains("replaces"), "{}", again.stdout);
+    assert_eq!(engine.live(), [engine.tokens()[1].clone()].into());
+}
+
+#[test]
 fn pairing_again_names_the_old_runner_when_its_token_cannot_be_revoked() {
     let engine = Engine::start();
     let runner = Runner::new(&engine);
@@ -95,7 +109,6 @@ fn an_invalid_or_expired_code_fails_with_a_plain_message() {
 
 #[test]
 fn status_reports_each_state_with_its_exit_code() {
-    // (state, how to get there, exit code, what status prints)
     let cases: [(&str, fn(&Engine, &mut Runner), i32, &str); 4] = [
         ("connected", |_, runner| { runner.run(&["pair", CODE, "--yes"], ""); }, 0, "connected"),
         ("unpaired", |_, _| {}, 3, "unpaired"),
@@ -201,7 +214,6 @@ fn with_elise_runner_home_the_token_is_in_an_owner_only_file_there() {
 
 #[test]
 fn the_command_line_is_checked() {
-    // (arguments, exit code, text on stdout or stderr)
     let cases: [(&[&str], i32, &str); 6] = [
         (&["--help"], 0, "Exit codes:"),
         (&["--version"], 0, concat!("elise-runner ", env!("CARGO_PKG_VERSION"))),

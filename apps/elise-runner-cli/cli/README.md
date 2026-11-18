@@ -66,7 +66,7 @@ A Scan uses your Claude login but not your Claude Code settings. It runs under i
 
 A succeeded Scan's work folder is removed once its result is sent. A failed Scan's is kept and its path is printed on the last line, with the agent's log and the files of the Phases that finished.
 
-Ctrl-C (`SIGINT`) or `SIGTERM` with no Scan running exits at once with 0. During a Scan it stops the running `claude`, reports the Scan to Elise as failed with a reason that says the Runner was stopped, keeps the work folder and exits with 1. Signals after the first are ignored until the result is sent.
+Ctrl-C (`SIGINT`) or `SIGTERM` with no Scan running exits at once with 0. During a Scan it stops the running `claude`, reports the Scan to Elise as failed with a reason that says the Runner was stopped, keeps the work folder and exits with 1. A stop that comes after the Scan already succeeded changes nothing: the result is sent and the program exits with 0. Signals after the first are ignored until the result is sent.
 
 ## Under a service manager
 

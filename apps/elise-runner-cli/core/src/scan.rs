@@ -14,7 +14,6 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::{sleep, timeout};
 
-// How often a Runner with nothing to do asks Elise for work.
 pub const POLL_EVERY: Duration = Duration::from_secs(5);
 const CLONE_TIMEOUT: Duration = Duration::from_secs(300);
 // A job with one prompt (an older engine) is one run of the agent under this limit.
@@ -52,9 +51,7 @@ const ALLOWED_TOOLS: &str = "Bash(cd:*) Bash(pwd:*) Bash(mkdir:*) Bash(ls:*) Bas
 // work folder, with the audit skill beside it. The person's login is not a setting and stays.
 // Their user, local and plugin settings and `~/.claude/skills` are not loaded.
 // This file grants nothing; it only denies: programs that start others or use the network, git
-// commands that reach a remote, web fetches, the places credentials live, the system's process
-// folder (on Linux, `/proc/<pid>/environ` holds the environment of the program that started the
-// agent), and edits to itself.
+// commands that reach a remote, web fetches, the places credentials live, and edits to itself.
 const AGENT_DENY_RULES: [&str; 34] = [
     "Bash(curl:*)",
     "Bash(wget:*)",
@@ -122,7 +119,6 @@ git -C repo rev-parse HEAD > repo.sha
 git -C repo rev-parse --abbrev-ref HEAD > repo.branch
 "#;
 
-// A job Elise handed this Runner: one Scan to run.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Job {
@@ -152,9 +148,6 @@ struct PhasePrompt {
     prompt: String,
 }
 
-// Where the programs and the audit skill are: plain values the program using the core passes in, so
-// a test passes a stub `claude`, a stub `node` and a skills folder. `None` is a program this computer
-// does not have; the Scan says so when it first needs it.
 pub struct Tools {
     pub claude: Option<PathBuf>,
     pub node: Option<PathBuf>,
@@ -163,7 +156,6 @@ pub struct Tools {
 }
 
 impl Tools {
-    // `claude` and `node` where this computer has them, and the skills from `skills`.
     pub fn locate(skills: PathBuf) -> Tools {
         Tools { claude: find_claude(), node: find_node(), skills }
     }
@@ -187,20 +179,13 @@ struct Report {
     files: BTreeMap<String, String>,
 }
 
-// What asking Elise for work gave.
 pub enum Claimed {
     Job(Box<Job>),
     Nothing,
     Offline,
-    // Elise rejected the token: the Runner was removed.
     Removed,
 }
 
-// What a Scan tells the program running it, in order: the desktop app turns it into its activity,
-// a terminal program into log lines. `repo` is `owner/name`. The repair run ends as a
-// `PhaseEnded` named `repair`. Money is in dollars; `pool_left_usd` is what the Phases after may spend.
-// `kept` is the work folder when it was kept for a person to read (the Scan failed or its result was
-// not sent); a succeeded Scan whose result was sent removes it.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Claimed { scan_id: String, repo: String },
@@ -213,18 +198,11 @@ pub enum Event {
 
 pub type OnEvent<'a> = &'a (dyn Fn(Event) + Send + Sync);
 
-// -----
-// Telling a running Scan to stop: the program running the core keeps the `Stopper` and gives the
-// Scan its `Stop`. Once stopped, the agent, the clone or the validators running then are killed, no
-// further run starts, and the Scan ends with `STOPPED` as its error through the usual failed report,
-// send and tidy, so the work folder is kept. It stays stopped: a Scan told later stops at once.
-// -----
 pub struct Stopper(tokio::sync::watch::Sender<bool>);
 
 #[derive(Clone)]
 pub struct Stop(tokio::sync::watch::Receiver<bool>);
 
-// The Scan's error when the Runner was stopped while it ran.
 pub const STOPPED: &str = "The Scan ended because the Runner was stopped (Ctrl-C or a stop signal) while it ran. The agent was stopped and its log so far is attached; the work folder on the Runner's computer keeps what the Scan wrote. Start the scan again.";
 
 impl Stopper {
@@ -239,7 +217,6 @@ impl Stopper {
 }
 
 impl Stop {
-    // A Stop nothing ever fires: for a program that never stops a Scan midway.
     pub fn never() -> Stop {
         Stopper::new().1
     }
@@ -248,7 +225,6 @@ impl Stop {
         *self.0.borrow()
     }
 
-    // Ends once the Scan is told to stop; never, for a Stop whose Stopper is gone without stopping.
     pub async fn stopped(&self) {
         let mut receiver = self.0.clone();
         if receiver.wait_for(|stopped| *stopped).await.is_err() {
@@ -257,11 +233,6 @@ impl Stop {
     }
 }
 
-// -----
-// The loop. It runs for as long as the program does and does nothing until the computer is paired.
-// `tools` is asked once per claimed Scan, so a `claude` installed while the program runs is found.
-// Nothing stops its Scans midway: the program ends with the loop.
-// -----
 pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, on_event: OnEvent<'_>) {
     let never = Stop::never();
     loop {
@@ -279,7 +250,6 @@ pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, on_event: O
     }
 }
 
-// Where `claude`, `node` and the Skill are, or a sentence for the dashboard saying why not.
 pub type FindTools<'a> = &'a (dyn Fn() -> Result<Tools, String> + Send + Sync);
 
 pub async fn claim(token: &str) -> Claimed {
@@ -302,8 +272,6 @@ pub async fn claim(token: &str) -> Claimed {
     }
 }
 
-// One claimed Scan from clone to report, told as it goes through `on_event`. When `stop` fires the
-// Scan ends with `STOPPED` and is still reported and tidied, so it never stays running in Elise.
 pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEvent<'_>, stop: &Stop) {
     let label = repo_label(&job.repo);
     on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
@@ -313,9 +281,7 @@ pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEv
         Ok(tools) => execute(&tools, &job, &work, on_event, stop).await,
         Err(error) => Err(error),
     };
-    // A process that saw the same Ctrl-C (it reaches the whole terminal group) may have ended
-    // before the stop was noticed: the Scan failed because the Runner was stopped all the same.
-    let ended = ended.map_err(|error| if stop.is_stopped() { STOPPED.to_string() } else { error });
+    let ended = ended.map_err(|error| blame_the_stop_for_any_failure_after_it(stop, error));
     let report = ended.unwrap_or_else(|error| failed_report(&work, error));
     let ok = report.state == "succeeded";
     let message = report.error.clone().unwrap_or_default();
@@ -335,6 +301,14 @@ pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEv
     });
 }
 
+fn blame_the_stop_for_any_failure_after_it(stop: &Stop, error: String) -> String {
+    if stop.is_stopped() {
+        STOPPED.to_string()
+    } else {
+        error
+    }
+}
+
 // What a scan that ended in an error sends: the error, and the agent's log, which carries what the
 // Phases that ran cost.
 fn failed_report(work: &Path, error: String) -> Report {
@@ -348,7 +322,7 @@ fn failed_report(work: &Path, error: String) -> Report {
 }
 
 // A finished scan cleans up after itself. A failed one keeps its folder, so the agent's own log and
-// the files of the Phases that finished can be read. Returns the folder when it was kept.
+// the files of the Phases that finished can be read.
 fn tidy(work: &Path, report: &Report, sent: bool) -> Option<PathBuf> {
     if report.state == "succeeded" && sent {
         let _ = fs::remove_dir_all(work);
@@ -512,7 +486,6 @@ fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(),
     Ok(())
 }
 
-// `settle`, telling what the run cost and what is left of the pool, whether or not the Scan goes on.
 fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event: OnEvent<'_>) -> Result<(), String> {
     let cost_usd = run.result.as_ref().and_then(cost_of);
     let settled = settle(run, spent, phase, cap);
@@ -549,7 +522,7 @@ fn repair_prompt(error: &str) -> String {
 }
 
 // The words for a run in an error: a Phase, or the repair run.
-fn run_label(phase: &str) -> String {
+pub fn run_label(phase: &str) -> String {
     if phase == REPAIR {
         "the repair run".to_string()
     } else {
@@ -671,7 +644,6 @@ async fn clone_repo(work: &Path, repo: &str, git_ref: &str, stop: &Stop) -> Resu
         .env("GIT_ALLOW_PROTOCOL", "https")
         .env("GIT_TERMINAL_PROMPT", "0")
         .kill_on_drop(true);
-    // Stopping drops the clone, and `kill_on_drop` ends it.
     let output = tokio::select! {
         output = timeout(CLONE_TIMEOUT, command.output()) => output,
         _ = stop.stopped() => return Err(STOPPED.to_string()),
@@ -823,7 +795,6 @@ async fn validate_full(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), Ch
             .env("PATH", "/usr/bin:/bin")
             .stdin(Stdio::null())
             .kill_on_drop(true);
-        // Stopping is an Environment failure: it starts no repair run.
         let ran = tokio::select! {
             ran = timeout(VALIDATE_TIMEOUT, command.output()) => ran,
             _ = stop.stopped() => return Err(Environment(STOPPED.to_string())),
@@ -869,7 +840,6 @@ struct AgentRun {
 // adds its output to `agent.log`, the whole Scan's log, which the engine reads the cost from; a
 // single run writes `agent.log` itself. `Err` here is a run that did not start; one that outran its
 // limit or failed is `Ok` with its `end` an `Err` and whatever result it left, so its spend counts.
-// A run that is stopped is killed the same way, its log so far kept, with `STOPPED` as its end.
 #[allow(clippy::too_many_arguments)]
 async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_usd: f64, phase: Option<&str>, limit: Duration, stop: &Stop) -> Result<AgentRun, String> {
     if stop.is_stopped() {
@@ -897,8 +867,6 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
         // The person's own login does the work. A key in the environment would be used instead.
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("ANTHROPIC_AUTH_TOKEN")
-        // The Runner's own token, when a headless Runner was given it this way: a hostile repository
-        // must not be able to make the agent copy it into a report.
         .env_remove(TOKEN_VARIABLE)
         .stdin(Stdio::null())
         .stdout(Stdio::from(log))
@@ -1379,7 +1347,6 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         scan_told(stage, job, minute, &|_| {})
     }
 
-    // The same, telling `on_event` what happens, on a plain runtime as a program using the core would.
     #[cfg(unix)]
     fn scan_told(stage: &Stage, job: &Job, minute: Duration, on_event: OnEvent<'_>) -> Report {
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
@@ -1632,8 +1599,6 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let _ = fs::remove_dir_all(&stage.root);
     }
 
-    // What a terminal Runner logs: each Phase and the repair run as they start and end, with what each
-    // cost and what is left of the $12 pool after it.
     #[cfg(unix)]
     #[test]
     fn the_scan_tells_each_phase_and_the_repair_with_its_cost_and_the_pool_left() {

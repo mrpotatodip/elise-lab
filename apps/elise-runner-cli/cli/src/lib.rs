@@ -1,10 +1,3 @@
-// The headless Runner: the shared core (`elise-runner-core`) driven from a terminal.
-//
-// - `args`: the command line, parsed into a `Command`, and the help text.
-// - `store`: which token store this run uses (the environment, the keychain or a file).
-// - `commands`: one function per command, each returning the program's `Exit` code.
-// - `tools`: the built-in Skill and where `claude` and `node` are, for the core's Scans.
-
 pub mod args;
 pub mod commands;
 pub mod store;
@@ -12,23 +5,17 @@ pub mod tools;
 
 use args::{Command, Parsed};
 
-// The exit codes. The help text lists them; scripts and health checks rely on them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exit {
-    // Success; `status`: connected.
     Ok = 0,
     Error = 1,
     Usage = 2,
     Unpaired = 3,
-    // Elise rejected the token.
     Revoked = 4,
-    // Elise could not be reached.
     Offline = 5,
-    // `run --once`: nothing to claim.
     NothingToClaim = 6,
 }
 
-// Runs one command line to the end.
 pub fn main(args: &[String]) -> Exit {
     let command = match args::parse(args) {
         Parsed::Command(command) => command,

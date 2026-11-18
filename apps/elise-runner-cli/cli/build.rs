@@ -1,7 +1,3 @@
-// Builds the `full` Skill into the binary: every file of the engine's `security-audit` skill folder
-// (the folder the desktop bundle copies) becomes one `(path, bytes)` entry of `SKILL_FILES`, so the
-// one `elise-runner` file is all a person installs.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -20,7 +16,6 @@ fn main() {
     fs::write(out, format!("pub const SKILL_FILES: &[(&str, &[u8])] = &[\n{entries}];\n")).unwrap();
 }
 
-// Every file under `dir`, as its path from `root` with `/` between folders, and its full path.
 fn walk(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) {
     for entry in fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();

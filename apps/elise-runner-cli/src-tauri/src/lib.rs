@@ -1,7 +1,3 @@
-// The desktop Runner: a window, a tray and the commands the page calls, over the shared core
-// (`elise-runner-core`), which pairs, keeps the token and runs the Scans. The page never talks to the
-// API and never sees the token.
-
 use elise_runner_core::pairing::{self, Enrolled, RunnerError, RunnerStatus};
 use elise_runner_core::scan::{self, Event, Tools};
 use elise_runner_core::store::{KeychainStore, DESKTOP_KEYCHAIN_SERVICE};
@@ -13,11 +9,8 @@ use tauri::{
     AppHandle, Manager, WindowEvent,
 };
 
-// The desktop app's token, in the keychain under its own service name.
 static STORE: KeychainStore = KeychainStore::new(DESKTOP_KEYCHAIN_SERVICE);
 
-// A pairing Elise has issued and the person has not accepted yet. It lives in memory only: it is
-// not in the keychain, so the work loop cannot use it, and quitting the app loses it.
 static PENDING: Mutex<Option<Enrolled>> = Mutex::new(None);
 
 fn take_pending() -> Option<Enrolled> {
@@ -33,7 +26,6 @@ struct PairingOffer {
     account_name: String,
 }
 
-// What the window shows about the work, made from the core's events. The page asks for it.
 #[derive(Clone, Serialize)]
 #[serde(tag = "state", rename_all = "lowercase", rename_all_fields = "camelCase")]
 enum Activity {
@@ -69,8 +61,6 @@ async fn runner_status() -> RunnerStatus {
     pairing::status(&STORE).await
 }
 
-// Trades a code for a token and holds it until the person accepts the account it belongs to. A
-// second code entered before the first was answered replaces it; the first is revoked.
 #[tauri::command]
 async fn pair_runner(code: String) -> Result<PairingOffer, RunnerError> {
     let enrolled = pairing::enroll(&code).await?;
