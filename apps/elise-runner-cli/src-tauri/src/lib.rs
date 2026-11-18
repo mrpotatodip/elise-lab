@@ -4,7 +4,7 @@
 
 use elise_runner_core::pairing::{self, Enrolled, RunnerError, RunnerStatus};
 use elise_runner_core::scan::{self, Event, Tools};
-use elise_runner_core::store::KeychainStore;
+use elise_runner_core::store::{KeychainStore, DESKTOP_KEYCHAIN_SERVICE};
 use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{
@@ -14,7 +14,7 @@ use tauri::{
 };
 
 // The desktop app's token, in the keychain under its own service name.
-static STORE: KeychainStore = KeychainStore::new("com.eliselab.runner");
+static STORE: KeychainStore = KeychainStore::new(DESKTOP_KEYCHAIN_SERVICE);
 
 // A pairing Elise has issued and the person has not accepted yet. It lives in memory only: it is
 // not in the keychain, so the work loop cannot use it, and quitting the app loses it.

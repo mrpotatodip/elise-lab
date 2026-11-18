@@ -1,4 +1,5 @@
-# The Runner's Rust code: the core every Runner shares (`core`) and the desktop app (`src-tauri`).
+# The Runner's Rust code: the core every Runner shares (`core`), the desktop app (`src-tauri`) and
+# the headless program (`cli`).
 [workspace]
 resolver = "2"
-members = ["core", "src-tauri"]
+members = ["core", "src-tauri", "cli"]

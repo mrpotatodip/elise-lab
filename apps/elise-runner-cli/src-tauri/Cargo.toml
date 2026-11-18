@@ -1,5 +1,7 @@
 [package]
-name = "elise-runner"
+# Not `elise-runner`: that is the headless program's binary, and both land in one `target` folder.
+# `mainBinaryName` in tauri.conf.json keeps the bundled app's executable named `elise-runner`.
+name = "elise-runner-desktop"
 version = "0.1.0"
 description = "Elise Runner: runs Scans on this computer"
 edition = "2021"

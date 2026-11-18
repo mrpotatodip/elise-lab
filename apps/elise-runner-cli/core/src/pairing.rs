@@ -138,6 +138,42 @@ pub async fn accept(store: &dyn TokenStore, enrolled: Enrolled) -> Result<Runner
     })
 }
 
+// What became of the token a Runner held before it was paired again.
+#[derive(Debug, PartialEq)]
+pub enum Replaced {
+    // There was none.
+    Nothing,
+    // Elise dropped it, or had already.
+    Revoked,
+    // Elise could not be reached: the old Runner stays in the account's list until an admin
+    // removes it.
+    StillLive,
+}
+
+// `accept` for a Runner that may already be paired: the new token is saved first, then the old one
+// is revoked with Elise, so no live token is left behind.
+pub async fn accept_replacing(
+    store: &dyn TokenStore,
+    enrolled: Enrolled,
+) -> Result<(RunnerStatus, Replaced), RunnerError> {
+    let old = store.token();
+    let status = accept(store, enrolled).await?;
+    let replaced = match old {
+        None => Replaced::Nothing,
+        Some(old) if revoke(&old).await => Replaced::Revoked,
+        Some(_) => Replaced::StillLive,
+    };
+    Ok((status, replaced))
+}
+
+impl Enrolled {
+    // The token itself, out of the core. Only for a program asked to print it once
+    // (`elise-runner pair --print-token`); it is in no store.
+    pub fn into_token(self) -> String {
+        self.token
+    }
+}
+
 // The person refused. Elise is told to drop the token; if it cannot be reached the token is
 // dropped here anyway, and a token nobody holds works for nobody. The runner then shows in the
 // account's list until an admin removes it.

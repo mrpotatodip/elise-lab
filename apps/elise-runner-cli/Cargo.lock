@@ -968,13 +968,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
-name = "elise-runner"
+name = "elise-runner-cli"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "elise-runner-core",
- "serde",
- "tauri",
- "tauri-build",
+ "tokio",
 ]
 
 [[package]]
@@ -986,6 +985,16 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "elise-runner-desktop"
+version = "0.1.0"
+dependencies = [
+ "elise-runner-core",
+ "serde",
+ "tauri",
+ "tauri-build",
 ]
 
 [[package]]

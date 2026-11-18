@@ -12,15 +12,17 @@ Elise Runner is a small desktop app (Tauri 2, Rust and TypeScript) that runs a s
 
 The page never holds the API token. Rust keeps it in the system keychain and makes every call to Elise. The page asks Rust through Tauri commands in `src/api.ts` and draws what comes back.
 
-The folder is one Cargo workspace (`Cargo.toml`, one `Cargo.lock`, one `target`). Everything a Runner does apart from drawing a window is in the core crate, `elise-runner-core`, which has no Tauri dependency. The desktop app is a thin shell over it: window, tray and commands. It tells the core where `claude`, `node` and the bundled skills are (`Tools`, from the app's resource folder), and turns the core's events (claimed, Phase started and ended with its cost and what is left of the pool, repair started, result sent, ended) into its activity.
+The folder is one Cargo workspace (`Cargo.toml`, one `Cargo.lock`, one `target`) with three crates: the core (`elise-runner-core`), the desktop app (`elise-runner-desktop`, bundled as "Elise Runner" with the executable `elise-runner` through `mainBinaryName`) and the headless Runner (`elise-runner-cli`, which builds the binary `elise-runner`). Everything a Runner does apart from drawing a window is in the core crate, which has no Tauri dependency. The desktop app is a thin shell over it: window, tray and commands. It tells the core where `claude`, `node` and the bundled skills are (`Tools`, from the app's resource folder), and turns the core's events (claimed, Phase started and ended with its cost and what is left of the pool, repair started, result sent, ended) into its activity.
 
 | Path | What it is |
 | --- | --- |
 | `src/` | The page: `main.ts`, `views.ts`, `api.ts` (the Tauri commands), `copy.ts` (every string the user reads). |
 | `core/src/pairing.rs` | Enroll a code, accept or decline it, the Runner's status, unpairing. |
-| `core/src/store.rs` | Where the token is kept: the keychain, under a service name the program picks. |
+| `core/src/store.rs` | Where the token is kept: the keychain (each program has its own service name), an owner-only file, or a token given from outside (read only). |
 | `core/src/scan.rs` | The work loop: claim, clone, run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
 | `src-tauri/src/lib.rs` | The desktop app: the commands, the pending pairing, the activity, the tray. |
+| `cli/src/` | The headless Runner: `args.rs` (command line, help text), `store.rs` (which token store a run uses), `commands.rs` (one function per command). |
+| `cli/tests/` | Process tests: the debug `elise-runner` run against a stub engine (`support/mod.rs`). |
 
 A scan uses your Claude login but not your Claude Code settings. The app writes its own settings file and the audit skill into the scan's work folder and tells `claude` to load only that (`--setting-sources project`), so an allow rule you keep for daily work, such as `curl`, cannot widen what the agent may do. Your `~/.claude` folder is neither read nor changed.
 
@@ -28,7 +30,7 @@ A job says which audit to run (`lite` or `full`). A full job that carries `phase
 
 A job with no `phasePrompts` (an older engine) is one run of `claude` on the single prompt, for up to 40 minutes. It stops at the same cap through `--max-budget-usd`. A job with no `profileCapUsd` (an older Worker) uses the budget it sends. When the limit is hit and the audit had already written `REPORT.md`, the files are sent and the Scan ends as a Partial Scan; otherwise the Scan ends with an error that says the cap was reached.
 
-The Rust tests (`cargo test --workspace` in this folder) run a Scan after the clone against a stub `claude` and `node`, in the core, on a plain tokio runtime.
+The Rust tests (`cargo test --workspace` in this folder) run a Scan after the clone against a stub `claude` and `node`, in the core, on a plain tokio runtime, and run the debug `elise-runner` as a process against a stub engine with `ELISE_RUNNER_HOME` set to a temp folder, so no test touches a keychain.
 
 The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The activity is `idle`, `running` or `finished`.
 
@@ -39,5 +41,18 @@ pnpm --filter elise-runner-cli app:dev     # tauri dev
 pnpm --filter elise-runner-cli app:build   # tauri build
 pnpm --filter elise-runner-cli check       # tsc --noEmit, then cargo test --workspace
 ```
+
+## The headless Runner
+
+`elise-runner` does what the desktop app does without a window, on macOS and Linux. Build it with `cargo build -p elise-runner-cli` (or `--release`).
+
+```bash
+elise-runner pair <code> [--yes]        # show the account and Runner name, ask y/N, save the token
+elise-runner pair <code> --print-token  # print the token once for ELISE_RUNNER_TOKEN, save nothing
+elise-runner status                     # unpaired, connected, revoked or offline, and the token store
+elise-runner unpair                     # Elise drops the token, then it is forgotten
+```
+
+Pairing a Runner that already holds a token saves the new one, then revokes the old one. The token store is `ELISE_RUNNER_TOKEN` if set (read only: `pair` and `unpair` refuse it), else the keychain under `com.eliselab.runner.headless` (the desktop app uses `com.eliselab.runner`, so the two are separate Runners), else an owner-only file in the config folder. A debug build reads `ELISE_RUNNER_HOME` (the token file goes there, the keychain is never touched) and `ELISE_ENGINE_URL`; a release build ignores both. Exit codes: 0 success (`status`: connected), 1 error, 2 usage, 3 unpaired, 4 revoked, 5 offline, 6 `run --once` with nothing to claim. `elise-runner --help` lists them.
 
 You need a Rust toolchain for `app:dev`, `app:build` and `check`. `pnpm check:apps` and the pre-commit check run `check` for this folder, so a commit that touches it runs the Rust tests.
