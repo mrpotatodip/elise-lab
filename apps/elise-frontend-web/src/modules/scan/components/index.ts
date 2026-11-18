@@ -1,6 +1,7 @@
 export * from "./scan-activity-chart";
 export * from "./scan-finding-detail";
 export * from "./scan-finding-header";
+export * from "./scan-finding-location";
 export * from "./scan-finding-sheet";
 export * from "./scan-findings-table";
 export * from "./scan-overview";
@@ -19,5 +20,5 @@ export * from "./scan-new-dialog";
 export * from "./scan-status-badge";
 export * from "./scan-summary";
 export * from "./scan-time";
-export * from "./scan-verdict-card";
+export * from "./scan-verdict-cell";
 export * from "./scan-success-ring";
