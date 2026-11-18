@@ -13,8 +13,9 @@ const GIT_SUFFIX = /(\.git)?\/?$/;
 // -----
 export const githubProvider = {
   id: "github",
-  capabilities: { canListRepos: true, hasBranches: true, isArchive: false },
+  capabilities: { canListRepos: true, hasBranches: true, isArchive: false, cloudScans: true },
   addressPattern: GITHUB_ADDRESS,
+  addressMessage: "A GitHub address looks like https://github.com/owner/name",
   fixedBranch: null,
   host: (): string => "github.com",
   canonical: (address: string): string => address.replace(GITHUB_PREFIX, "").replace(GIT_SUFFIX, "").toLowerCase(),

@@ -1,16 +1,12 @@
 import { z } from "zod";
 import { REPO_BRANCH_LIMIT } from "@repo/contracts/elise";
 import { SCANS_GIT_REF, SCANS_PROVIDER } from "#/modules/scans/constants";
-import { checkRepoAddress, SCANS_REPO_INPUT } from "#/modules/scans/schemas";
+import { checkRepoAddress } from "#/modules/scans/schemas";
 
-// -----
-// provider upload makes an upload app: repo is its name, and
-// branches are ignored, as the app has only its hidden Branch.
-// -----
 export const AddRepoBodySchema = z
   .object({
     provider: SCANS_PROVIDER,
-    repo: SCANS_REPO_INPUT,
+    repo: z.string().meta({ example: "https://github.com/octocat/Hello-World", description: "The repository's https address, read by the provider's own rules." }),
     branches: z
       .array(z.string().regex(SCANS_GIT_REF))
       .max(REPO_BRANCH_LIMIT)

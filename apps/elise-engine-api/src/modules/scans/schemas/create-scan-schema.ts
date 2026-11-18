@@ -3,26 +3,28 @@ import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "#/constants";
 import { documentFields } from "#/lib/document-fields";
 import { ScanQueuedSchema as ContractScanQueuedSchema } from "@repo/contracts/elise";
 import { SCANS_GIT_REF, SCANS_PROVIDER } from "#/modules/scans/constants";
-import { checkArchiveSource, checkRepoAddress, SCANS_REPO_INPUT } from "./repo-address-schema";
+import { checkArchiveSource, checkRepoAddress } from "./repo-address-schema";
 
-export const CreateScanBodySchema = z.object({
-  provider: SCANS_PROVIDER,
-  repo: SCANS_REPO_INPUT,
-  model: z.enum(SCAN_MODELS).optional(),
-  effort: z.enum(SCAN_EFFORTS).optional(),
-  profile: z.enum(SCAN_PROFILES).optional(),
-  max_budget_usd: z.number().positive().optional(),
-  runner_id: z.uuid().optional().meta({ description: "Run the scan on this Runner of the account instead of in EliseLAB's cloud. The Runner must be connected, and the repository public." }),
-  ref: z
-    .string()
-    .regex(SCANS_GIT_REF)
-    .optional()
-    .meta({ example: "main", description: "A branch, tag or commit to scan. Leave it out for the default branch." }),
-  archive_id: z.uuid().optional().meta({ description: "For provider upload only: the zip of the app to scan. An upload Scan runs on a Runner and takes no ref." }),
-}).superRefine((body, ctx) => {
-  checkRepoAddress(body, ctx);
-  checkArchiveSource(body, ctx);
-});
+export const CreateScanBodySchema = z
+  .object({
+    provider: SCANS_PROVIDER,
+    repo: z.string().meta({ example: "https://github.com/octocat/Hello-World", description: "The repository's https address, read by the provider's own rules. For provider upload, the app's name." }),
+    model: z.enum(SCAN_MODELS).optional(),
+    effort: z.enum(SCAN_EFFORTS).optional(),
+    profile: z.enum(SCAN_PROFILES).optional(),
+    max_budget_usd: z.number().positive().optional(),
+    runner_id: z.uuid().optional().meta({ description: "Run the scan on this Runner of the account instead of in EliseLAB's cloud. The Runner must be connected, and the repository public." }),
+    ref: z
+      .string()
+      .regex(SCANS_GIT_REF)
+      .optional()
+      .meta({ example: "main", description: "A branch, tag or commit to scan. Leave it out for the default branch." }),
+    archive_id: z.uuid().optional().meta({ description: "For provider upload only: the zip of the app to scan. An upload Scan runs on a Runner and takes no ref." }),
+  })
+  .superRefine((body, ctx) => {
+    checkRepoAddress(body, ctx);
+    checkArchiveSource(body, ctx);
+  });
 
 export const ScanQueuedSchema = documentFields(ContractScanQueuedSchema, {
   skill: { example: "lite" },

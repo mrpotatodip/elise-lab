@@ -64,6 +64,16 @@ In this order:
 
 `run` runs a Scan as the desktop app does: clone, the four Phases on one Pool, the validators, one repair run if they fail, and upload. It logs one plain line per step on standard output, each starting `[owner/name scanId]`: claimed, each Phase started and ended with what it spent and what is left of the Pool, repair started, result sent or not, and how the Scan ended. The lines are plain so that systemd, Docker or a CI log can capture them.
 
+## Where a Scan may clone from
+
+The Runner clones only `https://` addresses, with your own git login and no terminal prompt. It checks the address before git runs, with the rules of the address's provider (`docs/adr/0007-git-providers.md`):
+
+- `github.com`: `https://github.com/owner/name`.
+- `gitlab.com`: `https://gitlab.com/group/name`, with groups inside groups. A pasted branch view (`…/-/tree/main`) or a trailing `.git` still names the repository.
+- A GitLab server your company runs: only a host you list in `settings.json`, in the same config folder as the token file (`~/.config/elise-runner/settings.json` on Linux): `{"gitlabHosts": ["git.example.com"]}`. A host that only Elise's job names is refused, so a forged job cannot send this computer to clone from somewhere else. The file is read again for every Scan. The desktop app reads a `settings.json` in its own config folder.
+
+Whether a private repository clones with your git login is not tested yet.
+
 A Scan uses your Claude login but not your Claude Code settings. It runs under its own settings and tool allowlist and never reads or changes your `~/.claude` folder. The agent does not get `ELISE_RUNNER_TOKEN`, and on Linux its settings deny reading `/proc`, so a hostile repository cannot make it copy the token into a report.
 
 A succeeded Scan's work folder is removed once its result is sent. A failed Scan's is kept and its path is printed on the last line, with the agent's log and the files of the Phases that finished.

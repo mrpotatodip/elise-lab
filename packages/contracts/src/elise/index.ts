@@ -18,5 +18,7 @@ export * from "./credit";
 export * from "./verdict";
 export * from "./file";
 export * from "./github";
+export * from "./gitlab";
+export * from "./gitlab-sh";
 export * from "./runner";
 export * from "./upload";

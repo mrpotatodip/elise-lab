@@ -16,8 +16,9 @@ const UPLOAD_APP_NAME = /^[A-Za-z0-9](?:[\w .-]{0,78}[\w.-])?$/;
 // -----
 export const uploadProvider = {
   id: "upload",
-  capabilities: { canListRepos: false, hasBranches: false, isArchive: true },
+  capabilities: { canListRepos: false, hasBranches: false, isArchive: true, cloudScans: false },
   addressPattern: UPLOAD_APP_NAME,
+  addressMessage: "An app name is letters, digits, spaces, '.', '-' and '_', starts with a letter or digit, has no slash and is at most 80 characters",
   fixedBranch: "upload",
   host: (): null => null,
   canonical: (address: string): string => address.toLowerCase(),

@@ -1,6 +1,6 @@
 mod support;
 
-use support::{alive, job, Engine, Runner, CODE};
+use support::{alive, job, job_at, Engine, Runner, CODE};
 
 fn paired(engine: &Engine) -> Runner {
     let runner = Runner::new(engine);
@@ -190,6 +190,46 @@ fn a_stop_signal_with_no_scan_running_exits_at_once_with_code_0() {
         assert!(asked.elapsed() < std::time::Duration::from_secs(2), "{signal}: took {:?}", asked.elapsed());
         assert!(engine.results().is_empty(), "{signal}");
     }
+}
+
+// A GitLab job, on gitlab.com or on a server the person listed in this Runner's settings, clones
+// the repository its address names, read up to a pasted branch view.
+#[test]
+fn a_gitlab_job_clones_the_repository_its_address_names() {
+    for (repo, clone_url, label) in [
+        ("https://gitlab.com/acme/platform/app/-/tree/main", "https://gitlab.com/acme/platform/app.git", "acme/platform/app"),
+        ("https://git.acme.dev/infra/deployer", "https://git.acme.dev/infra/deployer.git", "infra/deployer"),
+    ] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        std::fs::write(runner.home.join("settings.json"), r#"{"gitlabHosts":["git.acme.dev"]}"#).unwrap();
+        let stubs = runner.stub_tools(&["claude", "node"]);
+        engine.queue_job(job_at("scan_7", repo, PLAIN));
+
+        let output = runner.run(&["run", "--once"], "");
+
+        assert_eq!(output.code, 0, "{repo}: {}{}", output.stdout, output.stderr);
+        assert_eq!(engine.results()[0].1["state"], "succeeded", "{repo}");
+        assert!(stubs.git_calls().contains(&format!("clone --depth 1 -- {clone_url} repo")), "{repo}: {}", stubs.git_calls());
+        assert!(output.stdout.starts_with(&format!("[{label} scan_7] Scan claimed")), "{repo}: {}", output.stdout);
+    }
+}
+
+// A GitLab server host that only the job names is refused before git runs, with the file to edit.
+#[test]
+fn a_gitlab_server_the_runner_does_not_list_is_refused_before_git_runs() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job_at("scan_8", "https://git.evil.example/acme/app", PLAIN));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 1, "{}{}", output.stdout, output.stderr);
+    let (_, result) = &engine.results()[0];
+    let error = result["error"].as_str().unwrap();
+    assert!(error.contains("git.evil.example") && error.contains(&runner.home.join("settings.json").display().to_string()), "{error}");
+    assert_eq!(stubs.git_calls(), "");
 }
 
 #[test]

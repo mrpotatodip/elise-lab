@@ -145,6 +145,10 @@ impl Engine {
 }
 
 pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
+    job_at(scan_id, REPO_URL, phase_prompts)
+}
+
+pub fn job_at(scan_id: &str, repo: &str, phase_prompts: [&str; 4]) -> String {
     let phases: Vec<serde_json::Value> = ["recon", "hunt", "check", "report"]
         .iter()
         .zip(phase_prompts)
@@ -152,7 +156,7 @@ pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
         .collect();
     serde_json::json!({
         "scanId": scan_id,
-        "repo": REPO_URL,
+        "repo": repo,
         "ref": null,
         "skill": "full",
         "profile": "standard",
@@ -434,7 +438,7 @@ impl Runner {
         for dir in [&bin, &record, &tmp] {
             std::fs::create_dir_all(dir).unwrap();
         }
-        executable(&bin.join("git"), STUB_GIT);
+        executable(&bin.join("git"), &STUB_GIT.replace("__RECORD__", &record.display().to_string()));
         for tool in tools {
             let text = match *tool {
                 "claude" => STUB_CLAUDE.replace("__RECORD__", &record.display().to_string()),
@@ -531,6 +535,11 @@ pub struct Stubs {
 }
 
 impl Stubs {
+    // What git was asked to do, one call per line.
+    pub fn git_calls(&self) -> String {
+        std::fs::read_to_string(self.record.join("git.txt")).unwrap_or_default()
+    }
+
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
@@ -550,6 +559,7 @@ fn executable(path: &std::path::Path, text: &str) {
 }
 
 const STUB_GIT: &str = r#"#!/bin/sh
+echo "$@" >> "__RECORD__/git.txt"
 case "$1" in
   clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
   -C) case "$3 $4" in
