@@ -6,7 +6,8 @@ import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
-import { canonicalRepo, displayRepoUrl } from "#/modules/scan-ledger";
+import { displayRepoUrlOf, repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import type { SourceProviderId } from "#/providers/registry";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
 import { branchStateOf, openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
 import { weighedScanWhere } from "#/modules/verdict/queries";
@@ -257,6 +258,8 @@ export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string
       const last = latest.find((row) => row.repoId === repo.id);
       return {
         id: repo.id,
+        provider: repo.provider,
+        host: repo.host,
         url: repo.url,
         canonical: repo.canonical,
         isPrivate: repo.isPrivate,
@@ -429,27 +432,30 @@ export const REPO_LIMIT_MESSAGE = `An account can have at most ${REPO_LIMIT_PER_
 // (refused past the account's limit), then its branches (refused
 // past the repo's limit), so a refusal leaves nothing behind.
 // -----
-export const addRepoEffect = (db: AppTxDbType, tenantId: string, url: string, branches: string[]): Effect.Effect<string, Conflict | NotFound | DbError> =>
+export const addRepoEffect = (
+  db: AppTxDbType,
+  tenantId: string,
+  url: string,
+  branches: string[],
+  provider?: SourceProviderId,
+): Effect.Effect<string, Conflict | NotFound | DbError> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
-        const canonical = canonicalRepo(url);
-        const [existing] = await tx
-          .select({ id: scanRepos.id })
-          .from(scanRepos)
-          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.canonical, canonical)));
+        const identity = repoIdentityOf(url, provider);
+        const [existing] = await tx.select({ id: scanRepos.id }).from(scanRepos).where(sameRepoIdentity(tenantId, identity));
         let repoId = existing?.id;
         if (!repoId) {
           const [{ total }] = await tx.select({ total: count() }).from(scanRepos).where(eq(scanRepos.tenantId, tenantId));
           if (total >= REPO_LIMIT_PER_TENANT) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
           const [created] = await tx
             .insert(scanRepos)
-            .values({ tenantId, canonical, url: displayRepoUrl(url) })
+            .values({ tenantId, ...identity, url: displayRepoUrlOf(url, provider) })
             .onConflictDoNothing()
             .returning({ id: scanRepos.id });
           repoId = created?.id;
           if (!repoId) {
-            const [raced] = await tx.select({ id: scanRepos.id }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.canonical, canonical)));
+            const [raced] = await tx.select({ id: scanRepos.id }).from(scanRepos).where(sameRepoIdentity(tenantId, identity));
             repoId = raced.id;
           }
         }

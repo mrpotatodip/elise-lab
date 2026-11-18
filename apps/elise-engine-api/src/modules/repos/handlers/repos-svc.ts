@@ -65,7 +65,7 @@ const branchNamesOf = (names: string[]): Effect.Effect<string[], Invalid> =>
 export const addRepoSvc = (db: AppTxDbType, accountId: string, body: AddRepoBody): Effect.Effect<RepoDetail, Invalid | Conflict | NotFound | DbError> =>
   Effect.gen(function* () {
     const names = yield* branchNamesOf(body.branches ?? []);
-    const repoId = yield* addRepoEffect(db, accountId, body.repo, names);
+    const repoId = yield* addRepoEffect(db, accountId, body.repo, names, body.provider);
     return yield* getRepoSvc(db, accountId, repoId);
   });
 

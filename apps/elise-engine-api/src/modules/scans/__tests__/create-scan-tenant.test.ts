@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { platformMasterPlans, scans, tenantAnthropicKeys, tenantCreditLedger, tenants, tenantSubscriptions } from "@repo/db-elise/schema";
+import { platformMasterPlans, scanRepos, scans,tenantAnthropicKeys, tenantCreditLedger, tenants, tenantSubscriptions } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
@@ -87,5 +87,28 @@ describe("POST /scans as one Account", () => {
     const { res, rows, holds, started } = await postAs("own");
 
     expect({ status: res.status, rows: rows.length, holds: holds.length, started }).toEqual({ status: 201, rows: 1, holds: 0, started: 1 });
+  });
+
+  it("files a request without a provider under the github Repo on github.com", async () => {
+    await postAs("pro");
+
+    const stored = await test.raw
+      .select({ provider: scanRepos.provider, host: scanRepos.host, canonical: scanRepos.canonical })
+      .from(scanRepos)
+      .where(eq(scanRepos.tenantId, accountOf.get("pro") ?? ""));
+
+    expect(stored).toEqual([{ provider: "github", host: "github.com", canonical: "octocat/hello-world" }]);
+  });
+
+  it("refuses a provider the engine has no parser for, and writes nothing", async () => {
+    const { env } = fakeBindings();
+    const accountId = accountOf.get("own") ?? "";
+    const headers = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountId, "content-type": "application/json" };
+    const before = await test.raw.select({ id: scans.id }).from(scans).where(eq(scans.tenantId, accountId));
+
+    const res = await app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify({ repo: REPO, provider: "bitbucket" }) }), env, testExecutionContext);
+    const after = await test.raw.select({ id: scans.id }).from(scans).where(eq(scans.tenantId, accountId));
+
+    expect({ status: res.status, written: after.length - before.length }).toEqual({ status: 400, written: 0 });
   });
 });

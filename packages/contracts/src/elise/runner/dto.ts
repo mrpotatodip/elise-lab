@@ -9,7 +9,7 @@ import {
   RUNNER_NAME_MAX,
   RUNNER_PAIRING_CODE_MAX,
 } from "../constants";
-import { RUNNER_JOB_PHASE_VALUES } from "../enums";
+import { RUNNER_JOB_PHASE_VALUES, type RunnerJobSourceValue } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 
 export const RunnerIdSchema = z.uuid();
@@ -95,9 +95,21 @@ export const RunnerPhasePromptSchema = z.object({
   prompt: z.string(),
 });
 
+// -----
+// What a job reads. git: clone repo at ref. archive: download the
+// uploaded zip with this id, which the Worker serves only to the
+// Runner that claimed the job. A job without a source is git: an
+// older Worker sends none. No Worker sends archive yet.
+// -----
+export const RunnerJobSourceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("git" satisfies RunnerJobSourceValue) }),
+  z.object({ kind: z.literal("archive" satisfies RunnerJobSourceValue), archiveId: z.uuid() }),
+]);
+
 export const RunnerJobSchema = z.object({
   scanId: z.string(),
   repo: z.string(),
+  source: RunnerJobSourceSchema.optional(),
   ref: z.string().nullable(),
   skill: z.string(),
   model: z.string(),
@@ -206,6 +218,7 @@ export type RunnerState = z.infer<typeof RunnerStateSchema>;
 export type Runner = z.infer<typeof RunnerSchema>;
 export type Runners = z.infer<typeof RunnersSchema>;
 export type RunnerPhasePrompt = z.infer<typeof RunnerPhasePromptSchema>;
+export type RunnerJobSource = z.infer<typeof RunnerJobSourceSchema>;
 export type RunnerJob = z.infer<typeof RunnerJobSchema>;
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;
 export type StartRunnerLoginBody = z.infer<typeof StartRunnerLoginBodySchema>;

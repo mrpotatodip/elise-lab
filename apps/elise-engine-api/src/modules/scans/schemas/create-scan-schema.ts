@@ -2,9 +2,10 @@ import { z } from "zod";
 import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "#/constants";
 import { documentFields } from "#/lib/document-fields";
 import { ScanQueuedSchema as ContractScanQueuedSchema } from "@repo/contracts/elise";
-import { SCANS_GIT_REF, SCANS_REPO_ADDRESS } from "#/modules/scans/constants";
+import { SCANS_GIT_REF, SCANS_PROVIDER, SCANS_REPO_ADDRESS } from "#/modules/scans/constants";
 
 export const CreateScanBodySchema = z.object({
+  provider: SCANS_PROVIDER,
   repo: z.string().regex(SCANS_REPO_ADDRESS).meta({ example: "https://github.com/octocat/Hello-World" }),
   model: z.enum(SCAN_MODELS).optional(),
   effort: z.enum(SCAN_EFFORTS).optional(),

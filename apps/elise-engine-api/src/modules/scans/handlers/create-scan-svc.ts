@@ -156,7 +156,7 @@ export const queueScanSvc = (
       }
     }
 
-    const record = yield* repo.ensureRepo(accountId, input.repo);
+    const record = yield* repo.ensureRepo(accountId, input.repo, input.provider);
     // -----
     // One spelling per branch (refs/heads/x is x, HEAD is no ref).
     // Whether the ref is a branch, a tag or a commit is settled by

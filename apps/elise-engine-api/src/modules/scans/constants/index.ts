@@ -1,9 +1,20 @@
-import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+import { z } from "zod";
+import { DEFAULT_SOURCE_PROVIDER_ID, SOURCE_PROVIDER_IDS, sourceProviderOf } from "#/providers/registry";
 
 // -----
 // Input
 // -----
 export const SCANS_REPO_ADDRESS = sourceProviderOf(DEFAULT_SOURCE_PROVIDER_ID).addressPattern;
+// -----
+// Where the repo lives. Only providers with a line in the
+// registry are accepted; a request without one is github
+// (repoIdentityOf), so a client from before providers keeps
+// working.
+// -----
+export const SCANS_PROVIDER = z
+  .enum(SOURCE_PROVIDER_IDS)
+  .optional()
+  .meta({ example: DEFAULT_SOURCE_PROVIDER_ID, description: "Where the repository lives. Leave it out for github." });
 // -----
 // A ref reaches git as an argument, so it cannot start
 // with a dash, and it holds only what a branch, tag or
