@@ -67,38 +67,22 @@ export const STEPS = [
   },
 ] as const;
 
-// The two plans the live plans table holds (Pro, and Bring your own key) with the words the
-// dashboard's Plan and Credit pages use, and the rules the engine enforces (a scan needs its hold
-// free to start, the scan allowance is a hard stop). The markup is deliberately not printed. Top-ups
-// are not claimed: the app cannot take a card yet. The 30-day credit expiry after a cancel is the
-// agreed design, not yet enforced: it needs Stripe. Update this when the plans table changes.
+// The one plan the live plans table offers (Runner, $35 a month, 5 members). Older plans stay in
+// the table but are not offered, so they are not printed. Card checkout is not claimed: the
+// subscription path is not live yet. Update this when the plans table changes.
 export const PRICING = {
-  note: "Paid plans open for sign-up soon. Until then, create an account and run a scan in Elise. There is no card checkout yet and no free trial.",
+  note: "One plan, one price. Paid sign-up opens soon. Until then, create an account and set up a Runner. There is no card checkout yet and no free trial.",
   action: "Create an account",
   actionHint: "Create an account opens the sign-up page in Elise.",
   plans: [
     {
-      name: "Pro",
-      price: "$49",
-      summary: "Scans run on our model key and spend credit from your balance.",
+      name: "Runner",
+      price: "$35",
+      summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place.",
       points: [
-        "$49 of credit arrives each month.",
-        "A scan spends credit based on what it cost to run, never more than about $3. A failed scan spends only what it used before it failed.",
-        "A scan needs about $3 of credit free to start. It holds that amount while it runs and releases what it did not use.",
-        "At zero credit, scans stop until the next $49 arrives. Elise never bills you for going over.",
-        "Unused credit carries over, up to $100.",
-        "If you cancel, your credit stays usable for 30 days, then expires.",
-        "Up to 5 members per account.",
-      ],
-    },
-    {
-      name: "Bring your own key",
-      price: "$19",
-      summary: "Scans run on your own model provider API key and use no credit.",
-      points: [
-        "Add your key under Settings in Elise before your first scan. Scans do not run without it.",
-        "The provider bills that key directly. Elise does not.",
-        "300 scans a month. Past that, scans stop until the 1st of the next month in UTC, the server's time zone.",
+        "Flat price. EliseLAB adds no charge per scan.",
+        "Install a Runner on your computer or a server and pair it to your account. Scans run there, on your own AI subscription, which you pay for directly.",
+        "See Runners, scans, reports and findings for every repository and branch in one dashboard.",
         "Up to 5 members per account.",
       ],
     },
@@ -111,7 +95,7 @@ export const FACTS = [
   { title: "It reads your code and never changes it", text: "Elise can read the repositories you choose and cannot write to them. Public repositories need no connection. Private ones need GitHub connected." },
   { title: "What a pass or a fail means", text: "A commit passes when it has been scanned at least twice, Elise re-checked the earlier findings, no Critical or High finding is open and no more than 3 Medium ones are. A fail says \"Do not ship yet\" and lists what blocks the commit. With too few scans, Elise says \"not enough scans\" instead of guessing. Scan the commit again to get an answer. Pass or fail, treat it as advice. An agent can miss a vulnerability." },
   { title: "What the severities mean", text: "Critical is the worst rating. An attacker could do serious harm with it. High is nearly as bad. Fix both before shipping. Medium is worth fixing, and a few can ship. Low is minor and does not block shipping. Unrated means nobody has rated the finding yet." },
-  { title: "What it costs", text: "Each audit stops at its own spend limit. On Pro, a scan spends credit from your balance, and none spends more than about $3. On Bring your own key, your provider key pays. A quick review is one agent's fast first pass. A full audit runs several agents through Cloudflare's open-source security-audit method and takes longer.", more: { href: "#pricing", label: "See the plans under Pricing." } },
+  { title: "What it costs", text: "The Runner plan is $35 a month. Scans run on your own AI subscription through a Runner, so you pay that provider directly and EliseLAB adds no per-scan charge. A quick review is one agent's fast first pass. A full audit runs several agents through Cloudflare's open-source security-audit method and takes longer.", more: { href: "#pricing", label: "See the plans under Pricing." } },
 ] as const;
 
 // Under "How it works": the pictures are real screens with made-up data.
@@ -120,7 +104,7 @@ export const STEPS_NOTE = "The pictures are Elise's own screens. The repositorie
 export const CLOSING = {
   title: "Audit your first repository",
   signUp: "Create an account",
-  text: " in Elise, then paste a GitHub URL. You can run a scan today. Paid plans open for sign-up soon.",
+  text: " in Elise, then pair a Runner and scan a GitHub repository. Paid sign-up opens soon.",
   link: "See the plans under Pricing.",
   hint: "Audit a repository opens Elise.",
 } as const;
