@@ -94,3 +94,21 @@ export const FINDING_THREAD_EVENT_LIMIT = 200;
 // -----
 export const REPO_LIMIT_PER_TENANT = 200;
 export const REPO_BRANCH_LIMIT = 25;
+
+// -----
+// GitLab addresses (docs/adr/0007-git-providers.md). A path is
+// groups inside groups and a name: 2 to 20 parts, each letters,
+// digits, '.', '_' or '-' and starting with a letter, digit or
+// '_', as GitLab requires (so no '..'). It is read up to a
+// branch-view marker ('/-/', as in '/-/tree/main') or a
+// trailing '.git'. https only, and a plain host: no user,
+// password or port. A gitlab-sh host is never github.com or
+// gitlab.com, which have providers of their own. Group 1 is
+// the host, group 2 the path. Twin of the Runner's
+// core/src/providers/address.rs.
+// -----
+export const GITLAB_ADDRESS_MESSAGE = "A GitLab address looks like https://gitlab.com/group/name (groups inside groups are fine)";
+export const GITLAB_SH_ADDRESS_MESSAGE = "A GitLab server address looks like https://git.example.com/group/name, on a host other than github.com or gitlab.com";
+export const GITLAB_ADDRESS_PATTERN = /^https:\/\/(gitlab\.com)\/((?:[a-z0-9_][\w.-]*\/){1,19}[a-z0-9_][\w.-]*?)(?:\.git)?\/?(?:\/-\/.*)?$/i;
+export const GITLAB_SH_ADDRESS_PATTERN =
+  /^https:\/\/(?!(?:github|gitlab)\.com\/)((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\/((?:[a-z0-9_][\w.-]*\/){1,19}[a-z0-9_][\w.-]*?)(?:\.git)?\/?(?:\/-\/.*)?$/i;

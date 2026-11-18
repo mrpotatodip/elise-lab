@@ -1,9 +1,10 @@
 use crate::browser;
-use crate::store::{Store, TOKEN_VARIABLE};
+use crate::store::{settings_file, Store, TOKEN_VARIABLE};
 use crate::tools::Skill;
 use crate::Exit;
 use elise_runner_core::login::{self, LoginError, Waited};
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
+use elise_runner_core::providers::Settings;
 use elise_runner_core::scan::{self, Claimed, Event, Stop, Stopper};
 use std::io::{BufRead, Write};
 use std::sync::Mutex;
@@ -254,7 +255,7 @@ pub async fn run(store: &Store, once: bool) -> Exit {
         match claimed_even_if_stopped_meanwhile {
             Claimed::Job(job) => {
                 offline = false;
-                scan::run_job(&token, *job, &find_tools, &on_event, &stop).await;
+                scan::run_job(&token, *job, &find_tools, &Settings::load(&settings_file()), &on_event, &stop).await;
                 if once || stop.is_stopped() {
                     return if log.succeeded() { Exit::Ok } else { Exit::Error };
                 }

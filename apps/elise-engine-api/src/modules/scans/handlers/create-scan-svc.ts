@@ -13,6 +13,8 @@ import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
 import type { TenantEffect } from "#/lib/tenant-effect";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+import { SCANS_RUNNER_ONLY_MESSAGE } from "#/modules/scans/constants";
 import type { Bindings } from "#/types/variables";
 
 // -----
@@ -31,6 +33,9 @@ export const queueScanSvc = (
   runnerConnected?: RunnerConnected,
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
+    const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
+    if (!provider.capabilities.cloudScans && input.runner_id === undefined) return yield* new Invalid({ message: SCANS_RUNNER_ONLY_MESSAGE });
+
     // -----
     // The per-scan ceiling follows who pays. A scan on a Runner runs
     // on the person's own Claude and has a safety cap. A scan on the
@@ -163,7 +168,11 @@ export const queueScanSvc = (
     // the clone, which tries it as a branch first.
     // -----
     const ref = input.ref === undefined ? undefined : (normalizeBranchName(input.ref) ?? undefined);
-    const github = access === undefined ? null : yield* access.forRepo(record.url);
+    // -----
+    // Only a github Repo can be covered by an Install of the
+    // GitHub App. Another provider's address never asks GitHub.
+    // -----
+    const github = access === undefined || provider.id !== DEFAULT_SOURCE_PROVIDER_ID ? null : yield* access.forRepo(record.url);
     if (onRunner && github) return yield* new Invalid({ message: RUNNER_JOB_PRIVATE });
     const params: ScanParams = {
       scanId: newScanId(),

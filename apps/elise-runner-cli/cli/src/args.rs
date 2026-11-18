@@ -47,6 +47,12 @@ Where the token is kept, in order:
   2. The system keychain, under a service name of its own (not the desktop app's).
   3. When there is no keychain service, a file in your config folder only you can read.
 
+Settings:
+  A file settings.json in the same config folder lists the GitLab servers your company runs
+  that this Runner may clone from, for example {\"gitlabHosts\": [\"git.example.com\"]}.
+  github.com and gitlab.com need no entry. A Scan on any other host is refused, whatever Elise
+  sends, and the file is read again for every Scan.
+
 Exit codes:
   0  success; status: connected
   1  an error
