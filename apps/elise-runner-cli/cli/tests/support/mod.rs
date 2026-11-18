@@ -2,7 +2,10 @@
 // with `ELISE_RUNNER_HOME` set to a temp folder so the token lands in the file store and no test
 // ever touches a keychain.
 
-use std::collections::BTreeSet;
+// Each test file uses part of this harness.
+#![allow(dead_code)]
+
+use std::collections::{BTreeSet, VecDeque};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -14,8 +17,8 @@ pub const CODE: &str = "PAIR-CODE-1";
 pub const RUNNER_NAME: &str = "build-box";
 pub const ACCOUNT_NAME: &str = "Acme Security";
 
-// What the stub engine knows: the tokens it issued that are still live, and every token it was
-// asked to revoke.
+// What the stub engine knows: the tokens it issued that are still live, every token it was asked
+// to revoke, the jobs waiting to be claimed and the results Runners sent.
 #[derive(Default)]
 struct State {
     issued: usize,
@@ -23,6 +26,11 @@ struct State {
     revoked: Vec<String>,
     // Elise is down for revokes only: `DELETE /runners/me` answers 503.
     revokes_fail: bool,
+    jobs: VecDeque<String>,
+    // (Scan ID, the result's JSON body), in the order they came.
+    results: Vec<(String, String)>,
+    // An admin removes every Runner as soon as a result comes in.
+    remove_after_result: bool,
 }
 
 pub struct Engine {
@@ -74,7 +82,51 @@ impl Engine {
     pub fn fail_revokes(&self) {
         self.state.lock().unwrap().revokes_fail = true;
     }
+
+    // A Scan started for this Runner, waiting to be claimed (see `job`).
+    pub fn queue_job(&self, job: String) {
+        self.state.lock().unwrap().jobs.push_back(job);
+    }
+
+    // The results Runners sent: (Scan ID, the body as JSON).
+    pub fn results(&self) -> Vec<(String, serde_json::Value)> {
+        let state = self.state.lock().unwrap();
+        state.results.iter().map(|(id, body)| (id.clone(), serde_json::from_str(body).expect("a result is JSON"))).collect()
+    }
+
+    // The Runner is removed in the dashboard right after it sends its next result.
+    pub fn remove_runners_after_the_next_result(&self) {
+        self.state.lock().unwrap().remove_after_result = true;
+    }
 }
+
+// A full job with the four Phases, as the engine hands it out. Each Phase prompt tells the stub
+// `claude` what to do (see `STUB_CLAUDE`).
+pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
+    let phases: Vec<serde_json::Value> = ["recon", "hunt", "check", "report"]
+        .iter()
+        .zip(phase_prompts)
+        .map(|(phase, prompt)| serde_json::json!({ "phase": phase, "prompt": prompt }))
+        .collect();
+    serde_json::json!({
+        "scanId": scan_id,
+        "repo": REPO_URL,
+        "ref": null,
+        "skill": "full",
+        "profile": "standard",
+        "model": "test-model",
+        "effort": "high",
+        "profileCapUsd": 12,
+        "maxBudgetUsd": 50,
+        "prompt": "single prompt",
+        "phasePrompts": phases,
+        "priorsJson": "",
+    })
+    .to_string()
+}
+
+pub const REPO_URL: &str = "https://github.com/acme/widgets";
+pub const REPO: &str = "acme/widgets";
 
 fn token_number(n: usize) -> String {
     format!("elise-test-token-{n}-0f9a7c")
@@ -159,6 +211,18 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             state.revoked.push(token);
             (200, r#"{"data":{"ok":true},"error":null}"#.to_string())
         }
+        ("POST", "/runners/claim") if live => match state.jobs.pop_front() {
+            Some(job) => (200, format!(r#"{{"data":{job},"error":null}}"#)),
+            None => (200, r#"{"data":null,"error":null}"#.to_string()),
+        },
+        ("POST", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/result") => {
+            let scan_id = path.trim_start_matches("/runners/jobs/").trim_end_matches("/result").to_string();
+            state.results.push((scan_id, request.body.clone()));
+            if state.remove_after_result {
+                state.live.clear();
+            }
+            (200, r#"{"data":{"ok":true},"error":null}"#.to_string())
+        }
         _ => (REJECTED.0, REJECTED.1.to_string()),
     }
 }
@@ -240,4 +304,81 @@ impl Runner {
     pub fn home_files(&self) -> Vec<PathBuf> {
         std::fs::read_dir(&self.home).unwrap().map(|entry| entry.unwrap().path()).collect()
     }
+
+    // Puts stub programs on the Runner's PATH: a `git` that "clones" without the network, and
+    // those of `claude` and `node` named in `tools` (leave one out to have it missing). The
+    // Runner's temp folder, where Scans make their work folders, is a folder of the test's own.
+    pub fn stub_tools(&mut self, tools: &[&str]) -> Stubs {
+        let root = temp_home();
+        let (bin, record, tmp) = (root.join("bin"), root.join("record"), root.join("tmp"));
+        for dir in [&bin, &record, &tmp] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        executable(&bin.join("git"), STUB_GIT);
+        for tool in tools {
+            let text = match *tool {
+                "claude" => STUB_CLAUDE.replace("__RECORD__", &record.display().to_string()),
+                "node" => STUB_NODE.to_string(),
+                other => panic!("no stub for {other}"),
+            };
+            executable(&bin.join(tool), &text);
+        }
+        self.env.push(("PATH", format!("{}:/usr/bin:/bin", bin.display())));
+        self.env.push(("TMPDIR", tmp.display().to_string()));
+        Stubs { record, tmp }
+    }
 }
+
+// Where the stub `claude` writes what it saw, and the Runner's temp folder.
+pub struct Stubs {
+    pub record: PathBuf,
+    pub tmp: PathBuf,
+}
+
+impl Stubs {
+    // The work folder a Scan uses.
+    pub fn work_folder(&self, scan_id: &str) -> PathBuf {
+        self.tmp.join(format!("eliselab-runner-{scan_id}"))
+    }
+}
+
+fn executable(path: &std::path::Path, text: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::write(path, text).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+// `git clone ... repo` makes the folder; `rev-parse` answers a commit and a branch.
+const STUB_GIT: &str = r#"#!/bin/sh
+case "$1" in
+  clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
+  -C) case "$3 $4" in
+        "rev-parse HEAD") echo 0123456789abcdef0123456789abcdef01234567 ;;
+        "rev-parse --abbrev-ref") echo main ;;
+      esac ;;
+esac
+"#;
+
+// The stub agent reads what to do from its prompt: `phase=check` and `phase=report` write the
+// files a full audit leaves, `cost=1.5` is what its result reports, `stop=crash` fails. The recon
+// Phase records what the agent was given: its environment, its settings file and the Skill's
+// SKILL.md, in the record folder outside the work folder.
+const STUB_CLAUDE: &str = r#"#!/bin/sh
+for a in "$@"; do prompt="$a"; done
+case "$prompt" in
+  *phase=recon*)
+    env > "__RECORD__/env.txt"
+    cp .claude/settings.json "__RECORD__/settings.json"
+    cp .claude/skills/security-audit/SKILL.md "__RECORD__/SKILL.md" ;;
+esac
+case "$prompt" in *stop=crash*) echo "the agent said: boom" >&2; exit 2 ;; esac
+case "$prompt" in
+  *phase=check*) echo '{"findings":[]}' > out/findings.json; echo '{"units":[]}' > out/coverage-ledger.json ;;
+  *phase=report*) echo '# Report' > out/REPORT.md ;;
+esac
+cost=$(printf '%s' "$prompt" | sed -n 's/.*cost=\([0-9.]*\).*/\1/p')
+printf '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":%s,"num_turns":1,"duration_ms":10,"usage":{}}\n' "${cost:-0}"
+"#;
+
+// The validators pass.
+const STUB_NODE: &str = "#!/bin/sh\nexit 0\n";

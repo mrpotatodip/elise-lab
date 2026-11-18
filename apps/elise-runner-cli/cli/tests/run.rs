@@ -1,0 +1,155 @@
+// `elise-runner run` and `run --once`, run as a process against a stub engine, with stub `claude`,
+// `node` and `git` on its PATH.
+
+mod support;
+
+use support::{job, Engine, Runner, CODE};
+
+fn paired(engine: &Engine) -> Runner {
+    let runner = Runner::new(engine);
+    let paired = runner.run(&["pair", CODE, "--yes"], "");
+    assert_eq!(paired.code, 0, "{}{}", paired.stdout, paired.stderr);
+    runner
+}
+
+#[test]
+fn run_once_with_nothing_to_claim_exits_with_code_6() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    runner.stub_tools(&["claude", "node"]);
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 6, "{}{}", output.stdout, output.stderr);
+    assert!(engine.results().is_empty());
+}
+
+// The Scan a person would start: a pool of $12 and four Phases that spend 1.5, 4, 2.5 and 1.
+const PLAIN: [&str; 4] = ["phase=recon cost=1.5", "phase=hunt cost=4", "phase=check cost=2.5", "phase=report cost=1"];
+
+#[test]
+fn run_once_runs_a_claimed_scan_sends_its_report_logs_each_step_and_removes_the_work_folder() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job("scan_1", PLAIN));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    let results = engine.results();
+    assert_eq!(results.len(), 1);
+    let (scan_id, result) = &results[0];
+    assert_eq!(scan_id, "scan_1");
+    assert_eq!(result["state"], "succeeded", "{result}");
+    assert_eq!(result["files"]["REPORT.md"], "# Report\n");
+    assert_eq!(result["checkout"]["headBranch"], "main");
+    let log: Vec<&str> = output.stdout.lines().collect();
+    assert_eq!(
+        log,
+        [
+            "[acme/widgets scan_1] Scan claimed",
+            "[acme/widgets scan_1] recon phase started",
+            "[acme/widgets scan_1] recon phase ended: spent $1.50, $10.50 left of the Pool",
+            "[acme/widgets scan_1] hunt phase started",
+            "[acme/widgets scan_1] hunt phase ended: spent $4.00, $6.50 left of the Pool",
+            "[acme/widgets scan_1] check phase started",
+            "[acme/widgets scan_1] check phase ended: spent $2.50, $4.00 left of the Pool",
+            "[acme/widgets scan_1] report phase started",
+            "[acme/widgets scan_1] report phase ended: spent $1.00, $3.00 left of the Pool",
+            "[acme/widgets scan_1] result sent to Elise",
+            "[acme/widgets scan_1] Scan succeeded.",
+        ]
+    );
+    assert!(!stubs.work_folder("scan_1").exists());
+}
+
+#[test]
+fn run_once_with_a_failed_scan_reports_it_keeps_the_work_folder_and_exits_with_code_1() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job("scan_2", ["phase=recon cost=1", "phase=hunt stop=crash", "phase=check", "phase=report"]));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 1, "{}{}", output.stdout, output.stderr);
+    let (_, result) = &engine.results()[0];
+    assert_eq!(result["state"], "failed", "{result}");
+    assert!(result["error"].as_str().unwrap().contains("The hunt phase failed"), "{result}");
+    let work = stubs.work_folder("scan_2");
+    assert!(work.join("agent-recon.log").is_file(), "the work folder is kept");
+    let last = output.stdout.lines().last().unwrap();
+    assert!(last.starts_with("[acme/widgets scan_2] Scan failed: The hunt phase failed"), "{last}");
+    assert!(last.ends_with(&format!("Work folder kept: {}", work.display())), "{last}");
+}
+
+// A Scan on a computer without `claude` or `node` fails at once, telling the dashboard which.
+#[test]
+fn a_missing_claude_or_node_is_reported_as_a_failed_scan_naming_it() {
+    for (present, missing) in [("node", "`claude`"), ("claude", "`node`")] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        runner.stub_tools(&[present]);
+        engine.queue_job(job("scan_3", PLAIN));
+
+        let output = runner.run(&["run", "--once"], "");
+
+        assert_eq!(output.code, 1, "{missing}: {}{}", output.stdout, output.stderr);
+        let (_, result) = &engine.results()[0];
+        assert_eq!(result["state"], "failed", "{missing}: {result}");
+        assert!(result["error"].as_str().unwrap().contains(missing), "{missing}: {result}");
+        assert!(output.stdout.contains(missing), "{missing}: {}", output.stdout);
+    }
+}
+
+// An admin removed the Runner in the dashboard: the next claim is rejected, the token is forgotten
+// and the program exits with 4. Without `--once` the Runner first runs the Scan it was given.
+#[test]
+fn a_token_elise_rejects_on_claim_is_forgotten_and_the_program_exits_with_code_4() {
+    // (arguments, Scans run before the rejection)
+    let cases: [(&[&str], usize); 2] = [(&["run", "--once"], 0), (&["run"], 1)];
+    for (args, scans) in cases {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        runner.stub_tools(&["claude", "node"]);
+        if scans == 1 {
+            engine.queue_job(job("scan_4", PLAIN));
+            engine.remove_runners_after_the_next_result();
+        } else {
+            engine.remove_all_runners();
+        }
+
+        let output = runner.run(args, "");
+
+        assert_eq!(output.code, 4, "{args:?}: {}{}", output.stdout, output.stderr);
+        assert!(output.stderr.contains("removed"), "{args:?}: {}", output.stderr);
+        assert_eq!(engine.results().len(), scans, "{args:?}");
+        assert!(runner.home_files().is_empty(), "{args:?}: {:?}", runner.home_files());
+    }
+}
+
+// What the agent is given: the Skill built into the binary (no folder beside it), the Runner's own
+// settings, which deny reading the process folder, and an environment without the Runner's token.
+#[test]
+fn the_agent_gets_the_built_in_skill_and_the_runners_settings_but_never_the_token() {
+    let engine = Engine::start();
+    let pairer = Runner::new(&engine);
+    let token = pairer.run_allowing_token(&["pair", CODE, "--yes", "--print-token"], "").stdout.trim().to_string();
+    let mut runner = Runner::new(&engine);
+    runner.env.push(("ELISE_RUNNER_TOKEN", token.clone()));
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job("scan_5", PLAIN));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    let read = |name: &str| std::fs::read_to_string(stubs.record.join(name)).unwrap();
+    let env = read("env.txt");
+    assert!(!env.contains("ELISE_RUNNER_TOKEN") && !env.contains(&token), "{env}");
+    let settings: serde_json::Value = serde_json::from_str(&read("settings.json")).unwrap();
+    let deny = settings["permissions"]["deny"].as_array().unwrap();
+    assert!(deny.contains(&"Read(//proc/**)".into()), "{settings}");
+    let skill = concat!(env!("CARGO_MANIFEST_DIR"), "/../../elise-engine-api/skills/security-audit/SKILL.md");
+    assert_eq!(read("SKILL.md"), std::fs::read_to_string(skill).unwrap());
+}

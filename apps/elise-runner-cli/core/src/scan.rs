@@ -3,7 +3,7 @@
 // person's own login (their Claude subscription), and sends back what the agent wrote.
 
 use crate::engine::{client, engine_url, Envelope};
-use crate::store::TokenStore;
+use crate::store::{TokenStore, TOKEN_VARIABLE};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -14,7 +14,8 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::{sleep, timeout};
 
-const POLL_EVERY: Duration = Duration::from_secs(5);
+// How often a Runner with nothing to do asks Elise for work.
+pub const POLL_EVERY: Duration = Duration::from_secs(5);
 const CLONE_TIMEOUT: Duration = Duration::from_secs(300);
 // A job with one prompt (an older engine) is one run of the agent under this limit.
 const AGENT_TIMEOUT: Duration = Duration::from_secs(40 * 60);
@@ -51,8 +52,10 @@ const ALLOWED_TOOLS: &str = "Bash(cd:*) Bash(pwd:*) Bash(mkdir:*) Bash(ls:*) Bas
 // work folder, with the audit skill beside it. The person's login is not a setting and stays.
 // Their user, local and plugin settings and `~/.claude/skills` are not loaded.
 // This file grants nothing; it only denies: programs that start others or use the network, git
-// commands that reach a remote, web fetches, the places credentials live, and edits to itself.
-const AGENT_DENY_RULES: [&str; 33] = [
+// commands that reach a remote, web fetches, the places credentials live, the system's process
+// folder (on Linux, `/proc/<pid>/environ` holds the environment of the program that started the
+// agent), and edits to itself.
+const AGENT_DENY_RULES: [&str; 34] = [
     "Bash(curl:*)",
     "Bash(wget:*)",
     "Bash(nc:*)",
@@ -84,6 +87,7 @@ const AGENT_DENY_RULES: [&str; 33] = [
     "Read(~/.config/**)",
     "Read(~/.claude/**)",
     "Read(//etc/**)",
+    "Read(//proc/**)",
     "Edit(.claude/**)",
     "Write(.claude/**)",
 ];
@@ -195,6 +199,8 @@ pub enum Claimed {
 // What a Scan tells the program running it, in order: the desktop app turns it into its activity,
 // a terminal program into log lines. `repo` is `owner/name`. The repair run ends as a
 // `PhaseEnded` named `repair`. Money is in dollars; `pool_left_usd` is what the Phases after may spend.
+// `kept` is the work folder when it was kept for a person to read (the Scan failed or its result was
+// not sent); a succeeded Scan whose result was sent removes it.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Claimed { scan_id: String, repo: String },
@@ -202,7 +208,7 @@ pub enum Event {
     PhaseEnded { phase: String, cost_usd: Option<f64>, pool_left_usd: f64 },
     RepairStarted,
     ResultSent { sent: bool },
-    Ended { ok: bool, repo: String, message: String },
+    Ended { ok: bool, repo: String, message: String, kept: Option<PathBuf> },
 }
 
 pub type OnEvent<'a> = &'a (dyn Fn(Event) + Send + Sync);
@@ -265,7 +271,7 @@ pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEv
     let message = report.error.clone().unwrap_or_default();
     let sent = send_report(token, &job.scan_id, &report).await;
     on_event(Event::ResultSent { sent });
-    tidy(&work, &report, sent);
+    let kept = tidy(&work, &report, sent);
 
     on_event(Event::Ended {
         ok: ok && sent,
@@ -275,6 +281,7 @@ pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, on_event: OnEv
             (true, true) => "The report was sent to Elise.".to_string(),
             (false, true) => message,
         },
+        kept,
     });
 }
 
@@ -291,11 +298,12 @@ fn failed_report(work: &Path, error: String) -> Report {
 }
 
 // A finished scan cleans up after itself. A failed one keeps its folder, so the agent's own log and
-// the files of the Phases that finished can be read.
-fn tidy(work: &Path, report: &Report, sent: bool) {
+// the files of the Phases that finished can be read. Returns the folder when it was kept.
+fn tidy(work: &Path, report: &Report, sent: bool) -> Option<PathBuf> {
     if report.state == "succeeded" && sent {
         let _ = fs::remove_dir_all(work);
     }
+    work.is_dir().then(|| work.to_path_buf())
 }
 
 async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
@@ -824,6 +832,9 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
         // The person's own login does the work. A key in the environment would be used instead.
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("ANTHROPIC_AUTH_TOKEN")
+        // The Runner's own token, when a headless Runner was given it this way: a hostile repository
+        // must not be able to make the agent copy it into a report.
+        .env_remove(TOKEN_VARIABLE)
         .stdin(Stdio::null())
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(err))

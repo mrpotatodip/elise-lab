@@ -2,9 +2,13 @@
 // never appears in what they print; `pair --print-token` is the one exception, asked for.
 
 use crate::store::{Store, TOKEN_VARIABLE};
+use crate::tools::Skill;
 use crate::Exit;
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
+use elise_runner_core::scan::{self, Claimed, Event};
 use std::io::{BufRead, Write};
+use std::sync::Mutex;
+use tokio::time::sleep;
 
 const TOKEN_WARNING: &str = "\
 The line above is this Runner's token. It is a credential: anyone who has it can claim Scans as
@@ -157,8 +161,113 @@ pub async fn unpair(store: &Store) -> Exit {
     }
 }
 
-// `run [--once]`: built in the next step (#187).
-pub async fn run(_store: &Store, _once: bool) -> Exit {
-    eprintln!("`run` is not in this build of elise-runner yet.");
-    Exit::Error
+// `run [--once]`: claims Scans and runs them through the core, logging each step on standard output.
+// Without `--once` it polls until stopped, as the desktop app does. With `--once` it claims at most
+// one Scan: 0 when it succeeded and its result was sent, 1 when not, 6 when there was nothing to
+// claim. Either way, a token Elise rejects is forgotten and the program exits with 4.
+pub async fn run(store: &Store, once: bool) -> Exit {
+    let skill = Skill::new();
+    let find_tools = || skill.tools();
+    let log = ScanLog::default();
+    let on_event = |event: Event| log.tell(event);
+    let mut offline = false;
+    if !once {
+        println!("Waiting for Scans from Elise. Stop with Ctrl-C.");
+    }
+    loop {
+        let Some(token) = store.tokens().token() else {
+            eprintln!("This computer is not paired. Pair it with `elise-runner pair <code>`.");
+            return Exit::Unpaired;
+        };
+        match scan::claim(&token).await {
+            Claimed::Job(job) => {
+                offline = false;
+                scan::run_job(&token, *job, &find_tools, &on_event).await;
+                if once {
+                    return if log.succeeded() { Exit::Ok } else { Exit::Error };
+                }
+                continue;
+            }
+            Claimed::Nothing if once => {
+                println!("Nothing to claim.");
+                return Exit::NothingToClaim;
+            }
+            Claimed::Offline if once => {
+                eprintln!("Could not reach Elise. Check the connection and try again.");
+                return Exit::Offline;
+            }
+            Claimed::Nothing => offline = false,
+            Claimed::Offline => {
+                if !offline {
+                    eprintln!("Could not reach Elise. Trying again every few seconds.");
+                }
+                offline = true;
+            }
+            Claimed::Removed => {
+                store.tokens().forget();
+                if store.is_read_only() {
+                    eprintln!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.");
+                } else {
+                    eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
+                }
+                return Exit::Revoked;
+            }
+        }
+        sleep(scan::POLL_EVERY).await;
+    }
+}
+
+// Turns the core's events into plain log lines, each with the repo and the Scan ID, and remembers
+// how the last Scan ended.
+#[derive(Default)]
+struct ScanLog {
+    // `owner/name` and the Scan ID of the Scan running now.
+    current: Mutex<Option<(String, String)>>,
+    succeeded: Mutex<bool>,
+}
+
+impl ScanLog {
+    fn tell(&self, event: Event) {
+        let mut current = self.current.lock().expect("the log is not poisoned");
+        if let Event::Claimed { scan_id, repo } = &event {
+            *current = Some((repo.clone(), scan_id.clone()));
+        }
+        let (repo, scan_id) = current.clone().unwrap_or_default();
+        let line = match event {
+            Event::Claimed { .. } => "Scan claimed".to_string(),
+            Event::PhaseStarted { phase } => format!("{phase} phase started"),
+            Event::PhaseEnded { phase, cost_usd, pool_left_usd } => {
+                let name = if phase == "repair" { "repair run".to_string() } else { format!("{phase} phase") };
+                let spent = cost_usd.map(dollars).unwrap_or_else(|| "an unknown amount".to_string());
+                format!("{name} ended: spent {spent}, {} left of the Pool", dollars(pool_left_usd))
+            }
+            Event::RepairStarted => "repair run started: the check failed, the agent gets one run to fix it".to_string(),
+            Event::ResultSent { sent: true } => "result sent to Elise".to_string(),
+            Event::ResultSent { sent: false } => "the result could not be sent to Elise".to_string(),
+            Event::Ended { ok, message, kept, .. } => {
+                *self.succeeded.lock().expect("the log is not poisoned") = ok;
+                let kept = kept.map(|path| format!(" Work folder kept: {}", path.display())).unwrap_or_default();
+                if ok {
+                    format!("Scan succeeded.{kept}")
+                } else {
+                    format!("Scan failed: {message}{kept}")
+                }
+            }
+        };
+        println!("[{repo} {scan_id}] {line}");
+    }
+
+    fn succeeded(&self) -> bool {
+        *self.succeeded.lock().expect("the log is not poisoned")
+    }
+}
+
+// Dollars with the cents, and the fractions of a cent a small run costs: `$1.50`, `$0.0034`.
+fn dollars(usd: f64) -> String {
+    let text = format!("{usd:.4}");
+    let text = text.trim_end_matches('0');
+    match text.split_once('.') {
+        Some((whole, cents)) if cents.len() < 2 => format!("${whole}.{cents:0<2}"),
+        _ => format!("${text}"),
+    }
 }

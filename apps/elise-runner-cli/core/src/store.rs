@@ -11,6 +11,10 @@ use std::sync::Mutex;
 pub const DESKTOP_KEYCHAIN_SERVICE: &str = "com.eliselab.runner";
 pub const HEADLESS_KEYCHAIN_SERVICE: &str = "com.eliselab.runner.headless";
 
+// The environment variable a headless Runner may be given its token in. The agent a Scan starts
+// never gets it (`scan::run_agent` removes it).
+pub const TOKEN_VARIABLE: &str = "ELISE_RUNNER_TOKEN";
+
 pub trait TokenStore: Send + Sync {
     // The token, or None when this Runner is not paired.
     fn token(&self) -> Option<String>;

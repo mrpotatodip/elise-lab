@@ -3,10 +3,12 @@
 // - `args`: the command line, parsed into a `Command`, and the help text.
 // - `store`: which token store this run uses (the environment, the keychain or a file).
 // - `commands`: one function per command, each returning the program's `Exit` code.
+// - `tools`: the built-in Skill and where `claude` and `node` are, for the core's Scans.
 
 pub mod args;
 pub mod commands;
 pub mod store;
+pub mod tools;
 
 use args::{Command, Parsed};
 

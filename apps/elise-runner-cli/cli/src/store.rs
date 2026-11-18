@@ -8,9 +8,9 @@
 // from a real keychain. A release build ignores it.
 
 use elise_runner_core::store::{FileStore, GivenToken, KeychainStore, TokenStore, HEADLESS_KEYCHAIN_SERVICE};
+pub use elise_runner_core::store::TOKEN_VARIABLE;
 use std::path::PathBuf;
 
-pub const TOKEN_VARIABLE: &str = "ELISE_RUNNER_TOKEN";
 const TOKEN_FILE: &str = "token";
 
 pub enum Where {
@@ -65,11 +65,11 @@ impl Store {
 }
 
 #[cfg(debug_assertions)]
-fn test_home() -> Option<PathBuf> {
+pub(crate) fn test_home() -> Option<PathBuf> {
     std::env::var_os("ELISE_RUNNER_HOME").filter(|home| !home.is_empty()).map(PathBuf::from)
 }
 
 #[cfg(not(debug_assertions))]
-fn test_home() -> Option<PathBuf> {
+pub(crate) fn test_home() -> Option<PathBuf> {
     None
 }

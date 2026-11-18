@@ -973,6 +973,7 @@ version = "0.1.0"
 dependencies = [
  "dirs",
  "elise-runner-core",
+ "serde_json",
  "tokio",
 ]
 
