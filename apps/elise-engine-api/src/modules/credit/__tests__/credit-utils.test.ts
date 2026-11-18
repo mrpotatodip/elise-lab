@@ -35,6 +35,7 @@ describe("creditBalanceOf", () => {
     creditMarkup: 1.5,
     creditBalanceUsd: 41.25,
     monthlyScanAllowance: null,
+    hostedScansAllowed: true,
     maxMembers: 5,
     status: "active",
     pastDueSince: null,

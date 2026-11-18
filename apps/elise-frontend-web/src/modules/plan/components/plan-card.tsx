@@ -3,8 +3,34 @@ import { Badge } from "#/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { creditScansLabel } from "#/modules/credit";
 import { usageUsd } from "#/modules/usage";
-import { planQuery } from "../hooks";
+import { planOffersQuery, planQuery } from "../hooks";
 import { PLAN_STATUS_VIEW, planDateLabel, planKeyLabel, planSeatsLabel, planSourceLabel } from "../utils";
+
+function PlanOfferCard() {
+  const { data: offers } = useSuspenseQuery(planOffersQuery());
+  const offer = offers[0];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Plan</CardTitle>
+        <p className="text-sm leading-relaxed text-muted-foreground">This account has no plan yet.</p>
+      </CardHeader>
+      {offer !== undefined && (
+        <CardContent className="grid gap-5">
+          <p className="text-sm font-medium">{offer.label}</p>
+          <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
+            {usageUsd(offer.monthlyPriceUsd)}
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place. To subscribe, contact us.
+          </p>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -20,14 +46,7 @@ export function PlanCard() {
   const { plan } = data;
 
   if (plan === null || data.status === null || data.source === null) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Plan</CardTitle>
-          <p className="text-sm leading-relaxed text-muted-foreground">This account has no plan yet. Contact us to set one up.</p>
-        </CardHeader>
-      </Card>
-    );
+    return <PlanOfferCard />;
   }
 
   const status = PLAN_STATUS_VIEW[data.status];

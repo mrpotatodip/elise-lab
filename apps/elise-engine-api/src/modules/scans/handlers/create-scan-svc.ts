@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE } from "#/modules/runners/constants";
+import { RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
 import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
@@ -11,7 +11,6 @@ import type { CreateScanEnv, QueuedScan, RunnerConnected, SubmitScanDeps } from 
 import { budgetCapOf, budgetRefusalHintOf, limitPathOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
-import { findConnectedRunnerEffect } from "#/modules/runners/queries";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
 import type { TenantEffect } from "#/lib/tenant-effect";
 import type { Bindings } from "#/types/variables";
@@ -68,8 +67,19 @@ export const queueScanSvc = (
     // BILLING_ENFORCED keeps its wider rule (own-key and Runner Scans
     // too) and is not turned on here.
     // -----
-    const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true" || !ownKeyScan, new Date());
+    // -----
+    // A Runner Scan needs a plan too, so an Account with none starts
+    // no Scan of either kind. On the Runner plan only a Runner Scan
+    // may start: the plan has no credit and no key, so a hosted Scan
+    // is refused with a pointer to the Runners page. Checked by plan
+    // key, because the plan's keySource would send it down the
+    // own-key path.
+    // -----
+    const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true" || !ownKeyScan || input.runner_id !== undefined, new Date());
     if (block) return yield* new RateLimited(block);
+    if (spend.plan?.hostedScansAllowed === false && input.runner_id === undefined) {
+      return yield* new RateLimited({ code: "RUNNER_PLAN_HOSTED", message: RUNNER_PLAN_HOSTED_MESSAGE });
+    }
 
     // -----
     // Each pool counts on its own, for the Account and over all Accounts.
@@ -252,7 +262,7 @@ export const submitScanSvc = (
           spend,
           deps.githubAccess(env, accountId),
           (scanId, holdUsd) => deps.holdCredit(db, accountId, scanId, holdUsd),
-          (runnerId) => findConnectedRunnerEffect(db, accountId, runnerId),
+          (runnerId) => deps.runnerConnected(db, accountId, runnerId),
         ),
       ),
     ),

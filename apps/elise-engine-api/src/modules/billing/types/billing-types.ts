@@ -6,7 +6,8 @@ import type { ScanKeySourceValue, SubscriptionStatusValue } from "@repo/contract
 // plan's scans use. creditMarkup multiplies a scan's cost into the
 // credit it takes. creditBalanceUsd is the Account's balance now, holds
 // of running scans already out. monthlyScanAllowance is the most scans
-// a UTC month allows, null for no limit.
+// a UTC month allows, null for no limit. hostedScansAllowed is false for
+// a plan whose Scans run on a Runner only.
 // -----
 export type PlanState = {
   planKey: string;
@@ -15,6 +16,7 @@ export type PlanState = {
   creditMarkup: number;
   creditBalanceUsd: number;
   monthlyScanAllowance: number | null;
+  hostedScansAllowed: boolean;
   maxMembers: number;
   status: SubscriptionStatusValue;
   pastDueSince: Date | null;

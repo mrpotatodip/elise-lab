@@ -12,6 +12,7 @@ const TEAM: PlanState = {
   creditMarkup: 1.5,
   creditBalanceUsd: 50,
   monthlyScanAllowance: null,
+  hostedScansAllowed: true,
   maxMembers: 10,
   status: "active",
   pastDueSince: null,

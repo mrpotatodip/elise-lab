@@ -38,7 +38,7 @@ describe("plan words", () => {
     expect([planSourceLabel("grant"), planSourceLabel("stripe"), planKeyLabel("account"), planKeyLabel("platform")]).toEqual([
       "Granted by us",
       "Stripe",
-      "Your own Anthropic key",
+      "Your own Claude, through a Runner",
       "Our key, paid with credit",
     ]);
   });

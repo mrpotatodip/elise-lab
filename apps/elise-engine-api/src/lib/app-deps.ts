@@ -3,6 +3,7 @@ import { createAuth } from "#/lib/auth";
 import { dbConnect, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { holdCreditEffect, settleCreditEffect } from "#/modules/credit";
+import { findConnectedRunnerEffect } from "#/modules/runners/queries";
 import { githubAccessFor, neonInstallationRepo } from "#/modules/github-installs";
 import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
 import { activeCountsEffect, tenantScanRepo } from "#/modules/scan-ledger";
@@ -28,6 +29,7 @@ export const realAppDeps: AppDeps = {
   githubAccess: (env, accountId) => githubAccessFor(env, neonInstallationRepo(dbConnect(env.DATABASE_URL)), accountId),
   monthSpend: (db, accountId) => monthSpendEffect(db, accountId, monthStartOf(new Date())),
   holdCredit: (db, accountId, scanId, holdUsd) => holdCreditEffect(db, { tenantId: accountId, scanId, holdUsd }),
+  runnerConnected: findConnectedRunnerEffect,
   releaseCredit: (db, accountId, scanId) => settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 }),
   sessionUserId,
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),

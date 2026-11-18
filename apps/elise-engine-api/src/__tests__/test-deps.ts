@@ -15,6 +15,7 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   githubAccess: noGithubAccess,
   monthSpend: () => Effect.succeed({ spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: true, plan: null }),
   holdCredit: () => Effect.succeed({ held: true, balanceUsd: 0 }),
+  runnerConnected: () => Effect.succeed(true),
   releaseCredit: () => Effect.succeed({ settled: true, chargeUsd: 0 }),
   sessionUserId: async () => undefined,
   userHasAccount: async () => true,

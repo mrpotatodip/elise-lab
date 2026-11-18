@@ -19,7 +19,7 @@ export const PLAN_STATUS_VIEW = {
 export const planSourceLabel = (source: NonNullable<PlanDetails["source"]>) => (source === "grant" ? "Granted by us" : "Stripe");
 
 export const planKeyLabel = (keySource: NonNullable<PlanDetails["plan"]>["keySource"]) =>
-  keySource === "account" ? "Your own Anthropic key" : "Our key, paid with credit";
+  keySource === "account" ? "Your own Claude, through a Runner" : "Our key, paid with credit";
 
 // -----
 // The same count the invite limit uses: people in the account plus
