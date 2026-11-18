@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight, ExternalLink, FileArchive, FolderGit2, GitBranch } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
+import { repoSiteName } from "#/lib/repo-site-name";
 import { useHydrated } from "#/lib/use-hydrated";
 import { useNow } from "#/lib/use-now";
 import { SCAN_PROFILE_OPTIONS } from "../constants";
@@ -20,7 +21,7 @@ const githubUrl = (repo: string) => repo.replace(/\.git$/, "").replace(/\/$/, ""
 
 // -----
 // Which branch the scan read, laid out as on the branch page: a chip, and
-// beside it a way to open that branch on GitHub. For a scan with a tracked
+// beside it a way to open that branch on its code host. For a scan with a tracked
 // branch the chip is the way to that branch's history. A scan of a pasted
 // commit has no branch: it is a one-off scan, so it says so and links to the
 // repository's history instead.
@@ -96,10 +97,10 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
         <span className={CHIP}>{chip}</span>
       )}
       <Tooltip>
-        <TooltipTrigger render={<a href={`${githubUrl(scan.repo)}/tree/${encodeURI(label)}`} target="_blank" rel="noreferrer" aria-label="Open this branch on GitHub" className={ICON_LINK} />}>
+        <TooltipTrigger render={<a href={`${githubUrl(scan.repo)}/tree/${encodeURI(label)}`} target="_blank" rel="noreferrer" aria-label={`Open this branch on ${repoSiteName(scan.repo)}`} className={ICON_LINK} />}>
           <ExternalLink aria-hidden="true" className="size-4" />
         </TooltipTrigger>
-        <TooltipContent>Open this branch on GitHub</TooltipContent>
+        <TooltipContent>Open this branch on {repoSiteName(scan.repo)}</TooltipContent>
       </Tooltip>
     </div>
   );
@@ -159,7 +160,7 @@ function ScanStatusLine({ scan }: { scan: ScanStatus }) {
             className="rounded-sm font-mono text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {commit}
-            <span className="sr-only"> (opens on GitHub)</span>
+            <span className="sr-only"> (opens on {repoSiteName(scan.repo)})</span>
           </a>
         </span>
       ) : (
