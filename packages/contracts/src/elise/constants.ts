@@ -94,3 +94,10 @@ export const FINDING_THREAD_EVENT_LIMIT = 200;
 // -----
 export const REPO_LIMIT_PER_TENANT = 200;
 export const REPO_BRANCH_LIMIT = 25;
+
+// -----
+// Upload apps: the label a zip is listed under (the file name
+// the dashboard sends). The size, count and storage limits are
+// #233's.
+// -----
+export const UPLOAD_ARCHIVE_LABEL_MAX = 120;

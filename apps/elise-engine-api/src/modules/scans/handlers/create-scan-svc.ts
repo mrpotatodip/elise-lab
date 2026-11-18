@@ -7,7 +7,10 @@ import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
-import type { CreateScanEnv, QueuedScan, RunnerConnected, SubmitScanDeps } from "#/modules/scans/types";
+import type { CreateScanEnv, LinkArchive, QueuedScan, RunnerConnected, SubmitScanDeps } from "#/modules/scans/types";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+
+export const ARCHIVE_NOT_LINKED = "archive_id: this Scan cannot read a zip";
 import { budgetCapOf, budgetRefusalHintOf, limitPathOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
@@ -29,6 +32,7 @@ export const queueScanSvc = (
   access?: GithubAccess,
   hold?: HoldCredit,
   runnerConnected?: RunnerConnected,
+  linkArchive?: LinkArchive,
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
     // -----
@@ -178,6 +182,16 @@ export const queueScanSvc = (
     };
     yield* repo.create(params, record.id, Date.now());
     // -----
+    // An upload Scan must have its link: the schema made archive_id
+    // required for an archive provider, and here the zip must be
+    // one of this app's. A refusal rolls the Scan row back.
+    // -----
+    const fixedBranch = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID).fixedBranch;
+    if (fixedBranch !== null || input.archive_id !== undefined) {
+      if (!linkArchive || fixedBranch === null || input.archive_id === undefined) return yield* new Invalid({ message: ARCHIVE_NOT_LINKED });
+      yield* linkArchive({ scanId: params.scanId, repoId: record.id, archiveId: input.archive_id, branch: fixedBranch });
+    }
+    // -----
     // The check above read the balance; this takes it, under a lock.
     // A scan that lost the race to another is failed, not started.
     // -----
@@ -263,6 +277,7 @@ export const submitScanSvc = (
           deps.githubAccess(env, accountId),
           (scanId, holdUsd) => deps.holdCredit(db, accountId, scanId, holdUsd),
           (runnerId) => deps.runnerConnected(db, accountId, runnerId),
+          (link) => deps.linkArchive(db, accountId, link),
         ),
       ),
     ),

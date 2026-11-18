@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { authUser, scanRunnerJobs, scans } from "@repo/db-elise";
+import { authUser, scanArchiveLinks, scanRunnerJobs, scans, scanUploadArchives } from "@repo/db-elise";
 import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/elise";
 import { SCAN_PROFILE_CAPS_USD } from "#/constants";
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
@@ -216,6 +216,19 @@ describe("reporting a job", () => {
     await report(scanId, { state: "succeeded", checkout, files: FILES });
 
     expect(await jobOf(scanId)).toMatchObject({ commitSha: "a".repeat(40), branch });
+  });
+
+  it("keeps an upload Scan on its zip's hash and the app's hidden Branch, whatever the runner reports", async () => {
+    const scanId = await claimed();
+    const sha = "c".repeat(64);
+    const [archive] = await test.raw
+      .insert(scanUploadArchives)
+      .values({ tenantId, repoId, label: "app-1.3.zip", r2Key: `accounts/${tenantId}/uploads/${repoId}/${scanId}.zip`, sizeBytes: 10, contentSha256: sha })
+      .returning();
+    await test.raw.insert(scanArchiveLinks).values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: sha });
+    await report(scanId, { state: "succeeded", checkout: { commitSha: "a".repeat(40), headBranch: "main", kind: null }, files: FILES });
+
+    expect(await jobOf(scanId)).toMatchObject({ commitSha: sha, branch: "upload" });
   });
 
   it("refuses a report from a runner that did not claim the scan", async () => {

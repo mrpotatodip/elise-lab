@@ -7,7 +7,7 @@ import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effe
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
 import { displayRepoUrlOf, repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
-import type { SourceProviderId } from "#/providers/registry";
+import { sourceProviderOf, type SourceProviderId } from "#/providers/registry";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
 import { branchStateOf, openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
 import { weighedScanWhere } from "#/modules/verdict/queries";
@@ -450,7 +450,7 @@ export const addRepoEffect = (
           if (total >= REPO_LIMIT_PER_TENANT) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
           const [created] = await tx
             .insert(scanRepos)
-            .values({ tenantId, ...identity, url: displayRepoUrlOf(url, provider) })
+            .values({ tenantId, ...identity, url: displayRepoUrlOf(url, provider), defaultBranch: sourceProviderOf(identity.provider).fixedBranch })
             .onConflictDoNothing()
             .returning({ id: scanRepos.id });
           repoId = created?.id;

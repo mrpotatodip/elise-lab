@@ -20,3 +20,4 @@ export * from "./tenant-github-installations";
 export * from "./tenant-groups";
 export * from "./scans";
 export * from "./scan-finding-comments";
+export * from "./scan-upload-archives";

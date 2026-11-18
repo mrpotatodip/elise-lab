@@ -1,6 +1,7 @@
 import { DEFAULT_SOURCE_PROVIDER } from "@repo/contracts/elise";
 import type { SourceProvider } from "#/providers/port";
 import { githubProvider } from "#/providers/github";
+import { uploadProvider } from "#/providers/upload";
 
 // -----
 // The only file that may import every provider. A new
@@ -10,6 +11,7 @@ import { githubProvider } from "#/providers/github";
 // -----
 export const SOURCE_PROVIDERS = {
   github: githubProvider,
+  upload: uploadProvider,
 } as const satisfies Readonly<Partial<Record<SourceProvider["id"], SourceProvider>>>;
 
 export type SourceProviderId = keyof typeof SOURCE_PROVIDERS;

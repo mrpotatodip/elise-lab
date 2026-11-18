@@ -9,6 +9,10 @@ import { normalizeBranchName } from "#/modules/branches";
 import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox";
 import { RUNNER_JOB_BAD_OPTIONS, RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_FOUND, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { claimRunnerJobEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
+import { scanArchiveOfEffect } from "#/modules/archives/queries";
+import { sourceProviderOf } from "#/providers/registry";
+
+const UPLOAD_BRANCH = sourceProviderOf("upload").fixedBranch;
 
 // -----
 // The Runner takes the next Scan waiting for it, or gets null.
@@ -95,13 +99,19 @@ export const reportJobSvc = (db: DbConnectType, runnerId: string, scanId: string
     const files = keptFiles(body.files);
     const succeeded = body.state === "succeeded" && files["REPORT.md"] !== undefined;
     const usage = body.agentLog ? parseAgentUsage(body.agentLog) : null;
+    // -----
+    // An upload Scan read the zip the server linked it to: its
+    // hash is the commit and the app's hidden Branch its Branch,
+    // whatever the Runner says, so the zips stay one History.
+    // -----
+    const archive = yield* scanArchiveOfEffect(db, scanId);
     const accepted = yield* reportRunnerJobEffect(db, {
       scanId,
       runnerId,
       state: succeeded ? "succeeded" : "failed",
       error: succeeded ? null : (body.error ?? RUNNER_JOB_NO_REPORT),
-      commitSha: body.checkout?.commitSha ?? null,
-      branch: branchOf(job.ref, body.checkout),
+      commitSha: archive ? archive.contentSha256 : (body.checkout?.commitSha ?? null),
+      branch: archive ? UPLOAD_BRANCH : branchOf(job.ref, body.checkout),
       usageJson: usage === null ? null : JSON.stringify(usage),
       filesJson: succeeded ? JSON.stringify(files) : null,
       now: new Date(),

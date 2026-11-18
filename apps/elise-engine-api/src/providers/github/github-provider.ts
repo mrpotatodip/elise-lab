@@ -15,6 +15,7 @@ export const githubProvider = {
   id: "github",
   capabilities: { canListRepos: true, hasBranches: true, isArchive: false },
   addressPattern: GITHUB_ADDRESS,
+  fixedBranch: null,
   host: (): string => "github.com",
   canonical: (address: string): string => address.replace(GITHUB_PREFIX, "").replace(GIT_SUFFIX, "").toLowerCase(),
   display: (address: string): string => address.replace(GIT_SUFFIX, ""),

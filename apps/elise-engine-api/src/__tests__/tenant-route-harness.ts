@@ -17,6 +17,7 @@ const tenantScanDeps: Partial<AppDeps> = {
   monthSpend: realAppDeps.monthSpend,
   holdCredit: realAppDeps.holdCredit,
   releaseCredit: realAppDeps.releaseCredit,
+  linkArchive: realAppDeps.linkArchive,
 };
 
 // -----

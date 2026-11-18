@@ -1,10 +1,6 @@
 import { z } from "zod";
-import { DEFAULT_SOURCE_PROVIDER_ID, SOURCE_PROVIDER_IDS, sourceProviderOf } from "#/providers/registry";
+import { DEFAULT_SOURCE_PROVIDER_ID, SOURCE_PROVIDER_IDS } from "#/providers/registry";
 
-// -----
-// Input
-// -----
-export const SCANS_REPO_ADDRESS = sourceProviderOf(DEFAULT_SOURCE_PROVIDER_ID).addressPattern;
 // -----
 // Where the repo lives. Only providers with a line in the
 // registry are accepted; a request without one is github

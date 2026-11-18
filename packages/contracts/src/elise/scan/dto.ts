@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ACCEPTED_RISK_MAX_DAYS } from "../constants";
+import { ScanArchiveRefSchema } from "../upload/dto";
 import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STEP_VALUES, SOURCE_PROVIDER_VALUES } from "../enums";
 
 export const SCAN_MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"] as const;
@@ -121,6 +122,7 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   usage: ScanUsageSchema.nullish(),
   summary: ScanSummarySchema.nullish(),
   runner: ScanRunnerSchema.nullish(),
+  archive: ScanArchiveRefSchema.nullish(),
 });
 
 export const ScanListSchema = z.object({

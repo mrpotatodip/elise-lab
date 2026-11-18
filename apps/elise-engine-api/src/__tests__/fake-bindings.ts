@@ -19,6 +19,9 @@ export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: 
     put: async (key: string, value: string) => {
       store.set(key, value);
     },
+    delete: async (key: string) => {
+      store.delete(key);
+    },
     get: async (key: string) => {
       const value = store.get(key);
       if (value === undefined) return null;

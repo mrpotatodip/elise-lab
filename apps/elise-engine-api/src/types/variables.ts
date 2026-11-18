@@ -2,7 +2,8 @@ import type { Context } from "hono";
 import type { Effect } from "effect";
 import type { AccessPower } from "@repo/contracts/elise";
 import type { TenantDbType } from "#/lib/db-connection";
-import type { DbError } from "#/lib/effect-query";
+import type { DbError, Invalid } from "#/lib/effect-query";
+import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
 import type { GithubAccess } from "#/modules/github-installs";
 import type { ScanRepo } from "#/modules/scan-ledger";
@@ -62,6 +63,7 @@ export type AppDeps = {
   monthSpend: (db: TenantDbType, accountId: string) => Effect.Effect<MonthSpend, DbError>;
   holdCredit: (db: TenantDbType, accountId: string, scanId: string, holdUsd: number) => Effect.Effect<HoldResult, DbError>;
   runnerConnected: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<boolean, DbError>;
+  linkArchive: (db: TenantDbType, accountId: string, link: ScanArchiveLink) => Effect.Effect<void, Invalid | DbError>;
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
   sessionUserId: (c: Context<AppEnv>) => Promise<string | undefined>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
