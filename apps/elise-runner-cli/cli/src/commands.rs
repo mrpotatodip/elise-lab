@@ -5,9 +5,10 @@ use crate::store::{Store, TOKEN_VARIABLE};
 use crate::tools::Skill;
 use crate::Exit;
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
-use elise_runner_core::scan::{self, Claimed, Event};
+use elise_runner_core::scan::{self, Claimed, Event, Stop, Stopper};
 use std::io::{BufRead, Write};
 use std::sync::Mutex;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::sleep;
 
 const TOKEN_WARNING: &str = "\
@@ -165,7 +166,15 @@ pub async fn unpair(store: &Store) -> Exit {
 // Without `--once` it polls until stopped, as the desktop app does. With `--once` it claims at most
 // one Scan: 0 when it succeeded and its result was sent, 1 when not, 6 when there was nothing to
 // claim. Either way, a token Elise rejects is forgotten and the program exits with 4.
+// Ctrl-C (SIGINT) or SIGTERM with no Scan running exits at once with 0. During a Scan the core stops
+// the agent, reports the Scan as failed because the Runner was stopped and keeps its work folder,
+// and the program exits with 1. It returns rather than exiting, so the built-in Skill's folder is
+// removed on the way out.
 pub async fn run(store: &Store, once: bool) -> Exit {
+    let Some(stop) = stop_on_signal() else {
+        eprintln!("Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.");
+        return Exit::Error;
+    };
     let skill = Skill::new();
     let find_tools = || skill.tools();
     let log = ScanLog::default();
@@ -174,16 +183,25 @@ pub async fn run(store: &Store, once: bool) -> Exit {
     if !once {
         println!("Waiting for Scans from Elise. Stop with Ctrl-C.");
     }
+    let stopped_idle = || {
+        eprintln!("Stopped. No Scan was running.");
+        Exit::Ok
+    };
     loop {
+        if stop.is_stopped() {
+            return stopped_idle();
+        }
         let Some(token) = store.tokens().token() else {
             eprintln!("This computer is not paired. Pair it with `elise-runner pair <code>`.");
             return Exit::Unpaired;
         };
+        // A claim is not cut short: a Scan Elise handed out just as the Runner stopped is still
+        // reported, as failed, so it never stays running.
         match scan::claim(&token).await {
             Claimed::Job(job) => {
                 offline = false;
-                scan::run_job(&token, *job, &find_tools, &on_event).await;
-                if once {
+                scan::run_job(&token, *job, &find_tools, &on_event, &stop).await;
+                if once || stop.is_stopped() {
                     return if log.succeeded() { Exit::Ok } else { Exit::Error };
                 }
                 continue;
@@ -213,8 +231,30 @@ pub async fn run(store: &Store, once: bool) -> Exit {
                 return Exit::Revoked;
             }
         }
-        sleep(scan::POLL_EVERY).await;
+        tokio::select! {
+            _ = sleep(scan::POLL_EVERY) => {}
+            _ = stop.stopped() => return stopped_idle(),
+        }
     }
+}
+
+// Catches Ctrl-C (SIGINT) and SIGTERM, what systemd and Docker send, from now on: the first one fires
+// the returned `Stop`. tokio keeps the handlers for the life of the process, so later signals are
+// ignored and cannot end the program before a stopped Scan is reported. None when the signals
+// cannot be caught.
+fn stop_on_signal() -> Option<Stop> {
+    let mut interrupt = signal(SignalKind::interrupt()).ok()?;
+    let mut terminate = signal(SignalKind::terminate()).ok()?;
+    let (stopper, stop) = Stopper::new();
+    tokio::spawn(async move {
+        tokio::select! {
+            _ = interrupt.recv() => {}
+            _ = terminate.recv() => {}
+        }
+        eprintln!("Stopping.");
+        stopper.stop();
+    });
+    Some(stop)
 }
 
 // Turns the core's events into plain log lines, each with the repo and the Scan ID, and remembers

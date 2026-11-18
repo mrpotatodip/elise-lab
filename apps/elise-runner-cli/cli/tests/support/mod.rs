@@ -277,6 +277,18 @@ impl Runner {
 
     // Only for `pair --print-token`, the one command that prints the token.
     pub fn run_allowing_token(&self, args: &[&str], stdin: &str) -> Output {
+        let mut child = self.command(args).spawn().expect("the elise-runner binary starts");
+        // A program that exits without reading its input closes the pipe; that is not a failure.
+        let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
+        let output = child.wait_with_output().unwrap();
+        Output {
+            code: output.status.code().expect("the program exited, not killed"),
+            stdout: String::from_utf8(output.stdout).unwrap(),
+            stderr: String::from_utf8(output.stderr).unwrap(),
+        }
+    }
+
+    fn command(&self, args: &[&str]) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_elise-runner"));
         command
             .args(args)
@@ -289,15 +301,30 @@ impl Runner {
         for (name, value) in &self.env {
             command.env(name, value);
         }
-        let mut child = command.spawn().expect("the elise-runner binary starts");
-        // A program that exits without reading its input closes the pipe; that is not a failure.
-        let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
-        let output = child.wait_with_output().unwrap();
-        Output {
-            code: output.status.code().expect("the program exited, not killed"),
-            stdout: String::from_utf8(output.stdout).unwrap(),
-            stderr: String::from_utf8(output.stderr).unwrap(),
-        }
+        command
+    }
+
+    // Starts the program and leaves it running, for a test that signals it while it works.
+    pub fn start(&self, args: &[&str]) -> Running {
+        let mut child = self.command(args).spawn().expect("the elise-runner binary starts");
+        let collect = |mut pipe: Box<dyn Read + Send>| {
+            let text = Arc::new(Mutex::new(String::new()));
+            let shared = text.clone();
+            std::thread::spawn(move || {
+                let mut chunk = [0; 4096];
+                while let Ok(read) = pipe.read(&mut chunk) {
+                    if read == 0 {
+                        break;
+                    }
+                    shared.lock().unwrap().push_str(&String::from_utf8_lossy(&chunk[..read]));
+                }
+            });
+            text
+        };
+        let stdout = collect(Box::new(child.stdout.take().unwrap()));
+        let stderr = collect(Box::new(child.stderr.take().unwrap()));
+        let issued = self.engine.lock().unwrap().issued;
+        Running { child, stdout, stderr, issued }
     }
 
     // The files in the Runner's home folder.
@@ -329,6 +356,68 @@ impl Runner {
     }
 }
 
+// A program started with `Runner::start`, still running.
+pub struct Running {
+    child: std::process::Child,
+    stdout: Arc<Mutex<String>>,
+    stderr: Arc<Mutex<String>>,
+    issued: usize,
+}
+
+impl Running {
+    // Waits, up to 20 seconds, for `text` on standard output.
+    pub fn wait_for_output(&self, text: &str) {
+        let ready = until(|| self.stdout.lock().unwrap().contains(text));
+        assert!(ready, "no {text:?} in the output: {}", self.stdout.lock().unwrap());
+    }
+
+    // Sends a signal by name (`INT`, `TERM`) to the program, not to the processes it started.
+    pub fn signal(&self, name: &str) {
+        let sent = Command::new("kill").args(["-s", name, &self.child.id().to_string()]).status().unwrap();
+        assert!(sent.success(), "kill -s {name} failed");
+    }
+
+    // Waits for the program to exit, up to 30 seconds, and checks no token is in what it printed.
+    pub fn finish(mut self) -> Output {
+        let mut status = None;
+        until(|| {
+            status = self.child.try_wait().unwrap();
+            status.is_some()
+        });
+        let Some(status) = status else {
+            let _ = self.child.kill();
+            panic!("the program did not exit: {}{}", self.stdout.lock().unwrap(), self.stderr.lock().unwrap());
+        };
+        // The readers stop once the pipes close.
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        let output = Output {
+            code: status.code().expect("the program exited, not killed"),
+            stdout: self.stdout.lock().unwrap().clone(),
+            stderr: self.stderr.lock().unwrap().clone(),
+        };
+        for token in (1..=self.issued).map(token_number) {
+            assert!(!output.stdout.contains(&token) && !output.stderr.contains(&token), "a token leaked into the output");
+        }
+        output
+    }
+}
+
+// Checks `done` every 50 milliseconds for up to 30 seconds; true when it came true.
+fn until(mut done: impl FnMut() -> bool) -> bool {
+    for _ in 0..600 {
+        if done() {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    false
+}
+
+// Whether a process with this ID is still running.
+pub fn alive(pid: u32) -> bool {
+    Command::new("kill").args(["-0", &pid.to_string()]).stderr(Stdio::null()).status().unwrap().success()
+}
+
 // Where the stub `claude` writes what it saw, and the Runner's temp folder.
 pub struct Stubs {
     pub record: PathBuf,
@@ -339,6 +428,14 @@ impl Stubs {
     // The work folder a Scan uses.
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
+    }
+
+    // Waits for a stub `claude` told `stop=wait` to be waiting, and returns its process ID.
+    pub fn waiting_agent(&self) -> u32 {
+        let file = self.record.join("waiting.pid");
+        let ready = until(|| file.is_file());
+        assert!(ready, "the stub claude never started waiting");
+        std::fs::read_to_string(file).unwrap().trim().parse().unwrap()
     }
 }
 
@@ -360,8 +457,9 @@ esac
 "#;
 
 // The stub agent reads what to do from its prompt: `phase=check` and `phase=report` write the
-// files a full audit leaves, `cost=1.5` is what its result reports, `stop=crash` fails. The recon
-// Phase records what the agent was given: its environment, its settings file and the Skill's
+// files a full audit leaves, `cost=1.5` is what its result reports, `stop=crash` fails, and
+// `stop=wait` prints a line, writes its process ID to `waiting.pid` and waits until it is killed. The
+// recon Phase records what the agent was given: its environment, its settings file and the Skill's
 // SKILL.md, in the record folder outside the work folder.
 const STUB_CLAUDE: &str = r#"#!/bin/sh
 for a in "$@"; do prompt="$a"; done
@@ -372,6 +470,12 @@ case "$prompt" in
     cp .claude/skills/security-audit/SKILL.md "__RECORD__/SKILL.md" ;;
 esac
 case "$prompt" in *stop=crash*) echo "the agent said: boom" >&2; exit 2 ;; esac
+case "$prompt" in
+  *stop=wait*)
+    echo "the agent was half way through"
+    echo $$ > "__RECORD__/waiting.tmp"; mv "__RECORD__/waiting.tmp" "__RECORD__/waiting.pid"
+    exec sleep 600 ;;
+esac
 case "$prompt" in
   *phase=check*) echo '{"findings":[]}' > out/findings.json; echo '{"units":[]}' > out/coverage-ledger.json ;;
   *phase=report*) echo '# Report' > out/REPORT.md ;;

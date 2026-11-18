@@ -3,7 +3,7 @@
 
 mod support;
 
-use support::{job, Engine, Runner, CODE};
+use support::{alive, job, Engine, Runner, CODE};
 
 fn paired(engine: &Engine) -> Runner {
     let runner = Runner::new(engine);
@@ -152,4 +152,56 @@ fn the_agent_gets_the_built_in_skill_and_the_runners_settings_but_never_the_toke
     assert!(deny.contains(&"Read(//proc/**)".into()), "{settings}");
     let skill = concat!(env!("CARGO_MANIFEST_DIR"), "/../../elise-engine-api/skills/security-audit/SKILL.md");
     assert_eq!(read("SKILL.md"), std::fs::read_to_string(skill).unwrap());
+}
+
+// Ctrl-C (SIGINT) or a stop signal (SIGTERM, what systemd and Docker send) during a Scan: the agent
+// is stopped, the Scan is reported failed with what its log holds so far, the work folder is kept
+// and printed, and the program exits with 1. Both signals do the same.
+#[test]
+fn a_stop_signal_during_a_scan_stops_the_agent_reports_the_scan_failed_and_exits_with_code_1() {
+    for signal in ["INT", "TERM"] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        let stubs = runner.stub_tools(&["claude", "node"]);
+        engine.queue_job(job("scan_6", ["phase=recon cost=1", "phase=hunt stop=wait", "phase=check", "phase=report"]));
+        let running = runner.start(&["run"]);
+        let agent = stubs.waiting_agent();
+
+        running.signal(signal);
+        let output = running.finish();
+
+        assert_eq!(output.code, 1, "{signal}: {}{}", output.stdout, output.stderr);
+        assert!(!alive(agent), "{signal}: the stub claude is still running");
+        let results = engine.results();
+        assert_eq!(results.len(), 1, "{signal}");
+        let (scan_id, result) = &results[0];
+        assert_eq!(scan_id, "scan_6");
+        assert_eq!(result["state"], "failed", "{signal}: {result}");
+        assert!(result["error"].as_str().unwrap().contains("the Runner was stopped"), "{signal}: {result}");
+        assert!(result["agentLog"].as_str().unwrap().contains("the agent was half way through"), "{signal}: {result}");
+        let work = stubs.work_folder("scan_6");
+        assert!(work.join("agent-hunt.log").is_file(), "{signal}: the work folder is kept");
+        let last = output.stdout.lines().last().unwrap();
+        assert!(last.ends_with(&format!("Work folder kept: {}", work.display())), "{signal}: {last}");
+    }
+}
+
+// With no Scan running, a stop signal ends the program at once with 0.
+#[test]
+fn a_stop_signal_with_no_scan_running_exits_at_once_with_code_0() {
+    for signal in ["INT", "TERM"] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        runner.stub_tools(&["claude", "node"]);
+        let running = runner.start(&["run"]);
+        running.wait_for_output("Waiting for Scans");
+
+        let asked = std::time::Instant::now();
+        running.signal(signal);
+        let output = running.finish();
+
+        assert_eq!(output.code, 0, "{signal}: {}{}", output.stdout, output.stderr);
+        assert!(asked.elapsed() < std::time::Duration::from_secs(2), "{signal}: took {:?}", asked.elapsed());
+        assert!(engine.results().is_empty(), "{signal}");
+    }
 }
