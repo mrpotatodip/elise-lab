@@ -129,8 +129,12 @@ pub async fn login(store: &Store, no_browser: bool) -> Exit {
     let enrolled = match login::wait(&started, &stop).await {
         Waited::Approved(enrolled) => enrolled,
         Waited::Cancelled => return Exit::Error,
-        Waited::TimedOut => {
+        Waited::Expired => {
             eprintln!("The code expired; run `elise-runner login` again.");
+            return Exit::Error;
+        }
+        Waited::Denied => {
+            eprintln!("The request was denied in Elise.");
             return Exit::Error;
         }
         Waited::Refused => {

@@ -28,6 +28,9 @@ struct State {
     login_pending: bool,
     login_approved: bool,
     login_refused: bool,
+    login_expires_at: Option<String>,
+    login_script: VecDeque<String>,
+    login_check_times: Vec<std::time::Instant>,
 }
 
 pub const USER_CODE: &str = "WXYZ-1234";
@@ -118,6 +121,18 @@ impl Engine {
 
     pub fn approve_login(&self) {
         self.state.lock().unwrap().login_approved = true;
+    }
+
+    pub fn login_expires_at(&self, expires_at: &str) {
+        self.state.lock().unwrap().login_expires_at = Some(expires_at.to_string());
+    }
+
+    pub fn script_login_checks(&self, answers: &[&str]) {
+        self.state.lock().unwrap().login_script = answers.iter().map(|answer| answer.to_string()).collect();
+    }
+
+    pub fn login_checks(&self) -> Vec<std::time::Instant> {
+        self.state.lock().unwrap().login_check_times.clone()
     }
 
     pub fn refuse_login_checks(&self) {
@@ -231,10 +246,16 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             state.login_starts.push(request.body.clone());
             state.login_pending = true;
             state.login_approved = false;
+            let expires_at = state.login_expires_at.as_deref().unwrap_or("2099-01-01T00:00:00.000Z");
             let body = format!(
-                r#"{{"data":{{"userCode":"{USER_CODE}","verificationUrl":"{VERIFICATION_URL}","deviceCode":"{DEVICE_CODE}","expiresAt":"2099-01-01T00:00:00.000Z"}},"error":null}}"#
+                r#"{{"data":{{"userCode":"{USER_CODE}","verificationUrl":"{VERIFICATION_URL}","deviceCode":"{DEVICE_CODE}","expiresAt":"{expires_at}"}},"error":null}}"#
             );
             (200, body)
+        }
+        ("POST", "/runners/login/check") if state.login_pending && !state.login_script.is_empty() => {
+            state.login_check_times.push(std::time::Instant::now());
+            let data = state.login_script.pop_front().unwrap_or_default();
+            (200, format!(r#"{{"data":{data},"error":null}}"#))
         }
         ("POST", "/runners/login/check") if state.login_refused || !request.body.contains(DEVICE_CODE) || !state.login_pending => {
             (403, r#"{"data":null,"error":{"code":"forbidden"}}"#.to_string())

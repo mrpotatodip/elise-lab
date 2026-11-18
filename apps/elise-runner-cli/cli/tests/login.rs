@@ -153,6 +153,65 @@ fn a_refusal_from_the_check_ends_the_login_with_one_sentence() {
 }
 
 #[test]
+fn a_denial_ends_the_login_with_one_sentence_and_saves_nothing() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+    engine.script_login_checks(&[r#"{"status":"pending"}"#, r#"{"status":"denied"}"#]);
+
+    let done = runner.run(&["login", "--no-browser"], "");
+
+    assert_eq!(done.code, 1, "{}{}", done.stdout, done.stderr);
+    assert_eq!(done.stderr.trim(), "The request was denied in Elise.");
+    assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
+    assert!(engine.live().is_empty());
+}
+
+#[test]
+fn an_expired_answer_ends_the_login_with_one_sentence_and_saves_nothing() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+    engine.script_login_checks(&[r#"{"status":"expired"}"#]);
+
+    let done = runner.run(&["login", "--no-browser"], "");
+
+    assert_eq!(done.code, 1, "{}{}", done.stdout, done.stderr);
+    assert_eq!(done.stderr.trim(), "The code expired; run `elise-runner login` again.");
+    assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
+}
+
+#[test]
+fn the_wait_ends_at_the_expiry_the_engine_named_even_if_it_keeps_answering_pending() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+    engine.login_expires_at("2001-01-01T00:00:00.000Z");
+
+    let done = runner.run(&["login", "--no-browser"], "");
+
+    assert_eq!(done.code, 1, "{}{}", done.stdout, done.stderr);
+    assert_eq!(done.stderr.trim(), "The code expired; run `elise-runner login` again.");
+    assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
+}
+
+#[test]
+fn a_slow_down_answer_makes_the_next_check_wait_the_interval_the_engine_named() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+    engine.script_login_checks(&[r#"{"status":"slow_down","interval":2}"#, r#"{"status":"pending"}"#]);
+
+    let login = runner.start(&["login", "--no-browser"]);
+    login.wait_for_output("Waiting for approval");
+    while engine.login_checks().len() < 2 {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    engine.approve_login();
+    let done = login.finish();
+
+    assert_eq!(done.code, 0, "{}{}", done.stdout, done.stderr);
+    let checks = engine.login_checks();
+    assert!(checks[1].duration_since(checks[0]) >= std::time::Duration::from_millis(1900), "{:?}", checks[1].duration_since(checks[0]));
+}
+
+#[test]
 fn the_help_lists_login_and_its_flag() {
     let engine = Engine::start();
     let runner = Runner::new(&engine);
