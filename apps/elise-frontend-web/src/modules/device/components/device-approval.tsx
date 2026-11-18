@@ -12,11 +12,11 @@ import { Label } from "#/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { ShellPublicBrand, ShellPublicThemeSwitch } from "#/modules/shell";
-import { approveDeviceLogin } from "../api";
+import { approveDeviceLogin, denyDeviceLogin } from "../api";
 import { DEVICE_COPY } from "../constants";
 import { deviceKeys, deviceLoginQuery } from "../hooks";
 import { DeviceFormSchema, type DeviceAccount, type PendingRunnerLogin } from "../schemas";
-import { displayCode, ipDiffers, preselectedAccountId } from "../utils";
+import { denyAccountId, displayCode, ipDiffers, preselectedAccountId } from "../utils";
 import { DeviceUnusable } from "./device-unusable";
 
 const NAME_ID = "device-runner-name";
@@ -46,6 +46,19 @@ function DeviceConnected({ approved }: { approved: Approved }) {
           <p className="text-sm text-muted-foreground">
             {approved.name} is now a Runner of {approved.accountName}. {DEVICE_COPY.doneHint}
           </p>
+        </CardHeader>
+      </Card>
+    </DeviceShell>
+  );
+}
+
+function DeviceDenied() {
+  return (
+    <DeviceShell>
+      <Card className="shadow-raised">
+        <CardHeader className="gap-1.5 px-8 py-8">
+          <h1 className="text-xl font-semibold leading-none tracking-tight">{DEVICE_COPY.deniedTitle}</h1>
+          <p className="text-sm text-muted-foreground">{DEVICE_COPY.deniedHint}</p>
         </CardHeader>
       </Card>
     </DeviceShell>
@@ -108,6 +121,7 @@ export function DeviceApproval({ code }: { code: string }) {
   const { data } = useSuspenseQuery(deviceLoginQuery(code));
   const queryClient = useQueryClient();
   const [approved, setApproved] = useState<Approved | null>(null);
+  const [denied, setDenied] = useState(false);
 
   const approve = useMutation({
     mutationFn: (input: { accountId: string; name: string }) => approveDeviceLogin({ data: { userCode: code, ...input } }),
@@ -118,13 +132,25 @@ export function DeviceApproval({ code }: { code: string }) {
     },
   });
 
+  const deny = useMutation({
+    mutationFn: (input: { accountId: string }) => denyDeviceLogin({ data: { userCode: code, ...input } }),
+    onSuccess: () => setDenied(true),
+    onError: async (error) => {
+      toast.error(`We couldn't deny this login. ${error.message}`);
+      await queryClient.invalidateQueries({ queryKey: deviceKeys.login(code) });
+    },
+  });
+
   const form = useForm({
     defaultValues: { accountId: preselectedAccountId(data.accounts), name: data.login?.suggestedName ?? "" },
     validators: { onSubmit: DeviceFormSchema },
     onSubmit: ({ value }) => approve.mutate({ accountId: value.accountId, name: value.name.trim() }),
   });
 
+  const busy = approve.isPending || deny.isPending;
+
   if (approved) return <DeviceConnected approved={approved} />;
+  if (denied) return <DeviceDenied />;
   if (!data.login) return <DeviceUnusable />;
 
   return (
@@ -188,9 +214,14 @@ export function DeviceApproval({ code }: { code: string }) {
                   </div>
                 )}
               </form.Field>
-              <Button type="submit" size="lg" disabled={approve.isPending}>
-                {approve.isPending ? DEVICE_COPY.approving : DEVICE_COPY.approve}
-              </Button>
+              <div className="grid gap-2">
+                <Button type="submit" size="lg" disabled={busy}>
+                  {approve.isPending ? DEVICE_COPY.approving : DEVICE_COPY.approve}
+                </Button>
+                <Button type="button" size="lg" variant="outline" disabled={busy} onClick={() => deny.mutate({ accountId: denyAccountId(data.accounts, form.getFieldValue("accountId")) })}>
+                  {deny.isPending ? DEVICE_COPY.denying : DEVICE_COPY.deny}
+                </Button>
+              </div>
             </form>
           )}
         </CardContent>

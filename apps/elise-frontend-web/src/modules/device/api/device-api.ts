@@ -3,7 +3,7 @@ import { getRequestHeader } from "@tanstack/react-start/server";
 import { MeSchema } from "@repo/contracts/elise";
 import { EngineError, engineJson, jsonPost } from "#/lib/engine-client";
 import { requireSession } from "#/modules/auth/server/session";
-import { ApprovedRunnerLoginSchema, DeviceApproveInputSchema, PendingRunnerLoginSchema, RunnerLoginLookupQuerySchema, type DeviceLoginView, type PendingRunnerLogin } from "../schemas";
+import { ApprovedRunnerLoginSchema, DeniedRunnerLoginSchema, DeviceApproveInputSchema, DeviceDenyInputSchema, PendingRunnerLoginSchema, RunnerLoginLookupQuerySchema, type DeviceLoginView, type PendingRunnerLogin } from "../schemas";
 import { runnerAccounts } from "../utils";
 
 const UNUSABLE_CODE_STATUSES = new Set([400, 403, 404]);
@@ -41,4 +41,18 @@ export const approveDeviceLogin = createServerFn({ method: "POST" })
     if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId)) throw new Error("You can't add a Runner to this account.");
     const body = JSON.stringify({ userCode: data.userCode, name: data.name });
     return engineJson(ApprovedRunnerLoginSchema, "/runners/login/approve", jsonPost(body), { token, accountId: data.accountId });
+  });
+
+// -----
+// The engine checks the Power for the Account it is sent, so the Account is
+// checked against /me here, as for approve.
+// -----
+export const denyDeviceLogin = createServerFn({ method: "POST" })
+  .validator(DeviceDenyInputSchema)
+  .handler(async ({ data }) => {
+    const { token } = await requireSession();
+    const me = await engineJson(MeSchema, "/me", {}, { token });
+    if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId)) throw new Error("You can't deny a Runner login for this account.");
+    const body = JSON.stringify({ userCode: data.userCode });
+    return engineJson(DeniedRunnerLoginSchema, "/runners/login/deny", jsonPost(body), { token, accountId: data.accountId });
   });

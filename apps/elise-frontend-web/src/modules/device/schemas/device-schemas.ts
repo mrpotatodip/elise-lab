@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { ApproveRunnerLoginBodySchema, RUNNER_NAME_MAX, type PendingRunnerLogin } from "@repo/contracts/elise";
+import { ApproveRunnerLoginBodySchema, DenyRunnerLoginBodySchema, RUNNER_NAME_MAX, type PendingRunnerLogin } from "@repo/contracts/elise";
 
-export { ApprovedRunnerLoginSchema, PendingRunnerLoginSchema, RunnerLoginLookupQuerySchema } from "@repo/contracts/elise";
+export { ApprovedRunnerLoginSchema, DeniedRunnerLoginSchema, PendingRunnerLoginSchema, RunnerLoginLookupQuerySchema } from "@repo/contracts/elise";
 export type { PendingRunnerLogin };
 
 export const DeviceApproveInputSchema = ApproveRunnerLoginBodySchema.extend({ accountId: z.uuid() });
+export const DeviceDenyInputSchema = DenyRunnerLoginBodySchema.extend({ accountId: z.uuid() });
 export type DeviceApproveInput = z.infer<typeof DeviceApproveInputSchema>;
 
 // -----

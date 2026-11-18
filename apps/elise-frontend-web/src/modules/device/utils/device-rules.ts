@@ -17,6 +17,13 @@ export const runnerAccounts = (accounts: readonly MeAccount[]): DeviceAccount[] 
 export const preselectedAccountId = (accounts: readonly DeviceAccount[]): string => (accounts.length === 1 ? (accounts[0]?.id ?? "") : "");
 
 // -----
+// Denying needs an Account whose Role holds the Power, because the engine
+// checks it and writes the Audit trail entry there. The one the person
+// picked counts if it is listed; otherwise the first listed one.
+// -----
+export const denyAccountId = (accounts: readonly DeviceAccount[], picked: string): string => accounts.find((account) => account.id === picked)?.id ?? accounts[0]?.id ?? "";
+
+// -----
 // The flag shows only when both IPs are known and differ. A request with
 // no readable IP of the person's own flags nothing.
 // -----

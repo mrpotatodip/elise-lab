@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MeAccount } from "@repo/contracts/elise";
 import { safeRedirectPath } from "#/modules/auth/utils";
-import { ipDiffers, preselectedAccountId, runnerAccounts } from "#/modules/device/utils";
+import { denyAccountId, ipDiffers, preselectedAccountId, runnerAccounts } from "#/modules/device/utils";
 
 const account = (id: string, name: string, powers: string[] | undefined): MeAccount => ({ id, name, slug: name, role: "member", roleLabel: "Member", powers });
 
@@ -30,6 +30,22 @@ describe("which Accounts the device page lists", () => {
     },
   ])("preselects $expected out of $listed.length listed", ({ listed, expected }) => {
     expect(preselectedAccountId(listed)).toBe(expected);
+  });
+});
+
+describe("which Account a denial is written in", () => {
+  const listed = [
+    { id: "a", name: "A" },
+    { id: "b", name: "B" },
+  ];
+
+  it.each([
+    { listed, picked: "b", expected: "b" },
+    { listed, picked: "", expected: "a" },
+    { listed, picked: "zzz", expected: "a" },
+    { listed: [], picked: "b", expected: "" },
+  ])("picked '$picked' of $listed.length listed gives '$expected'", ({ listed: accounts, picked, expected }) => {
+    expect(denyAccountId(accounts, picked)).toBe(expected);
   });
 });
 
