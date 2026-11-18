@@ -3,7 +3,7 @@ import { UploadAppPanel, UploadScanPicker } from "#/providers/upload/components"
 
 // -----
 // An upload app: zips of source code under a name, no git
-// host (ADR 0007). The new-scan form shows its picker in place
+// host (ADR 0008). The new-scan form shows its picker in place
 // of the search: an app, its zips, and the one zip a Scan reads.
 // Its Repo page adds the zips and a way to remove the app.
 // -----

@@ -1,7 +1,7 @@
 // -----
 // Said under the GitLab server search. The Runner clones
 // only from a host listed in its own settings, never from
-// one the job names (ADR 0007), so the person must list it.
+// one the job names (ADR 0008), so the person must list it.
 // -----
 export function GitlabShScanHelp() {
   return (

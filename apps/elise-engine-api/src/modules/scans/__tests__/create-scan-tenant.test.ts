@@ -115,7 +115,7 @@ describe("POST /scans as one Account", () => {
 });
 
 // -----
-// The git providers other than github (ADR 0007): each reads its
+// The git providers other than github (ADR 0008): each reads its
 // own addresses, and their Scans run only on a Runner.
 // -----
 const RUNNER_ID = "3f1c2b8e-5d4a-4c6b-9e7f-0a1b2c3d4e5f";

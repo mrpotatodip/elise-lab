@@ -1,4 +1,4 @@
-// Where the code of a Scan comes from (docs/adr/0007-git-providers.md). One module per provider,
+// Where the code of a Scan comes from (docs/adr/0008-git-providers.md). One module per provider,
 // each with its own address rules, and this file, the only one that knows every provider. No
 // provider module names another: `a_provider_never_names_another` fails the build when one does.
 // `address` is shared ground under all of them, not a provider.
@@ -219,7 +219,7 @@ mod tests {
         assert_eq!((missing.gitlab_hosts.len(), missing.problem), (0, None));
     }
 
-    // One module per provider, and none names another (ADR 0007). Fails the build when a provider's
+    // One module per provider, and none names another (ADR 0008). Fails the build when a provider's
     // file uses another provider's module.
     #[test]
     fn a_provider_never_names_another() {

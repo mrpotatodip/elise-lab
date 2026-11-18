@@ -116,7 +116,7 @@ export type ScanStepValue = (typeof SCAN_STEP_VALUES)[number];
 export type RunnerJobPhaseValue = (typeof RUNNER_JOB_PHASE_VALUES)[number];
 
 // -----
-// Where the code of a Scan comes from (docs/adr/0007-git-providers.md).
+// Where the code of a Scan comes from (docs/adr/0008-git-providers.md).
 // A Repo is known by (provider, host, path); upload has no host. A
 // request without a provider means github. Twin of the CHECK on
 // scan_repos.provider.

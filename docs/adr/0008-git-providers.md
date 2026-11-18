@@ -1,6 +1,6 @@
 # Source providers on the Runner: `github`, `gitlab`, `gitlab-sh` and `upload`
 
-Where the code of a Scan comes from, for Scans that run on a Runner (`apps/elise-runner-cli`). Builds on `0004-repo-branches.md`. Terms: `apps/elise-engine-api/GLOSSARY.md`. Draft: not yet agreed in a spec.
+Where the code of a Scan comes from, for Scans that run on a Runner (`apps/elise-runner-cli`). Builds on `0004-repo-branches.md`. Terms: `apps/elise-engine-api/GLOSSARY.md`. Agreed in spec #223 (2026-11-19).
 
 ## Scope
 

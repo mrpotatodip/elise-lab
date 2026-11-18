@@ -27,7 +27,7 @@ export const listArchivesSvc = (db: AppDbType, accountId: string, repoId: string
 
 // -----
 // The limits a zip's own bytes must meet, read from its central
-// directory (docs/adr/0007-git-providers.md).
+// directory (docs/adr/0008-git-providers.md).
 // -----
 const zipRefusalOf = (bytes: Uint8Array): Effect.Effect<void, Invalid> => {
   const contents = isZip(bytes) ? zipContentsOf(bytes) : null;

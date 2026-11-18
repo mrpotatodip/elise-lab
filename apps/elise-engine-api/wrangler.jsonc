@@ -35,7 +35,7 @@
     { "name": "RUNNER_LOGIN_START_TOTAL_LIMITER", "namespace_id": "1008", "simple": { "limit": 30, "period": 60 } }
   ],
   "r2_buckets": [{ "binding": "REPORTS", "bucket_name": "repo-scan-reports" }],
-  // Upload retention (docs/adr/0007-git-providers.md): once a day the scheduled handler deletes zips no Scan has read 30 days after upload, and upload objects with no row.
+  // Upload retention (docs/adr/0008-git-providers.md): once a day the scheduled handler deletes zips no Scan has read 30 days after upload, and upload objects with no row.
   "triggers": { "crons": ["17 3 * * *"] },
   // Tenant-scoped routes connect as the elise_app role (no BYPASSRLS) and set app.tenant_id per transaction. Caching must stay off on this config: Hyperdrive caches SELECT results by query text, so a cached answer would cross accounts.
   "hyperdrive": [{ "binding": "HYPERDRIVE_TENANT", "id": "c40dce1918af46b2bdf7be08609ba654" }],

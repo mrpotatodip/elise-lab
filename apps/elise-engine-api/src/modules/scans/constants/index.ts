@@ -14,7 +14,7 @@ export const SCANS_PROVIDER = z
 // -----
 // A provider without cloud Scans (gitlab, gitlab-sh) has no
 // token on our side: its Scans clone on a Runner, with the
-// person's own git login (ADR 0007).
+// person's own git login (ADR 0008).
 // -----
 export const SCANS_RUNNER_ONLY_MESSAGE = "runner_id: Scans of this provider run only on a Runner, which clones with your own git login. Pick a connected Runner.";
 // -----

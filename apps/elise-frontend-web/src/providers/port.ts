@@ -3,7 +3,7 @@ import type { SourceProviderValue } from "@repo/contracts/elise";
 
 // -----
 // The one shape the dashboard knows a source provider by
-// (docs/adr/0007-git-providers.md). Modules read a provider
+// (docs/adr/0008-git-providers.md). Modules read a provider
 // only through this port and the registry, never by
 // importing the provider's folder. cloudScans: a Scan may
 // run in Elise's cloud; without it a Scan runs only on a

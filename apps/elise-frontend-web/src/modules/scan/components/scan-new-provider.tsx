@@ -9,7 +9,7 @@ type ScanNewProviderProps = {
 
 // -----
 // The first choice of a new scan: where the code lives
-// (ADR 0007). The list is the registry's, in the contracts'
+// (ADR 0008). The list is the registry's, in the contracts'
 // order. A provider whose flow is not built yet is shown
 // and cannot be chosen.
 // -----

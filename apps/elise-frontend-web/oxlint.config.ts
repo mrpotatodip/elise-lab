@@ -20,7 +20,7 @@ const SHARED_IMPORT_RULES = [
 ];
 
 // -----
-// Source providers (docs/adr/0007-git-providers.md): modules read a provider
+// Source providers (docs/adr/0008-git-providers.md): modules read a provider
 // only through `#/providers/port` and `#/providers/registry`, a provider
 // imports only the port and its own folder, and only the registry imports
 // every provider. The `**/` form also catches a relative path. Each folder
@@ -29,7 +29,7 @@ const SHARED_IMPORT_RULES = [
 // -----
 const FORBID_PROVIDER_IN_CORE = {
   group: ["**/providers/*", "**/providers/*/**", "!**/providers/port", "!**/providers/registry"],
-  message: "Modules read a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0007).",
+  message: "Modules read a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
 };
 const CORE_IMPORT_RULES = [...SHARED_IMPORT_RULES, FORBID_PROVIDER_IN_CORE];
 const PROVIDER_IDS = readdirSync(new URL("src/providers", import.meta.url), { withFileTypes: true })
@@ -46,7 +46,7 @@ const providerOverride = (id: string): OxlintOverride => ({
           ...SHARED_IMPORT_RULES,
           {
             group: ["../**", "**/providers/*", "**/providers/*/**", "!**/providers/port", `!**/providers/${id}`, `!**/providers/${id}/**`],
-            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0007).",
+            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
           },
         ],
       },

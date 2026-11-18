@@ -3,7 +3,7 @@ import type { SourceProvider } from "#/providers/port";
 
 // -----
 // gitlab.com, groups inside groups. Scans run only on a
-// Runner: EliseLAB holds no GitLab token (ADR 0007).
+// Runner: EliseLAB holds no GitLab token (ADR 0008).
 // canonical is the path in lowercase, as GitLab matches
 // paths without case. display is the clean address,
 // without a branch view, .git or a trailing slash.

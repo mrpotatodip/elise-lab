@@ -2,7 +2,7 @@ import type { SourceProviderValue } from "@repo/contracts/elise";
 
 // -----
 // The one shape core knows a source provider by
-// (docs/adr/0007-git-providers.md). Core reads a
+// (docs/adr/0008-git-providers.md). Core reads a
 // provider only through this port and the registry,
 // never by importing the provider's folder. cloudScans:
 // a Scan may run in EliseLAB's cloud; without it a Scan

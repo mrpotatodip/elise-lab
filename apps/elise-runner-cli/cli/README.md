@@ -66,7 +66,7 @@ In this order:
 
 ## Where a Scan may clone from
 
-The Runner clones only `https://` addresses, with your own git login and no terminal prompt. It checks the address before git runs, with the rules of the address's provider (`docs/adr/0007-git-providers.md`):
+The Runner clones only `https://` addresses, with your own git login and no terminal prompt. It checks the address before git runs, with the rules of the address's provider (`docs/adr/0008-git-providers.md`):
 
 - `github.com`: `https://github.com/owner/name`.
 - `gitlab.com`: `https://gitlab.com/group/name`, with groups inside groups. A pasted branch view (`…/-/tree/main`) or a trailing `.git` still names the repository.

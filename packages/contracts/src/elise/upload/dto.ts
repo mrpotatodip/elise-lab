@@ -2,7 +2,7 @@ import { z } from "zod";
 import { UPLOAD_ARCHIVE_LABEL_MAX } from "../constants";
 
 // -----
-// The upload provider (docs/adr/0007-git-providers.md). An upload
+// The upload provider (docs/adr/0008-git-providers.md). An upload
 // app is a Repo with provider upload, made with POST /repos. Each
 // zip stored under it is an archive: its label, size, the SHA-256
 // of its bytes (the app's History reads it as the commit) and when

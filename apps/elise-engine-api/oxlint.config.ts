@@ -6,7 +6,7 @@ const FORBID_DEEP_IMPORT = { group: ["#/modules/*/*/*"], message: "Import throug
 const FORBID_HONO_IN_SERVICES = { group: ["hono", "hono/*"], message: "Services never import from `hono`: pass plain values, not a Context (Hono JS 2.3)." };
 
 // -----
-// Source providers (docs/adr/0007-git-providers.md): core reads a provider
+// Source providers (docs/adr/0008-git-providers.md): core reads a provider
 // only through `#/providers/port` and `#/providers/registry`, a provider
 // imports only the port and its own folder, and only the registry imports
 // every provider. Each folder under src/providers gets its own override, so a
@@ -14,7 +14,7 @@ const FORBID_HONO_IN_SERVICES = { group: ["hono", "hono/*"], message: "Services 
 // -----
 const FORBID_PROVIDER_IN_CORE = {
   group: ["#/providers/*", "#/providers/*/**", "!#/providers/port", "!#/providers/registry"],
-  message: "Core reads a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0007).",
+  message: "Core reads a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
 };
 const PROVIDER_IDS = readdirSync(new URL("src/providers", import.meta.url), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -30,7 +30,7 @@ const providerOverride = (id: string): OxlintOverride => ({
           FORBID_DEEP_IMPORT,
           {
             group: ["#/providers/*", "#/providers/*/**", "!#/providers/port", `!#/providers/${id}`, `!#/providers/${id}/**`],
-            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0007).",
+            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
           },
         ],
       },

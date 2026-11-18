@@ -100,7 +100,7 @@ export const REPO_BRANCH_LIMIT = 25;
 // -----
 // Upload apps: the label a zip is listed under (the file name
 // the dashboard sends), and the limits of
-// docs/adr/0007-git-providers.md. The upload route checks all
+// docs/adr/0008-git-providers.md. The upload route checks all
 // of them against the zip's central directory; the Runner checks
 // the unpacked ones again while it unpacks. A zip no Scan has
 // read is deleted UPLOAD_ARCHIVE_RETENTION_DAYS after upload.
@@ -136,7 +136,7 @@ export const UPLOAD_APP_NAME_PATTERN = /^[A-Za-z0-9](?:[\w .-]{0,78}[\w.-])?$/;
 export const UPLOAD_APP_NAME_MESSAGE = "An app name is letters, digits, spaces, '.', '-' and '_', starts with a letter or digit, has no slash and is at most 80 characters";
 
 // -----
-// GitLab addresses (docs/adr/0007-git-providers.md). A path is
+// GitLab addresses (docs/adr/0008-git-providers.md). A path is
 // groups inside groups and a name: 2 to 20 parts, each letters,
 // digits, '.', '_' or '-' and starting with a letter, digit or
 // '_', as GitLab requires (so no '..'). It is read up to a
