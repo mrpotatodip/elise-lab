@@ -1,4 +1,4 @@
-import type { SourceProvider, SourceProviderLink } from "#/providers/port";
+import type { GitSourceProvider, SourceProviderLink } from "#/providers/port";
 
 const GITHUB_ADDRESS = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/;
 const GITHUB_PREFIX = "https://github.com/";
@@ -18,10 +18,18 @@ function githubLinkOf(text: string): SourceProviderLink | null {
 export const githubProvider = {
   id: "github",
   label: "GitHub",
-  capabilities: { canListRepos: true, hasBranches: true, isArchive: false },
-  addressPattern: GITHUB_ADDRESS,
-  addressMessage: "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name.",
-  addressExample: "https://github.com/owner/name",
-  linkOf: githubLinkOf,
-  pathOf: (address: string) => address.replace(GITHUB_PREFIX, "").replace(/\.git$/, "").replace(/\/$/, ""),
-} as const satisfies SourceProvider;
+  available: true,
+  capabilities: { canListRepos: true, hasBranches: true, isArchive: false, cloudScans: true },
+  address: {
+    pattern: GITHUB_ADDRESS,
+    message: "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name.",
+    example: "https://github.com/owner/name",
+    linkOf: githubLinkOf,
+    nameOf: (address: string) => address.replace(GITHUB_PREFIX, "").replace(/\.git$/, "").replace(/\/$/, ""),
+    searchPlaceholder: "Search your repositories or paste a GitHub link",
+    emptyNote: "Paste the link to a public GitHub repository to scan it.",
+    linkNote: "Public repository, from the link",
+    repoNote: "Public repository",
+  },
+  Help: null,
+} as const satisfies GitSourceProvider;

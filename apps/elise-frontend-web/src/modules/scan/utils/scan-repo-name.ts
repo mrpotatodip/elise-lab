@@ -1,10 +1,13 @@
-import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+import { sourceProviderOfAddress } from "#/providers/registry";
 
-const provider = sourceProviderOf(DEFAULT_SOURCE_PROVIDER_ID);
-
+// -----
+// The repository's name, read by the provider its address
+// belongs to. A GitLab path may hold groups inside groups,
+// so the name is the last part and the owner the rest.
+// -----
 export function scanRepoName(repo: string | null | undefined, fallback: string) {
-  const path = repo ? provider.pathOf(repo) : "";
+  const path = repo ? (sourceProviderOfAddress(repo)?.address.nameOf(repo) ?? "") : "";
   if (!path) return { owner: "", name: fallback };
-  const [owner = "", ...rest] = path.split("/");
-  return { owner, name: rest.join("/") };
+  const cut = path.lastIndexOf("/");
+  return cut === -1 ? { owner: "", name: path } : { owner: path.slice(0, cut), name: path.slice(cut + 1) };
 }

@@ -112,6 +112,18 @@ describe("scanPlanSummary", () => {
   ] as const)("names the %s profile in plain words", (profile, words) => {
     expect(scanPlanSummary({ ...base, profile })).toContain(`${words} of honojs/hono with Claude Sonnet 5.5`);
   });
+
+  it("reads a repository by the provider the plan names, groups inside groups included", () => {
+    expect(scanPlanSummary({ ...base, provider: "gitlab", repo: "https://gitlab.com/acme/platform/api" })).toContain("of acme/platform/api with");
+  });
+
+  it.each([
+    ["github", "https://gitlab.com/acme/api"],
+    ["gitlab", "https://github.com/honojs/hono"],
+    ["upload", "https://gitlab.com/acme/api"],
+  ] as const)("starts nothing when the %s plan holds %s", (provider, repo) => {
+    expect(scanPlanSummary({ ...base, provider, repo })).toBeNull();
+  });
 });
 
 describe("scanFindingPrompt", () => {
