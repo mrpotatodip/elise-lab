@@ -5,7 +5,7 @@ import { SettingsChangesCard } from "#/modules/usage";
 export function SettingsHistoryPage() {
   return (
     <>
-      <ShellPageHeader title="History" description="Who changed the budget or the Anthropic key, and when." />
+      <ShellPageHeader title="History" description="Who changed the budget, and when." />
       <Suspense fallback={null}>
         <SettingsChangesCard />
       </Suspense>
