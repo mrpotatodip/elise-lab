@@ -22,7 +22,7 @@ import { SignInSchema, SignUpInputSchema } from "../schemas";
 // After a sign-in or sign-up: forget the old session and go to the app.
 // A failure from the server is a toast; a bad field is an inline error.
 // -----
-function useAuthDone() {
+function useAuthDone(redirectTo?: string) {
   const router = useRouter();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -30,14 +30,15 @@ function useAuthDone() {
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: authKeys.session() });
       await router.invalidate();
-      await navigate({ to: "/overview" });
+      if (redirectTo) await navigate({ href: redirectTo });
+      else await navigate({ to: "/overview" });
     },
     onError: (error: Error) => toast.error(error.message || "Something went wrong"),
   };
 }
 
-function SignInFields() {
-  const done = useAuthDone();
+function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
+  const done = useAuthDone(redirectTo);
   const signInMutation = useMutation({ mutationFn: (input: typeof SignInSchema._output) => signIn({ data: input }), ...done });
   const form = useForm({
     defaultValues: { email: "", password: "" },
@@ -181,17 +182,18 @@ function SignUpFields() {
 
 type AuthMode = "signin" | "signup" | "forgot" | "reset";
 
-function AuthFields({ mode, token }: { mode: AuthMode; token: string | undefined }) {
+function AuthFields({ mode, token, redirectTo }: { mode: AuthMode; token: string | undefined; redirectTo: string | undefined }) {
   if (mode === "signup") return <SignUpFields />;
   if (mode === "forgot") return <ForgotPasswordFields />;
   if (mode === "reset") return <ResetPasswordFields token={token} />;
-  return <SignInFields />;
+  return <SignInFields redirectTo={redirectTo} />;
 }
 
 // -----
 // `token` is only read by the reset page: the one from the emailed link.
+// `redirectTo` is only read by sign-in: the page to open once signed in.
 // -----
-export function AuthForm({ mode, token }: { mode: AuthMode; token?: string }) {
+export function AuthForm({ mode, token, redirectTo }: { mode: AuthMode; token?: string; redirectTo?: string }) {
   const copy = AUTH_COPY[mode];
 
   return (
@@ -208,7 +210,7 @@ export function AuthForm({ mode, token }: { mode: AuthMode; token?: string }) {
             <p className="text-sm text-muted-foreground">{copy.hint}</p>
           </CardHeader>
           <CardContent className="p-8">
-            <AuthFields mode={mode} token={token} />
+            <AuthFields mode={mode} token={token} redirectTo={redirectTo} />
           </CardContent>
         </Card>
         <Link to={copy.to} className="inline-flex min-h-6 items-center justify-self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

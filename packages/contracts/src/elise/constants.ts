@@ -30,6 +30,26 @@ export const RUNNER_PAIRING_CODE_TTL_MS = 10 * 60 * 1000;
 export const RUNNER_TOKEN_BYTES = 32;
 
 // -----
+// A Runner login from the terminal: both codes work once, for
+// 10 minutes. The device code is 32 random bytes only the Runner
+// sees. The suggested fields are capped so one start cannot fill
+// the table.
+// -----
+export const RUNNER_LOGIN_TTL_MS = 10 * 60 * 1000;
+export const RUNNER_LOGIN_DEVICE_CODE_BYTES = 32;
+export const RUNNER_LOGIN_USER_CODE_MAX = 32;
+export const RUNNER_LOGIN_DEVICE_CODE_MAX = 128;
+export const RUNNER_LOGIN_FIELD_MAX = 120;
+
+// -----
+// How often the Runner may check a login, in seconds. A check
+// sooner than that is answered "slow_down", and each one adds the
+// step to the interval the Runner must keep (RFC 8628).
+// -----
+export const RUNNER_LOGIN_CHECK_INTERVAL_S = 5;
+export const RUNNER_LOGIN_SLOW_DOWN_STEP_S = 5;
+
+// -----
 // A Scan on a Runner: how long it may wait for the app to claim it,
 // and the most a report may carry (characters), so one Runner cannot
 // fill the database.

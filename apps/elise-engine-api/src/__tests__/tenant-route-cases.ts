@@ -56,6 +56,9 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
   "POST /team/invites/:token/accept",
   "POST /runners/enroll",
   "POST /runners/claim",
+  "POST /runners/login/start",
+  "POST /runners/login/check",
+  "GET /runners/login/lookup",
   "POST /runners/jobs/:scanId/result",
   "GET /runners/me",
   "DELETE /runners/me",
@@ -159,5 +162,7 @@ export const CROSS_ACCOUNT_CASES = {
   // in the caller's Account. It stays below "GET /runners": the
   // Account has a Runner of its own from here on.
   // -----
+  "POST /runners/login/approve": serviceTest("modules/runners/__tests__/runner-login.test.ts"),
+  "POST /runners/login/deny": serviceTest("modules/runners/__tests__/runner-login.test.ts"),
   "POST /runners": { kind: "run", path: "/runners", method: "POST", body: { name: "Guard laptop" }, expect: "created" },
 } satisfies Record<string, CrossAccountCase>;

@@ -10,6 +10,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { createRunner } from "../api";
+import { RUNNER_LOGIN_COMMAND } from "../constants";
 import { runnerKeys } from "../hooks";
 import { RunnerDetailsSchema, type CreatedRunner, type RunnerDetails } from "../schemas";
 import { runnerWhen } from "../utils";
@@ -54,8 +55,27 @@ export function RunnerAddDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a runner</DialogTitle>
-          <DialogDescription>A runner is a computer that runs scans for this account. We make a code that you type into the Elise Runner app on that computer.</DialogDescription>
+          <DialogDescription>A runner is a computer that runs scans for this account.</DialogDescription>
         </DialogHeader>
+        {created ? null : (
+          <div className="grid gap-2 px-6 pb-2">
+            <Label htmlFor="runner-login-command">On the computer, run this in a terminal</Label>
+            <div className="flex gap-2">
+              <Input id="runner-login-command" readOnly value={RUNNER_LOGIN_COMMAND} onFocus={(event) => event.target.select()} className="font-mono" />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void navigator.clipboard.writeText(RUNNER_LOGIN_COMMAND).then(() => toast.success("Command copied."));
+                }}
+              >
+                <Copy className="size-3.5" />
+                Copy
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">It opens this site so you can approve the computer. For CI and containers with no browser, make a pairing code below.</p>
+          </div>
+        )}
         {created ? (
           <>
             <DialogBody className="grid gap-3">
@@ -125,7 +145,7 @@ export function RunnerAddDialog() {
                 )}
               </form.Subscribe>
               <Button type="submit" disabled={add.isPending}>
-                {add.isPending ? "Making the code" : "Make the code"}
+                {add.isPending ? "Making the code" : "Make a pairing code for CI or a container"}
               </Button>
             </DialogFooter>
           </form>

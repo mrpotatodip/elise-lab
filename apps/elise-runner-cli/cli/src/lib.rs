@@ -1,4 +1,5 @@
 pub mod args;
+pub mod browser;
 pub mod commands;
 pub mod store;
 pub mod tools;
@@ -40,7 +41,8 @@ pub fn main(args: &[String]) -> Exit {
     runtime.block_on(async {
         match command {
             Command::Pair { code, yes, print_token } => commands::pair(&store, &code, yes, print_token).await,
-            Command::Status => commands::status(&store).await,
+            Command::Login { no_browser } => commands::login(&store, no_browser).await,
+            Command::Status =>commands::status(&store).await,
             Command::Unpair => commands::unpair(&store).await,
             Command::Run { once } => commands::run(&store, once).await,
         }

@@ -61,6 +61,14 @@ export const SCAN_KEY_SOURCE_VALUES = ["platform", "account"] as const;
 // the Scan ended (timed out or failed) before the Runner reported.
 // Twin of the CHECK on scan_runner_jobs.state.
 // -----
+// -----
+// Where a Runner login from the terminal has got to. pending: started,
+// waiting for a member. approved: a member chose an Account and a name.
+// denied: a member refused it. collected: the Runner took its token.
+// Twin of the CHECK on platform_runner_device_logins.state.
+// -----
+export const RUNNER_LOGIN_STATE_VALUES = ["pending", "approved", "denied", "collected"] as const;
+
 export const RUNNER_JOB_STATE_VALUES = ["queued", "claimed", "succeeded", "failed", "cancelled"] as const;
 
 // -----
@@ -86,6 +94,7 @@ export type FindingStatusValue = (typeof FINDING_STATUS_VALUES)[number];
 export type FindingSeverityValue = (typeof FINDING_SEVERITY_VALUES)[number];
 export type FindingTriageStatusValue = (typeof FINDING_TRIAGE_STATUS_VALUES)[number];
 export type ScanKeySourceValue = (typeof SCAN_KEY_SOURCE_VALUES)[number];
+export type RunnerLoginStateValue = (typeof RUNNER_LOGIN_STATE_VALUES)[number];
 export type RunnerJobStateValue = (typeof RUNNER_JOB_STATE_VALUES)[number];
 export type SubscriptionStatusValue = (typeof SUBSCRIPTION_STATUS_VALUES)[number];
 export type SubscriptionSourceValue = (typeof SUBSCRIPTION_SOURCE_VALUES)[number];

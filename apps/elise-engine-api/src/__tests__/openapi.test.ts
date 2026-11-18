@@ -17,7 +17,7 @@ const operations = (spec: Spec) =>
 // Opened by someone with no login yet: the invitee, and a
 // Runner that pairs with a code.
 // -----
-const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll"]);
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll", "POST /runners/login/start", "POST /runners/login/check"]);
 
 describe("GET /openapi.json", () => {
   it("lists every route of the API", async () => {
@@ -46,6 +46,7 @@ describe("GET /openapi.json", () => {
       "GET /repos/{repoId}/findings",
       "GET /repos/{repoId}/verdict",
       "GET /runners",
+      "GET /runners/login/lookup",
       "GET /runners/me",
       "GET /scans",
       "GET /scans/{scanId}",
@@ -75,6 +76,10 @@ describe("GET /openapi.json", () => {
       "POST /runners/claim",
       "POST /runners/enroll",
       "POST /runners/jobs/{scanId}/result",
+      "POST /runners/login/approve",
+      "POST /runners/login/check",
+      "POST /runners/login/deny",
+      "POST /runners/login/start",
       "POST /scans",
       "POST /sign-up",
       "POST /team/invites",

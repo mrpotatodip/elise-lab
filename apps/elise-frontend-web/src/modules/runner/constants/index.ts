@@ -4,6 +4,11 @@
 export const RUNNER_WAITING_POLL_MS = 4_000;
 
 // -----
+// The terminal command that connects a Runner through the browser.
+// -----
+export const RUNNER_LOGIN_COMMAND = "elise-runner login";
+
+// -----
 // What the person reads for each state of a Runner. Raw values
 // (`waiting`) are never labels.
 // -----
