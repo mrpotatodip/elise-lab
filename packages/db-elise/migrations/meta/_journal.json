@@ -617,6 +617,20 @@
       "when": 1794974645984,
       "tag": "0087_runner_login_check_interval",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1794975000000,
+      "tag": "0088_runner_plan_only_offered",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794975000001,
+      "tag": "0089_aspiring_pixie",
+      "breakpoints": true
     }
   ]
 }

@@ -48,6 +48,7 @@ export const RUNNER_PROMPT_PLACE = {
 } as const;
 export const RUNNER_JOB_NOT_FOUND = "This scan is not waiting for a report from this runner";
 export const RUNNER_JOB_PRIVATE = "A private repository can't run on a runner yet. Run it in EliseLAB's cloud.";
+export const RUNNER_PLAN_HOSTED_MESSAGE = "The Runner plan runs Scans on your own computer only. Connect a Runner on the Runners page, then start the Scan there.";
 export const RUNNER_JOB_NOT_CONNECTED = "runner_id: this runner is not connected to the account";
 export const RUNNER_JOB_NOT_PICKED_UP = "The runner did not pick up this scan in time. Check that the EliseLAB Runner app is open and connected on that computer.";
 export const RUNNER_JOB_BAD_OPTIONS = "The scan's settings could not be read, so it was not run. Start a new scan.";

@@ -25,6 +25,7 @@ const PRO: PlanState = {
   creditMarkup: 1.5,
   creditBalanceUsd: 100,
   monthlyScanAllowance: null,
+  hostedScansAllowed: true,
   maxMembers: 5,
   status: "active",
   pastDueSince: null,

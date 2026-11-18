@@ -8,6 +8,6 @@ import type { AccessPower } from "@repo/contracts/elise";
 export const SETTINGS_PAGES = [
   { to: "/settings/budget", label: "Budget", power: "company:usage:budget:update" },
   { to: "/settings/plan", label: "Plan", power: "company:plan:read" },
-  { to: "/settings/providers", label: "Providers", power: "company:usage:anthropic_key:update" },
+  { to: "/settings/providers", label: "Runners", power: "company:usage:anthropic_key:update" },
   { to: "/settings/history", label: "History", power: "company:usage:budget:update" },
 ] as const satisfies readonly { to: string; label: string; power: AccessPower }[];

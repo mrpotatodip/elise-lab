@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { hasAccessPower } from "@repo/contracts/elise";
-import { creditEntriesQuery, planQuery } from "#/modules/plan";
+import { planOffersQuery, planQuery } from "#/modules/plan";
 import { SettingsPlanPage } from "#/modules/settings";
 
 export const Route = createFileRoute("/_app/settings/plan")({
@@ -8,6 +8,10 @@ export const Route = createFileRoute("/_app/settings/plan")({
   beforeLoad: ({ context }) => {
     if (!hasAccessPower(context.user?.powers ?? [], "company:plan:read")) throw redirect({ to: "/settings/budget" });
   },
-  loader: ({ context }) => Promise.all([context.queryClient.query({ ...planQuery(), staleTime: "static" }), context.queryClient.infiniteQuery({ ...creditEntriesQuery(), staleTime: "static" })]),
+  loader: async ({ context }) => {
+    const plan = await context.queryClient.query({ ...planQuery(), staleTime: "static" });
+    if (plan.plan === null) await context.queryClient.query({ ...planOffersQuery(), staleTime: "static" });
+    return plan;
+  },
   component: SettingsPlanPage,
 });

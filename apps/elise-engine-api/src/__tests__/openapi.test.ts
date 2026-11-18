@@ -62,6 +62,7 @@ describe("GET /openapi.json", () => {
       "GET /usage/credit",
       "GET /usage/credit/entries",
       "GET /usage/plan",
+      "GET /usage/plan/offers",
       "PATCH /findings/comments/{commentId}",
       "PATCH /groups/{groupId}",
       "PATCH /usage/budget",
