@@ -5,7 +5,7 @@ import { ShellPageHeader } from "#/modules/shell";
 export function SettingsProvidersPage() {
   return (
     <>
-      <ShellPageHeader title="Providers" description="Which computers run this account's scans, on their own Claude login." />
+      <ShellPageHeader title="Runners" description="Which computers run this account's scans, on their own Claude login." />
       <Suspense fallback={null}>
         <RunnersCard />
       </Suspense>
