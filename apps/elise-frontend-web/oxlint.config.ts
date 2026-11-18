@@ -93,20 +93,20 @@ export default defineConfig({
       rules: { "anti-slop/no-use-effect": "off" },
     },
     {
-      files: ["src/modules/*/components/**", "src/modules/*/hooks/**", "src/routes/**"],
+      files: ["src/modules/*/components/**", "src/modules/*/hooks/**", "src/providers/*/components/**", "src/providers/*/hooks/**", "src/routes/**"],
       rules: {
         "anti-slop/no-engine-client-import": "error",
       },
     },
     {
-      files: ["src/modules/**"],
+      files: ["src/modules/**", "src/providers/**"],
       excludeFiles: ["src/modules/**/__tests__/**"],
       rules: {
         "anti-slop/no-raw-colors": "error",
       },
     },
     {
-      files: ["src/modules/*/api/**"],
+      files: ["src/modules/*/api/**", "src/providers/*/api/**"],
       rules: {
         "anti-slop/require-imported-server-fn-schema": "error",
       },

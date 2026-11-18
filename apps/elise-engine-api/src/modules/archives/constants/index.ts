@@ -1,10 +1,10 @@
 import {
-  UPLOAD_ARCHIVE_MAX_MB,
-  UPLOAD_ARCHIVES_PER_APP_MAX,
-  UPLOAD_FILES_MAX,
-  UPLOAD_PATH_DEPTH_MAX,
-  UPLOAD_STORAGE_PER_TENANT_MAX_MB,
-  UPLOAD_UNPACKED_MAX_MB,
+  UPLOAD_ARCHIVE_TOO_LARGE_MESSAGE,
+  UPLOAD_PATH_TOO_DEEP_MESSAGE,
+  UPLOAD_STORAGE_FULL_MESSAGE,
+  UPLOAD_TOO_MANY_ARCHIVES_MESSAGE,
+  UPLOAD_TOO_MANY_FILES_MESSAGE,
+  UPLOAD_UNPACKED_TOO_LARGE_MESSAGE,
 } from "@repo/contracts/elise";
 
 export const MB = 1024 * 1024;
@@ -24,10 +24,12 @@ export const ORPHAN_MIN_AGE_MS = DAY_MS;
 
 // -----
 // Each refusal names its limit, so the person knows what to fix.
+// The words live in the contracts: the dashboard says the same
+// before it sends a zip.
 // -----
-export const ARCHIVE_TOO_LARGE = `A zip can be at most ${UPLOAD_ARCHIVE_MAX_MB} MB`;
-export const UNPACKED_TOO_LARGE = `A zip can unpack to at most ${UPLOAD_UNPACKED_MAX_MB} MB`;
-export const TOO_MANY_FILES = `A zip can hold at most ${UPLOAD_FILES_MAX.toLocaleString("en-US")} files`;
-export const PATH_TOO_DEEP = `A path in a zip can be at most ${UPLOAD_PATH_DEPTH_MAX} levels deep`;
-export const TOO_MANY_ARCHIVES = `An upload app can hold at most ${UPLOAD_ARCHIVES_PER_APP_MAX} zips: remove one first`;
-export const STORAGE_FULL = `An account can store at most ${UPLOAD_STORAGE_PER_TENANT_MAX_MB} MB of zips: remove some first`;
+export const ARCHIVE_TOO_LARGE = UPLOAD_ARCHIVE_TOO_LARGE_MESSAGE;
+export const UNPACKED_TOO_LARGE = UPLOAD_UNPACKED_TOO_LARGE_MESSAGE;
+export const TOO_MANY_FILES = UPLOAD_TOO_MANY_FILES_MESSAGE;
+export const PATH_TOO_DEEP = UPLOAD_PATH_TOO_DEEP_MESSAGE;
+export const TOO_MANY_ARCHIVES = UPLOAD_TOO_MANY_ARCHIVES_MESSAGE;
+export const STORAGE_FULL = UPLOAD_STORAGE_FULL_MESSAGE;

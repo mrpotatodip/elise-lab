@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import {
   UPLOAD_ARCHIVES_PER_APP_MAX,
   UPLOAD_FILES_MAX,
+  UPLOAD_NOT_A_ZIP_MESSAGE,
   UPLOAD_PATH_DEPTH_MAX,
   UPLOAD_STORAGE_PER_TENANT_MAX_MB,
   UPLOAD_UNPACKED_MAX_MB,
@@ -16,7 +17,7 @@ import { deleteObjectsEffect, listObjectsEffect } from "#/modules/archives/lib";
 import { archiveUsageEffect, deleteArchiveEffect, findUploadAppEffect, insertArchiveEffect, listArchivesEffect, removeUploadAppEffect } from "#/modules/archives/queries";
 import { archiveKeyOf, archivePrefixOf, isZip, sha256HexOf, zipContentsOf } from "#/modules/archives/utils";
 
-export const NOT_A_ZIP = "The file is not a zip";
+export const NOT_A_ZIP = UPLOAD_NOT_A_ZIP_MESSAGE;
 
 export const listArchivesSvc = (db: AppDbType, accountId: string, repoId: string): Effect.Effect<UploadArchiveList, NotFound | DbError> =>
   findUploadAppEffect(db, accountId, repoId).pipe(

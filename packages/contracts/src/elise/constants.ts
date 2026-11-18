@@ -115,6 +115,27 @@ export const UPLOAD_STORAGE_PER_TENANT_MAX_MB = 500;
 export const UPLOAD_ARCHIVE_RETENTION_DAYS = 30;
 
 // -----
+// Each refusal names its limit, so the person knows what to fix.
+// The dashboard says the same before it sends a zip.
+// -----
+export const UPLOAD_NOT_A_ZIP_MESSAGE = "The file is not a zip";
+export const UPLOAD_ARCHIVE_TOO_LARGE_MESSAGE = `A zip can be at most ${UPLOAD_ARCHIVE_MAX_MB} MB`;
+export const UPLOAD_UNPACKED_TOO_LARGE_MESSAGE = `A zip can unpack to at most ${UPLOAD_UNPACKED_MAX_MB} MB`;
+export const UPLOAD_TOO_MANY_FILES_MESSAGE = `A zip can hold at most ${UPLOAD_FILES_MAX.toLocaleString("en-US")} files`;
+export const UPLOAD_PATH_TOO_DEEP_MESSAGE = `A path in a zip can be at most ${UPLOAD_PATH_DEPTH_MAX} levels deep`;
+export const UPLOAD_TOO_MANY_ARCHIVES_MESSAGE = `An upload app can hold at most ${UPLOAD_ARCHIVES_PER_APP_MAX} zips: remove one first`;
+export const UPLOAD_STORAGE_FULL_MESSAGE = `An account can store at most ${UPLOAD_STORAGE_PER_TENANT_MAX_MB} MB of zips: remove some first`;
+
+// -----
+// An upload app's name: a letter or digit first, then letters,
+// digits, spaces, dots, dashes and underscores, ending in no
+// space; at most 80 characters. No slash, so a name never reads
+// as a path. Unique in an Account however it is cased.
+// -----
+export const UPLOAD_APP_NAME_PATTERN = /^[A-Za-z0-9](?:[\w .-]{0,78}[\w.-])?$/;
+export const UPLOAD_APP_NAME_MESSAGE = "An app name is letters, digits, spaces, '.', '-' and '_', starts with a letter or digit, has no slash and is at most 80 characters";
+
+// -----
 // GitLab addresses (docs/adr/0007-git-providers.md). A path is
 // groups inside groups and a name: 2 to 20 parts, each letters,
 // digits, '.', '_' or '-' and starting with a letter, digit or

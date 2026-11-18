@@ -32,4 +32,6 @@ export const githubProvider = {
     repoNote: "Public repository",
   },
   Help: null,
+  ArchivePicker: null,
+  RepoPanel: null,
 } as const satisfies GitSourceProvider;

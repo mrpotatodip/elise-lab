@@ -1,16 +1,19 @@
 import type { SourceProvider } from "#/providers/port";
+import { UploadAppPanel, UploadScanPicker } from "#/providers/upload/components";
 
 // -----
 // An upload app: zips of source code under a name, no git
-// host (ADR 0007). Listed so the person sees it; its own
-// flow (create an app, upload a zip, pick one per Scan)
-// comes with the upload tickets, and opens it.
+// host (ADR 0007). The new-scan form shows its picker in place
+// of the search: an app, its zips, and the one zip a Scan reads.
+// Its Repo page adds the zips and a way to remove the app.
 // -----
 export const uploadProvider = {
   id: "upload",
   label: "Upload",
-  available: false,
+  available: true,
   capabilities: { canListRepos: false, hasBranches: false, isArchive: true, cloudScans: false },
   address: null,
   Help: null,
+  ArchivePicker: UploadScanPicker,
+  RepoPanel: UploadAppPanel,
 } as const satisfies SourceProvider;

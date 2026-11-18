@@ -36,4 +36,6 @@ export const gitlabProvider = {
     repoNote: "GitLab repository, scanned on your Runner",
   },
   Help: GitlabScanHelp,
+  ArchivePicker: null,
+  RepoPanel: null,
 } as const satisfies GitSourceProvider;

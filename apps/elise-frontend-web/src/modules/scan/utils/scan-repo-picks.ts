@@ -1,4 +1,5 @@
 import type { GithubRepo } from "#/modules/github";
+import type { SourceArchivePick } from "#/providers/port";
 import { DEFAULT_SOURCE_PROVIDER_ID, isGitSourceProvider, sourceProviderOf } from "#/providers/registry";
 import type { SourceProviderValue } from "../schemas";
 import type { KnownRepo } from "./scan-known-repos";
@@ -21,7 +22,27 @@ export type ScanRepoPick = {
   repoId: string | null;
   connection: GithubRepo | null;
   fromLink: boolean;
+  archive?: { id: string; label: string };
 };
+
+// -----
+// An upload app's choice as a pick: the app, with the one zip
+// the Scan reads. It has no branches and no connection.
+// -----
+export function scanArchivePick(pick: SourceArchivePick): ScanRepoPick {
+  return {
+    provider: "upload",
+    url: pick.repo,
+    label: pick.appName,
+    note: pick.archiveLabel,
+    isPrivate: false,
+    running: false,
+    repoId: pick.repoId,
+    connection: null,
+    fromLink: false,
+    archive: { id: pick.archiveId, label: pick.archiveLabel },
+  };
+}
 
 const LAST_SCAN_NOTE = {
   none: "Not scanned yet",

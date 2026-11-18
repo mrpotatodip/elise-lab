@@ -33,7 +33,7 @@ import { createScan } from "../api";
 import { scanKeys, scanReposQuery, scansQuery } from "../hooks";
 import { DEFAULT_SOURCE_PROVIDER_ID, isGitSourceProvider, sourceProviderOf, sourceProviderOfAddress } from "#/providers/registry";
 import { CreateScanInputSchema, type CreateScanInput, type SourceProviderValue } from "../schemas";
-import { scanKnownRepos, scanPlanSummary, scanRepoChoices, scanRepoLinkPick, scanRepoPickSame, scanRepoPicks, type ScanRepoPick } from "../utils";
+import { scanArchivePick, scanKnownRepos, scanPlanSummary, scanRepoChoices, scanRepoLinkPick, scanRepoPickSame, scanRepoPicks, scanStartProblem, type ScanRepoPick } from "../utils";
 import { ScanNewBranch, useScanBranches } from "./scan-new-branch";
 import { ScanNewProvider } from "./scan-new-provider";
 import { ScanNewSearch, ScanRepoIcon } from "./scan-new-search";
@@ -95,6 +95,8 @@ type ScanNewFormProps = {
   startBranch?: string;
   startRef?: string;
   startOptions?: Partial<Pick<CreateScanInput, "model" | "effort" | "profile">>;
+  provider?: SourceProviderValue;
+  repoId?: string;
 };
 
 // -----
@@ -111,7 +113,7 @@ const planErrors = (plan: CreateScanInput) => {
   return { fields: { ...(repoIssue && { repo: repoIssue.message }), ...(refIssue && { ref: refIssue.message }) } };
 };
 
-export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions }: ScanNewFormProps) {
+export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions, provider: startProvider, repoId: startRepoId }: ScanNewFormProps) {
   const initial: CreateScanInput = { ...INITIAL, ...startOptions, ref: startRef ?? startBranch };
   const form = useForm({
     defaultValues: initial,
@@ -125,12 +127,15 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
   const values = useStore(form.store, (state) => state.values);
   // -----
   // The provider comes first. "Scan again" opens on the provider its
-  // address belongs to.
+  // address belongs to, or the one it names: an upload app's name is
+  // no address, so its pages name the provider and the app.
   // -----
-  const [providerId, setProviderId] = useState<SourceProviderValue>(() => (repo === undefined ? undefined : sourceProviderOfAddress(repo)?.id) ?? DEFAULT_SOURCE_PROVIDER_ID);
+  const [providerId, setProviderId] = useState<SourceProviderValue>(() => startProvider ?? (repo === undefined ? undefined : sourceProviderOfAddress(repo)?.id) ?? DEFAULT_SOURCE_PROVIDER_ID);
   const provider = sourceProviderOf(providerId);
   const listsRepos = provider.capabilities.canListRepos;
   const runnerOnly = !provider.capabilities.cloudScans;
+  const hasBranches = provider.capabilities.hasBranches;
+  const [startProblem, setStartProblem] = useState<string | null>(null);
   const [picked, setPicked] = useState<ScanRepoPick | null | undefined>(undefined);
   const [branchPick, setBranchPick] = useState(startRef ? SCAN_OTHER_BRANCH : (startBranch ?? SCAN_DEFAULT_BRANCH));
   const { data: list } = useQuery(scansQuery());
@@ -143,17 +148,22 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
   const { data: installs } = useQuery(githubInstallationsQuery());
   const everyKnown = repoList ? scanRepoChoices(repoList.repos, list?.scans ?? []) : scanKnownRepos(list?.scans ?? []);
   const picks = scanRepoPicks(everyKnown, connected ?? [], providerId);
-  const fromProp = repo === undefined ? null : (picks.find((item) => scanRepoPickSame(item.url, repo)) ?? scanRepoLinkPick(repo, providerId));
+  const fromProp = repo === undefined || provider.capabilities.isArchive ? null : (picks.find((item) => scanRepoPickSame(item.url, repo)) ?? scanRepoLinkPick(repo, providerId));
   // -----
   // The choice is remembered as a repository, not as the row that was clicked:
   // the list changes when the GitHub connection's repositories arrive (a
   // repository the account scanned turns out to be private), and the card
-  // must follow it. A pasted link is in no list, so it keeps its own row.
+  // must follow it. A pasted link is in no list, so it keeps its own row, and
+  // so does an upload app's pick, which carries its zip.
   // -----
-  const selected = picked === undefined ? fromProp : picked === null ? null : (picks.find((item) => scanRepoPickSame(item.url, picked.url)) ?? picked);
+  const selected = picked === undefined ? fromProp : picked === null ? null : picked.archive ? picked : (picks.find((item) => scanRepoPickSame(item.url, picked.url)) ?? picked);
   const isPrivate = selected?.isPrivate === true;
-  const branches = useScanBranches(selected);
-  const typedBranch = selected !== null && (branches.kind === "typed" || branches.isError || branchPick === SCAN_OTHER_BRANCH);
+  // -----
+  // An upload app has no branches: the zip is the version, so
+  // nothing asks for a branch and the plan sends no ref.
+  // -----
+  const branches = useScanBranches(hasBranches ? selected : null);
+  const typedBranch = hasBranches && selected !== null && (branches.kind === "typed" || branches.isError || branchPick === SCAN_OTHER_BRANCH);
   const noConnection = installs !== undefined && !installs.some((install) => install.status === "active");
   // -----
   // A scan can run on one of the account's connected runners: the person's own
@@ -167,13 +177,14 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
   const runner = isPrivate ? undefined : (connectedRunners.find((item) => item.id === values.runnerId) ?? (runnerOnly ? connectedRunners[0] : undefined));
   const showRunner = !isPrivate && connectedRunners.length > 0;
   const noRunner = runnerOnly && runners !== undefined && runner === undefined;
-  const ref = typedBranch ? values.ref : branchPick === SCAN_DEFAULT_BRANCH ? undefined : branchPick;
-  const plan: CreateScanInput = { ...values, provider: providerId, runnerId: runner?.id, repo: selected?.url ?? "", ref };
+  const ref = !hasBranches ? undefined : typedBranch ? values.ref : branchPick === SCAN_DEFAULT_BRANCH ? undefined : branchPick;
+  const plan: CreateScanInput = { ...values, provider: providerId, runnerId: runner?.id, repo: selected?.url ?? "", ref, archiveId: selected?.archive?.id };
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const choose = (next: ScanRepoPick | null) => {
     setPicked(next);
+    setStartProblem(null);
     setBranchPick(SCAN_DEFAULT_BRANCH);
     form.setFieldValue("ref", undefined);
   };
@@ -191,10 +202,17 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
       await queryClient.invalidateQueries({ queryKey: scanKeys.all });
       await navigate({ to: "/scans/$scanId", params: { scanId: scan.scanId } });
     },
-    onError: (error) => toast.error(`We couldn't start the audit. ${error.message}`),
+    // -----
+    // The reason also stays in the form, so a refusal the person must act
+    // on (an older Runner that cannot read zips) is not gone with the toast.
+    // -----
+    onError: (error) => {
+      setStartProblem(scanStartProblem(error.message));
+      toast.error(`We couldn't start the audit. ${error.message}`);
+    },
   });
 
-  const summary = scanPlanSummary(plan, runner?.name);
+  const summary = scanPlanSummary(plan, runner?.name, selected?.archive?.label);
   const chips = [runner?.name ?? (runnerOnly ? "No Runner connected" : "Elise's cloud"), labelOf(SCAN_MODEL_OPTIONS, values.model), `${labelOf(SCAN_EFFORT_OPTIONS, values.effort)} effort`];
 
   return (
@@ -211,6 +229,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
         {selected === null ? (
           <div className="grid gap-4">
             <ScanNewProvider value={providerId} onChange={chooseProvider} />
+            {provider.ArchivePicker !== null && <provider.ArchivePicker key={provider.id} startRepoId={startRepoId} onPick={(pick) => choose({ ...scanArchivePick(pick), running: everyKnown.some((item) => item.repoId === pick.repoId && item.running) })} />}
             {isGitSourceProvider(provider) && (
               <ScanNewSearch
                 key={provider.id}
@@ -242,7 +261,9 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                   <ScanRepoIcon pick={selected} />
                   <span className="grid min-w-0 flex-1">
                     <span className="truncate text-sm font-medium">{selected.label}</span>
-                    <span className="text-xs text-muted-foreground">{selected.isPrivate ? "Private repository" : isGitSourceProvider(provider) ? provider.address.repoNote : provider.label}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {selected.archive ? `Zip ${selected.archive.label}` : selected.isPrivate ? "Private repository" : isGitSourceProvider(provider) ? provider.address.repoNote : provider.label}
+                    </span>
                   </span>
                   <Button type="button" variant="ghost" size="sm" onClick={() => choose(null)}>
                     Change
@@ -292,6 +313,11 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                     </Link>
                     .
                   </AlertDescription>
+                </Alert>
+              )}
+              {startProblem !== null && (
+                <Alert variant="destructive">
+                  <AlertDescription>{startProblem}</AlertDescription>
                 </Alert>
               )}
               {selected.running && (

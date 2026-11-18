@@ -39,10 +39,34 @@ export type SourceProviderAddress = {
 };
 
 // -----
+// What an archive provider (upload) hands the new-scan form:
+// the app the Scan belongs to, by its address and id, and the
+// one zip the Scan reads, by id.
+// -----
+export type SourceArchivePick = {
+  repo: string;
+  repoId: string;
+  appName: string;
+  archiveId: string;
+  archiveLabel: string;
+};
+
+export type SourceArchivePickerProps = { startRepoId?: string; onPick: (pick: SourceArchivePick) => void };
+
+// -----
+// The provider's own part of a Repo page: an upload app's zips,
+// with upload and remove. onRemoved runs once the whole app is
+// gone, so the page can leave.
+// -----
+export type SourceRepoPanelProps = { repoId: string; name: string; onRemoved: () => void };
+
+// -----
 // available: the provider's flow is built, so the picker
 // lets the person choose it. address is null for a provider
 // that is not a git host (an upload app). Help is the
 // provider's own screen under the search, if it has one.
+// ArchivePicker replaces the search for an archive provider,
+// and RepoPanel adds to its Repo page.
 // -----
 export type SourceProvider = {
   id: SourceProviderValue;
@@ -51,6 +75,8 @@ export type SourceProvider = {
   capabilities: SourceProviderCapabilities;
   address: SourceProviderAddress | null;
   Help: ComponentType | null;
+  ArchivePicker: ComponentType<SourceArchivePickerProps> | null;
+  RepoPanel: ComponentType<SourceRepoPanelProps> | null;
 };
 
 export type GitSourceProvider = SourceProvider & { address: SourceProviderAddress };

@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { DEFAULT_SOURCE_PROVIDER } from "@repo/contracts/elise";
 import {
   CreateScanInputSchema,
   FindingListSchema,
@@ -24,6 +23,7 @@ import {
 } from "../schemas";
 import { EngineError, engineFetch, engineJson, jsonPost, type EngineAuth } from "#/lib/engine-client";
 import { engineAuth } from "#/modules/auth/server/session";
+import { scanCreateBodyOf } from "../utils";
 
 export const fetchScans = createServerFn({ method: "GET" })
   .validator(ScanCursorInputSchema)
@@ -53,16 +53,7 @@ export const fetchScanFile = createServerFn({ method: "GET" })
 
 export const createScan = createServerFn({ method: "POST" })
   .validator(CreateScanInputSchema)
-  .handler(async ({ data }) => {
-    // -----
-    // The engine names it runner_id, like max_budget_usd. A github
-    // plan sends no provider, which the engine reads as github, so an
-    // engine from before providers takes it unchanged.
-    // -----
-    const { runnerId, provider, ...scan } = data;
-    const named = provider === undefined || provider === DEFAULT_SOURCE_PROVIDER ? {} : { provider };
-    return engineJson(ScanQueuedSchema, "/scans", jsonPost(JSON.stringify({ ...named, ...scan, runner_id: runnerId })), await engineAuth());
-  });
+  .handler(async ({ data }) => engineJson(ScanQueuedSchema, "/scans", jsonPost(JSON.stringify(scanCreateBodyOf(data))), await engineAuth()));
 
 const RECORDED_PAGE = 100;
 
