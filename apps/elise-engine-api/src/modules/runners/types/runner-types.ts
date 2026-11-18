@@ -34,3 +34,23 @@ export type PairingClaim = {
   tokenHash: string;
   now: Date;
 };
+
+export type NewRunnerLogin = {
+  userCodeHash: string;
+  deviceCodeHash: string;
+  suggestedName: string;
+  os: string;
+  cpu: string;
+  runnerVersion: string;
+  requestIp: string;
+  expiresAt: Date;
+};
+
+export type RunnerLoginApproval = {
+  userCodeHash: string;
+  tenantId: string;
+  actorUserId: string;
+  name: string;
+  approverIp: string;
+  now: Date;
+};

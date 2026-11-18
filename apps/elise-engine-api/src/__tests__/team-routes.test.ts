@@ -37,6 +37,7 @@ const MANAGER_ROUTES: Array<[string, string, string | undefined]> = [
   ["PUT", `/groups/${ID}/members/${ID}`, undefined],
   ["DELETE", `/groups/${ID}/members/${ID}`, undefined],
   ["POST", "/runners", JSON.stringify({ name: "Ada's Mac" })],
+  ["POST", "/runners/login/approve", JSON.stringify({ userCode: "K7QM-4TXD", name: "Build box" })],
   ["DELETE", `/runners/${ID}`, undefined],
 ];
 

@@ -19,6 +19,32 @@ Content-Type: application/json
 
 ###
 
+# Start a login from the terminal. The Runner sends this; no session. The answer holds the user code, the dashboard link and the device code.
+POST {{baseUrl}}/runners/login/start
+Content-Type: application/json
+
+{ "name": "build-box", "os": "linux 6.8", "cpu": "x64", "version": "0.1.0" }
+
+###
+
+# Approve a login. Needs the session of a member who holds company:runners:create in the account.
+POST {{baseUrl}}/runners/login/approve
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "userCode": "K7QM-4TXD", "name": "Build box" }
+
+###
+
+# Check a login. The Runner sends this with its device code; no session. Pending until approved, then the token once.
+POST {{baseUrl}}/runners/login/check
+Content-Type: application/json
+
+{ "deviceCode": "<device-code>" }
+
+###
+
 # Who is this Runner? Send the token that enroll returned. 401 means revoked or never paired.
 GET {{baseUrl}}/runners/me
 Authorization: Bearer <runner-token>

@@ -15,7 +15,7 @@ const identityOf = (db: DbConnectType, row: RunnerRow): Effect.Effect<RunnerIden
     catch: toDbError,
   }).pipe(Effect.map(([tenant]) => ({ runnerId: row.id, name: row.name, accountId: row.tenantId, accountName: tenant?.name ?? "" })));
 
-const identityOrNull = (db: DbConnectType, rows: RunnerRow[]): Effect.Effect<RunnerIdentity | null, DbError> => {
+export const identityOrNull = (db: DbConnectType, rows: RunnerRow[]): Effect.Effect<RunnerIdentity | null, DbError> => {
   const [row] = rows;
   return row ? identityOf(db, row) : Effect.succeed(null);
 };

@@ -1,5 +1,14 @@
 import { z } from "zod";
-import { RUNNER_JOB_ERROR_MAX, RUNNER_JOB_FILE_MAX, RUNNER_JOB_LOG_MAX, RUNNER_NAME_MAX, RUNNER_PAIRING_CODE_MAX } from "../constants";
+import {
+  RUNNER_JOB_ERROR_MAX,
+  RUNNER_JOB_FILE_MAX,
+  RUNNER_JOB_LOG_MAX,
+  RUNNER_LOGIN_DEVICE_CODE_MAX,
+  RUNNER_LOGIN_FIELD_MAX,
+  RUNNER_LOGIN_USER_CODE_MAX,
+  RUNNER_NAME_MAX,
+  RUNNER_PAIRING_CODE_MAX,
+} from "../constants";
 import { RUNNER_JOB_PHASE_VALUES } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 
@@ -130,6 +139,39 @@ export const RunnerJobReportedSchema = z.object({
   accepted: z.literal(true),
 });
 
+export const StartRunnerLoginBodySchema = z.object({
+  name: z.string().trim().min(1).max(RUNNER_NAME_MAX),
+  os: z.string().trim().min(1).max(RUNNER_LOGIN_FIELD_MAX),
+  cpu: z.string().trim().min(1).max(RUNNER_LOGIN_FIELD_MAX),
+  version: z.string().trim().min(1).max(RUNNER_LOGIN_FIELD_MAX),
+});
+
+export const StartedRunnerLoginSchema = z.object({
+  userCode: z.string(),
+  verificationUrl: z.url(),
+  deviceCode: z.string(),
+  expiresAt: z.iso.datetime(),
+});
+
+export const ApproveRunnerLoginBodySchema = z.object({
+  userCode: z.string().trim().min(1).max(RUNNER_LOGIN_USER_CODE_MAX),
+  name: z.string().trim().min(1).max(RUNNER_NAME_MAX),
+});
+
+export const ApprovedRunnerLoginSchema = z.object({
+  approved: z.literal(true),
+  runnerId: RunnerIdSchema,
+});
+
+export const CheckRunnerLoginBodySchema = z.object({
+  deviceCode: z.string().trim().min(1).max(RUNNER_LOGIN_DEVICE_CODE_MAX),
+});
+
+export const RunnerLoginCheckSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("pending") }),
+  EnrolledRunnerSchema.extend({ status: z.literal("approved") }),
+]);
+
 export type CreateRunnerBody = z.infer<typeof CreateRunnerBodySchema>;
 export type EnrollRunnerBody = z.infer<typeof EnrollRunnerBodySchema>;
 export type CreatedRunner = z.infer<typeof CreatedRunnerSchema>;
@@ -141,3 +183,9 @@ export type Runners = z.infer<typeof RunnersSchema>;
 export type RunnerPhasePrompt = z.infer<typeof RunnerPhasePromptSchema>;
 export type RunnerJob = z.infer<typeof RunnerJobSchema>;
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;
+export type StartRunnerLoginBody = z.infer<typeof StartRunnerLoginBodySchema>;
+export type StartedRunnerLogin = z.infer<typeof StartedRunnerLoginSchema>;
+export type ApproveRunnerLoginBody = z.infer<typeof ApproveRunnerLoginBodySchema>;
+export type ApprovedRunnerLogin = z.infer<typeof ApprovedRunnerLoginSchema>;
+export type CheckRunnerLoginBody = z.infer<typeof CheckRunnerLoginBodySchema>;
+export type RunnerLoginCheck = z.infer<typeof RunnerLoginCheckSchema>;
