@@ -1,6 +1,8 @@
+use crate::browser;
 use crate::store::{Store, TOKEN_VARIABLE};
 use crate::tools::Skill;
 use crate::Exit;
+use elise_runner_core::login::{self, LoginError, Waited};
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
 use elise_runner_core::scan::{self, Claimed, Event, Stop, Stopper};
 use std::io::{BufRead, Write};
@@ -29,18 +31,7 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
         return Exit::Error;
     }
 
-    let previous = if print_token || store.tokens().token().is_none() {
-        None
-    } else {
-        match pairing::status(store.tokens()).await {
-            RunnerStatus::Connected { name, account_name } => Some(format!("\"{name}\" in {account_name}")),
-            RunnerStatus::Revoked => {
-                say("This computer's old token was no longer valid in Elise, so it was removed.");
-                None
-            }
-            _ => Some("this computer's earlier Runner".to_string()),
-        }
-    };
+    let previous = if print_token { None } else { earlier_runner(store, &say).await };
 
     let enrolled = match pairing::enroll(code).await {
         Ok(enrolled) => enrolled,
@@ -74,6 +65,84 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
     match pairing::accept_replacing(store.tokens(), enrolled).await {
         Ok((_, replaced)) => {
             say(&format!("Paired as \"{name}\" in {account_name}. The token is kept in {}.", store.describe()));
+            if replaced == Replaced::StillLive {
+                eprintln!(
+                    "Could not reach Elise to revoke the token of {}. Remove that Runner in Elise's Runners list.",
+                    previous.as_deref().unwrap_or("this computer's earlier Runner")
+                );
+            }
+            Exit::Ok
+        }
+        Err(_) => {
+            eprintln!("The token could not be saved in {}. Elise was told to drop it.", store.describe());
+            Exit::Error
+        }
+    }
+}
+
+async fn earlier_runner(store: &Store, say: &dyn Fn(&str)) -> Option<String> {
+    store.tokens().token()?;
+    match pairing::status(store.tokens()).await {
+        RunnerStatus::Connected { name, account_name } => Some(format!("\"{name}\" in {account_name}")),
+        RunnerStatus::Revoked => {
+            say("This computer's old token was no longer valid in Elise, so it was removed.");
+            None
+        }
+        _ => Some("this computer's earlier Runner".to_string()),
+    }
+}
+
+pub async fn login(store: &Store, no_browser: bool) -> Exit {
+    if store.is_read_only() {
+        eprintln!(
+            "The token comes from {TOKEN_VARIABLE}, which elise-runner does not manage. \
+             Unset it to log in this computer."
+        );
+        return Exit::Error;
+    }
+    let Some(stop) = stop_on_signal("Login cancelled.") else {
+        eprintln!("Could not listen for Ctrl-C and stop signals, so the login could not be cancelled.");
+        return Exit::Error;
+    };
+    let previous = earlier_runner(store, &|line| println!("{line}")).await;
+    if let Some(previous) = &previous {
+        println!("This computer is already paired as {previous}. Logging in replaces it.");
+    }
+
+    let started = match login::start(env!("CARGO_PKG_VERSION")).await {
+        Ok(started) => started,
+        Err(LoginError::Unsupported) => {
+            eprintln!("This Elise does not support login yet; use `elise-runner pair <code>`.");
+            return Exit::Error;
+        }
+        Err(LoginError::Unreachable) => {
+            eprintln!("Could not reach Elise. Check the connection and try again.");
+            return Exit::Offline;
+        }
+    };
+    println!("Open this link and approve this computer in Elise:\n  {}\nCode: {}", started.verification_url, started.user_code);
+    if !no_browser {
+        browser::open(&started.verification_url);
+    }
+    println!("Waiting for approval. Stop with Ctrl-C.");
+
+    let enrolled = match login::wait(&started, &stop).await {
+        Waited::Approved(enrolled) => enrolled,
+        Waited::Cancelled => return Exit::Error,
+        Waited::TimedOut => {
+            eprintln!("The code expired; run `elise-runner login` again.");
+            return Exit::Error;
+        }
+        Waited::Refused => {
+            eprintln!("Elise did not accept this login. Run `elise-runner login` again.");
+            return Exit::Error;
+        }
+    };
+
+    let (name, account_name) = (enrolled.name.clone(), enrolled.account_name.clone());
+    match pairing::accept_replacing(store.tokens(), enrolled).await {
+        Ok((_, replaced)) => {
+            println!("Logged in as \"{name}\" in {account_name}. The token is kept in {}.", store.describe());
             if replaced == Replaced::StillLive {
                 eprintln!(
                     "Could not reach Elise to revoke the token of {}. Remove that Runner in Elise's Runners list.",
@@ -153,7 +222,7 @@ pub async fn unpair(store: &Store) -> Exit {
 }
 
 pub async fn run(store: &Store, once: bool) -> Exit {
-    let Some(stop) = stop_on_signal() else {
+    let Some(stop) = stop_on_signal("Stopping.") else {
         eprintln!("Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.");
         return Exit::Error;
     };
@@ -220,7 +289,7 @@ pub async fn run(store: &Store, once: bool) -> Exit {
     }
 }
 
-fn stop_on_signal() -> Option<Stop> {
+fn stop_on_signal(message: &'static str) -> Option<Stop> {
     let mut interrupt = signal(SignalKind::interrupt()).ok()?;
     let mut terminate = signal(SignalKind::terminate()).ok()?;
     let (stopper, stop) = Stopper::new();
@@ -229,7 +298,7 @@ fn stop_on_signal() -> Option<Stop> {
             _ = interrupt.recv() => {}
             _ = terminate.recv() => {}
         }
-        eprintln!("Stopping.");
+        eprintln!("{message}");
         stopper.stop();
     });
     Some(stop)

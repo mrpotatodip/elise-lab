@@ -146,6 +146,10 @@ pub async fn accept_replacing(
 }
 
 impl Enrolled {
+    pub(crate) fn new(name: String, account_name: String, token: String) -> Enrolled {
+        Enrolled { name, account_name, token }
+    }
+
     pub fn into_token(self) -> String {
         self.token
     }

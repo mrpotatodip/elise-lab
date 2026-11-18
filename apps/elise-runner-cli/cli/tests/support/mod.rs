@@ -23,7 +23,16 @@ struct State {
     remove_after_result: bool,
     claims_held: bool,
     a_claim_was_held: bool,
+    no_login_routes: bool,
+    login_starts: Vec<String>,
+    login_pending: bool,
+    login_approved: bool,
+    login_refused: bool,
 }
+
+pub const USER_CODE: &str = "WXYZ-1234";
+pub const VERIFICATION_URL: &str = "https://app.example/device?code=WXYZ-1234";
+const DEVICE_CODE: &str = "device-code-secret-77";
 
 pub struct Engine {
     pub url: String,
@@ -91,6 +100,28 @@ impl Engine {
 
     pub fn release_claims(&self) {
         self.state.lock().unwrap().claims_held = false;
+    }
+
+    pub fn without_login_routes(&self) {
+        self.state.lock().unwrap().no_login_routes = true;
+    }
+
+    pub fn login_starts(&self) -> Vec<serde_json::Value> {
+        let state = self.state.lock().unwrap();
+        state.login_starts.iter().map(|body| serde_json::from_str(body).expect("a login start is JSON")).collect()
+    }
+
+    pub fn wait_for_a_pending_login(&self) {
+        let started = until(|| self.state.lock().unwrap().login_pending);
+        assert!(started, "no login was started");
+    }
+
+    pub fn approve_login(&self) {
+        self.state.lock().unwrap().login_approved = true;
+    }
+
+    pub fn refuse_login_checks(&self) {
+        self.state.lock().unwrap().login_refused = true;
     }
 
     pub fn remove_runners_after_the_next_result(&self) {
@@ -192,7 +223,33 @@ const REJECTED: (u16, &str) = (401, r#"{"data":null,"error":{"code":"unauthorize
 
 fn answer(request: &Request, state: &mut State) -> (u16, String) {
     let live = request.bearer.as_ref().is_some_and(|token| state.live.contains(token));
+    if state.no_login_routes && request.path.starts_with("/runners/login/") {
+        return (404, r#"{"data":null,"error":{"code":"not_found"}}"#.to_string());
+    }
     match (request.method.as_str(), request.path.as_str()) {
+        ("POST", "/runners/login/start") => {
+            state.login_starts.push(request.body.clone());
+            state.login_pending = true;
+            state.login_approved = false;
+            let body = format!(
+                r#"{{"data":{{"userCode":"{USER_CODE}","verificationUrl":"{VERIFICATION_URL}","deviceCode":"{DEVICE_CODE}","expiresAt":"2099-01-01T00:00:00.000Z"}},"error":null}}"#
+            );
+            (200, body)
+        }
+        ("POST", "/runners/login/check") if state.login_refused || !request.body.contains(DEVICE_CODE) || !state.login_pending => {
+            (403, r#"{"data":null,"error":{"code":"forbidden"}}"#.to_string())
+        }
+        ("POST", "/runners/login/check") if !state.login_approved => (200, r#"{"data":{"status":"pending"},"error":null}"#.to_string()),
+        ("POST", "/runners/login/check") => {
+            state.login_pending = false;
+            state.issued += 1;
+            let token = token_number(state.issued);
+            state.live.insert(token.clone());
+            let body = format!(
+                r#"{{"data":{{"status":"approved","name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}","token":"{token}"}},"error":null}}"#
+            );
+            (200, body)
+        }
         ("POST", "/runners/enroll") => {
             if !request.body.contains(&format!("\"{CODE}\"")) {
                 return (403, r#"{"data":null,"error":{"code":"invalid_code"}}"#.to_string());
@@ -261,7 +318,12 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(engine: &Engine) -> Runner {
-        Runner { home: temp_home(), url: engine.url.clone(), env: Vec::new(), engine: engine.state.clone() }
+        Runner {
+            home: temp_home(),
+            url: engine.url.clone(),
+            env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string())],
+            engine: engine.state.clone(),
+        }
     }
 
     pub fn run(&self, args: &[&str], stdin: &str) -> Output {
@@ -294,6 +356,9 @@ impl Runner {
         command
             .args(args)
             .env_remove("ELISE_RUNNER_TOKEN")
+            .env_remove("SSH_CONNECTION")
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
             .env("ELISE_RUNNER_HOME", &self.home)
             .env("ELISE_ENGINE_URL", &self.url)
             .stdin(Stdio::piped())
@@ -323,12 +388,23 @@ impl Runner {
         };
         let stdout = collect(Box::new(child.stdout.take().unwrap()));
         let stderr = collect(Box::new(child.stderr.take().unwrap()));
-        let issued = self.engine.lock().unwrap().issued;
-        Running { child, stdout, stderr, issued }
+        Running { child, stdout, stderr, engine: self.engine.clone() }
     }
 
     pub fn home_files(&self) -> Vec<PathBuf> {
         std::fs::read_dir(&self.home).unwrap().map(|entry| entry.unwrap().path()).collect()
+    }
+
+    pub fn stub_browser(&mut self) -> Browser {
+        let root = temp_home();
+        let (bin, record) = (root.join("bin"), root.join("opened"));
+        std::fs::create_dir_all(&bin).unwrap();
+        for opener in ["open", "xdg-open"] {
+            executable(&bin.join(opener), &format!("#!/bin/sh\necho \"$1\" >> \"{}\"\n", record.display()));
+        }
+        self.env.push(("PATH", format!("{}:/usr/bin:/bin", bin.display())));
+        self.env.push(("DISPLAY", ":0".to_string()));
+        Browser { record }
     }
 
     pub fn stub_tools(&mut self, tools: &[&str]) -> Stubs {
@@ -356,7 +432,7 @@ pub struct Running {
     child: std::process::Child,
     stdout: Arc<Mutex<String>>,
     stderr: Arc<Mutex<String>>,
-    issued: usize,
+    engine: Arc<Mutex<State>>,
 }
 
 impl Running {
@@ -391,7 +467,8 @@ impl Running {
             stdout: self.stdout.lock().unwrap().clone(),
             stderr: self.stderr.lock().unwrap().clone(),
         };
-        for token in (1..=self.issued).map(token_number) {
+        let issued = self.engine.lock().unwrap().issued;
+        for token in (1..=issued).map(token_number) {
             assert!(!output.stdout.contains(&token) && !output.stderr.contains(&token), "a token leaked into the output");
         }
         output
@@ -410,6 +487,21 @@ fn until(mut done: impl FnMut() -> bool) -> bool {
 
 pub fn alive(pid: u32) -> bool {
     Command::new("kill").args(["-0", &pid.to_string()]).stderr(Stdio::null()).status().unwrap().success()
+}
+
+pub struct Browser {
+    record: PathBuf,
+}
+
+impl Browser {
+    pub fn opened(&self) -> Vec<String> {
+        std::fs::read_to_string(&self.record).unwrap_or_default().lines().map(str::to_string).collect()
+    }
+
+    pub fn wait_for_a_call(&self) {
+        let called = until(|| !self.opened().is_empty());
+        assert!(called, "the browser was never opened");
+    }
 }
 
 pub struct Stubs {
