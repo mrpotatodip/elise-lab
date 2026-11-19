@@ -27,7 +27,7 @@ import type { RepoFinding } from "../schemas";
 import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
-import { RepoSummaryStrip } from "./repo-summary-strip";
+import { RepoBranchSummary } from "./repo-branch-summary";
 
 const RECENT_SCAN_COUNT = 3;
 
@@ -571,8 +571,9 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
       {source.RepoPanel !== null && <source.RepoPanel repoId={repoId} name={repoName(repo.url)} onRemoved={() => void navigate({ to: "/repos" })} />}
 
       {current && (
-        <RepoSummaryStrip
-          branch={open}
+        <RepoBranchSummary
+          open={open}
+          scans={recentScans}
           verdict={current.latestCommit && <ScanVerdictCell repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} branchOpen={open.total} findingsHref="#branch-findings" />}
         />
       )}
