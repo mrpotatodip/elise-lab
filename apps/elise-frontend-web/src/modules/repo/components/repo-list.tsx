@@ -31,6 +31,7 @@ export function RepoList() {
       <Card>
         <CardHeader>
           <CardTitle>Repositories</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Every repository you scan, with what is still open in it.</p>
         </CardHeader>
         <CardContent className="overflow-hidden p-0">
           <Empty className="py-14">

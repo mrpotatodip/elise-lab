@@ -161,6 +161,7 @@ export function TeamMembersCard({ email }: { email: string }) {
     <Card id="people">
       <CardHeader>
         <CardTitle>People</CardTitle>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Everyone on this account and any invite still waiting. A role sets what each person can do.</p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         <DataTable table={table} />

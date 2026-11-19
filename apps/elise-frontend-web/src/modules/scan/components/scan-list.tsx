@@ -145,7 +145,10 @@ export function ScanList() {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>All scans</CardTitle>
+        <div className="grid gap-1.5">
+          <CardTitle>All scans</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Every audit on this account, newest first. Filter by status or search by repository.</p>
+        </div>
         <ShellListCount shown={visible.length} total={all.length} more={Boolean(nextCursor)} noun="scan" plural="scans" />
       </CardHeader>
       {all.length === 0 ? (

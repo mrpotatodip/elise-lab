@@ -30,6 +30,7 @@ function PlanOfferCard() {
       <Card className="max-w-3xl">
         <CardHeader>
           <CardTitle>No plan yet</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Scans start once this account has a plan.</p>
         </CardHeader>
         {offer !== undefined && (
           <CardContent className="grid gap-5">

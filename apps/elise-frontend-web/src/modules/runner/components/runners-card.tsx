@@ -77,7 +77,10 @@ export function RunnersCard() {
   return (
     <Card className="max-w-4xl">
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Computers</CardTitle>
+        <div className="grid gap-1.5">
+          <CardTitle>Computers</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one runs scans while its Runner is open. Add a computer to run more at once.</p>
+        </div>
         <Suspense fallback={<Skeleton className="h-8 w-32" />}>
           <RunnerAddDialog />
         </Suspense>

@@ -216,6 +216,7 @@ export function TeamGroupsCard() {
     <Card id="groups" className="scroll-mt-24">
       <CardHeader>
         <CardTitle>Groups</CardTitle>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Sort people into teams, such as Backend or Security. A person can be in several.</p>
       </CardHeader>
       <CardContent className="grid gap-5">
         <GroupCreateForm />

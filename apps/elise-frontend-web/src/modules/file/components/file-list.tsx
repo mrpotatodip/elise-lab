@@ -115,7 +115,10 @@ function FileListView({ filters, onChange }: FileListViewProps) {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>All files</CardTitle>
+        <div className="grid gap-1.5">
+          <CardTitle>All files</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Reports and finding lists saved by each scan. Filter by type, repository or date.</p>
+        </div>
         <ShellListCount shown={files.length} total={files.length} more={Boolean(nextCursor)} noun="file" plural="files" />
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
