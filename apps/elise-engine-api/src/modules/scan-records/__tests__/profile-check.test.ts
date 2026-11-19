@@ -50,7 +50,7 @@ type Unit = {
 type MetadataExtra = {
   run_status?: string;
   incomplete_reason?: string;
-  critic_passes?: { wave: number; accepted: number }[];
+  critic_passes?: { wave: number; accepted: number | string[] }[];
   final_verifiers?: { fingerprint: string; agent_id: string }[];
   phase_completed?: number | string;
   phase_2_note?: string;
@@ -202,6 +202,16 @@ describe("checkRunnerProfile", () => {
       ["Focused, one agent, units deferred as quick_profile_final_critic (old Skill)", "quick", FOCUSED_RUN3],
       ["Focused, one agent, critic pass recorded and nothing deferred", "quick", FOCUSED_NEW_SKILL],
       ["Focused, five hunters, a fresh verifier on each candidate", "quick", FOCUSED_MONOREPO],
+      [
+        "Focused whose critic pass lists no accepted unit instead of counting zero (a Runner Scan on 2026-11-19)",
+        "quick",
+        filesOf([coveredBy("a", "hunter-1"), candidateOf("c", "h4", ["verifier-c"], "fp-1")], metadataOf("quick", { critic_passes: [{ wave: 1, accepted: [] }] }), [recordOf("needs_validation", "fp-1")]),
+      ],
+      [
+        "Focused whose critic pass lists the units it accepted instead of counting them",
+        "quick",
+        filesOf([coveredBy("a", "hunter-1"), candidateOf("c", "h4", ["verifier-c"], "fp-1")], metadataOf("quick", { critic_passes: [{ wave: 1, accepted: ["unit-a", "unit-b"] }] }), [recordOf("needs_validation", "fp-1")]),
+      ],
       [
         "Focused whose findings.json holds a rejected record that no unit holds, next to a record verified by another agent",
         "quick",
