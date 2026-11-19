@@ -98,10 +98,20 @@ export type CreditEntryKindValue = (typeof CREDIT_ENTRY_KIND_VALUES)[number];
 export const SCAN_STEP_VALUES = ["cloning", "auditing", "saving"] as const;
 
 // -----
-// The four Phases of a full audit, in the order they run. Not a database
-// enum: only the Runner job's phasePrompts carry them.
+// The four Phases of a full audit, in the order they run. The Runner
+// job's phasePrompts carry them, and so does a Trace entry: twin of
+// the CHECK on scan_trace_entries.phase.
 // -----
 export const RUNNER_JOB_PHASE_VALUES = ["recon", "hunt", "check", "report"] as const;
 
+// -----
+// What a Trace entry says the agent did. A closed set: the producer
+// keeps the label and drops everything else the agent wrote. A tool
+// it does not know is calling_tool. Twin of the CHECK on
+// scan_trace_entries.label.
+// -----
+export const TRACE_LABEL_VALUES = ["reasoning", "reading_files", "searching", "running_command", "writing", "calling_tool", "phase_started", "phase_ended"] as const;
+
 export type ScanStepValue = (typeof SCAN_STEP_VALUES)[number];
 export type RunnerJobPhaseValue = (typeof RUNNER_JOB_PHASE_VALUES)[number];
+export type TraceLabelValue = (typeof TRACE_LABEL_VALUES)[number];

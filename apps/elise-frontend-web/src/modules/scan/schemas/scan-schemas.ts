@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "@repo/contracts/elise";
 
-export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS, RepoDetailSchema, RepoListSchema, RepoParamSchema, ScanListSchema, ScanQueuedSchema, ScanStateSchema, ScanStatusSchema } from "@repo/contracts/elise";
-export type { Repo, RepoBranch, ScanState, ScanStatus } from "@repo/contracts/elise";
+export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS, RepoDetailSchema, RepoListSchema, RepoParamSchema, ScanListSchema, ScanQueuedSchema, ScanStateSchema, ScanStatusSchema, TraceSchema } from "@repo/contracts/elise";
+export type { Repo, RepoBranch, ScanState, ScanStatus, Trace, TraceEntry } from "@repo/contracts/elise";
 
 export const CreateScanInputSchema = z.object({
   repo: z.string().regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/, "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name."),
@@ -14,6 +14,8 @@ export const CreateScanInputSchema = z.object({
 });
 
 export const ScanIdInputSchema = z.object({ scanId: z.string().regex(/^[\w-]+$/) });
+
+export const ScanTraceInputSchema = ScanIdInputSchema.extend({ after: z.string().optional() });
 
 export const ScanFileInputSchema = ScanIdInputSchema.extend({ file: z.string().regex(/^[\w.-]+$/) });
 

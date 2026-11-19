@@ -3,6 +3,7 @@ import { createAuth } from "#/lib/auth";
 import { dbConnect, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { holdCreditEffect, settleCreditEffect } from "#/modules/credit";
+import { runnerIdentitySvc } from "#/modules/runners/handlers";
 import { findConnectedRunnerEffect } from "#/modules/runners/queries";
 import { githubAccessFor, neonInstallationRepo } from "#/modules/github-installs";
 import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
@@ -32,6 +33,11 @@ export const realAppDeps: AppDeps = {
   runnerConnected: findConnectedRunnerEffect,
   releaseCredit: (db, accountId, scanId) => settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 }),
   sessionUserId,
+  // -----
+  // A Runner token names the Runner, and only the Runner row names
+  // its Account, so the lookup runs on the owner role.
+  // -----
+  runnerIdentity: (c, token) => runEffect(runnerIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) => runEffect(userHasPowerEffect(dbConnect(c.env.DATABASE_URL), userId, accountId, power)),
   enqueueInviteEmail: async (env, mail) => {

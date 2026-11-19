@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { Effect } from "effect";
-import type { AccessPower } from "@repo/contracts/elise";
+import type { AccessPower, RunnerIdentity } from "@repo/contracts/elise";
 import type { TenantDbType } from "#/lib/db-connection";
 import type { DbError } from "#/lib/effect-query";
 import type { HoldResult, SettleResult } from "#/modules/credit";
@@ -62,6 +62,7 @@ export type AppDeps = {
   runnerConnected: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<boolean, DbError>;
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
   sessionUserId: (c: Context<AppEnv>) => Promise<string | undefined>;
+  runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
   enqueueInviteEmail: (env: Bindings, mail: InviteEmail) => Promise<void>;
