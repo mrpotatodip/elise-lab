@@ -28,4 +28,4 @@ export const TRACE_QUIET_MS = 3 * 60 * 1000;
 
 export const TRACE_POLL_MS = 5000;
 
-export const TRACE_VISIBLE_ENTRIES = 8;
+export const TRACE_VISIBLE_ENTRIES = 5;

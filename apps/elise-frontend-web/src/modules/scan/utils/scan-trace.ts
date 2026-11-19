@@ -1,4 +1,4 @@
-import { RUNNER_JOB_PHASE_VALUES, type RunnerJobPhaseValue } from "@repo/contracts/elise";
+import { TRACE_LABEL_VALUES, type TraceLabelValue } from "@repo/contracts/elise";
 import { TRACE_PHASE_COPY } from "../constants";
 import type { TraceEntry } from "../schemas";
 
@@ -36,20 +36,18 @@ export function traceSpan(ms: number) {
   return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
 }
 
-export type TracePhaseState = "done" | "current" | "pending";
-export type TracePhaseStep = { phase: RunnerJobPhaseValue; state: TracePhaseState };
+export const isTraceWork = (entry: TraceEntry) => entry.label !== "phase_started" && entry.label !== "phase_ended";
 
 // -----
-// Each Phase in run order with where it stands: done once it has an end
-// entry, current when it holds the newest entry of a running Scan.
+// How often each kind of action ran, in the fixed label order. A merged
+// entry counts as its repeats, and the Phase markers are not actions.
 // -----
-export function tracePhaseStates(entries: TraceEntry[], active: boolean): TracePhaseStep[] {
-  const currentPhase = active ? entries[0]?.phase : null;
-  return RUNNER_JOB_PHASE_VALUES.map((phase) => {
-    const ended = entries.some((entry) => entry.phase === phase && entry.label === "phase_ended");
-    const state: TracePhaseState = ended ? "done" : phase === currentPhase ? "current" : "pending";
-    return { phase, state };
-  });
+export function tallyTraceLabels(entries: TraceEntry[]) {
+  const totals = new Map<TraceLabelValue, number>();
+  for (const entry of entries) {
+    if (isTraceWork(entry)) totals.set(entry.label, (totals.get(entry.label) ?? 0) + entry.count);
+  }
+  return TRACE_LABEL_VALUES.map((label) => ({ label, count: totals.get(label) ?? 0 })).filter((item) => item.count > 0);
 }
 
 export function traceAgo(iso: string, now: number) {

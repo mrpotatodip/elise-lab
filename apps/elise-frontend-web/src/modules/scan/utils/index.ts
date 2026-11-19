@@ -8,7 +8,6 @@ export * from "./scan-repo-picks";
 export * from "./scan-sidebar";
 export * from "./scan-success-rate";
 export * from "./scan-trace";
-export * from "./scan-trace-fake";
 export * from "./scan-format";
 export * from "./scan-known-repos";
 export * from "./verdict-blockers";

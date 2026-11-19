@@ -1,99 +1,112 @@
 import { useState, type ReactNode } from "react";
-import { Check, ChevronUp, Info } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Info, X } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { Alert, AlertDescription } from "#/components/ui/alert";
-import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "#/components/ui/collapsible";
 import { cn } from "#/lib/utils";
-import { SCAN_STEP_COPY, TRACE_LABEL_COPY, TRACE_NO_PHASE_COPY, TRACE_PHASE_COPY, TRACE_QUIET_MS, TRACE_VISIBLE_ENTRIES } from "../constants";
+import { SCAN_STEP_COPY, TRACE_LABEL_COPY, TRACE_NO_PHASE_COPY, TRACE_QUIET_MS, TRACE_VISIBLE_ENTRIES } from "../constants";
 import { useNow, useScanTrace } from "../hooks";
 import type { ScanStatus, TraceEntry } from "../schemas";
-import { groupTraceByPhase, scanPlural, summarizeTraceGroup, tracePhaseStates, traceAgo, traceSpan, type TracePhaseGroup } from "../utils";
+import { groupTraceByPhase, isTraceWork, summarizeTraceGroup, tallyTraceLabels, traceAgo, traceSpan, type TracePhaseGroup } from "../utils";
+import { TRACE_LABEL_ICON } from "./scan-trace-icons";
 
-const isMarker = (entry: TraceEntry) => entry.label === "phase_started" || entry.label === "phase_ended";
+const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
-function EntryLabel({ entry }: { entry: TraceEntry }) {
+function Count({ value }: { value: number }) {
+  return <span className="font-normal tabular-nums text-muted-foreground/70">×{value}</span>;
+}
+
+function Time({ children }: { children: ReactNode }) {
+  return <span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground/70">{children}</span>;
+}
+
+function Branch({ last, children }: { last: boolean; children: ReactNode }) {
+  const reduce = useReducedMotion();
   return (
-    <>
-      {TRACE_LABEL_COPY[entry.label]}
-      {entry.count > 1 && <span className="text-muted-foreground tabular-nums"> ×{entry.count}</span>}
-    </>
+    <motion.li layout={reduce ? false : "position"} transition={{ duration: 0.2, ease: EASE_OUT }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="relative pl-6">
+        <span aria-hidden="true" className="absolute left-0 top-0 h-[1.0625rem] w-4 rounded-bl-lg border-b border-l border-foreground/20" />
+        {!last && <span aria-hidden="true" className="absolute bottom-0 left-0 top-[1.0625rem] w-px bg-foreground/20" />}
+        <div className="flex min-h-8 items-center gap-2 text-sm">{children}</div>
+      </motion.div>
+    </motion.li>
   );
 }
 
-function PhaseSteps({ entries, active }: { entries: TraceEntry[]; active: boolean }) {
-  return (
-    <ol className="flex flex-wrap items-center gap-2" aria-label="Phases">
-      {tracePhaseStates(entries, active).map(({ phase, state }) => (
-        <li
-          key={phase}
-          aria-current={state === "current" ? "step" : undefined}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
-            state === "current" && "border-primary bg-primary/10 text-foreground",
-            state === "done" && "text-foreground",
-            state === "pending" && "border-dashed text-muted-foreground",
-          )}
-        >
-          {state === "done" && <Check aria-hidden="true" className="size-3" />}
-          {state === "current" && <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-primary" />}
-          {TRACE_PHASE_COPY[phase]}
-        </li>
-      ))}
-    </ol>
-  );
-}
+type PhaseNodeProps = { group: TracePhaseGroup; now: number; last: boolean; running: boolean; stopped: boolean };
 
-function NowDoing({ entry, now }: { entry: TraceEntry; now: number }) {
-  return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-lg border bg-muted/40 px-4 py-3">
-      <div>
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Doing now</p>
-        <p className="text-lg font-semibold">
-          <EntryLabel entry={entry} />
-        </p>
-      </div>
-      <p className="text-sm text-muted-foreground tabular-nums">Last event {traceAgo(entry.endedAt, now)}</p>
-    </div>
-  );
-}
+function PhaseNode({ group, now, last, running, stopped }: PhaseNodeProps) {
+  const reduce = useReducedMotion();
+  const [picked, setPicked] = useState<boolean | null>(null);
+  const work = group.entries.filter(isTraceWork);
+  const recent = running || stopped;
+  const leaves = recent ? work.slice(0, TRACE_VISIBLE_ENTRIES) : [];
+  const earlier = recent ? work.length - leaves.length : 0;
+  const tally = recent ? [] : tallyTraceLabels(work);
 
-function PhaseGroup({ group, now, openByDefault }: { group: TracePhaseGroup; now: number; openByDefault: boolean }) {
-  const [showAll, setShowAll] = useState(false);
-  const rows = group.entries.filter((entry) => !isMarker(entry));
-  const shown = showAll ? rows : rows.slice(0, TRACE_VISIBLE_ENTRIES);
-  const summary = summarizeTraceGroup(group.entries);
   return (
-    <Collapsible defaultOpen={openByDefault} className="rounded-lg border">
-      <CollapsibleTrigger className="group flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="text-sm font-semibold">{group.title ?? TRACE_NO_PHASE_COPY}</span>
-        <span className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
-          {scanPlural(rows.length, "entry", "entries")} · {traceSpan(summary.spentMs)}
-          <ChevronUp aria-hidden="true" className="size-4 rotate-180 transition-transform group-data-[panel-open]:rotate-0" />
-        </span>
-      </CollapsibleTrigger>
-      <CollapsiblePanel>
-        <ul className="grid gap-1 border-t px-4 py-3">
-          {shown.map((entry) => (
-            <li key={entry.id} className="flex items-baseline justify-between gap-3 text-sm">
-              <span>
-                <EntryLabel entry={entry} />
-              </span>
-              <time dateTime={entry.endedAt} className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {traceAgo(entry.endedAt, now)}
-              </time>
-            </li>
-          ))}
-          {rows.length > TRACE_VISIBLE_ENTRIES && (
-            <li>
-              <Button variant="ghost" size="sm" className="-ml-2.5" onClick={() => setShowAll(!showAll)}>
-                {showAll ? "Show fewer" : `Show all ${rows.length}`}
-              </Button>
-            </li>
-          )}
-        </ul>
-      </CollapsiblePanel>
-    </Collapsible>
+    <motion.li
+      layout={reduce ? false : "position"}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25, ease: EASE_OUT }}
+      className="relative pb-2 last:pb-0"
+    >
+      {!last && <span aria-hidden="true" className="absolute bottom-0 left-[0.71875rem] top-7 w-px bg-foreground/20" />}
+      <Collapsible open={picked ?? recent} onOpenChange={setPicked}>
+        <CollapsibleTrigger className="group flex min-h-8 w-full items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <span
+            className={cn(
+              "z-10 grid size-6 shrink-0 place-items-center rounded-full border bg-background",
+              running && "border-primary text-primary",
+              stopped && "border-status-danger text-status-danger",
+              !running && !stopped && "border-foreground/20 bg-muted text-muted-foreground",
+            )}
+          >
+            {running && <span className="size-2 rounded-full bg-primary" />}
+            {stopped && <X aria-hidden="true" className="size-3.5" />}
+            {!running && !stopped && <Check aria-hidden="true" className="size-3.5" />}
+          </span>
+          <span className="text-sm font-semibold">
+            {group.title ?? TRACE_NO_PHASE_COPY}
+            <Time>{traceSpan(summarizeTraceGroup(group.entries).spentMs)}</Time>
+            {stopped && <span className="ml-2 text-xs font-normal text-status-danger">Stopped here</span>}
+          </span>
+          <ChevronDown aria-hidden="true" className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsiblePanel>
+          <ul className="ml-[2.375rem] pb-2 pt-0.5">
+            {leaves.map((entry, leaf) => {
+              const Icon = TRACE_LABEL_ICON[entry.label];
+              return (
+                <Branch key={entry.id} last={leaf === leaves.length - 1 && earlier === 0}>
+                  <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                  <span>{TRACE_LABEL_COPY[entry.label]}</span>
+                  {entry.count > 1 && <Count value={entry.count} />}
+                  <Time>{traceAgo(entry.endedAt, now)}</Time>
+                </Branch>
+              );
+            })}
+            {earlier > 0 && (
+              <Branch key="earlier" last>
+                <span className="text-xs tabular-nums text-muted-foreground/70">{earlier} earlier</span>
+              </Branch>
+            )}
+            {tally.map(({ label, count }, leaf) => {
+              const Icon = TRACE_LABEL_ICON[label];
+              return (
+                <Branch key={label} last={leaf === tally.length - 1}>
+                  <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                  <span>{TRACE_LABEL_COPY[label]}</span>
+                  <Count value={count} />
+                </Branch>
+              );
+            })}
+          </ul>
+        </CollapsiblePanel>
+      </Collapsible>
+    </motion.li>
   );
 }
 
@@ -102,42 +115,62 @@ export type TraceViewProps = {
   candidateFindings: number | null;
   now: number;
   active: boolean;
+  failed: boolean;
   quiet: boolean;
   empty: ReactNode;
 };
 
 // -----
-// The Trace as a person reads it: where the Scan is among its Phases, what
-// it is doing right now, and each Phase as a block that opens to its latest
-// entries. It takes plain props so /dev/trace can show it on made-up data.
+// The Trace as a person reads it: what the agent is doing now, then a tree
+// with one branch point per Phase. The running Phase is open with its last
+// few actions; a finished Phase closes by itself and shows how often each
+// kind of action ran; a failed Scan marks the Phase it stopped in. It takes
+// plain props so a preview page can feed it made-up data.
 // -----
-export function TraceView({ entries, candidateFindings, now, active, quiet, empty }: TraceViewProps) {
-  const newest = entries.find((entry) => !isMarker(entry)) ?? entries[0];
+export function TraceView({ entries, candidateFindings, now, active, failed, quiet, empty }: TraceViewProps) {
+  const newest = entries.find(isTraceWork) ?? entries[0];
   if (!newest) return <div className="grid gap-2 text-sm text-muted-foreground">{empty}</div>;
+  const groups = groupTraceByPhase(entries);
 
   return (
-    <div className="grid gap-4">
-      <PhaseSteps entries={entries} active={active} />
-      {active && <NowDoing entry={newest} now={now} />}
-      <p className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-        {candidateFindings !== null && (
-          <span>
-            Candidate findings: <span className="font-medium text-foreground tabular-nums">{candidateFindings}</span>
+    <div className="grid gap-5">
+      {active && (
+        <div className="flex items-center gap-3 rounded-xl bg-primary/5 px-4 py-3 ring-1 ring-primary/15">
+          <span className="relative flex size-2.5">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/60 motion-reduce:animate-none" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
           </span>
-        )}
-        <span>{scanPlural(entries.filter((entry) => !isMarker(entry)).length, "entry", "entries")}</span>
-      </p>
+          <p className="flex-1 text-base font-semibold">
+            {TRACE_LABEL_COPY[newest.label]}
+            {newest.count > 1 && (
+              <>
+                {" "}
+                <Count value={newest.count} />
+              </>
+            )}
+            <Time>{traceAgo(newest.endedAt, now)}</Time>
+          </p>
+          {candidateFindings !== null && <p className="text-xs tabular-nums text-muted-foreground/70">{candidateFindings} candidates</p>}
+        </div>
+      )}
       {quiet && (
         <Alert variant="info">
           <Info />
           <AlertDescription>Nothing new has arrived for a few minutes. The scan is still running; some steps take a while.</AlertDescription>
         </Alert>
       )}
-      <div className="grid gap-2">
-        {groupTraceByPhase(entries).map((group, index) => (
-          <PhaseGroup key={group.key} group={group} now={now} openByDefault={active && index === 0} />
+      <ol>
+        {groups.map((group, index) => (
+          <PhaseNode
+            key={group.title ?? "scan"}
+            group={group}
+            now={now}
+            last={index === groups.length - 1}
+            running={active && index === 0}
+            stopped={failed && index === 0}
+          />
         ))}
-      </div>
+      </ol>
     </div>
   );
 }
@@ -146,7 +179,7 @@ function TraceEntries({ scan, active }: { scan: ScanStatus; active: boolean }) {
   const { data, isPending, isError } = useScanTrace(scan.scanId, active);
   const entries = data?.entries ?? [];
   const loaded = !isPending;
-  const failed = isError && !data;
+  const loadFailed = isError && !data;
   const browserNow = useNow();
   const [mountedAt] = useState(() => Date.now());
   const quiet = active && browserNow - (data?.changedAt ?? mountedAt) >= TRACE_QUIET_MS;
@@ -155,16 +188,26 @@ function TraceEntries({ scan, active }: { scan: ScanStatus; active: boolean }) {
   const empty = (
     <>
       {!loaded && <p>Loading the trace.</p>}
-      {loaded && failed && <p>The trace could not be loaded. It tries again by itself while the scan runs.</p>}
-      {loaded && !failed && active && step && <p>{step.label}. Nothing more detailed yet.</p>}
-      {loaded && !failed && !active && step && <p>Last step: {step.label}.</p>}
-      {loaded && !failed && active && <p>Waiting for the first entries.</p>}
-      {loaded && !failed && !active && <p>{scan.runner ? "Live detail needs a newer Runner." : "No live detail was recorded for this scan."}</p>}
+      {loaded && loadFailed && <p>The trace could not be loaded. It tries again by itself while the scan runs.</p>}
+      {loaded && !loadFailed && active && step && <p>{step.label}. Nothing more detailed yet.</p>}
+      {loaded && !loadFailed && !active && step && <p>Last step: {step.label}.</p>}
+      {loaded && !loadFailed && active && <p>Waiting for the first entries.</p>}
+      {loaded && !loadFailed && !active && <p>{scan.runner ? "Live detail needs a newer Runner." : "No live detail was recorded for this scan."}</p>}
       {quiet && <p>Nothing new has arrived for a few minutes. The scan is still running; some steps take a while.</p>}
     </>
   );
 
-  return <TraceView entries={entries} candidateFindings={data?.candidateFindings ?? null} now={browserNow + (data?.offsetMs ?? 0)} active={active} quiet={quiet} empty={empty} />;
+  return (
+    <TraceView
+      entries={entries}
+      candidateFindings={data?.candidateFindings ?? null}
+      now={browserNow + (data?.offsetMs ?? 0)}
+      active={active}
+      failed={scan.status === "failed"}
+      quiet={quiet}
+      empty={empty}
+    />
+  );
 }
 
 // -----
