@@ -19,7 +19,7 @@
 
 - **`// SAFETY:`** right above an `as` assertion (React 8.1).
 - **`// -----` section dividers** in `constants/` and `types/` files (Hono JS 1.7, 1.8, Contracts 2.5).
-- **A comment another rule asks for:**
+- **A comment another rule asks for,** in the wrapped form of 1.4. These blocks outside `constants/` and `types/` are ratcheted: `scripts/ratchets.json` holds each file's count, and the pre-commit check fails when a count rises. Add a block only where a rule below asks for it, and raise that file's baseline in the same commit so the reviewer sees it. Rust comment lines under `apps/elise-runner-cli` are ratcheted the same way. Remove a comment, then run `node scripts/check-ratchets.mjs --update` to lock the lower count in. The rules that ask:
   - Why a response is bare, not in the envelope (Hono JS 4.1).
   - Why a route is on the public allowlist (Hono JS 6.2).
   - Why a route uses the realtime connection (Hono JS 7.2).
@@ -38,7 +38,7 @@
 // -----
 ```
 
-**1.5 `[House]` Reviewers check the diff for comments.** Flag every added comment that 1.2 doesn't list, and ask for its removal.
+**1.5 `[House]` Reviewers check the diff for comments.** Flag every added comment that 1.2 doesn't list, and ask for its removal. The pre-commit check enforces the counts (1.2); when a diff changes `scripts/ratchets.json`, confirm the change lowers a count, or that a rule in `docs/standards` asks for each comment it raises.
 
 ---
 
