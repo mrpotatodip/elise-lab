@@ -14,7 +14,7 @@ import { ResetPasswordSchema } from "../schemas";
 
 function AskAgainLink() {
   return (
-    <Link to="/forgot-password" className="text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <Link to="/forgot-password" className="inline-flex min-h-6 items-center text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {AUTH_COPY.reset.askAgain}
     </Link>
   );

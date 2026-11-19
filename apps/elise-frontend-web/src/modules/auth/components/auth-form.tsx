@@ -78,7 +78,7 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
       <Button type="submit" size="lg" className="mt-1 w-full" disabled={signInMutation.isPending}>
         {signInMutation.isPending ? "Please wait…" : AUTH_COPY.signin.submit}
       </Button>
-      <Link to={AUTH_COPY.signin.forgotTo} className="justify-self-start rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Link to={AUTH_COPY.signin.forgotTo} className="inline-flex min-h-6 items-center justify-self-start rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {AUTH_COPY.signin.forgot}
       </Link>
     </form>

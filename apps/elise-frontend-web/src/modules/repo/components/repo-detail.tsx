@@ -630,7 +630,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
             <p className="border-t px-6 py-3 text-sm leading-relaxed text-muted-foreground">
               {olderScans > 0 && `${scanPlural(olderScans, "older scan", "older scans")} of this ${current ? "branch" : "repository"}. `}
               {otherScans > 0 && `${scanPlural(otherScans, "scan", "scans")} of other branches, tags or commits. `}
-              <Link to="/scans" className="rounded-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Link to="/scans" className="inline-flex min-h-6 items-center rounded-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 See every scan
               </Link>
             </p>

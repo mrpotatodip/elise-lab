@@ -103,6 +103,8 @@ export default defineConfig({
       excludeFiles: ["src/modules/**/__tests__/**"],
       rules: {
         "anti-slop/no-raw-colors": "error",
+        "anti-slop/no-off-design-classes": "error",
+        "anti-slop/require-link-target-size": "error",
       },
     },
     {
@@ -125,6 +127,33 @@ export default defineConfig({
       files: ["src/modules/shell/components/shell-theme-switch.tsx"],
       rules: {
         "anti-slop/no-raw-colors": "off",
+      },
+    },
+    {
+      // -----
+      // The sidebar rows take their class from `NAV_ROW` and `TREE_LINK` in other files, and `NAV_ROW` is 40px tall.
+      // -----
+      files: ["src/modules/shell/components/shell-sidebar.tsx", "src/modules/shell/components/shell-settings-nav.tsx"],
+      rules: {
+        "anti-slop/require-link-target-size": "off",
+      },
+    },
+    {
+      // -----
+      // These render links inside running prose (a report, a comment), where a link is inline and WCAG 2.5.8 exempts it from the 24px size.
+      // -----
+      files: ["src/modules/scan/components/scan-markdown.tsx", "src/modules/finding-comment/components/finding-comment-body.tsx"],
+      rules: {
+        "anti-slop/require-link-target-size": "off",
+      },
+    },
+    {
+      // -----
+      // A finding opened from a link gets a 3px accent edge, which no elevation token draws.
+      // -----
+      files: ["src/modules/summary/components/summary-findings.tsx"],
+      rules: {
+        "anti-slop/no-off-design-classes": "off",
       },
     },
     {

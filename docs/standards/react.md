@@ -276,6 +276,8 @@ Lint also enforces these, so reviewers don't check them by hand:
 - **A server function names an imported schema** (3.5): `engineJson(Schema, …)` and `.validator(Schema)` take a schema from `@repo/contracts/elise` or the module's `../schemas`, never one built or declared in the `api/` file: `anti-slop/require-imported-server-fn-schema`.
 - **No template literal in `className`** (7.2): `anti-slop/no-template-literal-class-name`.
 - **No hex value or raw palette class in a feature module** (7.3): `anti-slop/no-raw-colors`.
+- **Classes follow DESIGN.md's tokens** in a feature module: no `max-w-prose`, raw or arbitrary shadow, arbitrary radius, off-scale `text-[Npx]`, status ink as a fill, mark at partial opacity, or icon `strokeWidth` other than 1.5: `anti-slop/no-off-design-classes`.
+- **A link is at least 24px tall** in a feature module: `min-h-6` with `inline-flex items-center`, unless it sits inside a sentence or is stretched over a row: `anti-slop/require-link-target-size`.
 
 Not in lint yet: 7.1 (ten raw `<button>`s in feature code today; `react/forbid-elements` finds them), and the layout rules (1.1, 1.2, 4.1 to 4.5), which need a file-layout check.
 
