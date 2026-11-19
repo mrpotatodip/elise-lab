@@ -42,6 +42,7 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
       }}
     >
       <SheetContent
+        className="max-w-[56rem]"
         aria-keyshortcuts="ArrowLeft ArrowRight"
         onKeyDown={(event) => {
           if (selected === undefined || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
