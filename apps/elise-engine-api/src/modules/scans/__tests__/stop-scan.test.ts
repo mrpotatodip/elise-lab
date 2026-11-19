@@ -17,7 +17,7 @@ let otherTenantId: string;
 let runnerId: string;
 let counter = 0;
 
-const app = tenantRouteApp(() => test);
+const app = tenantRouteApp(() => test, { sessionUserId: async () => "admin-user" });
 const NOW = new Date("2026-11-19T09:00:00Z");
 const OPTIONS: ScanOptions = { skill: "full", model: "claude-sonnet-5-5", effort: "high", profile: "quick", maxBudgetUsd: 2 };
 const StoppedBodySchema = z.object({ data: z.object({ scanId: z.string(), status: z.string() }).nullable(), error: z.unknown() });
@@ -102,6 +102,23 @@ describe("stopping a Scan", () => {
     await run(neonScanRepo(test.http).mark(tenantId, scanId, { status: "running", step: "auditing" }));
 
     expect(await statusOf(scanId)).toBe("stopped");
+  });
+
+  it("stops the running Scan of a Runner that an admin removes, and leaves the Scan of another Runner alone", async () => {
+    const userId = (await test.raw.select({ id: authUser.id }).from(authUser).where(eq(authUser.email, "stop@example.com")))[0].id;
+    const removed = await run(createRunnerEffect(test.http, { tenantId, actorUserId: userId, name: "goner", codeHash: "gone-code", expiresAt: new Date("2026-11-19T10:00:00Z") }));
+    const scanId = await newScan("running", false);
+    const params: ScanParams = { scanId, accountId: tenantId, repo: "https://github.com/octocat/Hello-World", options: OPTIONS, keySource: "account", runnerId: removed.id, createdAt: NOW.toISOString() };
+    await runnerSandbox(test.http, params, removed.id, () => NOW).launchAgent(OPTIONS);
+    await test.raw.update(scanRunnerJobs).set({ state: "claimed" }).where(eq(scanRunnerJobs.scanId, scanId));
+    const bystander = await newScan("running");
+    await test.raw.update(scanRunnerJobs).set({ state: "claimed" }).where(eq(scanRunnerJobs.scanId, bystander));
+
+    const res = await callAs(app, tenantId, `/runners/${removed.id}`, { method: "DELETE" });
+
+    expect(res.status).toBe(200);
+    expect({ scan: await statusOf(scanId), job: await jobState(scanId) }).toEqual({ scan: "stopped", job: "cancelled" });
+    expect({ scan: await statusOf(bystander), job: await jobState(bystander) }).toEqual({ scan: "running", job: "claimed" });
   });
 
   it("queues no job for a Scan stopped before the Workflow got to it", async () => {
