@@ -1,14 +1,13 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { LayoutDashboard, Laptop, Users } from "lucide-react";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
+import { Progress } from "#/components/ui/progress";
 import { useNow } from "#/lib/use-now";
-import { cn } from "#/lib/utils";
 import { runnerShownState, runnersQuery } from "#/modules/runner";
-import { ShellPageHeader, ShellStatCell as Cell } from "#/modules/shell";
+import { ShellPageHeader } from "#/modules/shell";
 import { usageUsd } from "#/modules/usage";
 import { planOffersQuery, planQuery } from "../hooks";
 import { PLAN_STATUS_VIEW, planDateLabel, planSourceLabel } from "../utils";
@@ -45,17 +44,21 @@ function PlanOfferCard() {
   );
 }
 
-type FeatureProps = { icon: ReactNode; title: string; children: ReactNode };
+type MeterProps = { label: string; used: number; of: number; note: ReactNode };
 
-function Feature({ icon, title, children }: FeatureProps) {
+function Meter({ label, used, of, note }: MeterProps) {
+  const percent = of > 0 ? Math.min(100, Math.round((used / of) * 100)) : 0;
   return (
-    <li className="grid content-start gap-3 p-6">
-      <span aria-hidden="true" className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
-        {icon}
-      </span>
-      <h3 className="text-[15px] font-semibold leading-snug">{title}</h3>
-      <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{children}</p>
-    </li>
+    <div className="grid gap-2">
+      <div className="flex items-baseline justify-between gap-4">
+        <h3 className="text-sm font-medium">{label}</h3>
+        <p className="text-sm tabular-nums text-muted-foreground">
+          <span className="text-base font-semibold text-foreground">{used}</span> of {of}
+        </p>
+      </div>
+      <Progress value={percent} aria-label={`${label}: ${used} of ${of}`} />
+      <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{note}</p>
+    </div>
   );
 }
 
@@ -73,27 +76,11 @@ export function PlanCard() {
   const paired = (runners ?? []).filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
   const people = data.seats.members + data.seats.pendingInvites;
+  const waiting = data.seats.pendingInvites;
 
   return (
     <>
-      <ShellPageHeader
-        title="Plan"
-        description="What this account pays for."
-        badges={<Badge variant={status.variant}>{status.label}</Badge>}
-        below={
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-relaxed text-muted-foreground">
-            <span>{plan.label} plan</span>
-            <span aria-hidden="true">·</span>
-            <span>{planSourceLabel(data.source)}</span>
-            {data.currentPeriodEnd !== null && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>Renews {planDateLabel(data.currentPeriodEnd)}</span>
-              </>
-            )}
-          </p>
-        }
-      />
+      <ShellPageHeader title="Plan" description="What this account pays for." badges={<Badge variant={status.variant}>{status.label}</Badge>} />
 
       {status.note !== null && (
         <Alert variant={ALERT_VARIANT[status.variant]}>
@@ -101,64 +88,50 @@ export function PlanCard() {
         </Alert>
       )}
 
-      <section aria-label="Plan summary">
-        <Card className="grid divide-y overflow-hidden lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-          <Cell
-            lead
-            label={`${plan.label} plan`}
-            value={
-              <>
-                {usageUsd(plan.monthlyPriceUsd)}
-                {PER_MONTH}
-              </>
-            }
-            note="Flat. Elise charges nothing per scan."
-          />
-          <Cell
-            label="People"
-            value={
-              <>
-                {people}
-                <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {plan.maxMembers}</span>
-              </>
-            }
-            note={data.seats.pendingInvites > 0 ? `Includes ${data.seats.pendingInvites} waiting ${data.seats.pendingInvites === 1 ? "invite" : "invites"}.` : "Everyone on this account."}
-          />
-          <Cell
-            label="Runners running"
-            value={
-              <>
-                {running}
-                <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {paired.length}</span>
-              </>
-            }
-            note={
-              <Link to="/settings/providers" className="font-medium text-primary-ink underline underline-offset-4">
-                {paired.length === 0 ? "Add a Runner" : "Manage Runners"}
-              </Link>
-            }
-          />
-        </Card>
-      </section>
+      <Card className="grid overflow-hidden lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <section aria-label="Your plan" className="grid content-start gap-4 border-b p-6 lg:border-b-0 lg:border-r">
+          <h2 className="text-sm font-medium text-muted-foreground">{plan.label} plan</h2>
+          <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
+            {usageUsd(plan.monthlyPriceUsd)}
+            {PER_MONTH}
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">Flat. Elise charges nothing per scan.</p>
+          <dl className="grid gap-1.5 border-t pt-4 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">Billing</dt>
+              <dd className="font-medium">{planSourceLabel(data.source)}</dd>
+            </div>
+            {data.currentPeriodEnd !== null && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Renews</dt>
+                <dd className="font-medium tabular-nums">{planDateLabel(data.currentPeriodEnd)}</dd>
+              </div>
+            )}
+          </dl>
+          <p className="text-sm leading-relaxed text-muted-foreground">To change your plan, contact us.</p>
+        </section>
 
-      <Card>
-        <CardHeader className="gap-1.5">
-          <CardTitle>What the plan covers</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">To change your plan, contact us.</p>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ul className={cn("grid divide-y border-t md:grid-cols-3 md:divide-x md:divide-y-0")}>
-            <Feature icon={<Laptop className="size-4" />} title="Scans on your own Claude">
-              Each scan runs on a computer you pair, with that computer&apos;s Claude and git login.
-            </Feature>
-            <Feature icon={<Users className="size-4" />} title={`Up to ${plan.maxMembers} people`}>
-              One account for the team, with shared reports, findings and decisions.
-            </Feature>
-            <Feature icon={<LayoutDashboard className="size-4" />} title="Every result in one place">
-              Runners, scans, files, findings and the Verdict across all your repositories and branches.
-            </Feature>
-          </ul>
-        </CardContent>
+        <section aria-label="What you are using" className="grid content-start gap-6 p-6">
+          <Meter
+            label="People"
+            used={people}
+            of={plan.maxMembers}
+            note={waiting > 0 ? `Includes ${waiting} waiting ${waiting === 1 ? "invite" : "invites"}. Everyone shares the same reports and findings.` : "Everyone on this account shares the same reports and findings."}
+          />
+          <Meter
+            label="Runners running"
+            used={running}
+            of={paired.length}
+            note={
+              <>
+                A Runner is a computer you pair. Each scan runs on it, with that computer&apos;s Claude and git login.{" "}
+                <Link to="/settings/providers" className="font-medium text-primary-ink underline underline-offset-4">
+                  {paired.length === 0 ? "Add a Runner" : "Manage Runners"}
+                </Link>
+              </>
+            }
+          />
+        </section>
       </Card>
     </>
   );
