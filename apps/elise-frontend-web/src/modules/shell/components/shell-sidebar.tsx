@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronUp, ClipboardCheck, FileText, FolderGit2, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plug, ScanSearch, Sparkles, Users } from "lucide-react";
+import { ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, KeyRound, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plug, ScanSearch, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -11,7 +11,6 @@ import { ShellBrand } from "./shell-brand";
 import { useSidebarReposOpen } from "../hooks";
 import { NAV_ACTIVE as ACTIVE, NAV_CHEVRON as CHEVRON, NAV_ICON as ICON, NAV_ROW as ROW, NAV_TOGGLE as TOGGLE, NavHint as Hint } from "./shell-nav";
 import { ShellRepoTree } from "./shell-repo-tree";
-import { ShellSettingsNav } from "./shell-settings-nav";
 import { ShellThemeSwitch } from "./shell-theme-switch";
 
 export type ShellRepo = {
@@ -31,7 +30,10 @@ type ShellSidebarProps = {
   repos: readonly ShellRepo[];
   repoCount: number;
   showTeam: boolean;
-  showSettings: boolean;
+  showRunners: boolean;
+  showPlan: boolean;
+  runnersPaired: number;
+  runnersRunning: number;
   showDashboard: boolean;
   collapsed: boolean;
   canToggle: boolean;
@@ -46,9 +48,11 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showSettings, showDashboard, collapsed, canToggle, onToggle }: ShellSidebarProps) {
+export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, runnersPaired, runnersRunning, showDashboard, collapsed, canToggle, onToggle }: ShellSidebarProps) {
   const { open: reposOpen, setOpen: setReposOpen } = useSidebarReposOpen();
   const scansLabel = running > 0 ? `Scans, ${running} in progress` : "Scans";
+  const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
+  const runnersLabel = runnersPaired === 0 ? "Runners" : runnersRunning > 0 ? `Runners, ${runnersRunning} running` : "Runners, none running";
   const hasRepoChildren = repoCount >= 2;
   const onConnectFlow = useRouterState({ select: (state) => state.location.pathname.startsWith("/github/") });
   const empty = scanCount === 0;
@@ -151,6 +155,27 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
       </nav>
 
       <nav aria-label="Account" className="grid grid-cols-[minmax(0,1fr)] gap-1 border-t pt-3 empty:hidden">
+        {showRunners && (
+          <Hint label={runnersLabel} collapsed={collapsed}>
+            <Link to="/settings/providers" aria-label={collapsed ? runnersLabel : undefined} className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <KeyRound className={ICON} strokeWidth={1.5} />
+              {collapsed ? (
+                runnersMark && <span aria-hidden="true" className={cn("absolute right-2.5 top-2 size-2 rounded-full", runnersMark)} />
+              ) : (
+                <>
+                  <span className="flex-1">Runners</span>
+                  {runnersMark && (
+                    <>
+                      <span aria-hidden="true" className={cn("size-2 rounded-full", runnersMark)} />
+                      <span className="sr-only">{runnersRunning > 0 ? `${runnersRunning} running` : "none running"}</span>
+                    </>
+                  )}
+                </>
+              )}
+            </Link>
+          </Hint>
+        )}
+
         {showDashboard && (
           <Hint label="Connections" collapsed={collapsed}>
             <Link to="/connections" aria-label="Connections" className={cn(ROW, collapsed && "justify-center px-0", onConnectFlow && ACTIVE.className)} activeProps={ACTIVE}>
@@ -169,7 +194,14 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
           </Hint>
         )}
 
-        {showSettings && <ShellSettingsNav collapsed={collapsed} />}
+        {showPlan && (
+          <Hint label="Plan" collapsed={collapsed}>
+            <Link to="/settings/plan" aria-label="Plan" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <CreditCard className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Plan"}
+            </Link>
+          </Hint>
+        )}
       </nav>
 
       {empty && !collapsed && showDashboard && (

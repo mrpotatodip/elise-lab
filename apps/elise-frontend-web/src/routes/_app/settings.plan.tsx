@@ -4,9 +4,9 @@ import { planOffersQuery, planQuery } from "#/modules/plan";
 import { SettingsPlanPage } from "#/modules/settings";
 
 export const Route = createFileRoute("/_app/settings/plan")({
-  head: () => ({ meta: [{ title: "Plan · Settings · Elise" }] }),
+  head: () => ({ meta: [{ title: "Plan · Elise" }] }),
   beforeLoad: ({ context }) => {
-    if (!hasAccessPower(context.user?.powers ?? [], "company:plan:read")) throw redirect({ to: "/settings/budget" });
+    if (!hasAccessPower(context.user?.powers ?? [], "company:plan:read")) throw redirect({ to: "/overview" });
   },
   loader: async ({ context }) => {
     const plan = await context.queryClient.query({ ...planQuery(), staleTime: "static" });
