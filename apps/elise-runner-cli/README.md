@@ -37,7 +37,7 @@ The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The
 ```bash
 pnpm --filter elise-runner-cli app:dev     # tauri dev
 pnpm --filter elise-runner-cli app:build   # tauri build
-pnpm --filter elise-runner-cli check       # tsc --noEmit, then cargo test for the core and the terminal program
+pnpm --filter elise-runner-cli check       # tsc --noEmit, cargo fmt --check, cargo clippy (-D warnings) and cargo test for the core and the terminal program
 ```
 
 ## The headless Runner
