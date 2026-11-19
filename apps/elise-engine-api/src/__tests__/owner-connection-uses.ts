@@ -12,9 +12,9 @@
 // -----
 export const OWNER_CONNECTION_USES = {
   "lib/app-deps.ts": {
-    uses: 8,
+    uses: 10,
     reason:
-      "The global count of live Scans crosses Accounts; the GitHub Install lookup of POST /scans runs outside its withTenant transaction; the membership checks read a person's Roles across Accounts before one is chosen",
+      "The global count of live Scans crosses Accounts; the GitHub Install lookup of POST /scans runs outside its withTenant transaction; the membership checks read a person's Roles across Accounts before one is chosen; a Runner token names the Runner, and only the Runner row names its Account",
   },
   "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
   "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },
@@ -32,12 +32,11 @@ export const OWNER_CONNECTION_USES = {
   "modules/runners/api/job-archive.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account; the zip is served only for the job that Runner claimed" },
   "modules/runners/api/report-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/runner-me.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
-  "modules/runners/lib/runner-of.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/scan-records/handlers/record-scan-svc.ts": { uses: 4, reason: "A Workflow step with no request: records the finished Scan, its files and findings, filtered by the Scan's Account" },
   "modules/scan-records/types/scan-records-types.ts": { uses: 1, reason: "The env type of record-scan, which the Workflow passes" },
   "modules/scan-workflow/lib/full-scan-workflow.ts": {
-    uses: 6,
-    reason: "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, each filtered by the Scan's Account",
+    uses: 8,
+    reason: "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, write its Trace entries, each filtered by the Scan's Account",
   },
   "modules/scan-workflow/lib/settle-scan-credit.ts": { uses: 4, reason: "A Workflow step with no request: reads the Plan and settles the Scan's credit hold for the Scan's Account" },
   "modules/sign-up/api/create-account.ts": { uses: 2, reason: "Creates the Account, so none exists to run as yet" },

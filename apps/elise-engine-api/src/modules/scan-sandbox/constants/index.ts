@@ -40,6 +40,7 @@ export const SCAN_SANDBOX_CLONE_TIMEOUT_S = 300;
 export const SCAN_SANDBOX_KILL_AFTER_S = 5;
 export const SCAN_SANDBOX_CLONE_GUARD_MS = (SCAN_SANDBOX_CLONE_TIMEOUT_S + 30) * 1000;
 export const SCAN_SANDBOX_LOG_TAIL_CHARS = 2000;
+export const SCAN_SANDBOX_LOG_READ_BYTES = 32 * 1024;
 
 // -----
 // Outbound allowlist
@@ -88,6 +89,12 @@ export const SCAN_SANDBOX_DEFAULT_PRICE = { input: 10, output: 50, cacheRead: 0.
 // -----
 export const SCAN_SANDBOX_FULL_PHASES = ["recon", "hunt", "check", "report"] as const;
 export const SCAN_SANDBOX_PHASES_KEY = "phases";
+
+// -----
+// The key that holds the running Phase's Trace: how far its log was
+// read, the entry that can still grow, and the markers not yet sent.
+// -----
+export const SCAN_SANDBOX_TRACE_KEY = "trace";
 
 // -----
 // Which of the skill's six phases each Phase runs. The skill's own

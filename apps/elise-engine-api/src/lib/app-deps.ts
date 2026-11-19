@@ -4,6 +4,7 @@ import { dbConnect, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { linkScanArchiveEffect } from "#/modules/archives/queries";
 import { holdCreditEffect, settleCreditEffect } from "#/modules/credit";
+import { runnerIdentitySvc } from "#/modules/runners/handlers";
 import { findConnectedRunnerEffect } from "#/modules/runners/queries";
 import { githubAccessFor, neonInstallationRepo } from "#/modules/github-installs";
 import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
@@ -34,6 +35,7 @@ export const realAppDeps: AppDeps = {
   linkArchive: linkScanArchiveEffect,
   releaseCredit: (db, accountId, scanId) => settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 }),
   sessionUserId,
+  runnerIdentity: (c, token) => runEffect(runnerIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) => runEffect(userHasPowerEffect(dbConnect(c.env.DATABASE_URL), userId, accountId, power)),
   enqueueInviteEmail: async (env, mail) => {

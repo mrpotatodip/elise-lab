@@ -19,6 +19,7 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   linkArchive: () => Effect.void,
   releaseCredit: () => Effect.succeed({ settled: true, chargeUsd: 0 }),
   sessionUserId: async () => undefined,
+  runnerIdentity: async () => null,
   userHasAccount: async () => true,
   userHasPower: async () => true,
   enqueueInviteEmail: async () => undefined,
