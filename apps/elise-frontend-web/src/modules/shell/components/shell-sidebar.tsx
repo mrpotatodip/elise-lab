@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, KeyRound, Layers, LayoutDashboard, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Users } from "lucide-react";
+import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -157,7 +157,7 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
         {showRunners && (
           <Hint label={runnersLabel} collapsed={collapsed}>
             <Link to="/settings/providers" aria-label={collapsed ? runnersLabel : undefined} className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
-              <KeyRound className={ICON} strokeWidth={1.5} />
+              <Bot className={ICON} strokeWidth={1.5} />
               {collapsed ? (
                 runnersMark && <span aria-hidden="true" className={cn("absolute right-2.5 top-2 size-2 rounded-full", runnersMark)} />
               ) : (

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
-import { Laptop } from "lucide-react";
+import { Bot } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "#/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -82,7 +82,7 @@ export function RunnersCard() {
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <Laptop aria-hidden="true" />
+                <Bot aria-hidden="true" />
               </EmptyMedia>
               <EmptyTitle>No runners yet</EmptyTitle>
               <EmptyDescription>Add a computer to get a pairing code, then type the code into the Elise Runner app on it.</EmptyDescription>
