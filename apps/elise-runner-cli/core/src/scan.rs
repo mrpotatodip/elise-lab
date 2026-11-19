@@ -926,7 +926,13 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
         Ok(end) => Ok(end),
         Err(()) => {
             let stderr = fs::read_to_string(work.join(&err_name)).unwrap_or_default();
-            let said = format!("claude exited {}: {} {}", status.code().unwrap_or(-1), tail(stderr.trim(), 1500), tail(stdout.trim(), 1500));
+            let code = status.code().unwrap_or(-1);
+            // The agent's own sentence leads, so the person reads why it stopped; the end of the
+            // raw output follows for support. Without a sentence the raw tails are all there is.
+            let said = match agent_words(&stdout) {
+                Some(words) => format!("claude exited {code}: {words}\n\nThe end of the agent's output:\n{} {}", tail(stderr.trim(), 500), tail(stdout.trim(), 600)),
+                None => format!("claude exited {code}: {} {}", tail(stderr.trim(), 1500), tail(stdout.trim(), 1500)),
+            };
             Err(match phase {
                 Some(phase) => format!("{} failed: {said}", capitalized(&run_label(phase))),
                 None => said,
@@ -934,6 +940,16 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
         }
     };
     Ok(AgentRun { end, result: last_result(&stdout), stdout })
+}
+
+// What the agent itself said when it ended, from the `result` of its final JSON object: a refusal such as
+// "You've hit your 5-hour limit" is only there, never in stderr. Cut to a length a person can read.
+fn agent_words(log: &str) -> Option<String> {
+    let words = last_result(log)?["result"].as_str()?.trim().to_string();
+    if words.is_empty() {
+        return None;
+    }
+    Some(words.chars().take(400).collect())
 }
 
 // The agent's final JSON result: the log is one object, or has stray lines before it.
@@ -1277,6 +1293,7 @@ esac
 cost=$(printf '%s' "$prompt" | sed -n 's/.*[^o]cost=\(-\{0,1\}[0-9.]*\).*/\1/p')
 case "$prompt" in
   *"stop=crash"*) echo "the agent said: boom" >&2; exit 2 ;;
+  *"stop=usage"*) printf '%s\n' '{"type":"result","subtype":"success","is_error":true,"result":"You'"'"'ve hit your 5-hour limit · resets 5:40pm (Pacific/Auckland)","total_cost_usd":0,"usage":{"input_tokens":0,"output_tokens":0}}'; exit 1 ;;
 esac
 case "$prompt" in
   *"phase=recon"*) echo recon > out/recon.md ;;
@@ -1453,6 +1470,23 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert!(!said.contains("PARTIAL:"));
         assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
         assert!(report.files.is_empty());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    // A refusal such as a plan's usage limit is in the agent's JSON `result`, with nothing on stderr.
+    // The Scan's reason starts with that sentence, not with a cut-off piece of the JSON.
+    #[cfg(unix)]
+    #[test]
+    fn a_phase_the_plan_refused_says_so_in_the_agents_own_words() {
+        let stage = stage("usage");
+        let job = phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check stop=usage", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.clone().unwrap();
+        assert!(said.starts_with("The check phase failed: claude exited 1: You've hit your 5-hour limit · resets 5:40pm (Pacific/Auckland)"), "{said}");
+        assert!(said.contains("The end of the agent's output:"), "{said}");
         let _ = fs::remove_dir_all(&stage.root);
     }
 

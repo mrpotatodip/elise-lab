@@ -18,6 +18,11 @@ describe("scanFailure", () => {
     ["a clone the timeout killed", TIMEOUT, "Cloning the repository took too long and was stopped."],
     ["an agent that ran out of memory", "claude exited 1: RangeError: Out of memory", "The agent ran out of memory while it read the repository."],
     [
+      "a plan that hit its usage limit, in the agent's own words",
+      "The check phase failed: claude exited 1: You've hit your 5-hour limit · resets 5:40pm (Pacific/Auckland)\n\nThe end of the agent's output:\n {\"type\":\"result\"}",
+      "Your Claude plan is out of usage.",
+    ],
+    [
       "a review that ended with no report, whose text mentions budget",
       "The audit finished without writing REPORT.md. The agent may have been stopped by a permission, or run out of budget.",
       "The agent stopped before it wrote the report.",
