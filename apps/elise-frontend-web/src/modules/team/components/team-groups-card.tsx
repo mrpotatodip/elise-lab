@@ -213,7 +213,7 @@ export function TeamGroupsCard() {
   const [{ data: groups }, { data: team }] = useSuspenseQueries({ queries: [groupsQuery(), teamQuery()] });
 
   return (
-    <Card className="max-w-4xl">
+    <Card id="groups" className="scroll-mt-24">
       <CardHeader>
         <CardTitle>Groups</CardTitle>
       </CardHeader>
@@ -230,7 +230,7 @@ export function TeamGroupsCard() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <ul className="grid gap-4 md:grid-cols-2">
+          <ul className="grid gap-4">
             {groups.map((group) => (
               <GroupRow key={group.id} group={group} members={team.members} />
             ))}
