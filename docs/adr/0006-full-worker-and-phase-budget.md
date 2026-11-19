@@ -66,7 +66,11 @@ A person can end a `queued` or `running` Scan on purpose: `POST /scans/:scanId/s
 
 A Stopped Scan keeps no Report and no findings. It frees the Account's active-Scan slot (only `queued` and `running` count), weighs 0 in the Verdict and is never a Branch's latest Scan, because every one of those reads takes `succeeded` Scans only. The Workflow that is still polling can no longer overwrite it: `ledger.mark` never writes over `stopped`, the record step skips it, and a Runner sandbox queues no job for a Scan stopped before the Workflow got to it. The Workflow ends by itself on its next poll, when it finds the job cancelled.
 
-This ticket stops Runner Scans. A cloud Scan's Sandbox and credit are #251; a headless Runner learns of the stop from the job-state route in #250. A Runner built before that keeps running until it finishes, and its result is refused.
+A cloud Scan's Stop (#251) also tears down its Sandbox, which destroys the container, and records the cost the meter had reached. The Scan is charged that cost, as a failed Scan is; a Runner Scan is charged nothing. If the teardown fails the Scan is still stopped, and nothing is charged.
+
+A headless Runner learns of the stop from the job-state route (#250). A Runner built before that keeps running until it finishes, and its result is refused.
+
+Removing a Runner (#252) stops the Scan it is running in the same transaction as the revoke: the claimed job becomes `cancelled` and its Scan `stopped`. The Runner's next job-state check gets a 401, so it kills the agent, sends nothing, keeps its work folder and forgets its token.
 
 ## Not built here
 
