@@ -239,7 +239,7 @@ export function TraceShell({ active, narrow, children }: { active: boolean; narr
 export function ScanTrace({ scan }: { scan: ScanStatus }) {
   const active = scan.status === "queued" || scan.status === "running";
   return (
-    <TraceShell active={active} narrow={scan.status !== "succeeded"}>
+    <TraceShell active={active} narrow={false}>
       <TraceEntries scan={scan} active={active} />
     </TraceShell>
   );
