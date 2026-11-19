@@ -18,6 +18,7 @@ import type { FileEntry, FilesSearch } from "../schemas";
 import { FileDownloadButton } from "./file-download-button";
 import { FileFilters } from "./file-filters";
 import { FileListSkeleton } from "./file-list-skeleton";
+import { FileListSummary } from "./file-list-summary";
 
 type FileListViewProps = {
   filters: FilesSearch;
@@ -113,6 +114,8 @@ function FileListView({ filters, onChange }: FileListViewProps) {
   const table = useTable({ features: dataTableFeatures, columns, data: files, getRowId: rowKey });
 
   return (
+    <>
+    <FileListSummary files={files} counts={data.counts} more={Boolean(nextCursor)} />
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <div className="grid gap-1.5">
@@ -155,6 +158,7 @@ function FileListView({ filters, onChange }: FileListViewProps) {
         )}
       </CardContent>
     </Card>
+    </>
   );
 }
 
