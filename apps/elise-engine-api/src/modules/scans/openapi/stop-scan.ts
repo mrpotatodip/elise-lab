@@ -11,6 +11,7 @@ export const stopScanDoc = describeRoute({
     steps: [
       "The Worker checks the token and the account, as for starting a scan.",
       "The Worker sets a `queued` or `running` Scan to `stopped` and its Runner job, if it has one, to `cancelled`, in one transaction. No Runner claims a cancelled job, and a late report for it is refused.",
+      "A Scan in our cloud also has its Workflow ended and its sandbox destroyed, the cost metered up to the stop is recorded on it, and its credit is settled at that cost. A queued Scan with no sandbox is charged nothing.",
       "A Scan that already ended answers 409 and changes nothing. A scan of another account answers 404.",
     ],
     example: [

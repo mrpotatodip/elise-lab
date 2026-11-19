@@ -109,7 +109,7 @@ const columns = column.columns([
   column.display({
     id: "stop",
     header: () => <span className="sr-only">Stop</span>,
-    cell: ({ row }) => (canStopScan(row.original) ? <ScanStopButton scanId={row.original.scanId} className="relative" /> : null),
+    cell: ({ row }) => (canStopScan(row.original) ? <ScanStopButton scanId={row.original.scanId} onRunner={Boolean(row.original.runner)} className="relative" /> : null),
   }),
   column.display({
     id: "open",

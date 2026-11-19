@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { Effect } from "effect";
-import type { AccessPower } from "@repo/contracts/elise";
+import type { AccessPower, ScanUsage } from "@repo/contracts/elise";
 import type { TenantDbType } from "#/lib/db-connection";
 import type { DbError, Invalid } from "#/lib/effect-query";
 import type { ScanArchiveLink } from "#/modules/archives/queries";
@@ -65,6 +65,7 @@ export type AppDeps = {
   connectedRunnerSources: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<string[] | null, DbError>;
   linkArchive: (db: TenantDbType, accountId: string, link: ScanArchiveLink) => Effect.Effect<void, Invalid | DbError>;
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
+  teardownScan: (env: Bindings, scanId: string) => Promise<ScanUsage | null>;
   sessionUserId: (c: Context<AppEnv>) => Promise<string | undefined>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;

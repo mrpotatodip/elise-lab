@@ -6,9 +6,9 @@ import { stopScan } from "../api";
 import { isScanActive, scanKeys } from "../hooks";
 import type { ScanStatus } from "../schemas";
 
-export const canStopScan = (scan: Pick<ScanStatus, "status" | "runner">): boolean => isScanActive(scan.status) && Boolean(scan.runner);
+export const canStopScan = (scan: Pick<ScanStatus, "status">): boolean => isScanActive(scan.status);
 
-export function ScanStopButton({ scanId, size = "sm", className }: { scanId: string; size?: "sm" | "default"; className?: string }) {
+export function ScanStopButton({ scanId, onRunner, size = "sm", className }: { scanId: string; onRunner: boolean; size?: "sm" | "default"; className?: string }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const stop = useMutation({
@@ -32,7 +32,9 @@ export function ScanStopButton({ scanId, size = "sm", className }: { scanId: str
         <DialogHeader>
           <DialogTitle>Stop this scan?</DialogTitle>
           <DialogDescription>
-            The scan ends at once. No report and no findings are kept. A Runner built before this change keeps running until it finishes, and its result is dropped.
+            {onRunner
+              ? "The scan ends at once. No report and no findings are kept. A Runner built before this change keeps running until it finishes, and its result is dropped."
+              : "The scan ends at once and its sandbox is destroyed. No report and no findings are kept. The cost so far is still charged."}
           </DialogDescription>
         </DialogHeader>
         {stop.isError && <p role="alert" className="text-sm text-status-danger">{stop.error.message}</p>}
