@@ -1,3 +1,4 @@
+export * from "./groups-page";
 export * from "./team-confirm-dialog";
 export * from "./team-groups-card";
 export * from "./team-invite-accept";

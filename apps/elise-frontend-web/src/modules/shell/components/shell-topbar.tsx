@@ -41,6 +41,7 @@ const crumbs = (pathname: string, names: RouteNames | null, when: FormatTime): C
   if (pathname.startsWith("/github/")) return [{ label: "Connections", to: "/connections" }, { label: "Finish connecting GitHub" }];
   if (pathname.startsWith("/connections")) return [{ label: "Connections" }];
   if (pathname.startsWith("/team")) return [{ label: "Team" }];
+  if (pathname.startsWith("/groups")) return [{ label: "Groups" }];
   if (pathname.startsWith("/settings/plan")) return [{ label: "Plan" }];
   if (pathname.startsWith("/settings/providers")) return [{ label: "Runners" }];
   if (pathname.startsWith("/summary/")) return [{ label: "Security status", to: "/summary" }, { label: names?.name ?? "Repository" }];

@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { buttonVariants } from "#/components/ui/button";
 import { Card } from "#/components/ui/card";
@@ -77,9 +78,9 @@ export function TeamSummary() {
         <Column
           label="Groups"
           footer={
-            <a href="#groups" className={ACTION}>
+            <Link to="/groups" className={ACTION}>
               Manage groups
-            </a>
+            </Link>
           }
         >
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">

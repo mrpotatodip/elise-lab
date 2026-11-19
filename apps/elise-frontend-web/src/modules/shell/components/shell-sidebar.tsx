@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, KeyRound, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plug, ScanSearch, Sparkles, Users } from "lucide-react";
+import { ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, KeyRound, Layers, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plug, ScanSearch, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -190,6 +190,15 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
             <Link to="/team" aria-label="Team" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <Users className={ICON} strokeWidth={1.5} />
               {!collapsed && "Team"}
+            </Link>
+          </Hint>
+        )}
+
+        {showTeam && (
+          <Hint label="Groups" collapsed={collapsed}>
+            <Link to="/groups" aria-label="Groups" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <Layers className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Groups"}
             </Link>
           </Hint>
         )}

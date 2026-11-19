@@ -213,7 +213,7 @@ export function TeamGroupsCard() {
   const [{ data: groups }, { data: team }] = useSuspenseQueries({ queries: [groupsQuery(), teamQuery()] });
 
   return (
-    <Card id="groups" className="scroll-mt-24">
+    <Card>
       <CardHeader>
         <CardTitle>Groups</CardTitle>
         <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Sort people into teams, such as Backend or Security. A person can be in several.</p>
@@ -231,7 +231,7 @@ export function TeamGroupsCard() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <ul className="grid gap-4">
+          <ul className="grid gap-4 md:grid-cols-2">
             {groups.map((group) => (
               <GroupRow key={group.id} group={group} members={team.members} />
             ))}

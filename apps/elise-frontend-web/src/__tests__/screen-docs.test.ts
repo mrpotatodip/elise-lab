@@ -17,6 +17,7 @@ const SCREEN_WORD = {
   repos: "Repositories",
   files: "Files",
   team: "Team",
+  groups: "Groups",
   settings: "Settings",
   connections: "Connections",
   github: "GitHub",
