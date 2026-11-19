@@ -131,7 +131,7 @@ describe("createScanSvc", () => {
     });
 
     it("stores a Scan on a Runner as full, starts it on the full workflow and counts it on MAX_ACTIVE_SCANS only", async () => {
-      const { env, createdFull } = fakeBindings({ MAX_ACTIVE_SCANS: "1", MAX_ACTIVE_FULL_SCANS: "0", MAX_GLOBAL_FULL_SCANS: "0" });
+      const { env, createdFull } = fakeBindings({ MAX_ACTIVE_SCANS: "1", MAX_ACTIVE_FULL_SCANS: "0" });
       const queued = await startOnRunnerOk(env, "acme", "a");
 
       expect(queued).toMatchObject({ status: "queued", skill: "full" });
@@ -139,16 +139,6 @@ describe("createScanSvc", () => {
       expect(createdFull).toHaveLength(1);
       expect(await startOnRunner(env, "acme", "b")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("Runner scans (limit 1)") });
       expect(await startOnRunnerOk(env, "other", "c")).toMatchObject({ status: "queued" });
-    });
-
-    it("does not use up the place of a full Scan in our cloud, nor the platform's", async () => {
-      const { env, createdFull } = fakeBindings({ MAX_GLOBAL_FULL_SCANS: "1" });
-      await startOnRunnerOk(env, "other", "a");
-      await startOnRunnerOk(env, "acme", "b");
-      await startOk(env, "acme", "c");
-
-      expect(createdFull).toHaveLength(3);
-      expect(await start(env, "someone", "d")).toMatchObject({ code: "SCAN_WORKER_BUSY" });
     });
 
     it("is not held back by a full Scan of its Account in our cloud", async () => {

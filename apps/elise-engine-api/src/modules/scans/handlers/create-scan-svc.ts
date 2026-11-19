@@ -26,7 +26,7 @@ export const ARCHIVE_NOT_LINKED = "archive_id: this Scan cannot read a zip";
 // -----
 export const queueScanSvc = (
   env: CreateScanEnv,
-  repo: Pick<ScanRepo, "ensureRepo" | "create" | "mark" | "activeSince" | "activeCounts">,
+  repo: Pick<ScanRepo, "ensureRepo" | "create" | "mark" | "activeSince">,
   accountId: string,
   input: CreateScanBody,
   spend: MonthSpend,
@@ -90,19 +90,15 @@ export const queueScanSvc = (
     }
 
     // -----
-    // Each pool counts on its own, for the Account and over all Accounts.
-    // Every Scan that runs in our cloud meets MAX_ACTIVE_FULL_SCANS and
-    // MAX_GLOBAL_FULL_SCANS. A Scan on a Runner meets only
-    // MAX_ACTIVE_SCANS for its Account, and the live Scans on a Runner are
-    // counted there too, never against the full limit. It holds no
-    // Sandbox of ours, so the global caps do not count it and do not
-    // refuse it.
+    // Each pool counts on its own, for the Account. Every Scan that runs
+    // in our cloud meets MAX_ACTIVE_FULL_SCANS. A Scan on a Runner meets
+    // only MAX_ACTIVE_SCANS, and the live Scans on a Runner are counted
+    // there too, never against the full limit.
     // -----
     const limitPath = limitPathOf({ skill: options.skill, runner: input.runner_id === undefined ? null : { id: input.runner_id } });
     const nowMs = Date.now();
     const activeScans = yield* repo.activeSince(accountId, nowMs);
-    const globalActive = input.runner_id === undefined ? yield* repo.activeCounts(nowMs) : null;
-    const refusal = scanRefusalOf(env, limitPath, activeScans.filter((scan) => limitPathOf(scan) === limitPath).length, globalActive);
+    const refusal = scanRefusalOf(env, limitPath, activeScans.filter((scan) => limitPathOf(scan) === limitPath).length);
     if (refusal) return yield* new RateLimited(refusal);
 
     // -----
