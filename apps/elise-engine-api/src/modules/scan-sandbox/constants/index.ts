@@ -40,6 +40,7 @@ export const SCAN_SANDBOX_CLONE_TIMEOUT_S = 300;
 export const SCAN_SANDBOX_KILL_AFTER_S = 5;
 export const SCAN_SANDBOX_CLONE_GUARD_MS = (SCAN_SANDBOX_CLONE_TIMEOUT_S + 30) * 1000;
 export const SCAN_SANDBOX_LOG_TAIL_CHARS = 2000;
+export const SCAN_SANDBOX_LOG_READ_BYTES = 32 * 1024;
 
 // -----
 // Outbound allowlist

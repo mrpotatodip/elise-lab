@@ -48,12 +48,16 @@ export const TraceQuerySchema = z.object({
 // -----
 // The entries changed after the cursor, in display order (start time,
 // then id), and the cursor to send next time. The reader replaces an
-// entry it already has by id, so a grown entry updates in place.
+// entry it already has by id, so a grown entry updates in place. A
+// read can repeat entries from just before the cursor. now is the
+// server's clock, for a reader to measure ages against (optional: an
+// older engine leaves it out).
 // -----
 export const TraceSchema = z.object({
   entries: z.array(TraceEntrySchema),
   cursor: z.iso.datetime().nullable(),
   candidateFindings: z.number().int().min(0).nullable(),
+  now: z.iso.datetime().optional(),
 });
 
 export type TraceEntry = z.infer<typeof TraceEntrySchema>;

@@ -52,7 +52,7 @@ export const fetchScanTrace = createServerFn({ method: "GET" })
     return engineJson(TraceSchema, `/scans/${data.scanId}/trace${query}`, {}, await engineAuth());
   });
 
-export const fetchScanFile =createServerFn({ method: "GET" })
+export const fetchScanFile = createServerFn({ method: "GET" })
   .validator(ScanFileInputSchema)
   .handler(async ({ data }) => {
     const res = await engineFetch(`/scans/${data.scanId}/files/${data.file}`, {}, await engineAuth());

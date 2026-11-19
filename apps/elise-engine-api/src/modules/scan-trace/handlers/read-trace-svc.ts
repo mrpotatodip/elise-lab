@@ -27,5 +27,6 @@ export const readTraceSvc = (db: AppDbType, accountId: string, scanId: string, q
       })),
       cursor: newest ?? query.after ?? null,
       candidateFindings: scan.candidateFindings,
+      now: new Date().toISOString(),
     };
   });

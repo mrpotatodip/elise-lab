@@ -174,16 +174,22 @@ impl TraceSink {
     }
 
     // Sends the entries that changed since the last send, 500 to a request. A failed request is
-    // dropped, not retried: an entry that grows is sent again with its next change.
+    // dropped, not retried: an entry that grows is sent again with its next change. A send that
+    // is cancelled (the run ended while it was in flight) puts the entries it had not sent back
+    // as changed, so the last send carries them.
     async fn flush(&self) {
-        let changed: Vec<Entry> = self.with_state(|state| {
-            let places = std::mem::take(&mut state.changed);
-            places
-                .into_iter()
-                .filter_map(|at| state.entries.get(at).cloned())
-                .collect()
-        });
-        for batch in changed.chunks(BATCH_MAX) {
+        let mut guard = Unsent {
+            sink: self,
+            places: self.with_state(|state| std::mem::take(&mut state.changed).into_iter().collect()),
+        };
+        while !guard.places.is_empty() {
+            let take = guard.places.len().min(BATCH_MAX);
+            let batch: Vec<Entry> = self.with_state(|state| {
+                guard.places[..take]
+                    .iter()
+                    .filter_map(|at| state.entries.get(*at).cloned())
+                    .collect()
+            });
             let _ = client()
                 .post(format!(
                     "{}/runners/jobs/{}/trace",
@@ -195,7 +201,21 @@ impl TraceSink {
                 .json(&serde_json::json!({ "entries": batch }))
                 .send()
                 .await;
+            guard.places.drain(..take);
         }
+    }
+}
+
+// The places of a send not yet made; what is left when it is dropped goes back to `changed`.
+struct Unsent<'a> {
+    sink: &'a TraceSink,
+    places: Vec<usize>,
+}
+
+impl Drop for Unsent<'_> {
+    fn drop(&mut self) {
+        let places = std::mem::take(&mut self.places);
+        self.sink.with_state(|state| state.changed.extend(places));
     }
 }
 
@@ -253,12 +273,24 @@ async fn read_loop(sink: TraceSink, log: PathBuf, phased: bool, stop: Arc<Notify
             _ = stop.notified() => true,
         };
         read_new(&log, &mut offset, &mut pending, stopped, &sink);
-        if stopped && phased {
-            sink.with_state(|state| state.record(Label::PhaseEnded));
-        }
-        sink.flush().await;
         if stopped {
+            if phased {
+                sink.with_state(|state| state.record(Label::PhaseEnded));
+            }
+            sink.flush().await;
             return;
+        }
+        // A periodic send gives way to the end of the run: the final read and send come first.
+        tokio::select! {
+            () = sink.flush() => {}
+            () = stop.notified() => {
+                read_new(&log, &mut offset, &mut pending, true, &sink);
+                if phased {
+                    sink.with_state(|state| state.record(Label::PhaseEnded));
+                }
+                sink.flush().await;
+                return;
+            }
         }
     }
 }

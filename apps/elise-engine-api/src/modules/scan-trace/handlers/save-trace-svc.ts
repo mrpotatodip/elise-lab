@@ -32,6 +32,12 @@ export const keepTraceBatchSvc = (db: AppDbType, tenantId: string, scanId: strin
       scanId,
       entries.map((entry) => entry.id),
     );
+    // -----
+    // The cap check and the write are two statements, so two batches of
+    // one Scan in flight together can pass the cap by one batch (at most
+    // TRACE_BATCH_MAX entries). A Scan has one producer sending in turn,
+    // so the overshoot is accepted rather than locked against.
+    // -----
     const total = yield* countTraceEntriesEffect(db, scanId);
     const room = Math.max(0, TRACE_ENTRIES_PER_SCAN_MAX - total);
     const fresh = entries.filter((entry) => !known.has(entry.id)).slice(0, room);

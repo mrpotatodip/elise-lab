@@ -14,11 +14,11 @@ function TraceEntries({ scan, active }: { scan: ScanStatus; active: boolean }) {
   const candidateFindings = data?.candidateFindings ?? null;
   const loaded = !isPending;
   const failed = isError && !data;
-  const now = useNow();
+  const browserNow = useNow();
   const [mountedAt] = useState(() => Date.now());
   const newest = entries[0];
-  const lastEventAt = newest ? new Date(newest.endedAt).getTime() : mountedAt;
-  const quiet = active && now - lastEventAt >= TRACE_QUIET_MS;
+  const now = browserNow + (data?.offsetMs ?? 0);
+  const quiet = active && browserNow - (data?.changedAt ?? mountedAt) >= TRACE_QUIET_MS;
   const currentPhase = newest?.phase ? TRACE_PHASE_COPY[newest.phase] : null;
   const step = scan.step ? SCAN_STEP_COPY[scan.step] : null;
 
@@ -29,7 +29,8 @@ function TraceEntries({ scan, active }: { scan: ScanStatus; active: boolean }) {
         {loaded && failed && <p>The trace could not be loaded. It tries again by itself while the scan runs.</p>}
         {loaded && !failed && active && step && <p>{step.label}. Nothing more detailed yet.</p>}
         {loaded && !failed && !active && step && <p>Last step: {step.label}.</p>}
-        {loaded && !failed && (
+        {loaded && !failed && active && <p>Waiting for the first entries.</p>}
+        {loaded && !failed && !active && (
           <p>{scan.runner ? "Live detail needs a newer Runner." : "No live detail was recorded for this scan."}</p>
         )}
         {quiet && <p>Nothing new has arrived for a few minutes. The scan is still running; some steps take a while.</p>}

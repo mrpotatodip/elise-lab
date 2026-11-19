@@ -16,6 +16,7 @@ import {
   SCAN_SANDBOX_INACTIVITY_MS,
   SCAN_SANDBOX_INSTANCE_TYPE,
   SCAN_SANDBOX_KIND_FILE,
+  SCAN_SANDBOX_LOG_READ_BYTES,
   SCAN_SANDBOX_LOG_TAIL_CHARS,
   SCAN_SANDBOX_METER_KEY,
   SCAN_SANDBOX_OUT_DIR,
@@ -29,6 +30,7 @@ import {
 import { drainTrace as drainLog, emptyTraceState, phaseMarker, type TraceState } from "#/modules/scan-trace/utils";
 import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, OutboundGithub, ScanCheckout } from "#/modules/scan-sandbox/types";
 import {
+  agentErrorText,
   buildAgentPrompt,
   buildAgentScript,
   buildCloneScript,
@@ -157,8 +159,8 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     const meter = await this.#openMeter(options.maxBudgetUsd);
     const started = await this.#startedPhases();
     if (!started.includes(phase)) {
-      await this.ctx.storage.put<FullPhase[]>(SCAN_SANDBOX_PHASES_KEY, [...started, phase]);
-      await this.ctx.storage.put<StoredTrace>(SCAN_SANDBOX_TRACE_KEY, { ...emptyTraceState(), phase, pending: [phaseMarker("phase_started", phase, new Date())], ended: false });
+      const trace: StoredTrace = { ...emptyTraceState(), phase, pending: [phaseMarker("phase_started", phase, new Date())], ended: false };
+      await this.ctx.storage.put({ [SCAN_SANDBOX_PHASES_KEY]: [...started, phase], [SCAN_SANDBOX_TRACE_KEY]: trace });
     }
     const remaining = remainingUsd(meter);
     console.log(`scan: phase ${phase} starts, $${remaining.toFixed(4)} of the $${options.maxBudgetUsd} cap left`);
@@ -218,9 +220,10 @@ export class FullScanSandbox extends DurableObject<Bindings> {
 
   async agentLogTail(): Promise<string> {
     const files = await this.#currentFiles();
-    const log = (await this.#readText(files.log)) ?? "(no agent log)";
+    const log = (await this.#logEnd(files.log)) ?? "";
     const err = (await this.#readText(files.err))?.trim();
-    return `${err ? `${err.slice(-SCAN_SANDBOX_LOG_TAIL_CHARS)} ` : ""}${log.slice(-SCAN_SANDBOX_LOG_TAIL_CHARS)}`;
+    const text = agentErrorText(log, SCAN_SANDBOX_LOG_TAIL_CHARS) || "(no agent log)";
+    return `${err ? `${err.slice(-SCAN_SANDBOX_LOG_TAIL_CHARS)} ` : ""}${text}`;
   }
 
   // -----
@@ -231,7 +234,7 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async readUsage(): Promise<ScanUsage | null> {
     const meter = await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY);
     const started = await this.#startedPhases();
-    const logs = await Promise.all((started.length > 0 ? started.map((phase) => phaseAgentFiles(phase)) : [DEFAULT_AGENT_FILES]).map((files) => this.#readText(files.log)));
+    const logs = await Promise.all((started.length > 0 ? started.map((phase) => phaseAgentFiles(phase)) : [DEFAULT_AGENT_FILES]).map((files) => this.#logEnd(files.log)));
     const reports = logs.flatMap((log) => (log === null ? [] : [parseAgentUsage(log)])).filter((report) => report !== null);
     const reported = reports.length === 0 ? null : { ...reports[0], turns: sumOrNull(reports.map((report) => report.turns)), durationMs: sumOrNull(reports.map((report) => report.durationMs)) };
     if (meter === undefined) return reported;
@@ -304,6 +307,20 @@ export class FullScanSandbox extends DurableObject<Bindings> {
       return output.exitCode === 0 ? new TextDecoder().decode(output.stdout) : "";
     } catch {
       return "";
+    }
+  }
+
+  // -----
+  // The last bytes of a log, null when the file is not there. The first
+  // line may be cut; the lines a caller wants (the result line) are last.
+  // -----
+  async #logEnd(path: string): Promise<string | null> {
+    try {
+      const process = await this.#container.exec(["tail", "-c", `${SCAN_SANDBOX_LOG_READ_BYTES}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });
+      const output = await process.output();
+      return output.exitCode === 0 ? new TextDecoder().decode(output.stdout) : null;
+    } catch {
+      return null;
     }
   }
 

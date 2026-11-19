@@ -4,6 +4,7 @@ import { scanRunnerJobs, scans, scanTraceEntries } from "@repo/db-elise/schema";
 import type { TraceEntry } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
+import { SCAN_TRACE_CURSOR_OVERLAP_SECONDS } from "#/modules/scan-trace/constants";
 import type { TraceRow } from "#/modules/scan-trace/types";
 
 // -----
@@ -74,8 +75,9 @@ export const knownTraceIdsEffect = (db: AppDbType, scanId: string, ids: readonly
 
 // -----
 // Writes the entries, replacing any the Scan already has by id. Every
-// written row takes the database's time as updated_at, so a reader's
-// cursor never depends on the producer's clock.
+// written row takes the database's time as updated_at, read when the
+// statement runs (clock_timestamp, not the transaction's start), so a
+// reader's cursor never depends on the producer's clock.
 // -----
 export const upsertTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId: string, entries: readonly TraceEntry[]): Effect.Effect<void, DbError> =>
   entries.length === 0
@@ -94,6 +96,7 @@ export const upsertTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId
                 startedAt: new Date(entry.startedAt),
                 endedAt: new Date(entry.endedAt),
                 count: entry.count,
+                updatedAt: sql`clock_timestamp()`,
               })),
             )
             .onConflictDoUpdate({
@@ -104,7 +107,7 @@ export const upsertTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId
                 startedAt: sql`excluded.started_at`,
                 endedAt: sql`excluded.ended_at`,
                 count: sql`excluded.count`,
-                updatedAt: sql`now()`,
+                updatedAt: sql`clock_timestamp()`,
               },
             }),
         catch: toDbError,
@@ -142,7 +145,7 @@ export const readTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId: 
           and(
             eq(scanTraceEntries.tenantId, tenantId),
             eq(scanTraceEntries.scanId, scanId),
-            after === undefined ? undefined : gt(scanTraceEntries.updatedAt, sql`${after}::timestamptz`),
+            after === undefined ? undefined : gt(scanTraceEntries.updatedAt, sql`${after}::timestamptz - make_interval(secs => ${SCAN_TRACE_CURSOR_OVERLAP_SECONDS})`),
           ),
         )
         .orderBy(asc(scanTraceEntries.startedAt), asc(scanTraceEntries.id)),
