@@ -30,7 +30,7 @@ function GithubConnectView({ canConnect }: GithubConnectCardProps) {
   const { connect } = useGithubActions();
 
   return (
-    <Card>
+    <Card className="max-w-4xl">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
         <div className="grid gap-1.5">
           <CardTitle>GitHub</CardTitle>

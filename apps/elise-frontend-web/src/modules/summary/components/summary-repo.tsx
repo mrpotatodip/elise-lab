@@ -17,7 +17,10 @@ function RepoLine({ repo, leading }: { repo: Repo; leading: ReactNode }) {
       <span className="flex min-w-0 items-center gap-3">
         {leading}
         <span className="grid min-w-0 gap-0.5">
-          <span className="truncate font-medium">{repoName(repo.url)}</span>
+          <span className="flex min-w-0 items-center gap-2.5">
+            <span className="truncate font-medium">{repoName(repo.url)}</span>
+            <Badge variant={status.variant}>{status.label}</Badge>
+          </span>
           <span className="text-xs leading-relaxed text-muted-foreground">{repoSubtitle(repo)}</span>
         </span>
       </span>
@@ -26,7 +29,6 @@ function RepoLine({ repo, leading }: { repo: Repo; leading: ReactNode }) {
         {repo.open.total > 0 && <ScanSeverityDots counts={repo.open.severity} />}
         {repo.open.needsValidation > 0 && <span className="text-xs text-muted-foreground">{needsPersonLabel(repo.open.needsValidation)}</span>}
         {repo.open.total > 0 && <span className="font-medium tabular-nums">{repo.open.total} open</span>}
-        <Badge variant={status.variant}>{status.label}</Badge>
       </span>
     </>
   );

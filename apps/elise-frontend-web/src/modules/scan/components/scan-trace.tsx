@@ -203,7 +203,7 @@ function TraceEntries({ scan, active }: { scan: ScanStatus; active: boolean }) {
   );
 }
 
-export function TraceShell({ active, children }: { active: boolean; children: ReactNode }) {
+export function TraceShell({ active, narrow, children }: { active: boolean; narrow: boolean; children: ReactNode }) {
   if (active) {
     return (
       <Card>
@@ -217,7 +217,7 @@ export function TraceShell({ active, children }: { active: boolean; children: Re
   }
 
   return (
-    <Card>
+    <Card className={narrow ? "max-w-4xl" : undefined}>
       <Collapsible>
         <CardHeader className="gap-1.5">
           <CardTitle>
@@ -239,7 +239,7 @@ export function TraceShell({ active, children }: { active: boolean; children: Re
 export function ScanTrace({ scan }: { scan: ScanStatus }) {
   const active = scan.status === "queued" || scan.status === "running";
   return (
-    <TraceShell active={active}>
+    <TraceShell active={active} narrow={scan.status !== "succeeded"}>
       <TraceEntries scan={scan} active={active} />
     </TraceShell>
   );

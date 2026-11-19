@@ -77,12 +77,9 @@ export function RunnersCard() {
   const table = useTable({ features: dataTableFeatures, columns, data: rows, getRowId: (row) => row.runner.id });
 
   return (
-    <Card>
+    <Card className="max-w-4xl">
       <CardHeader className="flex-row items-center justify-between">
-        <div className="grid gap-1.5">
-          <CardTitle>Runners</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The computers that run this account&apos;s scans, on their own Claude and git login. Elise charges nothing per scan.</p>
-        </div>
+        <CardTitle>Computers</CardTitle>
         <Suspense fallback={<Skeleton className="h-8 w-32" />}>
           <RunnerAddDialog />
         </Suspense>

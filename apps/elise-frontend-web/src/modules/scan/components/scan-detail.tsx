@@ -48,7 +48,7 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
   if (scan.status === "failed") {
     const failure = scanFailure(scan.error);
     return (
-      <Alert variant="destructive">
+      <Alert variant="destructive" className="max-w-4xl">
         <OctagonX />
         <div className="grid gap-1">
           <AlertDescription className="font-medium">{failure.title}</AlertDescription>
@@ -68,7 +68,7 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
   }
   if (scan.status === "stopped") {
     return (
-      <Alert>
+      <Alert className="max-w-4xl">
         <OctagonX />
         <div className="grid gap-1">
           <AlertDescription className="font-medium">You stopped this scan.</AlertDescription>

@@ -213,7 +213,7 @@ export function TeamGroupsCard() {
   const [{ data: groups }, { data: team }] = useSuspenseQueries({ queries: [groupsQuery(), teamQuery()] });
 
   return (
-    <Card>
+    <Card className="max-w-4xl">
       <CardHeader>
         <CardTitle>Groups</CardTitle>
       </CardHeader>

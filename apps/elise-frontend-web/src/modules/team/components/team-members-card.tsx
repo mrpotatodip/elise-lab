@@ -161,7 +161,7 @@ export function TeamMembersCard({ email }: { email: string }) {
   const table = useTable({ features: dataTableFeatures, columns, data: rows, getRowId: (person) => person.id });
 
   return (
-    <Card>
+    <Card className="max-w-4xl">
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle>People</CardTitle>
         <Suspense fallback={<Skeleton className="h-8 w-20" />}>

@@ -13,10 +13,9 @@ import { reposQuery } from "../hooks";
 import { repoAttention, repoName } from "../utils";
 import { RepoAddDialog } from "./repo-add-dialog";
 import { RepoOpenFindings } from "./repo-open-findings";
-import { RepoSummaryStrip } from "./repo-summary-strip";
 
 const BRANCH_ROW =
-  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 px-5 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]";
+  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 px-5 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]";
 
 const SEARCH_FROM = 6;
 
@@ -54,7 +53,6 @@ export function RepoList() {
 
   return (
     <>
-      <RepoSummaryStrip repos={data.repos} />
       <Card>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <div className="grid gap-1.5">

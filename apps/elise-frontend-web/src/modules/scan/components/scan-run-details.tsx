@@ -23,8 +23,8 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 // -----
 export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
   return (
-    <Card>
-      <Collapsible>
+    <Card className={scan.status === "succeeded" ? undefined : "max-w-4xl"}>
+      <Collapsible defaultOpen={scan.status !== "succeeded"}>
         <CardHeader className="gap-1.5">
           <CardTitle>
             <CollapsibleTrigger className="group flex min-h-8 w-full items-center justify-between gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

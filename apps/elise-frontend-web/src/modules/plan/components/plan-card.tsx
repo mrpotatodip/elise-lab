@@ -11,7 +11,7 @@ function PlanOfferCard() {
   const offer = offers[0];
 
   return (
-    <Card>
+    <Card className="max-w-2xl">
       <CardHeader>
         <CardTitle>Plan</CardTitle>
         <p className="text-sm leading-relaxed text-muted-foreground">This account has no plan yet.</p>
@@ -52,7 +52,7 @@ export function PlanCard() {
   const status = PLAN_STATUS_VIEW[data.status];
 
   return (
-    <Card>
+    <Card className="max-w-2xl">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>{plan.label}</CardTitle>

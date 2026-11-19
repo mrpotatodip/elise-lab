@@ -220,7 +220,7 @@ export function RepoOverviewBrief({ repos }: RepoOverviewBriefProps) {
       </Card>
 
       {actions.length > 0 && (
-        <Card>
+        <Card className="max-w-5xl">
           <CardHeader>
             <CardTitle>What to do, most urgent first</CardTitle>
             <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Grouped by what to do about each problem. Each group says what it means, who can deal with it and where to go.</p>
