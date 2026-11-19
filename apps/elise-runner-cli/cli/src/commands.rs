@@ -6,8 +6,12 @@ use elise_runner_core::login::{self, LoginError, Waited};
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
 use elise_runner_core::providers::Settings;
 use elise_runner_core::scan::{self, Claimed, Event, Stop, Stopper};
+use std::collections::HashMap;
+use std::future::{poll_fn, Future};
 use std::io::{BufRead, Write};
+use std::pin::Pin;
 use std::sync::Mutex;
+use std::task::Poll;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::sleep;
 
@@ -223,7 +227,23 @@ pub async fn unpair(store: &Store) -> Exit {
     }
 }
 
-pub async fn run(store: &Store, once: bool) -> Exit {
+type Running<'a> = Vec<Pin<Box<dyn Future<Output = ()> + 'a>>>;
+
+async fn one_ended(running: &mut Running<'_>) {
+    poll_fn(|cx| {
+        let ended = running.iter_mut().position(|scan| scan.as_mut().poll(cx).is_ready());
+        match ended {
+            Some(index) => {
+                drop(running.swap_remove(index));
+                Poll::Ready(())
+            }
+            None => Poll::Pending,
+        }
+    })
+    .await;
+}
+
+pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
     let Some(stop) = stop_on_signal("Stopping.") else {
         eprintln!("Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.");
         return Exit::Error;
@@ -231,62 +251,99 @@ pub async fn run(store: &Store, once: bool) -> Exit {
     let skill = Skill::new();
     let find_tools = || skill.tools();
     let log = ScanLog::default();
-    let on_event = |event: Event| log.tell(event);
+    let on_event = |scan_id: &str, event: Event| log.tell(scan_id, event);
+    let (find_tools, on_event, stop) = (&find_tools, &on_event, &stop);
+    let mut running: Running<'_> = Vec::new();
+    let mut claimed_any = false;
     let mut offline = false;
     if !once {
         println!("Waiting for Scans from Elise. Stop with Ctrl-C.");
+    }
+    if parallel > 1 {
+        println!("Running up to {parallel} Scans at once. Elise allows 3 live Runner Scans for an Account, shared with its other Runners.");
     }
     let stopped_idle = || {
         eprintln!("Stopped. No Scan was running.");
         Exit::Ok
     };
+    let finished = || if log.all_succeeded() { Exit::Ok } else { Exit::Error };
     loop {
         if stop.is_stopped() {
-            return stopped_idle();
+            let had_scans = !running.is_empty();
+            while !running.is_empty() {
+                one_ended(&mut running).await;
+            }
+            return if had_scans { finished() } else { stopped_idle() };
         }
-        let Some(token) = store.tokens().token() else {
-            eprintln!("This computer is not paired. Pair it with `elise-runner pair <code>`.");
-            return Exit::Unpaired;
-        };
-        let claimed_even_if_stopped_meanwhile = scan::claim(&token).await;
-        match claimed_even_if_stopped_meanwhile {
-            Claimed::Job(job) => {
-                offline = false;
-                scan::run_job(&token, *job, &find_tools, &Settings::load(&settings_file()), &on_event, &stop).await;
-                if once || stop.is_stopped() {
-                    return if log.succeeded() { Exit::Ok } else { Exit::Error };
+        let claiming = !(once && claimed_any);
+        if claiming && running.len() < parallel {
+            let Some(token) = store.tokens().token() else {
+                eprintln!("This computer is not paired. Pair it with `elise-runner pair <code>`.");
+                return Exit::Unpaired;
+            };
+            while running.len() < parallel {
+                match scan::claim(&token).await {
+                    Claimed::Job(job) => {
+                        offline = false;
+                        claimed_any = true;
+                        let token = token.clone();
+                        running.push(Box::pin(async move {
+                            scan::run_job(&token, *job, find_tools, &Settings::load(&settings_file()), on_event, stop).await;
+                        }));
+                    }
+                    Claimed::Removed => {
+                        store.tokens().forget();
+                        if store.is_read_only() {
+                            eprintln!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.");
+                        } else {
+                            eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
+                        }
+                        while !running.is_empty() {
+                            one_ended(&mut running).await;
+                        }
+                        return Exit::Revoked;
+                    }
+                    _ if stop.is_stopped() => break,
+                    Claimed::Nothing if once && !claimed_any => {
+                        println!("Nothing to claim.");
+                        return Exit::NothingToClaim;
+                    }
+                    Claimed::Offline if once && !claimed_any => {
+                        eprintln!("Could not reach Elise. Check the connection and try again.");
+                        return Exit::Offline;
+                    }
+                    Claimed::Nothing => {
+                        offline = false;
+                        break;
+                    }
+                    Claimed::Offline => {
+                        if !offline {
+                            eprintln!("Could not reach Elise. Trying again every few seconds.");
+                        }
+                        offline = true;
+                        break;
+                    }
                 }
-                continue;
-            }
-            Claimed::Removed => {
-                store.tokens().forget();
-                if store.is_read_only() {
-                    eprintln!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.");
-                } else {
-                    eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
+                if once && claimed_any && running.len() >= parallel {
+                    break;
                 }
-                return Exit::Revoked;
-            }
-            _ if stop.is_stopped() => return stopped_idle(),
-            Claimed::Nothing if once => {
-                println!("Nothing to claim.");
-                return Exit::NothingToClaim;
-            }
-            Claimed::Offline if once => {
-                eprintln!("Could not reach Elise. Check the connection and try again.");
-                return Exit::Offline;
-            }
-            Claimed::Nothing => offline = false,
-            Claimed::Offline => {
-                if !offline {
-                    eprintln!("Could not reach Elise. Trying again every few seconds.");
-                }
-                offline = true;
             }
         }
-        tokio::select! {
-            _ = sleep(scan::POLL_EVERY) => {}
-            _ = stop.stopped() => return stopped_idle(),
+        if once && claimed_any && running.is_empty() {
+            return finished();
+        }
+        let may_claim = !(once && claimed_any) && running.len() < parallel;
+        if running.is_empty() {
+            tokio::select! {
+                _ = sleep(scan::POLL_EVERY) => {}
+                _ = stop.stopped() => {}
+            }
+        } else {
+            tokio::select! {
+                _ = one_ended(&mut running) => {}
+                _ = sleep(scan::POLL_EVERY), if may_claim => {}
+                _ = stop.stopped() => {}
+            }
         }
     }
 }
@@ -308,17 +365,23 @@ fn stop_on_signal(message: &'static str) -> Option<Stop> {
 
 #[derive(Default)]
 struct ScanLog {
-    current_repo_and_scan_id: Mutex<Option<(String, String)>>,
-    succeeded: Mutex<bool>,
+    state: Mutex<LogState>,
+}
+
+#[derive(Default)]
+struct LogState {
+    repos: HashMap<String, String>,
+    ended: usize,
+    failed: usize,
 }
 
 impl ScanLog {
-    fn tell(&self, event: Event) {
-        let mut current = self.current_repo_and_scan_id.lock().expect("the log is not poisoned");
-        if let Event::Claimed { scan_id, repo } = &event {
-            *current = Some((repo.clone(), scan_id.clone()));
+    fn tell(&self, scan_id: &str, event: Event) {
+        let mut state = self.state.lock().expect("the log is not poisoned");
+        if let Event::Claimed { repo, .. } = &event {
+            state.repos.insert(scan_id.to_string(), repo.clone());
         }
-        let (repo, scan_id) = current.clone().unwrap_or_default();
+        let repo = state.repos.get(scan_id).cloned().unwrap_or_default();
         let line = match event {
             Event::Claimed { .. } => "Scan claimed".to_string(),
             Event::PhaseStarted { phase } => format!("{} started", scan::run_label(&phase)),
@@ -330,7 +393,10 @@ impl ScanLog {
             Event::ResultSent { sent: true } => "result sent to Elise".to_string(),
             Event::ResultSent { sent: false } => "the result could not be sent to Elise".to_string(),
             Event::Ended { ok, message, kept, .. } => {
-                *self.succeeded.lock().expect("the log is not poisoned") = ok;
+                state.ended += 1;
+                if !ok {
+                    state.failed += 1;
+                }
                 let kept = kept.map(|path| format!(" Work folder kept: {}", path.display())).unwrap_or_default();
                 if ok {
                     format!("Scan succeeded.{kept}")
@@ -342,8 +408,9 @@ impl ScanLog {
         println!("[{repo} {scan_id}] {line}");
     }
 
-    fn succeeded(&self) -> bool {
-        *self.succeeded.lock().expect("the log is not poisoned")
+    fn all_succeeded(&self) -> bool {
+        let state = self.state.lock().expect("the log is not poisoned");
+        state.ended > 0 && state.failed == 0
     }
 }
 

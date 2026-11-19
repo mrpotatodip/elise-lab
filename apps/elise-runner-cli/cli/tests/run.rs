@@ -327,3 +327,80 @@ fn run_once_stopped_while_its_claim_is_in_flight_exits_with_code_0() {
     assert!(output.stderr.contains("No Scan was running"), "{}", output.stderr);
     assert!(engine.results().is_empty());
 }
+
+const WAITING: [&str; 4] = ["phase=recon cost=1", "phase=hunt stop=wait", "phase=check", "phase=report"];
+
+#[test]
+fn parallel_runs_that_many_scans_at_once_claims_no_more_and_one_stop_signal_ends_them_all() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    for scan_id in ["scan_a", "scan_b", "scan_c"] {
+        engine.queue_job(job_at(scan_id, &format!("https://github.com/acme/{scan_id}"), WAITING));
+    }
+    let running = runner.start(&["run", "--parallel", "2"]);
+    let agents = stubs.waiting_agents(2);
+
+    running.signal("INT");
+    let output = running.finish();
+
+    assert_eq!(output.code, 1, "{}{}", output.stdout, output.stderr);
+    assert!(output.stdout.contains("Running up to 2 Scans at once"), "{}", output.stdout);
+    assert!(agents.iter().all(|agent| !alive(*agent)), "a stub claude is still running");
+    assert_eq!(engine.claims().len(), 2, "a third Scan was claimed while both slots were busy");
+    let results = engine.results();
+    let mut sent: Vec<&str> = results.iter().map(|(scan_id, _)| scan_id.as_str()).collect();
+    sent.sort_unstable();
+    assert_eq!(sent, ["scan_a", "scan_b"]);
+    assert!(results.iter().all(|(_, result)| result["state"] == "failed"), "{results:?}");
+    for scan_id in ["scan_a", "scan_b"] {
+        let repo = format!("acme/{scan_id}");
+        let ended = format!("[{repo} {scan_id}] Scan failed:");
+        assert!(output.stdout.lines().any(|line| line.starts_with(&ended)), "{scan_id}: {}", output.stdout);
+        assert!(output.stdout.contains(&format!("[{repo} {scan_id}] the hunt phase started")), "{scan_id}: {}", output.stdout);
+    }
+}
+
+#[test]
+fn run_once_with_parallel_runs_the_queued_scans_together_and_exits_0_only_if_every_one_succeeded() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job_at("scan_1", "https://github.com/acme/one", PLAIN));
+    engine.queue_job(job_at("scan_2", "https://github.com/acme/two", PLAIN));
+
+    let output = runner.run(&["run", "--once", "--parallel", "3"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    assert_eq!(engine.results().len(), 2);
+    assert!(engine.results().iter().all(|(_, result)| result["state"] == "succeeded"));
+
+    engine.queue_job(job_at("scan_3", "https://github.com/acme/three", PLAIN));
+    engine.queue_job(job_at(
+        "scan_4",
+        "https://github.com/acme/four",
+        ["phase=recon", "phase=hunt stop=crash", "phase=check", "phase=report"],
+    ));
+
+    let output = runner.run(&["run", "--once", "--parallel", "2"], "");
+
+    assert_eq!(output.code, 1, "{}{}", output.stdout, output.stderr);
+    assert_eq!(engine.results().len(), 4);
+}
+
+#[test]
+fn a_parallel_count_outside_1_to_3_or_on_another_command_is_a_usage_error() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+    for args in [
+        vec!["run", "--parallel", "0"],
+        vec!["run", "--parallel", "4"],
+        vec!["run", "--parallel", "many"],
+        vec!["run", "--parallel"],
+        vec!["status", "--parallel", "2"],
+    ] {
+        let output = runner.run(&args, "");
+
+        assert_eq!(output.code, 2, "{args:?}: {}{}", output.stdout, output.stderr);
+    }
+}

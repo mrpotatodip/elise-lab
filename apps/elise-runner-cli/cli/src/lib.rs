@@ -41,7 +41,7 @@ pub fn main(args: &[String]) -> Exit {
             Command::Login { no_browser } => commands::login(&store, no_browser).await,
             Command::Status => commands::status(&store).await,
             Command::Unpair => commands::unpair(&store).await,
-            Command::Run { once } => commands::run(&store, once).await,
+            Command::Run { once, parallel } => commands::run(&store, once, parallel).await,
         }
     })
 }
