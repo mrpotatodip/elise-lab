@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { RUNNER_JOB_SOURCE_VALUES, type RunnerJob, type RunnerJobResultBody } from "@repo/contracts/elise";
+import { RUNNER_JOB_SOURCE_VALUES, type RunnerJob, type RunnerJobResultBody, type RunnerJobState } from "@repo/contracts/elise";
 import { SCAN_PROFILE_CAPS_USD, SCAN_REPORT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
 import { NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
@@ -90,6 +90,13 @@ export const jobArchiveSvc = (db: DbConnectType, reports: R2Bucket, runnerId: st
     const object = key === null ? null : yield* Effect.tryPromise({ try: () => reports.get(key), catch: toExternalError });
     if (object === null) return yield* new NotFound({ message: RUNNER_JOB_ARCHIVE_REMOVED });
     return { body: object.body };
+  });
+
+export const jobStateSvc = (db: DbConnectType, runnerId: string, scanId: string): Effect.Effect<RunnerJobState, NotFound | DbError> =>
+  Effect.gen(function* () {
+    const job = yield* readRunnerJobEffect(db, scanId);
+    if (job === null || job.runnerId !== runnerId) return yield* new NotFound({ message: RUNNER_JOB_NOT_FOUND });
+    return { state: job.state };
   });
 
 // -----

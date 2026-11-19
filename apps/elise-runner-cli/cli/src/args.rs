@@ -61,6 +61,7 @@ Exit codes:
   4  revoked (Elise rejected the token)
   5  offline (Elise could not be reached)
   6  run --once: nothing to claim
+  7  run --once: the Scan was stopped from Elise
 ";
 
 pub fn parse(args: &[String]) -> Parsed {

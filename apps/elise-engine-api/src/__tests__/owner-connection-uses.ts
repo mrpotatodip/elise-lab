@@ -30,6 +30,7 @@ export const OWNER_CONNECTION_USES = {
   "modules/runners/api/start-runner-login.ts": { uses: 2, reason: "A Runner starts a login with no session and no Account" },
   "modules/runners/api/enroll-runner.ts": { uses: 2, reason: "A pairing code is looked up before its Account is known" },
   "modules/runners/api/job-archive.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account; the zip is served only for the job that Runner claimed" },
+  "modules/runners/api/job-state.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account; the state is read only for a job that Runner holds" },
   "modules/runners/api/report-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/runner-me.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/scan-records/handlers/record-scan-svc.ts": { uses: 4, reason: "A Workflow step with no request: records the finished Scan, its files and findings, filtered by the Scan's Account" },

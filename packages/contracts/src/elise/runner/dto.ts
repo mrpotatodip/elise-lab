@@ -11,7 +11,7 @@ import {
   RUNNER_NAME_MAX,
   RUNNER_PAIRING_CODE_MAX,
 } from "../constants";
-import { RUNNER_JOB_PHASE_VALUES, type RunnerJobSourceValue } from "../enums";
+import { RUNNER_JOB_PHASE_VALUES, RUNNER_JOB_STATE_VALUES, type RunnerJobSourceValue } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 
 export const RunnerIdSchema = z.uuid();
@@ -165,6 +165,10 @@ export const RunnerJobReportedSchema = z.object({
   accepted: z.literal(true),
 });
 
+export const RunnerJobStateSchema = z.object({
+  state: z.enum(RUNNER_JOB_STATE_VALUES),
+});
+
 export const StartRunnerLoginBodySchema = z.object({
   name: z.string().trim().min(1).max(RUNNER_NAME_MAX),
   os: z.string().trim().min(1).max(RUNNER_LOGIN_FIELD_MAX),
@@ -234,6 +238,8 @@ export type RunnerPhasePrompt = z.infer<typeof RunnerPhasePromptSchema>;
 export type RunnerJobSource = z.infer<typeof RunnerJobSourceSchema>;
 export type RunnerJob = z.infer<typeof RunnerJobSchema>;
 export type RunnerClaimBody = z.infer<typeof RunnerClaimBodySchema>;
+export type RunnerJobState = z.infer<typeof RunnerJobStateSchema>;
+
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;
 export type StartRunnerLoginBody = z.infer<typeof StartRunnerLoginBodySchema>;
 export type StartedRunnerLogin = z.infer<typeof StartedRunnerLoginSchema>;
