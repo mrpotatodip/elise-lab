@@ -14,7 +14,6 @@ import { RUNNER_STATE_COPY } from "../constants";
 import { runnerKeys, runnersQuery } from "../hooks";
 import type { Runner } from "../schemas";
 import { runnerAddedBy, runnerDetail, runnerShownState } from "../utils";
-import { useHydrated } from "#/lib/use-hydrated";
 import { useNow } from "#/lib/use-now";
 import { RunnerAddDialog } from "./runner-add-dialog";
 import { RunnerRemoveDialog } from "./runner-remove-dialog";
@@ -24,9 +23,8 @@ type RunnerRow = { runner: Runner; busy: boolean; remove: () => Promise<void> };
 const column = dataTableColumns<RunnerRow>();
 
 function RunnerStateBadge({ runner }: { runner: Runner }) {
-  const hydrated = useHydrated();
   const now = useNow();
-  const state = RUNNER_STATE_COPY[hydrated ? runnerShownState(runner, now) : runner.state];
+  const state = RUNNER_STATE_COPY[runnerShownState(runner, now)];
   return <Badge variant={state.variant}>{state.label}</Badge>;
 }
 

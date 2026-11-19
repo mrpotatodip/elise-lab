@@ -100,7 +100,7 @@ function GroupRow({ group, members }: { group: Group; members: readonly TeamMemb
   const candidates = members.filter((m) => !group.memberIds.includes(m.partyId));
 
   return (
-    <li className="grid gap-3 py-4 first:pt-0 last:pb-0">
+    <li className="grid content-start gap-3 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-3">
         {renaming ? (
           <GroupRenameForm group={group} pending={rename.isPending} onSave={(name) => rename.mutate(name)} onCancel={() => setRenaming(false)} />
@@ -230,7 +230,7 @@ export function TeamGroupsCard() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <ul className="divide-y">
+          <ul className="grid gap-4 md:grid-cols-2">
             {groups.map((group) => (
               <GroupRow key={group.id} group={group} members={team.members} />
             ))}
