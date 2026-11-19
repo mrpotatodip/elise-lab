@@ -14,6 +14,7 @@ import { SCAN_MODEL_NAMES, SCAN_SKILL_OPTIONS } from "../constants";
 import { scansQuery } from "../hooks";
 import type { ScanState, ScanStatus } from "../schemas";
 import { scanCost, scanPlural } from "../utils";
+import { ScanListSummary } from "./scan-list-summary";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanOrigin } from "./scan-origin";
 import { ScanProfileBadge } from "./scan-profile-badge";
@@ -101,7 +102,7 @@ const columns = column.columns([
     cell: ({ row }) => (
       <>
         {row.original.usage ? scanCost(row.original.usage.costUsd) : "-"}
-        {row.original.runner && <span className="block text-xs">on {row.original.runner.name}</span>}
+        {row.original.runner && <span className="block whitespace-nowrap text-xs">on {row.original.runner.name}</span>}
       </>
     ),
   }),
@@ -143,6 +144,8 @@ export function ScanList() {
   const table = useTable({ features: dataTableFeatures, columns, data: visible, getRowId: (scan) => scan.scanId });
 
   return (
+    <>
+    <ScanListSummary scans={all} />
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <div className="grid gap-1.5">
@@ -224,5 +227,6 @@ export function ScanList() {
         </CardContent>
       )}
     </Card>
+    </>
   );
 }
