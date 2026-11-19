@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
 import { Laptop } from "lucide-react";
@@ -7,7 +6,6 @@ import { Badge } from "#/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
-import { Skeleton } from "#/components/ui/skeleton";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { removeRunner } from "../api";
 import { RUNNER_STATE_COPY } from "../constants";
@@ -15,7 +13,6 @@ import { runnerKeys, runnersQuery } from "../hooks";
 import type { Runner } from "../schemas";
 import { runnerAddedBy, runnerDetail, runnerShownState } from "../utils";
 import { useNow } from "#/lib/use-now";
-import { RunnerAddDialog } from "./runner-add-dialog";
 import { RunnerRemoveDialog } from "./runner-remove-dialog";
 
 type RunnerRow = { runner: Runner; busy: boolean; remove: () => Promise<void> };
@@ -75,15 +72,10 @@ export function RunnersCard() {
   const table = useTable({ features: dataTableFeatures, columns, data: rows, getRowId: (row) => row.runner.id });
 
   return (
-    <Card className="max-w-4xl">
-      <CardHeader className="flex-row items-center justify-between">
-        <div className="grid gap-1.5">
-          <CardTitle>Computers</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one runs scans while its Runner is open. Add a computer to run more at once.</p>
-        </div>
-        <Suspense fallback={<Skeleton className="h-8 w-32" />}>
-          <RunnerAddDialog />
-        </Suspense>
+    <Card>
+      <CardHeader>
+        <CardTitle>All computers</CardTitle>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one runs scans while its Runner is open. Remove a computer to stop it taking scans.</p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         {rows.length === 0 ? (

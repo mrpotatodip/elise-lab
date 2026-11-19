@@ -1,5 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, KeyRound, Layers, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Plug, ScanSearch, Sparkles, Users } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, KeyRound, Layers, LayoutDashboard, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -54,7 +54,6 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
   const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
   const runnersLabel = runnersPaired === 0 ? "Runners" : runnersRunning > 0 ? `Runners, ${runnersRunning} running` : "Runners, none running";
   const hasRepoChildren = repoCount >= 2;
-  const onConnectFlow = useRouterState({ select: (state) => state.location.pathname.startsWith("/github/") });
   const empty = scanCount === 0;
   const personName = userName || accountName;
   const personDetail = userName ? accountName : email;
@@ -172,15 +171,6 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
                   )}
                 </>
               )}
-            </Link>
-          </Hint>
-        )}
-
-        {showDashboard && (
-          <Hint label="Connections" collapsed={collapsed}>
-            <Link to="/connections" aria-label="Connections" className={cn(ROW, collapsed && "justify-center px-0", onConnectFlow && ACTIVE.className)} activeProps={ACTIVE}>
-              <Plug className={ICON} strokeWidth={1.5} />
-              {!collapsed && "Connections"}
             </Link>
           </Hint>
         )}
