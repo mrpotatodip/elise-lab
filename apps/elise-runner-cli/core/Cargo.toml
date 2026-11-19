@@ -13,6 +13,9 @@ tokio = { version = "1.54.1", features = ["process", "time", "sync", "macros"] }
 # Uploaded zips: stored and deflated entries only, which is what zip tools write by default.
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
+[lints]
+workspace = true
+
 [dev-dependencies]
 # The Scan tests run on a plain runtime of their own.
 tokio = { version = "1.54.1", features = ["process", "time", "sync", "macros", "rt"] }

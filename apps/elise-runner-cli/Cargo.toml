@@ -3,3 +3,12 @@
 [workspace]
 resolver = "2"
 members = ["core", "src-tauri", "cli"]
+
+# Clippy's defaults plus three that catch left-over scaffolding. `print_stdout` is not on the list
+# (the terminal program prints on purpose), nor are `unwrap_used` and `expect_used`: the 18 sites
+# are build-script panics and `expect` calls with a message, and turning them into errors would
+# change what the Runner does. `pnpm check` runs clippy with `-D warnings`.
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
