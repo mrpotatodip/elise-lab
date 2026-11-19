@@ -109,17 +109,35 @@ fn an_invalid_or_expired_code_fails_with_a_plain_message() {
 
 #[test]
 fn status_reports_each_state_with_its_exit_code() {
-    let cases: [(&str, fn(&Engine, &mut Runner), i32, &str); 4] = [
-        ("connected", |_, runner| { runner.run(&["pair", CODE, "--yes"], ""); }, 0, "connected"),
+    type Setup = fn(&Engine, &mut Runner);
+    let cases: [(&str, Setup, i32, &str); 4] = [
+        (
+            "connected",
+            |_, runner| {
+                runner.run(&["pair", CODE, "--yes"], "");
+            },
+            0,
+            "connected",
+        ),
         ("unpaired", |_, _| {}, 3, "unpaired"),
-        ("revoked", |engine, runner| {
-            runner.run(&["pair", CODE, "--yes"], "");
-            engine.remove_all_runners();
-        }, 4, "revoked"),
-        ("offline", |_, runner| {
-            runner.run(&["pair", CODE, "--yes"], "");
-            runner.url = Engine::unreachable_url();
-        }, 5, "offline"),
+        (
+            "revoked",
+            |engine, runner| {
+                runner.run(&["pair", CODE, "--yes"], "");
+                engine.remove_all_runners();
+            },
+            4,
+            "revoked",
+        ),
+        (
+            "offline",
+            |_, runner| {
+                runner.run(&["pair", CODE, "--yes"], "");
+                runner.url = Engine::unreachable_url();
+            },
+            5,
+            "offline",
+        ),
     ];
     for (state, arrange, code, text) in cases {
         let engine = Engine::start();

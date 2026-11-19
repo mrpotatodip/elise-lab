@@ -115,7 +115,8 @@ fn unpack_within(zip: &Path, into: &Path, unpacked_max: u64) -> Result<(), Strin
         })?;
         let mut entry = archive.by_index(item.index).map_err(|e| format!("The zip is damaged at {shown}: {e}"))?;
         let left = unpacked_max - written;
-        let copied = std::io::copy(&mut (&mut entry).take(left + 1), &mut out).map_err(|e| format!("The zip is damaged at {shown}: {e}"))?;
+        let copied =
+            std::io::copy(&mut (&mut entry).take(left + 1), &mut out).map_err(|e| format!("The zip is damaged at {shown}: {e}"))?;
         written += copied;
         if copied > left {
             return Err(format!("The zip unpacks to more than {} MB, the limit for an upload.", unpacked_max / MB));
@@ -132,7 +133,8 @@ fn items_of<R: Read + Seek>(archive: &mut zip::ZipArchive<R>) -> Result<Vec<Item
     for index in 0..archive.len() {
         let entry = archive.by_index(index).map_err(|e| format!("The zip is damaged: {e}"))?;
         let name = entry.name().map_err(|e| format!("The zip is damaged: {e}"))?.to_string();
-        let parts = safe_parts(&name).ok_or_else(|| format!("The zip holds a path that leads outside its folder ({name}), so this Runner will not unpack it."))?;
+        let parts = safe_parts(&name)
+            .ok_or_else(|| format!("The zip holds a path that leads outside its folder ({name}), so this Runner will not unpack it."))?;
         if parts.len() > PATH_DEPTH_MAX {
             return Err(format!("A path in the zip is more than {PATH_DEPTH_MAX} levels deep, the limit for an upload: {name}"));
         }
@@ -190,7 +192,7 @@ fn group_thousands(n: usize) -> String {
     let digits = n.to_string();
     let mut out = String::new();
     for (at, digit) in digits.chars().enumerate() {
-        if at > 0 && (digits.len() - at) % 3 == 0 {
+        if at > 0 && (digits.len() - at).is_multiple_of(3) {
             out.push(',');
         }
         out.push(digit);
@@ -276,8 +278,12 @@ mod tests {
     // finding keeps its path from one version to the next.
     #[test]
     fn two_versions_give_the_same_paths_for_the_same_file() {
-        let (one, first) = unpacked("v12", &[Entry::Dir("app-1.2/"), Entry::File("app-1.2/src/main.rs", "fn main() {}"), Entry::File("app-1.2/README.md", "v1.2")]);
-        let (two, second) = unpacked("v13", &[Entry::File("app-1.3/src/main.rs", "fn main() {}"), Entry::File("app-1.3/README.md", "v1.3")]);
+        let (one, first) = unpacked(
+            "v12",
+            &[Entry::Dir("app-1.2/"), Entry::File("app-1.2/src/main.rs", "fn main() {}"), Entry::File("app-1.2/README.md", "v1.2")],
+        );
+        let (two, second) =
+            unpacked("v13", &[Entry::File("app-1.3/src/main.rs", "fn main() {}"), Entry::File("app-1.3/README.md", "v1.3")]);
 
         assert_eq!((first, second), (Ok(()), Ok(())));
         assert_eq!(files_in(&one.into), ["README.md", "src/main.rs"]);
@@ -304,7 +310,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn links_are_skipped() {
-        let (place, result) = unpacked("links", &[Entry::File("app/main.rs", "x"), Entry::Link("app/leak", "/etc/hosts"), Entry::Link("app/up", "../../..")]);
+        let (place, result) =
+            unpacked("links", &[Entry::File("app/main.rs", "x"), Entry::Link("app/leak", "/etc/hosts"), Entry::Link("app/up", "../../..")]);
 
         assert_eq!(result, Ok(()));
         assert_eq!(files_in(&place.into), ["main.rs"]);
@@ -314,7 +321,8 @@ mod tests {
     // A path that leads outside the work folder refuses the whole zip, and nothing lands outside it.
     #[test]
     fn a_path_that_leaves_the_folder_is_refused() {
-        for (name, path) in [("dotdot", "../escaped.txt"), ("deep-dotdot", "app/../../escaped.txt"), ("absolute", "/tmp/elise-escaped.txt")] {
+        for (name, path) in [("dotdot", "../escaped.txt"), ("deep-dotdot", "app/../../escaped.txt"), ("absolute", "/tmp/elise-escaped.txt")]
+        {
             let (place, result) = unpacked(name, &[Entry::File("app/main.rs", "x"), Entry::File(path, "owned")]);
 
             let error = result.unwrap_err();

@@ -33,16 +33,13 @@ pub fn main(args: &[String]) -> Exit {
             return Exit::Usage;
         }
     };
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("the async runtime starts");
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("the async runtime starts");
     let store = store::Store::open();
     runtime.block_on(async {
         match command {
             Command::Pair { code, yes, print_token } => commands::pair(&store, &code, yes, print_token).await,
             Command::Login { no_browser } => commands::login(&store, no_browser).await,
-            Command::Status =>commands::status(&store).await,
+            Command::Status => commands::status(&store).await,
             Command::Unpair => commands::unpair(&store).await,
             Command::Run { once } => commands::run(&store, once).await,
         }

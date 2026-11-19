@@ -349,12 +349,8 @@ fn tidy(work: &Path, report: &Report, sent: bool) -> Option<PathBuf> {
 
 async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
     for attempt in 1..=REPORT_TRIES {
-        let answer = client()
-            .post(format!("{}/runners/jobs/{}/result", engine_url(), scan_id))
-            .bearer_auth(token)
-            .json(report)
-            .send()
-            .await;
+        let answer =
+            client().post(format!("{}/runners/jobs/{}/result", engine_url(), scan_id)).bearer_auth(token).json(report).send().await;
         if let Ok(response) = answer {
             // 404 means the scan ended before this report (it timed out): sending again cannot help.
             if response.status().is_success() || response.status() == StatusCode::NOT_FOUND {
@@ -373,7 +369,15 @@ async fn send_report(token: &str, scan_id: &str, report: &Report) -> bool {
 // dashboard as the scan's error, so it says what to do. An archive job runs no git at all; its
 // unpacked `repo` gets the same clean-up as a clone (`strip_untrusted`, in `audit`).
 // -----
-async fn execute(token: &str, tools: &Tools, job: &Job, settings: &Settings, work: &Path, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
+async fn execute(
+    token: &str,
+    tools: &Tools,
+    job: &Job,
+    settings: &Settings,
+    work: &Path,
+    on_event: OnEvent<'_>,
+    stop: &Stop,
+) -> Result<Report, String> {
     if !job.scan_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
         return Err("The scan id is not one this runner will use.".into());
     }
@@ -442,7 +446,16 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event
         Err(error) => return Err(error),
     };
     if job.skill == "full" {
-        validate_full(tools, work, stop).await.map_err(CheckFailure::message).map_err(|error| if capped { format!("The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}", budget_for(job)) } else { error })?;
+        validate_full(tools, work, stop).await.map_err(CheckFailure::message).map_err(|error| {
+            if capped {
+                format!(
+                    "The Budget cap was reached (${}) before the audit finished, and what it left did not pass the check. {error}",
+                    budget_for(job)
+                )
+            } else {
+                error
+            }
+        })?;
     }
     Ok(report)
 }
@@ -460,7 +473,10 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event
 async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
     let names: Vec<&str> = job.phase_prompts.iter().map(|p| p.phase.as_str()).collect();
     if names != PHASES.map(|(phase, _)| phase) {
-        return Err(format!("The job's Phases ({}) are not the four this runner runs: recon, hunt, check and report. Update the Elise Runner app.", names.join(", ")));
+        return Err(format!(
+            "The job's Phases ({}) are not the four this runner runs: recon, hunt, check and report. Update the Elise Runner app.",
+            names.join(", ")
+        ));
     }
     let mut spent = Spent::default();
     let ran = run_each_phase(tools, job, work, &mut spent, minute, on_event, stop).await;
@@ -472,7 +488,15 @@ async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_
     collect(work).map_err(|error| format!("The report phase ended. {error}"))
 }
 
-async fn run_each_phase(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<(), String> {
+async fn run_each_phase(
+    tools: &Tools,
+    job: &Job,
+    work: &Path,
+    spent: &mut Spent,
+    minute: Duration,
+    on_event: OnEvent<'_>,
+    stop: &Stop,
+) -> Result<(), String> {
     let cap = budget_for(job);
     for (prompt, (phase, minutes)) in job.phase_prompts.iter().zip(PHASES) {
         let left = money(cap - spent.cost);
@@ -530,7 +554,16 @@ fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event
 // ends the Scan as a failed validation did before: with the check Phase's error. One repair at most.
 // -----
 #[allow(clippy::too_many_arguments)]
-async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute: Duration, error: &str, on_event: OnEvent<'_>, stop: &Stop) -> Result<(), String> {
+async fn repair(
+    tools: &Tools,
+    job: &Job,
+    work: &Path,
+    spent: &mut Spent,
+    minute: Duration,
+    error: &str,
+    on_event: OnEvent<'_>,
+    stop: &Stop,
+) -> Result<(), String> {
     let cap = budget_for(job);
     let left = money(cap - spent.cost);
     if left <= 0.0 {
@@ -538,9 +571,16 @@ async fn repair(tools: &Tools, job: &Job, work: &Path, spent: &mut Spent, minute
     }
     let failed = format!("The {VALIDATED_AFTER} phase left files that did not pass the check. {error}");
     on_event(Event::RepairStarted);
-    let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32), stop).await.map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
+    let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32), stop)
+        .await
+        .map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
     settle_told(run, spent, REPAIR, cap, on_event).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
-    validate_full(tools, work, stop).await.map_err(|again| format!("The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}", again.message()))
+    validate_full(tools, work, stop).await.map_err(|again| {
+        format!(
+            "The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}",
+            again.message()
+        )
+    })
 }
 
 // The repair run's whole prompt: no skill, no earlier files to read, only what the validator said.
@@ -720,7 +760,8 @@ fn write_agent_settings(work: &Path) -> Result<(), String> {
 // (the person's rules), never `--bare` (it also drops the person's login).
 // -----
 fn agent_args(job: &Job, prompt: &str, budget_usd: f64) -> Vec<String> {
-    let mut args: Vec<String> = ["--print", "--output-format", "json", "--no-session-persistence", "--setting-sources", "project"].map(String::from).to_vec();
+    let mut args: Vec<String> =
+        ["--print", "--output-format", "json", "--no-session-persistence", "--setting-sources", "project"].map(String::from).to_vec();
     args.extend(["--model".to_string(), job.model.clone(), "--effort".to_string(), job.effort.clone()]);
     args.extend(["--max-budget-usd".to_string(), budget_usd.to_string()]);
     args.extend(["--permission-mode", "acceptEdits", "--allowedTools", ALLOWED_TOOLS, "--"].map(String::from));
@@ -809,7 +850,10 @@ async fn validate_full(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), Ch
     for (script, file) in [("validate-findings.cjs", "findings.json"), ("validate-coverage-ledger.cjs", "coverage-ledger.json")] {
         let path = work.join("out").join(file);
         if !skill.join(script).is_file() {
-            return Err(Environment(format!("The audit skill's check ({script}) was not found in {}. Reinstall the Elise Runner app.", skill.display())));
+            return Err(Environment(format!(
+                "The audit skill's check ({script}) was not found in {}. Reinstall the Elise Runner app.",
+                skill.display()
+            )));
         }
         if !path.is_file() {
             return Err(Environment(format!("The audit finished without writing {file}, which a full audit must have.")));
@@ -869,7 +913,16 @@ struct AgentRun {
 // single run writes `agent.log` itself. `Err` here is a run that did not start; one that outran its
 // limit or failed is `Ok` with its `end` an `Err` and whatever result it left, so its spend counts.
 #[allow(clippy::too_many_arguments)]
-async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_usd: f64, phase: Option<&str>, limit: Duration, stop: &Stop) -> Result<AgentRun, String> {
+async fn run_agent(
+    tools: &Tools,
+    work: &Path,
+    job: &Job,
+    prompt: &str,
+    budget_usd: f64,
+    phase: Option<&str>,
+    limit: Duration,
+    stop: &Stop,
+) -> Result<AgentRun, String> {
     if stop.is_stopped() {
         return Err(STOPPED.to_string());
     }
@@ -930,7 +983,11 @@ async fn run_agent(tools: &Tools, work: &Path, job: &Job, prompt: &str, budget_u
             // The agent's own sentence leads, so the person reads why it stopped; the end of the
             // raw output follows for support. Without a sentence the raw tails are all there is.
             let said = match agent_words(&stdout) {
-                Some(words) => format!("claude exited {code}: {words}\n\nThe end of the agent's output:\n{} {}", tail(stderr.trim(), 500), tail(stdout.trim(), 600)),
+                Some(words) => format!(
+                    "claude exited {code}: {words}\n\nThe end of the agent's output:\n{} {}",
+                    tail(stderr.trim(), 500),
+                    tail(stdout.trim(), 600)
+                ),
                 None => format!("claude exited {code}: {} {}", tail(stderr.trim(), 1500), tail(stdout.trim(), 1500)),
             };
             Err(match phase {
@@ -958,7 +1015,8 @@ fn agent_words(log: &str) -> Option<String> {
 fn last_result(log: &str) -> Option<serde_json::Value> {
     let log = log.trim();
     let whole = serde_json::from_str::<serde_json::Value>(log).ok();
-    let lines = log.lines().rev().filter(|line| line.starts_with('{')).filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok());
+    let lines =
+        log.lines().rev().filter(|line| line.starts_with('{')).filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok());
     whole.into_iter().chain(lines).find(|object| object["type"] == "result")
 }
 
@@ -1116,12 +1174,7 @@ mod tests {
     }
 
     fn full_job(profile_cap_usd: Option<f64>, max_budget_usd: f64) -> Job {
-        Job {
-            skill: "full".into(),
-            profile_cap_usd,
-            max_budget_usd,
-            ..test_job()
-        }
+        Job { skill: "full".into(), profile_cap_usd, max_budget_usd, ..test_job() }
     }
 
     // An old Worker sends neither profile field and a new one sends both: the job must read either way.
@@ -1235,7 +1288,16 @@ mod tests {
         let json = agent_settings_json();
         assert!(!json.contains("\"allow\""), "the settings file must not grant anything");
         assert!(!json.contains("\"ask\""));
-        for rule in ["Bash(curl:*)", "Bash(wget:*)", "Bash(ssh:*)", "Bash(git push:*)", "WebFetch", "WebSearch", "Edit(.claude/**)", "Write(.claude/**)"] {
+        for rule in [
+            "Bash(curl:*)",
+            "Bash(wget:*)",
+            "Bash(ssh:*)",
+            "Bash(git push:*)",
+            "WebFetch",
+            "WebSearch",
+            "Edit(.claude/**)",
+            "Write(.claude/**)",
+        ] {
             assert!(json.contains(&format!("\"{rule}\"")), "{rule} must be denied");
         }
         for rule in AGENT_DENY_RULES {
@@ -1362,7 +1424,11 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     fn phased_job(prompts: [&str; 4]) -> Job {
         let phases = ["recon", "hunt", "check", "report"];
         Job {
-            phase_prompts: phases.iter().zip(prompts).map(|(phase, prompt)| PhasePrompt { phase: phase.to_string(), prompt: prompt.to_string() }).collect(),
+            phase_prompts: phases
+                .iter()
+                .zip(prompts)
+                .map(|(phase, prompt)| PhasePrompt { phase: phase.to_string(), prompt: prompt.to_string() })
+                .collect(),
             ..full_job(Some(12.0), 50.0)
         }
     }
@@ -1443,7 +1509,10 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     #[test]
     fn a_spent_pool_ends_the_scan_before_the_next_phase_starts() {
         let stage = stage("spent");
-        let job = Job { profile_cap_usd: Some(5.0), ..phased_job(["phase=recon cost=3", "phase=hunt cost=2", "phase=check cost=1", "phase=report cost=1"]) };
+        let job = Job {
+            profile_cap_usd: Some(5.0),
+            ..phased_job(["phase=recon cost=3", "phase=hunt cost=2", "phase=check cost=1", "phase=report cost=1"])
+        };
 
         let report = scan(&stage, &job);
 
@@ -1485,7 +1554,10 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
 
         assert_eq!(report.state, "failed");
         let said = report.error.clone().unwrap();
-        assert!(said.starts_with("The check phase failed: claude exited 1: You've hit your 5-hour limit · resets 5:40pm (Pacific/Auckland)"), "{said}");
+        assert!(
+            said.starts_with("The check phase failed: claude exited 1: You've hit your 5-hour limit · resets 5:40pm (Pacific/Auckland)"),
+            "{said}"
+        );
         assert!(said.contains("The end of the agent's output:"), "{said}");
         let _ = fs::remove_dir_all(&stage.root);
     }
@@ -1615,7 +1687,10 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let report = scan(&stage, &plain_job());
 
         assert_eq!(report.state, "succeeded", "{:?}", report.error);
-        assert_eq!(lines_of(stage.work.join("validated.txt")), ["validate-findings.cjs findings.json |", "validate-coverage-ledger.cjs coverage-ledger.json |"]);
+        assert_eq!(
+            lines_of(stage.work.join("validated.txt")),
+            ["validate-findings.cjs findings.json |", "validate-coverage-ledger.cjs coverage-ledger.json |"]
+        );
         assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 4);
         assert!(!stage.work.join("agent-repair.log").exists());
         let _ = fs::remove_dir_all(&stage.root);
@@ -1636,7 +1711,11 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let calls = lines_of(stage.work.join("calls.txt"));
         assert_eq!(calls.len(), 5);
         assert!(calls[3].starts_with("4|"), "{}", calls[3]);
-        assert!(calls[3].contains("findings.json") && calls[3].contains("the file is not valid") && calls[3].contains("./out"), "{}", calls[3]);
+        assert!(
+            calls[3].contains("findings.json") && calls[3].contains("the file is not valid") && calls[3].contains("./out"),
+            "{}",
+            calls[3]
+        );
         assert!(calls[4].starts_with("3|phase=report"), "{}", calls[4]);
         assert!(stage.work.join("agent-repair.log").is_file());
         assert_eq!(lines_of(stage.work.join("validated.txt")).len(), 3, "the first validator failed, then both passed");
@@ -1664,7 +1743,8 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         scan_told(&stage, &job, MINUTE, &|event| told.lock().unwrap().push(event));
 
         let started = |phase: &str| Event::PhaseStarted { phase: phase.into() };
-        let ended = |phase: &str, cost: f64, left: f64| Event::PhaseEnded { phase: phase.into(), cost_usd: Some(cost), pool_left_usd: left };
+        let ended =
+            |phase: &str, cost: f64, left: f64| Event::PhaseEnded { phase: phase.into(), cost_usd: Some(cost), pool_left_usd: left };
         assert_eq!(
             told.into_inner().unwrap(),
             [
@@ -1707,7 +1787,10 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     #[test]
     fn a_spent_pool_starts_no_repair_run() {
         let stage = stage("repair-spent");
-        let job = Job { profile_cap_usd: Some(5.0), ..phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check invalid=1 cost=3", "phase=report cost=1"]) };
+        let job = Job {
+            profile_cap_usd: Some(5.0),
+            ..phased_job(["phase=recon cost=1", "phase=hunt cost=1", "phase=check invalid=1 cost=3", "phase=report cost=1"])
+        };
 
         let report = scan(&stage, &job);
 
@@ -1764,7 +1847,10 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
 
             assert_eq!(report.state, "failed");
             let said = report.error.clone().unwrap();
-            assert!(said.contains("check phase") && said.contains("the file is not valid") && said.contains("repair run") && said.contains(why), "{said}");
+            assert!(
+                said.contains("check phase") && said.contains("the file is not valid") && said.contains("repair run") && said.contains(why),
+                "{said}"
+            );
             assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 4);
             assert_eq!(last_json(report.agent_log.as_deref().unwrap())["total_cost_usd"], spent);
             let _ = fs::remove_dir_all(&stage.root);
@@ -1782,7 +1868,10 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
 
         assert_eq!(report.state, "succeeded", "{:?}", report.error);
         assert_eq!(lines_of(stage.work.join("calls.txt")), ["12|phase=all cost=2"]);
-        assert_eq!(lines_of(stage.work.join("validated.txt")), ["validate-findings.cjs findings.json | report-present", "validate-coverage-ledger.cjs coverage-ledger.json | report-present"]);
+        assert_eq!(
+            lines_of(stage.work.join("validated.txt")),
+            ["validate-findings.cjs findings.json | report-present", "validate-coverage-ledger.cjs coverage-ledger.json | report-present"]
+        );
         assert_eq!(report.agent_log.unwrap().lines().count(), 1, "the agent's own log, with no summed line");
         let _ = fs::remove_dir_all(&stage.root);
     }
@@ -1816,7 +1905,10 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let new: Job = serde_json::from_str(&format!("{{{base}{phases}}}")).unwrap();
 
         assert!(old.phase_prompts.is_empty());
-        assert_eq!(new.phase_prompts.iter().map(|p| (p.phase.as_str(), p.prompt.as_str())).collect::<Vec<_>>(), [("recon", "a"), ("hunt", "b"), ("check", "c"), ("report", "d")]);
+        assert_eq!(
+            new.phase_prompts.iter().map(|p| (p.phase.as_str(), p.prompt.as_str())).collect::<Vec<_>>(),
+            [("recon", "a"), ("hunt", "b"), ("check", "c"), ("report", "d")]
+        );
     }
 
     // The cloud's slots: 10, 45, 25 and 10 minutes, 90 in all. A single run keeps its 40.

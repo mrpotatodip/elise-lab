@@ -1,5 +1,5 @@
-use elise_runner_core::store::{FileStore, GivenToken, KeychainStore, TokenStore, HEADLESS_KEYCHAIN_SERVICE};
 pub use elise_runner_core::store::TOKEN_VARIABLE;
+use elise_runner_core::store::{FileStore, GivenToken, KeychainStore, TokenStore, HEADLESS_KEYCHAIN_SERVICE};
 use std::path::PathBuf;
 
 const TOKEN_FILE: &str = "token";

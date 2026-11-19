@@ -21,11 +21,5 @@ pub fn open(url: &str) -> bool {
     let Some(program) = opener() else {
         return false;
     };
-    Command::new(program)
-        .arg(url)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .is_ok()
+    Command::new(program).arg(url).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().is_ok()
 }

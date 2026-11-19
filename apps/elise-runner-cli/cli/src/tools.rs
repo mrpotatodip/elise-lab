@@ -44,6 +44,12 @@ impl Skill {
     }
 }
 
+impl Default for Skill {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for Skill {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);

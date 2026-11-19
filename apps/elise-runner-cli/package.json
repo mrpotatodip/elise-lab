@@ -6,7 +6,7 @@
   "scripts": {
     "app:dev": "tauri dev",
     "app:build": "tauri build",
-    "check": "tsc --noEmit && cargo test --quiet -p elise-runner-core -p elise-runner-cli"
+    "check": "tsc --noEmit && cargo fmt --check --quiet && cargo clippy --quiet -p elise-runner-core -p elise-runner-cli --all-targets -- -D warnings && cargo test --quiet -p elise-runner-core -p elise-runner-cli"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4"
