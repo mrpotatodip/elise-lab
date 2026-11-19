@@ -6,7 +6,7 @@ import { runEffect } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanParams } from "#/schemas";
 import { RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_PICKED_UP, RUNNER_JOB_PRIVATE, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
-import { cancelRunnerJobEffect, insertRunnerJobEffect, readRunnerJobEffect, scanStoppedEffect } from "#/modules/runners/queries";
+import { cancelRunnerJobEffect, insertRunnerJobEffect, readRunnerJobEffect } from "#/modules/runners/queries";
 import { buildAgentPrompt } from "#/modules/scan-sandbox";
 import type { SandboxPort } from "#/modules/scan-workflow/types";
 
@@ -32,7 +32,6 @@ export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: s
     },
 
     launchAgent: async (options) => {
-      if (await runEffect(scanStoppedEffect(db, params.scanId))) return;
       await runEffect(
         insertRunnerJobEffect(db, {
           scanId: params.scanId,

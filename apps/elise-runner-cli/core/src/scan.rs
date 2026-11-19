@@ -313,26 +313,28 @@ fn check_every() -> Duration {
     POLL_EVERY
 }
 
-async fn watch_job(token: &str, scan_id: &str) -> Unwanted {
+async fn check_job(token: &str, scan_id: &str) -> Option<Unwanted> {
     #[derive(Deserialize)]
     struct JobState {
         state: String,
     }
+    let response = client().get(format!("{}/runners/jobs/{scan_id}", engine_url())).bearer_auth(token).send().await.ok()?;
+    match response.status() {
+        StatusCode::UNAUTHORIZED => Some(Unwanted::Removed),
+        StatusCode::NOT_FOUND => Some(Unwanted::Cancelled),
+        StatusCode::OK => match response.json::<Envelope<JobState>>().await {
+            Ok(Envelope { data: JobState { state } }) if state == "cancelled" => Some(Unwanted::Cancelled),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+async fn watch_job(token: &str, scan_id: &str) -> Unwanted {
     loop {
         sleep(check_every()).await;
-        let Ok(response) = client().get(format!("{}/runners/jobs/{scan_id}", engine_url())).bearer_auth(token).send().await else {
-            continue;
-        };
-        match response.status() {
-            StatusCode::UNAUTHORIZED => return Unwanted::Removed,
-            StatusCode::OK => {
-                if let Ok(Envelope { data: JobState { state } }) = response.json::<Envelope<JobState>>().await {
-                    if state == "cancelled" {
-                        return Unwanted::Cancelled;
-                    }
-                }
-            }
-            _ => {}
+        if let Some(why) = check_job(token, scan_id).await {
+            return why;
         }
     }
 }
@@ -364,7 +366,12 @@ pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Set
             _ = watching => unreachable!("the watch never ends"),
         }
     };
-    if let Some(why) = unwanted.into_inner().expect("the flag is not poisoned") {
+    let unwanted = unwanted.into_inner().expect("the flag is not poisoned");
+    let unwanted = match unwanted {
+        Some(why) => Some(why),
+        None => check_job(token, &job.scan_id).await,
+    };
+    if let Some(why) = unwanted {
         let kept = work.is_dir().then(|| work.clone());
         on_event(Event::StoppedFromElise { repo: label, kept });
         return match why {

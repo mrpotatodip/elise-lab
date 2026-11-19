@@ -16,6 +16,7 @@ let runnerId: string;
 let counter = 0;
 const torn: string[] = [];
 let metered: ScanUsage | null = null;
+let failTeardown = false;
 
 const USAGE: ScanUsage = { inputTokens: 1000, outputTokens: 500, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.5, turns: 3, durationMs: 4000 };
 const HOLD_USD = 3;
@@ -25,6 +26,7 @@ const OPTIONS: ScanOptions = { skill: "full", model: "claude-sonnet-5-5", effort
 const app = tenantRouteApp(() => test, {
   teardownScan: async (_env, scanId) => {
     torn.push(scanId);
+    if (failTeardown) throw new Error("the sandbox did not answer");
     return metered;
   },
 });
@@ -100,6 +102,18 @@ describe("stopping a cloud Scan", () => {
 
     expect(late.settled).toBe(false);
     expect((await settleRows(scanId)).filter((row) => row.kind === "scan_settle")).toHaveLength(1);
+  });
+
+  it("gives the hold back when the sandbox could not be torn down, so a second Stop has nothing left to settle", async () => {
+    failTeardown = true;
+    const before = await run(balanceEffect(test.http, tenantId));
+    const scanId = await newScan("running");
+    const res = await stop(scanId);
+    failTeardown = false;
+
+    expect(res.status).toBe(200);
+    expect(Number((await settledOf(scanId))?.amountUsd)).toBe(HOLD_USD);
+    expect(await run(balanceEffect(test.http, tenantId))).toBe(before);
   });
 
   it("leaves a Scan on a Runner alone: no sandbox to destroy", async () => {
