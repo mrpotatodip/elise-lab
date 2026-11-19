@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, isNull, notExists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { RunnerJobSourceValue } from "@repo/contracts/elise";
-import { scanArchiveLinks, scanRunnerJobs, tenantRunners, type TScanRunnerJob } from "@repo/db-elise";
+import { scanArchiveLinks, scanRunnerJobs, scans, tenantRunners, type TScanRunnerJob } from "@repo/db-elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { JobReport, NewRunnerJob } from "#/modules/runners/types";
@@ -12,6 +12,11 @@ import type { JobReport, NewRunnerJob } from "#/modules/runners/types";
 // -----
 export const insertRunnerJobEffect = (db: DbConnectType, job: NewRunnerJob): Effect.Effect<void, DbError> =>
   Effect.tryPromise({ try: () => db.insert(scanRunnerJobs).values(job).onConflictDoNothing(), catch: toDbError }).pipe(Effect.asVoid);
+
+export const scanStoppedEffect = (db: DbConnectType, scanId: string): Effect.Effect<boolean, DbError> =>
+  Effect.tryPromise({ try: () => db.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)), catch: toDbError }).pipe(
+    Effect.map(([row]) => row?.status === "stopped"),
+  );
 
 // -----
 // The Runner takes its oldest queued job in one UPDATE. The state

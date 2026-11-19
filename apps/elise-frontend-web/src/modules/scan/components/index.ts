@@ -18,6 +18,7 @@ export * from "./scan-origin";
 export * from "./scan-profile-badge";
 export * from "./scan-new-dialog";
 export * from "./scan-status-badge";
+export * from "./scan-stop-button";
 export * from "./scan-summary";
 export * from "./scan-time";
 export * from "./scan-verdict-cell";

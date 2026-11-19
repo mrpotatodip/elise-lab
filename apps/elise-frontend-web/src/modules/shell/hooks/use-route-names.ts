@@ -6,7 +6,7 @@ const SidebarBranchSchema = z.object({
   name: z.string(),
   isDefault: z.boolean(),
   latestScanAt: z.string().nullable(),
-  status: z.enum(["queued", "running", "succeeded", "failed"]).nullable(),
+  status: z.enum(["queued", "running", "succeeded", "failed", "stopped"]).nullable(),
 });
 
 const RouteNamesSchema = z.object({

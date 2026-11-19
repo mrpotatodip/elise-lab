@@ -44,7 +44,11 @@ export const fetchScan = createServerFn({ method: "GET" })
     return engineJson(ScanStatusSchema, `/scans/${data.scanId}`, {}, await engineAuth());
   });
 
-export const fetchScanFile = createServerFn({ method: "GET" })
+export const stopScan = createServerFn({ method: "POST" })
+  .validator(ScanIdInputSchema)
+  .handler(async ({ data }) => engineJson(ScanStatusSchema, `/scans/${data.scanId}/stop`, { method: "POST" }, await engineAuth()));
+
+export const fetchScanFile =createServerFn({ method: "GET" })
   .validator(ScanFileInputSchema)
   .handler(async ({ data }) => {
     const res = await engineFetch(`/scans/${data.scanId}/files/${data.file}`, {}, await engineAuth());
@@ -89,7 +93,7 @@ export const fetchOverview = createServerFn({ method: "GET" }).handler(async () 
   const [list, repoList] = await Promise.all([engineJson(ScanListSchema, "/scans", {}, auth), engineJson(RepoListSchema, "/repos", {}, auth)]);
 
   const byState = { queued: 0, running: 0, succeeded: 0, failed: 0 };
-  for (const scan of list.scans) byState[scan.status] += 1;
+  for (const scan of list.scans) if (scan.status !== "stopped") byState[scan.status] += 1;
 
   const severity = { critical: 0, high: 0, medium: 0, low: 0, informational: 0 } satisfies Record<Severity, number>;
   let needsValidation = 0;

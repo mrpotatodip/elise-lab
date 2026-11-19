@@ -18,7 +18,7 @@ export type ShellRepo = {
   id: string;
   owner: string;
   name: string;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "queued" | "running" | "succeeded" | "failed" | "stopped";
   isPrivate?: boolean;
 };
 
