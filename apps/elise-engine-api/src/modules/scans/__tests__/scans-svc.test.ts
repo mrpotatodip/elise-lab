@@ -413,14 +413,13 @@ describe("createScanSvc: a Runner", () => {
     expect(createdFull[0].params).toMatchObject({ runnerId: RUNNER, keySource: "account" });
   });
 
-  it("refuses a private repository, which only the container can read", async () => {
+  it("runs a private repository on the Runner, which clones it with its own git login and gets no GitHub token", async () => {
     const { env, createdFull } = fakeBindings();
-    const github ={ installationRowId: "7c1e4a52-9d3b-4f60-8a71-2b3c4d5e6f70", installationId: 42, repoId: 7, repo: "octocat/hello-world", isPrivate: true };
+    const github = { installationRowId: "7c1e4a52-9d3b-4f60-8a71-2b3c4d5e6f70", installationId: 42, repoId: 7, repo: "octocat/hello-world", isPrivate: true };
     const access: GithubAccess = { forRepo: () => Effect.succeed(github) };
-    const failure = await Effect.runPromise(Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, RUNNER_SPEND(), access, hold, connected)));
+    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, RUNNER_SPEND(), access, hold, connected));
 
-    expect(failure).toMatchObject({ _tag: "Invalid" });
-    expect(createdFull).toEqual([]);
+    expect(createdFull[0].params).toMatchObject({ runnerId: RUNNER, github: undefined });
   });
 });
 
