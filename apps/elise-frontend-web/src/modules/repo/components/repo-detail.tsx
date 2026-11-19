@@ -120,7 +120,11 @@ const severityColumn = findingColumn.display({
       <span className="grid justify-items-start gap-1.5">
         <ScanSeverityBadge severity={finding.severity} />
         {plainOpen ? <span className="sr-only">Open</span> : <FindingStatusBadge state={finding.state} triage={finding.triage} />}
-        {blocks && <Badge variant="destructive">Blocks shipping</Badge>}
+        {blocks && (
+          <Badge variant="destructive" title="This problem is serious enough that the commit should not ship until it is fixed or a person accepts the risk.">
+            Blocks shipping
+          </Badge>
+        )}
       </span>
     );
   },

@@ -37,6 +37,11 @@ export function TeamSummary() {
   const maxMembers = plan?.plan?.maxMembers ?? null;
   const percent = maxMembers !== null && maxMembers > 0 ? Math.min(100, Math.round((people / maxMembers) * 100)) : 0;
   const grouped = team.members.filter((member) => groups.some((group) => group.memberIds.includes(member.partyId))).length;
+  const heldOnly = team.members
+    .filter((member) => !roles.some((role) => role.key === member.role))
+    .filter((member, index, all) => all.findIndex((other) => other.role === member.role) === index)
+    .map((member) => ({ key: member.role, label: member.roleLabel, description: null }));
+  const shownRoles = [...roles, ...heldOnly];
   const holders = (key: string) => team.members.filter((member) => member.role === key).length + team.invites.filter((invite) => invite.role === key).length;
 
   return (
@@ -63,7 +68,7 @@ export function TeamSummary() {
 
         <Column label="Roles">
           <ul className="divide-y rounded-lg border">
-            {roles.map((role) => (
+            {shownRoles.map((role) => (
               <li key={role.key} className="flex items-start justify-between gap-4 px-4 py-3">
                 <span className="grid min-w-0 gap-0.5">
                   <span className="text-sm font-medium">{teamRoleLabel(role.key, role.label)}</span>

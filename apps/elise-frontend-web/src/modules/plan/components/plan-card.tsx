@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
 import { buttonVariants } from "#/components/ui/button";
@@ -66,8 +66,8 @@ function Column({ label, aside, footer, children }: ColumnProps) {
 
 export function PlanCard() {
   const { data } = useSuspenseQuery(planQuery());
-  const { data: runners } = useQuery(runnersQuery());
-  const { data: team } = useQuery(teamQuery());
+  const { data: runners } = useSuspenseQuery(runnersQuery());
+  const { data: team } = useSuspenseQuery(teamQuery());
   const now = useNow();
   const { plan } = data;
 
@@ -77,7 +77,7 @@ export function PlanCard() {
 
   const status = PLAN_STATUS_VIEW[data.status];
   const granted = data.source === "grant";
-  const paired = (runners ?? []).filter((runner) => runner.state === "connected");
+  const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
   const people = data.seats.members + data.seats.pendingInvites;
   const waiting = data.seats.pendingInvites;
@@ -131,7 +131,7 @@ export function PlanCard() {
           </p>
           <Progress value={peoplePercent} indicatorClassName="bg-primary/55" aria-label={`People: ${people} of ${plan.maxMembers}`} />
           <ul className="divide-y rounded-lg border">
-            {(team?.members ?? []).map((member) => (
+            {team.members.map((member) => (
               <li key={member.partyId} className="flex items-center justify-between gap-4 px-4 py-3">
                 <span className="grid min-w-0 gap-0.5">
                   <span className="truncate text-sm font-medium">{member.name}</span>

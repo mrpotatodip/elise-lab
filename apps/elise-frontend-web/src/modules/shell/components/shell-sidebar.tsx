@@ -165,7 +165,7 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
                   <span className="flex-1">Runners</span>
                   {runnersMark && (
                     <>
-                      <span aria-hidden="true" className={cn("size-2 rounded-full", runnersMark)} />
+                      {runnersRunning > 0 ? <span aria-hidden="true" className={cn("size-2 rounded-full", runnersMark)} /> : <span aria-hidden="true" className="text-xs font-normal">Off</span>}
                       <span className="sr-only">{runnersRunning > 0 ? `${runnersRunning} running` : "none running"}</span>
                     </>
                   )}
