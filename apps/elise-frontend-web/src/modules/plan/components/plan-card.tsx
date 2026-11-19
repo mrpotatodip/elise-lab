@@ -3,11 +3,13 @@ import { Link } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
+import { buttonVariants } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Progress } from "#/components/ui/progress";
 import { useNow } from "#/lib/use-now";
-import { runnerShownState, runnersQuery } from "#/modules/runner";
+import { runnerShownState, runnersQuery, runnerWhen } from "#/modules/runner";
 import { ShellPageHeader } from "#/modules/shell";
+import { teamQuery, teamRoleLabel } from "#/modules/team";
 import { usageUsd } from "#/modules/usage";
 import { planOffersQuery, planQuery } from "../hooks";
 import { PLAN_STATUS_VIEW, planDateLabel, planSourceLabel } from "../utils";
@@ -15,6 +17,8 @@ import { PLAN_STATUS_VIEW, planDateLabel, planSourceLabel } from "../utils";
 const PER_MONTH = <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>;
 
 const ALERT_VARIANT = { success: "success", warning: "warning", destructive: "destructive", neutral: "info" } as const;
+
+const ACTION = buttonVariants({ variant: "outline", size: "sm" });
 
 function PlanOfferCard() {
   const { data: offers } = useSuspenseQuery(planOffersQuery());
@@ -44,27 +48,25 @@ function PlanOfferCard() {
   );
 }
 
-type MeterProps = { label: string; used: number; of: number; note: ReactNode };
+type ColumnProps = { label: string; aside?: ReactNode; footer?: ReactNode; children: ReactNode };
 
-function Meter({ label, used, of, note }: MeterProps) {
-  const percent = of > 0 ? Math.min(100, Math.round((used / of) * 100)) : 0;
+function Column({ label, aside, footer, children }: ColumnProps) {
   return (
-    <div className="grid gap-2">
+    <section aria-label={label} className="grid grid-rows-[auto_1fr_auto] gap-4 p-6">
       <div className="flex items-baseline justify-between gap-4">
-        <h3 className="text-sm font-medium">{label}</h3>
-        <p className="text-sm tabular-nums text-muted-foreground">
-          <span className="text-base font-semibold text-foreground">{used}</span> of {of}
-        </p>
+        <h2 className="text-sm font-medium text-muted-foreground">{label}</h2>
+        {aside}
       </div>
-      <Progress value={percent} aria-label={`${label}: ${used} of ${of}`} />
-      <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{note}</p>
-    </div>
+      <div className="grid content-start gap-4">{children}</div>
+      {footer}
+    </section>
   );
 }
 
 export function PlanCard() {
   const { data } = useSuspenseQuery(planQuery());
   const { data: runners } = useQuery(runnersQuery());
+  const { data: team } = useQuery(teamQuery());
   const now = useNow();
   const { plan } = data;
 
@@ -73,10 +75,12 @@ export function PlanCard() {
   }
 
   const status = PLAN_STATUS_VIEW[data.status];
+  const granted = data.source === "grant";
   const paired = (runners ?? []).filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
   const people = data.seats.members + data.seats.pendingInvites;
   const waiting = data.seats.pendingInvites;
+  const peoplePercent = plan.maxMembers > 0 ? Math.min(100, Math.round((people / plan.maxMembers) * 100)) : 0;
 
   return (
     <>
@@ -88,50 +92,102 @@ export function PlanCard() {
         </Alert>
       )}
 
-      <Card className="grid overflow-hidden lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <section aria-label="Your plan" className="grid content-start gap-4 border-b p-6 lg:border-b-0 lg:border-r">
-          <h2 className="text-sm font-medium text-muted-foreground">{plan.label} plan</h2>
-          <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
-            {usageUsd(plan.monthlyPriceUsd)}
-            {PER_MONTH}
-          </p>
-          <p className="text-sm leading-relaxed text-muted-foreground">Flat. Elise charges nothing per scan.</p>
-          <dl className="grid gap-1.5 border-t pt-4 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Billing</dt>
-              <dd className="font-medium">{planSourceLabel(data.source)}</dd>
-            </div>
-            {data.currentPeriodEnd !== null && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Renews</dt>
-                <dd className="font-medium tabular-nums">{planDateLabel(data.currentPeriodEnd)}</dd>
-              </div>
-            )}
-          </dl>
-          <p className="text-sm leading-relaxed text-muted-foreground">To change your plan, contact us.</p>
-        </section>
+      <Card className="grid overflow-hidden lg:grid-cols-3 lg:divide-x">
+        <Column label={`${plan.label} plan`} footer={<p className="max-w-copy text-sm leading-relaxed text-muted-foreground">To change your plan, contact us.</p>}>
+          {granted ? (
+            <>
+              <p className="text-[40px] font-semibold leading-none tracking-tight">No charge</p>
+              <p className="text-sm tabular-nums text-muted-foreground">
+                <s>{usageUsd(plan.monthlyPriceUsd)}</s> per month
+              </p>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{planSourceLabel(data.source)}, with no end date. Elise charges nothing per scan.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
+                {usageUsd(plan.monthlyPriceUsd)}
+                {PER_MONTH}
+              </p>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                {planSourceLabel(data.source)}
+                {data.currentPeriodEnd !== null ? `. Renews ${planDateLabel(data.currentPeriodEnd)}` : ""}. Elise charges nothing per scan.
+              </p>
+            </>
+          )}
+        </Column>
 
-        <section aria-label="What you are using" className="grid content-start gap-6 p-6">
-          <Meter
-            label="People"
-            used={people}
-            of={plan.maxMembers}
-            note={waiting > 0 ? `Includes ${waiting} waiting ${waiting === 1 ? "invite" : "invites"}. Everyone shares the same reports and findings.` : "Everyone on this account shares the same reports and findings."}
-          />
-          <Meter
-            label="Runners running"
-            used={running}
-            of={paired.length}
-            note={
-              <>
-                A Runner is a computer you pair. Each scan runs on it, with that computer&apos;s Claude and git login.{" "}
-                <Link to="/settings/providers" className="font-medium text-primary-ink underline underline-offset-4">
-                  {paired.length === 0 ? "Add a Runner" : "Manage Runners"}
-                </Link>
-              </>
-            }
-          />
-        </section>
+        <Column
+          label="People"
+          footer={
+            <Link to="/team" className={ACTION}>
+              Manage the team
+            </Link>
+          }
+        >
+          <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
+            {people}
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {plan.maxMembers}</span>
+          </p>
+          <Progress value={peoplePercent} indicatorClassName="bg-primary/55" aria-label={`People: ${people} of ${plan.maxMembers}`} />
+          <ul className="divide-y rounded-lg border">
+            {(team?.members ?? []).map((member) => (
+              <li key={member.partyId} className="flex items-center justify-between gap-4 px-4 py-3">
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="truncate text-sm font-medium">{member.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{member.email}</span>
+                </span>
+                <Badge variant="outline">{teamRoleLabel(member.role, member.roleLabel)}</Badge>
+              </li>
+            ))}
+          </ul>
+          {waiting > 0 && <p className="text-sm leading-relaxed text-muted-foreground">Plus {waiting} waiting {waiting === 1 ? "invite" : "invites"}.</p>}
+        </Column>
+
+        <Column
+          label="Runners"
+          aside={
+            <p className="text-sm tabular-nums text-muted-foreground">
+              {running} of {paired.length} running
+            </p>
+          }
+          footer={
+            <Link to="/settings/providers" className={ACTION}>
+              {paired.length === 0 ? "Add a Runner" : "Manage Runners"}
+            </Link>
+          }
+        >
+          {paired.length === 0 ? (
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">No computer is paired yet. A Runner is a computer that runs your scans, with its own Claude and git login.</p>
+          ) : (
+            <>
+              <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
+                {paired.length}
+                <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">paired</span>
+              </p>
+              {running === 0 && (
+                <Alert variant="warning">
+                  <AlertDescription>
+                    <span className="font-medium">No Runner is running.</span> A new scan waits until one starts. Open the Elise Runner on one of your computers.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <ul className="divide-y rounded-lg border">
+                {paired.map((runner) => {
+                  const isRunning = runnerShownState(runner, now) === "connected";
+                  return (
+                    <li key={runner.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                      <span className="grid min-w-0 gap-0.5">
+                        <span className="truncate text-sm font-medium">{runner.name}</span>
+                        <span className="text-xs text-muted-foreground">{runner.lastSeenAt === null ? "Not seen yet." : `Last seen ${runnerWhen(runner.lastSeenAt)}.`}</span>
+                      </span>
+                      <Badge variant={isRunning ? "success" : "neutral"}>{isRunning ? "Running" : "Not running"}</Badge>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </Column>
       </Card>
     </>
   );

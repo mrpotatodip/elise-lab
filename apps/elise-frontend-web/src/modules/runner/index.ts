@@ -1,3 +1,3 @@
 export * from "./components";
 export * from "./hooks";
-export { runnerShownState } from "./utils";
+export { runnerShownState, runnerWhen } from "./utils";
