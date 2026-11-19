@@ -2,7 +2,7 @@
 
 `elise-runner` is a command-line program that runs Scans started in Elise on this computer, with no window. Pair it with a one-time code, start it, and leave it running on a server, a build machine or a terminal-only box. It claims the Scans that are started for it in the dashboard, runs them, and logs what it does to standard output.
 
-It is a Runner like the desktop app (the folder above): both run Scans through one shared core, `core/` (`elise-runner-core`), so a Scan behaves the same whichever runs it. Its rules are in `docs/adr/0006-full-worker-and-phase-budget.md`, under "Runner Scans". To Elise the two are two Runners. On one computer each is paired with its own code and holds its own token, so neither reads or changes the other's, and each runs one Scan at a time. The headless Runner shows in the Runners list in Elise like any other Runner, and removing it there stops it claiming Scans.
+It is a Runner like the desktop app (the folder above): both run Scans through one shared core, `core/` (`elise-runner-core`), so a Scan behaves the same whichever runs it. Its rules are in `docs/adr/0006-full-worker-and-phase-budget.md`, under "Runner Scans". To Elise the two are two Runners. On one computer each is paired with its own code and holds its own token, so neither reads or changes the other's. The desktop app runs one Scan at a time. The headless Runner runs one by default, and up to three with `--parallel`. The headless Runner shows in the Runners list in Elise like any other Runner, and removing it there stops it claiming Scans.
 
 It supports macOS and Linux. Windows is not supported.
 
@@ -21,7 +21,7 @@ It supports macOS and Linux. Windows is not supported.
 elise-runner login [--no-browser]
 elise-runner pair <code> [--yes] [--print-token]
 elise-runner status
-elise-runner run [--once]
+elise-runner run [--once] [--parallel N]
 elise-runner unpair
 elise-runner --help | --version
 ```
@@ -30,8 +30,9 @@ elise-runner --help | --version
 - `pair <code>` is the way for CI, scripts and a box with no browser: you get the code first in Elise (Add a Runner), then give it here. It shows the Account name and the Runner name the code belongs to and asks `y/N`. On yes it saves the token. On no it revokes the token Elise issued, so none is left. `--yes` accepts without asking, for a script. If this Runner already holds a token, the new one is saved first and then the old one is revoked; if that revoke cannot reach Elise, the program says so and names the old Runner, so an admin can remove it in Elise.
 - `pair <code> --print-token` enrolls and confirms as usual, then prints the token once on standard output and saves nothing. See "In a container".
 - `status` says whether this Runner is unpaired, connected (with its name and Account), revoked or offline, and names the token store in use.
-- `run` claims and runs Scans until you stop it.
-- `run --once` claims at most one Scan, runs it, reports it and exits. With nothing to claim it exits at once with 6.
+- `run` claims and runs Scans until you stop it. It runs one Scan at a time unless you give `--parallel N`.
+- `run --parallel N` runs up to N Scans at once, N from 1 to 3 (1 is the default; anything else is a usage error, exit 2). Elise allows 3 live Runner Scans for an Account, shared by all its Runners, so a Scan that would be the fourth is refused when it is started in Elise, not here. Parallel Scans are on different Repos, because an Account has one active Scan per Repo. Each Scan has its own work folder and its own Pool, so one that fails or runs out of money leaves the others running. Every log line starts with `[repo scan_id]`, so interleaved lines can be told apart. One Ctrl-C (or a stop signal) stops every running Scan, each reports as it does for a single Scan, and the program exits after the last report is sent. Running N `claude` runs at once uses N times the CPU, memory and Claude usage.
+- `run --once` claims the Scans that are queued, up to the number `--parallel` allows (one by default), runs them together, reports them and exits. It exits 0 only if every Scan succeeded, and with nothing to claim it exits at once with 6.
 - `unpair` tells Elise to drop the token, then forgets it.
 
 The program never prints the token in its log, in `status` or in an error. `pair --print-token` is the one exception, because you ask for it.

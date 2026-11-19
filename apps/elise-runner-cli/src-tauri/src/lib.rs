@@ -36,7 +36,7 @@ enum Activity {
 
 static ACTIVITY: Mutex<Activity> = Mutex::new(Activity::Idle);
 
-fn on_event(event: Event) {
+fn on_event(_scan_id: &str, event: Event) {
     let next = match event {
         Event::Claimed { repo, .. } => Activity::Running { repo },
         Event::Ended { ok, repo, message, .. } => Activity::Finished { ok, repo, message },

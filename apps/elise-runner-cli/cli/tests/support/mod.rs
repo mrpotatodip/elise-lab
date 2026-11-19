@@ -635,6 +635,15 @@ impl Stubs {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
 
+    pub fn waiting_agents(&self, count: usize) -> Vec<u32> {
+        let file = self.record.join("waiting-all.txt");
+        let read =
+            || std::fs::read_to_string(&file).unwrap_or_default().lines().filter_map(|line| line.trim().parse().ok()).collect::<Vec<u32>>();
+        let ready = until(|| read().len() >= count);
+        assert!(ready, "fewer than {count} stub agents started waiting");
+        read()
+    }
+
     pub fn waiting_agent(&self) -> u32 {
         let file = self.record.join("waiting.pid");
         let ready = until(|| file.is_file());
@@ -674,6 +683,7 @@ case "$prompt" in *stop=slow*) sleep 2 ;; esac
 case "$prompt" in
   *stop=wait*)
     echo "the agent was half way through"
+    echo $$ >> "__RECORD__/waiting-all.txt"
     echo $$ > "__RECORD__/waiting.tmp"; mv "__RECORD__/waiting.tmp" "__RECORD__/waiting.pid"
     exec sleep 600 ;;
 esac

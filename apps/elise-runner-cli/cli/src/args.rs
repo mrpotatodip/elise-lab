@@ -4,7 +4,7 @@ pub enum Command {
     Login { no_browser: bool },
     Status,
     Unpair,
-    Run { once: bool },
+    Run { once: bool, parallel: usize },
 }
 
 #[derive(Debug, PartialEq)]
@@ -22,7 +22,7 @@ Usage:
   elise-runner pair <code> [--yes] [--print-token]
   elise-runner login [--no-browser]
   elise-runner status
-  elise-runner run [--once]
+  elise-runner run [--once] [--parallel N]
   elise-runner unpair
   elise-runner --help | --version
 
@@ -39,7 +39,10 @@ Commands:
   status          Say whether this Runner is unpaired, connected, revoked or offline, and where
                   its token is kept.
   run             Claim and run Scans until stopped.
-    --once        Claim at most one Scan, run it and exit.
+    --once        Claim the Scans that are queued, up to the number --parallel allows, run them and exit.
+    --parallel N  Run up to N Scans at once, from 1 to 3 (default 1). Elise allows 3 live Runner
+                  Scans for an Account, shared by all its Runners, so a Scan that would be the
+                  fourth is refused.
   unpair          Tell Elise to drop this Runner's token, then forget it.
 
 Where the token is kept, in order:
@@ -61,8 +64,33 @@ Exit codes:
   4  revoked (Elise rejected the token)
   5  offline (Elise could not be reached)
   6  run --once: nothing to claim
-  7  run --once: the Scan was stopped from Elise
+  7  run --once: a Scan was stopped from Elise
+  (run --once with several Scans exits 0 only if every one succeeded)
 ";
+
+pub const MAX_PARALLEL: usize = 3;
+
+fn take_parallel(rest: &[String]) -> Result<(Vec<String>, usize), String> {
+    let mut kept = Vec::new();
+    let mut parallel = 1;
+    let mut items = rest.iter();
+    while let Some(item) = items.next() {
+        let value = if item == "--parallel" {
+            Some(items.next().map(String::as_str).unwrap_or_default())
+        } else {
+            item.strip_prefix("--parallel=")
+        };
+        let Some(value) = value else {
+            kept.push(item.clone());
+            continue;
+        };
+        parallel = match value.parse::<usize>() {
+            Ok(count) if (1..=MAX_PARALLEL).contains(&count) => count,
+            _ => return Err(format!("`--parallel` takes a number from 1 to {MAX_PARALLEL}")),
+        };
+    }
+    Ok((kept, parallel))
+}
 
 pub fn parse(args: &[String]) -> Parsed {
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
@@ -73,6 +101,12 @@ pub fn parse(args: &[String]) -> Parsed {
     }
     let Some((command, rest)) = args.split_first() else {
         return Parsed::Usage("no command given".to_string());
+    };
+    let (rest, parallel) = match take_parallel(rest) {
+        Ok(taken) if command == "run" => taken,
+        Ok((kept, 1)) if kept.len() == rest.len() => (kept, 1),
+        Ok(_) => return Parsed::Usage(format!("`{command}` does not take `--parallel`")),
+        Err(problem) => return Parsed::Usage(problem),
     };
     let (flags, positional): (Vec<&String>, Vec<&String>) = rest.iter().partition(|arg| arg.starts_with('-'));
     let allowed: &[&str] = match command.as_str() {
@@ -95,7 +129,7 @@ pub fn parse(args: &[String]) -> Parsed {
         ("login", []) => Parsed::Command(Command::Login { no_browser: has("--no-browser") }),
         ("status", []) => Parsed::Command(Command::Status),
         ("unpair", []) => Parsed::Command(Command::Unpair),
-        ("run", []) => Parsed::Command(Command::Run { once: has("--once") }),
+        ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel }),
         _ => Parsed::Usage(format!("too many arguments for `{command}`")),
     }
 }

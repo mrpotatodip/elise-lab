@@ -215,6 +215,8 @@ pub enum Event {
 
 pub type OnEvent<'a> = &'a (dyn Fn(Event) + Send + Sync);
 
+pub type OnScanEvent<'a> = &'a (dyn Fn(&str, Event) + Send + Sync);
+
 pub struct Stopper(tokio::sync::watch::Sender<bool>);
 
 #[derive(Clone)]
@@ -251,7 +253,7 @@ impl Stop {
 }
 
 // The settings file is read again for every job, so a host added to it counts from the next Scan.
-pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, settings_file: &Path, on_event: OnEvent<'_>) {
+pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, settings_file: &Path, on_event: OnScanEvent<'_>) {
     let never = Stop::never();
     loop {
         if let Some(token) = store.token() {
@@ -340,7 +342,17 @@ async fn watch_job(token: &str, scan_id: &str) -> Unwanted {
     }
 }
 
-pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Settings, on_event: OnEvent<'_>, stop: &Stop) -> JobEnd {
+pub async fn run_job(
+    token: &str,
+    job: Job,
+    tools: FindTools<'_>,
+    settings: &Settings,
+    on_scan_event: OnScanEvent<'_>,
+    stop: &Stop,
+) -> JobEnd {
+    let scan_id = job.scan_id.clone();
+    let on_event = |event: Event| on_scan_event(&scan_id, event);
+    let on_event: OnEvent<'_> = &on_event;
     let sink = trace::TraceSink::new(token, &job.scan_id);
     trace::scope(sink, run_traced_job(token, job, tools, settings, on_event, stop)).await
 }
