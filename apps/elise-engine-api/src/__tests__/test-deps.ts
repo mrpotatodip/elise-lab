@@ -20,6 +20,7 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   releaseCredit: () => Effect.succeed({ settled: true, chargeUsd: 0 }),
   teardownScan: async () => null,
   sessionUserId: async () => undefined,
+  runnerIdentity: async () => null,
   userHasAccount: async () => true,
   userHasPower: async () => true,
   enqueueInviteEmail: async () => undefined,

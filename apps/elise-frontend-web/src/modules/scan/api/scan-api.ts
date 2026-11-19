@@ -18,6 +18,8 @@ import {
   ScanIdInputSchema,
   ScanListSchema,
   ScanStatusSchema,
+  ScanTraceInputSchema,
+  TraceSchema,
   VerdictInputSchema,
   VerdictSchema,
 } from "../schemas";
@@ -48,7 +50,14 @@ export const stopScan = createServerFn({ method: "POST" })
   .validator(ScanIdInputSchema)
   .handler(async ({ data }) => engineJson(ScanStatusSchema, `/scans/${data.scanId}/stop`, { method: "POST" }, await engineAuth()));
 
-export const fetchScanFile =createServerFn({ method: "GET" })
+export const fetchScanTrace = createServerFn({ method: "GET" })
+  .validator(ScanTraceInputSchema)
+  .handler(async ({ data }) => {
+    const query = data.after ? `?after=${encodeURIComponent(data.after)}` : "";
+    return engineJson(TraceSchema, `/scans/${data.scanId}/trace${query}`, {}, await engineAuth());
+  });
+
+export const fetchScanFile = createServerFn({ method: "GET" })
   .validator(ScanFileInputSchema)
   .handler(async ({ data }) => {
     const res = await engineFetch(`/scans/${data.scanId}/files/${data.file}`, {}, await engineAuth());

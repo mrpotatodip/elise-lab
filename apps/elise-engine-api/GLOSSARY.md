@@ -58,6 +58,14 @@ _Avoid_: Tier, level, Effort (how hard the agent thinks), Skill
 Where a running Scan is: `cloning`, `auditing` or `saving`. It is null when the Scan has not started or has ended. A full Scan is in the `auditing` Step through all four of its Phases: a Phase is a part of the audit, never a Step.
 _Avoid_: Phase (a Phase is one of recon, hunt, check or report)
 
+**Trace**:
+The ordered list of Trace entries of one Scan, kept for as long as the Scan. It tells a person what kind of work the agent is doing, never what it read or wrote.
+_Avoid_: Activity (the dashboard uses that for the per-day Scan count), log, event stream
+
+**Trace entry**:
+One line of a Trace: a label such as Reasoning, Reading files, Searching, Running a command or Writing, or the start or end of a Phase. Consecutive entries with the same label merge into one with a count and a time span. It holds no text, path, pattern, command or tool result from the agent. A Trace entry is never a Step, and a Phase is never a Trace entry.
+_Avoid_: Event, log line
+
 **Phase**:
 One of the four runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. In the cloud each is a Detached run; on a Runner each is a run of `claude` that the app starts. A Runner Scan has Phases too, on the Phase prompts the engine puts in its job (`phasePrompts`). They share the one Pool, and no Phase has a share of its own. Each has its own time slot (10, 45, 25 and 10 minutes). The one repair run that a Runner starts when the validators fail after `check` is not a Phase: it has a 5-minute slot of its own and spends from the same Pool. Only a full Scan has Phases; a lite Scan is one run, and so is a Runner Scan whose job carries no Phase prompts (an older engine). ADR 0006 holds the rules.
 _Avoid_: Step (that is cloning, auditing or saving), stage

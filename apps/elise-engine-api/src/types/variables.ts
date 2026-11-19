@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { Effect } from "effect";
-import type { AccessPower, ScanUsage } from "@repo/contracts/elise";
+import type { AccessPower, RunnerIdentity, ScanUsage } from "@repo/contracts/elise";
 import type { TenantDbType } from "#/lib/db-connection";
 import type { DbError, Invalid } from "#/lib/effect-query";
 import type { ScanArchiveLink } from "#/modules/archives/queries";
@@ -20,7 +20,6 @@ export type Bindings = {
   MAX_BUDGET_FULL_USD: string;
   MAX_ACTIVE_SCANS: string;
   MAX_ACTIVE_FULL_SCANS: string;
-  MAX_GLOBAL_FULL_SCANS: string;
   MONTHLY_BUDGET_USD: string;
   BUDGET_ALLOWANCE_USD: string;
   BILLING_ENFORCED: string;
@@ -67,6 +66,7 @@ export type AppDeps = {
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
   teardownScan: (env: Bindings, scanId: string) => Promise<ScanUsage | null>;
   sessionUserId: (c: Context<AppEnv>) => Promise<string | undefined>;
+  runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
   enqueueInviteEmail: (env: Bindings, mail: InviteEmail) => Promise<void>;

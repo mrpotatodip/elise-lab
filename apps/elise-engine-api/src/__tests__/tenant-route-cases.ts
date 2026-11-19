@@ -62,6 +62,7 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
   "POST /runners/jobs/:scanId/result",
   "GET /runners/jobs/:scanId",
   "GET /runners/jobs/:scanId/archive",
+  "POST /runners/jobs/:scanId/trace",
   "GET /runners/me",
   "DELETE /runners/me",
   "GET /openapi.json",
@@ -116,6 +117,7 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /scans": { kind: "run", path: "/scans", expect: "empty" },
   "GET /scans/:scanId": { kind: "run", path: "/scans/theirs", expect: "not-found" },
   "GET /scans/:scanId/diff": { kind: "run", path: "/scans/theirs/diff", expect: "not-found" },
+  "GET /scans/:scanId/trace": { kind: "run", path: "/scans/theirs/trace", expect: "not-found" },
   "GET /scans/:scanId/files/:file": { kind: "run", path: "/scans/theirs/files/REPORT.md", expect: "not-found" },
   // -----
   // The stranger, on a key of its own, scans the repo the other

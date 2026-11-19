@@ -185,24 +185,6 @@ describe("neonScanRepo", () => {
     expect(active.find((scan) => scan.scanId === "act-cloud")?.runner ?? null).toBeNull();
   });
 
-  it("counts the live scans of every account on each path, and leaves out a scan that is on a Runner", async () => {
-    const repo = neonScanRepo(test.http);
-    const before = await Effect.runPromise(repo.activeCounts(Date.now()));
-    await queue(repo, paramsFor(acme, "cnt-lite"));
-    await queue(repo, paramsFor(other, "cnt-lite-other"));
-    await queue(repo, { ...paramsFor(other, "cnt-full"), options: { ...paramsFor(acme, "x").options, skill: "full" } });
-    await queue(repo, paramsFor(acme, "cnt-runner"));
-    const [runner] = await test.raw.insert(tenantRunners).values({ tenantId: acme, name: "laptop", createdBy: acmePartyId }).returning();
-    await test.raw
-      .insert(scanRunnerJobs)
-      .values({ tenantId: acme, scanId: "cnt-runner", runnerId: runner.id, state: "claimed", repoUrl: "https://github.com/octocat/cnt-runner", prompt: "p", optionsJson: "{}", priorsJson: "[]" });
-
-    const after = await Effect.runPromise(repo.activeCounts(Date.now()));
-
-    expect({ lite: after.lite - before.lite, full: after.full - before.full }).toEqual({ lite: 2, full: 1 });
-    expect(await Effect.runPromise(repo.activeCounts(PAST_ANY_WINDOW()))).toEqual({ lite: 0, full: 0 });
-  });
-
   it("keeps one record for a repo however its URL is spelled, per account", async () => {
     const repo = neonScanRepo(test.http);
     const first = await Effect.runPromise(repo.ensureRepo(acme, "https://github.com/Octocat/Spoon-Knife"));

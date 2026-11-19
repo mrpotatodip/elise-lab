@@ -1,5 +1,5 @@
 {
-  "id": "c1e87bb0-8160-496b-a758-9d7571dd2569",
+  "id": "a6998a08-5aa1-4863-9425-8b36270f4bdc",
   "prevId": "39a434b7-f98c-4a05-b477-054c5682c112",
   "version": "7",
   "dialect": "postgresql",
@@ -5356,6 +5356,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "trace_candidate_findings": {
+          "name": "trace_candidate_findings",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -5493,7 +5499,7 @@
       "checkConstraints": {
         "scans_status": {
           "name": "scans_status",
-          "value": "\"scans\".\"status\" in ('queued', 'running', 'succeeded', 'failed', 'stopped')"
+          "value": "\"scans\".\"status\" in ('queued', 'running', 'succeeded', 'failed')"
         },
         "scans_step": {
           "name": "scans_step",
@@ -5927,6 +5933,153 @@
         "scan_upload_archives_sha": {
           "name": "scan_upload_archives_sha",
           "value": "\"scan_upload_archives\".\"content_sha256\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.scan_trace_entries": {
+      "name": "scan_trace_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scan_id": {
+          "name": "scan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phase": {
+          "name": "phase",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_scan_trace_entries_scan_updated": {
+          "name": "idx_scan_trace_entries_scan_updated",
+          "columns": [
+            {
+              "expression": "scan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scan_trace_entries_tenant_id_tenants_id_fk": {
+          "name": "scan_trace_entries_tenant_id_tenants_id_fk",
+          "tableFrom": "scan_trace_entries",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scan_trace_entries_scan_tenant_fk": {
+          "name": "scan_trace_entries_scan_tenant_fk",
+          "tableFrom": "scan_trace_entries",
+          "tableTo": "scans",
+          "columnsFrom": [
+            "scan_id",
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id",
+            "tenant_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scan_trace_entries_pk": {
+          "name": "scan_trace_entries_pk",
+          "columns": [
+            "scan_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "scan_trace_entries_label": {
+          "name": "scan_trace_entries_label",
+          "value": "\"scan_trace_entries\".\"label\" in ('reasoning', 'reading_files', 'searching', 'running_command', 'writing', 'calling_tool', 'phase_started', 'phase_ended')"
+        },
+        "scan_trace_entries_phase": {
+          "name": "scan_trace_entries_phase",
+          "value": "\"scan_trace_entries\".\"phase\" is null or \"scan_trace_entries\".\"phase\" in ('recon', 'hunt', 'check', 'report')"
+        },
+        "scan_trace_entries_count": {
+          "name": "scan_trace_entries_count",
+          "value": "\"scan_trace_entries\".\"count\" >= 1"
         }
       },
       "isRLSEnabled": false

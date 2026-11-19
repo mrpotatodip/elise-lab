@@ -1,9 +1,8 @@
 import { scanPathOf, type ScanPath } from "#/lib/scan-path";
 import type { ScanOptions } from "#/schemas";
-import type { ActiveCounts } from "#/modules/scan-ledger";
 import type { CreateScanEnv } from "#/modules/scans/types";
 
-export type ScanRefusal = { code: "TOO_MANY_ACTIVE_SCANS" | "SCAN_WORKER_BUSY"; message: string };
+export type ScanRefusal = { code: "TOO_MANY_ACTIVE_SCANS"; message: string };
 
 // -----
 // The pool's own count of live Scans for one Account. A Scan in our cloud
@@ -27,25 +26,14 @@ export const limitPathOf = (scan: { skill: ScanOptions["skill"]; runner?: { id: 
 const POOL_NAME = { full: "full", lite: "Runner" } as const;
 
 // -----
-// Why a new Scan may not start now, or null. The Account's own count is
-// checked first: it is the answer a person can act on. A Scan that meets
-// a global cap is refused, not queued: a queue would hide a wait
-// the person cannot see and cannot cancel. A Scan on a Runner holds no
-// Sandbox of ours, so it passes null for the global counts and meets no
-// global cap.
+// Why a new Scan may not start now, or null. A Scan over its Account's
+// limit is refused, not queued: a queue would hide a wait the person
+// cannot see and cannot cancel.
 // -----
-export const scanRefusalOf = (
-  env: CreateScanEnv,
-  path: ScanPath,
-  accountActive: number,
-  globalActive: ActiveCounts | null,
-): ScanRefusal | null => {
+export const scanRefusalOf = (env: CreateScanEnv, path: ScanPath, accountActive: number): ScanRefusal | null => {
   const accountLimit = accountLimitOf(env, path);
   if (accountActive >= accountLimit) {
     return { code: "TOO_MANY_ACTIVE_SCANS", message: `This account already has ${accountActive} active ${POOL_NAME[path]} scans (limit ${accountLimit})` };
-  }
-  if (path === "full" && globalActive !== null && globalActive.full >= Number(env.MAX_GLOBAL_FULL_SCANS)) {
-    return { code: "SCAN_WORKER_BUSY", message: "EliseLAB is busy with full scans right now. Try again in a few minutes." };
   }
   return null;
 };

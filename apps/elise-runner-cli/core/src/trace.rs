@@ -1,0 +1,291 @@
+use crate::engine::{client, engine_url};
+use serde::Serialize;
+use std::collections::BTreeSet;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::Notify;
+use tokio::task::JoinHandle;
+use tokio::time::{sleep, timeout};
+
+const SEND_EVERY: Duration = Duration::from_millis(2500);
+const UPLOAD_TIMEOUT: Duration = Duration::from_secs(5);
+const FINISH_TIMEOUT: Duration = Duration::from_secs(2);
+const BATCH_MAX: usize = 500;
+const ENTRIES_MAX: usize = 5000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Label {
+    Reasoning,
+    ReadingFiles,
+    Searching,
+    RunningCommand,
+    Writing,
+    CallingTool,
+    PhaseStarted,
+    PhaseEnded,
+}
+
+pub fn classify(line: &str) -> Vec<Label> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+        return Vec::new();
+    };
+    if value["type"] != "assistant" {
+        return Vec::new();
+    }
+    let Some(blocks) = value["message"]["content"].as_array() else {
+        return Vec::new();
+    };
+    blocks
+        .iter()
+        .filter_map(|block| match block["type"].as_str()? {
+            "thinking" | "text" => Some(Label::Reasoning),
+            "tool_use" => Some(tool_label(block["name"].as_str().unwrap_or_default())),
+            _ => None,
+        })
+        .collect()
+}
+
+fn tool_label(name: &str) -> Label {
+    match name.to_ascii_lowercase().as_str() {
+        "read" | "glob" => Label::ReadingFiles,
+        "grep" => Label::Searching,
+        "bash" => Label::RunningCommand,
+        "write" | "edit" | "multiedit" | "notebookedit" => Label::Writing,
+        _ => Label::CallingTool,
+    }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct Entry {
+    id: String,
+    label: Label,
+    phase: Option<String>,
+    started_at: String,
+    ended_at: String,
+    count: u32,
+}
+
+#[derive(Default)]
+struct State {
+    entries: Vec<Entry>,
+    changed: BTreeSet<usize>,
+    phase: Option<String>,
+}
+
+impl State {
+    fn record(&mut self, label: Label) {
+        let now = now_iso();
+        let phase = self.phase.clone();
+        if let Some(last) = self.entries.last_mut() {
+            if last.label == label && last.phase == phase && !matches!(label, Label::PhaseStarted | Label::PhaseEnded) {
+                last.count += 1;
+                last.ended_at = now;
+                let at = self.entries.len() - 1;
+                self.changed.insert(at);
+                return;
+            }
+        }
+        if self.entries.len() >= ENTRIES_MAX {
+            return;
+        }
+        self.entries.push(Entry { id: uuid::Uuid::now_v7().to_string(), label, phase, started_at: now.clone(), ended_at: now, count: 1 });
+        self.changed.insert(self.entries.len() - 1);
+    }
+}
+
+#[derive(Clone)]
+pub struct TraceSink {
+    state: Arc<Mutex<State>>,
+    token: String,
+    scan_id: String,
+}
+
+tokio::task_local! {
+    static SINK: TraceSink;
+}
+
+impl TraceSink {
+    pub fn new(token: &str, scan_id: &str) -> TraceSink {
+        TraceSink { state: Arc::default(), token: token.to_string(), scan_id: scan_id.to_string() }
+    }
+
+    fn with_state<T>(&self, change: impl FnOnce(&mut State) -> T) -> T {
+        change(&mut self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
+
+    async fn flush(&self) {
+        let mut guard = Unsent { sink: self, places: self.with_state(|state| std::mem::take(&mut state.changed).into_iter().collect()) };
+        while !guard.places.is_empty() {
+            let take = guard.places.len().min(BATCH_MAX);
+            let batch: Vec<Entry> =
+                self.with_state(|state| guard.places[..take].iter().filter_map(|at| state.entries.get(*at).cloned()).collect());
+            let _ = client()
+                .post(format!("{}/runners/jobs/{}/trace", engine_url(), self.scan_id))
+                .bearer_auth(&self.token)
+                .timeout(UPLOAD_TIMEOUT)
+                .json(&serde_json::json!({ "entries": batch }))
+                .send()
+                .await;
+            guard.places.drain(..take);
+        }
+    }
+}
+
+struct Unsent<'a> {
+    sink: &'a TraceSink,
+    places: Vec<usize>,
+}
+
+impl Drop for Unsent<'_> {
+    fn drop(&mut self) {
+        let places = std::mem::take(&mut self.places);
+        self.sink.with_state(|state| state.changed.extend(places));
+    }
+}
+
+pub async fn scope<F: std::future::Future>(sink: TraceSink, work: F) -> F::Output {
+    SINK.scope(sink, work).await
+}
+
+pub struct Follow {
+    stop: Arc<Notify>,
+    task: JoinHandle<()>,
+}
+
+pub fn follow(log: &Path, phase: Option<&str>) -> Option<Follow> {
+    let sink = SINK.try_with(Clone::clone).ok()?;
+    let phase = phase.filter(|name| ["recon", "hunt", "check", "report"].contains(name));
+    sink.with_state(|state| {
+        state.phase = phase.map(str::to_string);
+        if phase.is_some() {
+            state.record(Label::PhaseStarted);
+        }
+    });
+    let stop = Arc::new(Notify::new());
+    let task = tokio::spawn(read_loop(sink, log.to_path_buf(), phase.is_some(), stop.clone()));
+    Some(Follow { stop, task })
+}
+
+impl Follow {
+    pub async fn finish(self) {
+        self.stop.notify_one();
+        let mut task = self.task;
+        if timeout(FINISH_TIMEOUT, &mut task).await.is_err() {
+            task.abort();
+        }
+    }
+}
+
+async fn read_loop(sink: TraceSink, log: PathBuf, phased: bool, stop: Arc<Notify>) {
+    let mut offset = 0u64;
+    let mut pending: Vec<u8> = Vec::new();
+    loop {
+        let stopped = tokio::select! {
+            _ = sleep(SEND_EVERY) => false,
+            _ = stop.notified() => true,
+        };
+        read_new(&log, &mut offset, &mut pending, stopped, &sink);
+        if stopped {
+            if phased {
+                sink.with_state(|state| state.record(Label::PhaseEnded));
+            }
+            sink.flush().await;
+            return;
+        }
+        tokio::select! {
+            () = sink.flush() => {}
+            () = stop.notified() => {
+                read_new(&log, &mut offset, &mut pending, true, &sink);
+                if phased {
+                    sink.with_state(|state| state.record(Label::PhaseEnded));
+                }
+                sink.flush().await;
+                return;
+            }
+        }
+    }
+}
+
+fn read_new(log: &Path, offset: &mut u64, pending: &mut Vec<u8>, last: bool, sink: &TraceSink) {
+    let Ok(mut file) = std::fs::File::open(log) else {
+        return;
+    };
+    if file.seek(SeekFrom::Start(*offset)).is_err() {
+        return;
+    }
+    let mut fresh = Vec::new();
+    if file.read_to_end(&mut fresh).is_err() {
+        return;
+    }
+    *offset += fresh.len() as u64;
+    pending.extend(fresh);
+    let mut lines: Vec<Vec<u8>> = pending.split(|byte| *byte == b'\n').map(<[u8]>::to_vec).collect();
+    *pending = if last { Vec::new() } else { lines.pop().unwrap_or_default() };
+    sink.with_state(|state| {
+        for line in &lines {
+            for label in classify(&String::from_utf8_lossy(line)) {
+                state.record(label);
+            }
+        }
+    });
+}
+
+fn now_iso() -> String {
+    let since = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let (days, rest) = ((since.as_secs() / 86_400) as i64, since.as_secs() % 86_400);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!("{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z", rest / 3600, rest % 3600 / 60, rest % 60, since.subsec_millis())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../packages/contracts/fixtures/trace-classifier");
+
+    #[test]
+    fn the_classifier_agrees_with_the_shared_fixture() {
+        let stream = std::fs::read_to_string(format!("{FIXTURES}/agent-stream.ndjson")).unwrap();
+        let expected: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(format!("{FIXTURES}/agent-stream.expected.json")).unwrap()).unwrap();
+        let expected: Vec<Vec<String>> = serde_json::from_value(expected["lines"].clone()).unwrap();
+
+        let given: Vec<Vec<String>> = stream
+            .lines()
+            .map(|line| {
+                classify(line).into_iter().map(|label| serde_json::to_value(label).unwrap().as_str().unwrap().to_string()).collect()
+            })
+            .collect();
+
+        assert_eq!(given, expected);
+    }
+
+    #[test]
+    fn identical_labels_in_a_row_merge_into_one_entry_that_grows() {
+        let mut state = State::default();
+        for label in [Label::ReadingFiles, Label::ReadingFiles, Label::Searching, Label::ReadingFiles] {
+            state.record(label);
+        }
+
+        let counts: Vec<(Label, u32)> = state.entries.iter().map(|e| (e.label, e.count)).collect();
+        assert_eq!(counts, [(Label::ReadingFiles, 2), (Label::Searching, 1), (Label::ReadingFiles, 1)]);
+    }
+
+    #[test]
+    fn the_time_reads_as_iso_8601() {
+        let now = now_iso();
+        assert!(now.len() == 24 && now.ends_with('Z') && now.as_bytes()[10] == b'T', "{now}");
+    }
+}

@@ -5,6 +5,7 @@
 use crate::engine::{client, engine_url, Envelope};
 use crate::providers::{clone_address, label_of, read_archive, Settings, JOB_SOURCES};
 use crate::store::{TokenStore, TOKEN_VARIABLE};
+use crate::trace;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -340,6 +341,11 @@ async fn watch_job(token: &str, scan_id: &str) -> Unwanted {
 }
 
 pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Settings, on_event: OnEvent<'_>, stop: &Stop) -> JobEnd {
+    let sink = trace::TraceSink::new(token, &job.scan_id);
+    trace::scope(sink, run_traced_job(token, job, tools, settings, on_event, stop)).await
+}
+
+async fn run_traced_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Settings, on_event: OnEvent<'_>, stop: &Stop) -> JobEnd {
     let label = label_of(&job.repo);
     on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
 
@@ -843,7 +849,9 @@ fn write_agent_settings(work: &Path) -> Result<(), String> {
 // -----
 fn agent_args(job: &Job, prompt: &str, budget_usd: f64) -> Vec<String> {
     let mut args: Vec<String> =
-        ["--print", "--output-format", "json", "--no-session-persistence", "--setting-sources", "project"].map(String::from).to_vec();
+        ["--print", "--output-format", "stream-json", "--verbose", "--no-session-persistence", "--setting-sources", "project"]
+            .map(String::from)
+            .to_vec();
     args.extend(["--model".to_string(), job.model.clone(), "--effort".to_string(), job.effort.clone()]);
     args.extend(["--max-budget-usd".to_string(), budget_usd.to_string()]);
     args.extend(["--permission-mode", "acceptEdits", "--allowedTools", ALLOWED_TOOLS, "--"].map(String::from));
@@ -1037,10 +1045,14 @@ async fn run_agent(
         .kill_on_drop(true);
     let mut child = command.spawn().map_err(|e| format!("Could not start Claude Code: {e}"))?;
 
+    let following = trace::follow(&work.join(&log_name), phase);
     let waited = tokio::select! {
         waited = timeout(limit, child.wait()) => waited.map_err(|_| named(&format!("ran longer than {} minutes, so this runner stopped it.", limit.as_secs() / 60))),
         _ = stop.stopped() => Err(STOPPED.to_string()),
     };
+    if let Some(following) = following {
+        following.finish().await;
+    }
     let status = match waited {
         Ok(status) => status.map_err(|e| format!("Claude Code stopped unexpectedly: {e}"))?,
         Err(why) => {

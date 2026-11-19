@@ -7,6 +7,7 @@ import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
 import { recordScanSvc } from "#/modules/scan-records";
 import { SCAN_SANDBOX_FULL_PHASES } from "#/modules/scan-sandbox";
+import { keepTraceBatchSvc } from "#/modules/scan-trace/handlers";
 import type { Bindings } from "#/types/variables";
 import { maxPollsOf } from "./max-polls";
 import { runScan } from "./run-scan";
@@ -31,6 +32,7 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
         reports: this.env.REPORTS,
         sealedKeyFor: (accountId) => runEffect(findSealedKeyEffect(dbConnect(this.env.DATABASE_URL), accountId)),
         recordScan: (params, status, error, usage) => runEffect(recordScanSvc(this.env, params, status, error, usage)),
+        saveTrace: (params, body) => runEffect(keepTraceBatchSvc(dbConnect(this.env.DATABASE_URL), params.accountId, params.scanId, body)),
         settleCredit: (params, status, usage) => settleScanCredit(this.env, params, status, usage),
       },
       event.payload,

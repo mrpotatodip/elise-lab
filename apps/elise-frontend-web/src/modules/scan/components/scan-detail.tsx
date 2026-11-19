@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
 import { SCAN_STEP_COPY } from "../constants";
-import { scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
+import { isScanActive, scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
 import type { ScanStatus } from "../schemas";
 import { scanBytes, scanCost, scanFailure, scanPlural, scanProfileNote, scanRepoName } from "../utils";
 import { ScanBranchScans } from "./scan-branch-scans";
@@ -22,6 +22,7 @@ import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanRunDetails } from "./scan-run-details";
 import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanSummary } from "./scan-summary";
+import { ScanTrace } from "./scan-trace";
 
 const DEFAULT_FILE = "REPORT.md";
 
@@ -158,6 +159,8 @@ export function ScanDetail({ scanId }: { scanId: string }) {
 
       <ScanStatusNotice scan={scan} />
 
+      {isScanActive(scan.status) && <ScanTrace scan={scan} />}
+
       {succeeded && (
         <>
           <ScanSummary scan={scan} />
@@ -224,6 +227,8 @@ export function ScanDetail({ scanId }: { scanId: string }) {
           </Tabs>
         </Card>
       )}
+
+      {!isScanActive(scan.status) && <ScanTrace scan={scan} />}
     </>
   );
 }
