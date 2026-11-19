@@ -112,7 +112,7 @@ function NameForm({ id, label, initial, pending, submitLabel, onSave, onCancel, 
   );
 }
 
-function NewGroupDialog() {
+export function NewGroupDialog() {
   const [open, setOpen] = useState(false);
   const refresh = useRefresh();
   const create = useMutation({
@@ -249,12 +249,9 @@ export function GroupsTable() {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <div className="grid gap-1.5">
-          <CardTitle>All groups</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Sort people into teams, such as Backend or Security. A person can be in several.</p>
-        </div>
-        <NewGroupDialog />
+      <CardHeader>
+        <CardTitle>All groups</CardTitle>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Rename a group, or add and remove its people. A person can be in several groups.</p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         {groups.length === 0 ? (
