@@ -123,11 +123,6 @@ export function memoryScanRepo() {
             return { ...withFiles(row), runner: runnerId === undefined ? null : { id: runnerId, name: "runner" } };
           }),
       ),
-    activeCounts: (nowMs) =>
-      Effect.sync(() => {
-        const ours = [...rows.values()].filter((row) => isLive(row, nowMs) && !onRunner.has(row.scanId));
-        return { lite: ours.filter((row) => row.skill !== "full").length, full: ours.filter((row) => row.skill === "full").length };
-      }),
     file: (accountId, scanId, name) =>
       Effect.sync(() => {
         const file = files.get(`${scanId}/${name}`);
@@ -149,6 +144,5 @@ export const brokenScanRepo: ScanRepo = {
   list: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   get: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   activeSince: () => Effect.fail(new DbError({ cause: new Error("db down") })),
-  activeCounts: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   file: () => Effect.fail(new DbError({ cause: new Error("db down") })),
 };

@@ -107,7 +107,7 @@ describe("POST /scans: the limits of the full path", () => {
     expect(createdFull).toHaveLength(1);
   });
 
-  it("refuses a fourth Scan across the platform with the busy message, with no queue", async () => {
+  it("does not make Accounts refuse each other: a fourth Account's Scan starts", async () => {
     const accounts = [OTHER_ACCOUNT, "6e2a1b0f-7c3d-4f4e-8b9c-2d3e4f5a6b7c", "7f3b2c1a-8d4e-4a5f-9cad-3e4f5a6b7c8d", "8a4c3d2b-9e5f-4b60-8dbe-4f5a6b7c8d9e"];
     const { env, createdFull } = fakeBindings();
     const answers: Response[] = [];
@@ -115,8 +115,7 @@ describe("POST /scans: the limits of the full path", () => {
       answers.push(await post(env, { repo: repoOf(`r${index}`) }, account));
     }
 
-    expect(answers.map((answer) => answer.status)).toEqual([201, 201, 201, 429]);
-    expect(ErrorSchema.parse(await answers[3].json()).error).toMatchObject({ code: "SCAN_WORKER_BUSY", message: expect.stringContaining("Try again in a few minutes") });
-    expect(createdFull).toHaveLength(3);
+    expect(answers.map((answer) => answer.status)).toEqual([201, 201, 201, 201]);
+    expect(createdFull).toHaveLength(4);
   });
 });

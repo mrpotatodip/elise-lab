@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, ne, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
@@ -6,7 +6,7 @@ import { Conflict, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
-import type { ActiveCounts, ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
+import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
 import { displayRepoUrlOf, liveScansSql, repoIdentityOf, sameRepoIdentity, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
@@ -206,7 +206,7 @@ const activeConflictOf = (db: AppDbType, repoId: string) => (): Effect.Effect<ne
     catch: toDbError,
   }).pipe(Effect.flatMap(([active]) => Effect.fail(new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT }))));
 
-const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> => ({
+const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   ...scanReads(db),
 
   // -----
@@ -288,30 +288,6 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> =>
 });
 
 // -----
-// How many live scans each path holds, over every Account. It is
-// the global cap's count, so it is the one read here that crosses
-// Accounts, and it returns counts only: it runs on the owner role,
-// since a withTenant transaction sees one Account's scans. A scan
-// on a Runner runs on the person's computer and holds no Sandbox
-// of ours, so it is left out.
-// -----
-export const activeCountsEffect = (db: DbConnectType, nowMs: number): Effect.Effect<ActiveCounts, DbError> =>
-  Effect.tryPromise({
-    try: () =>
-      db
-        .select({ skill: scans.skill, total: sql<string>`count(*)` })
-        .from(scans)
-        .where(and(liveScansSql(nowMs), notExists(db.select({ one: sql`1` }).from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scans.id)))))
-        .groupBy(scans.skill),
-    catch: toDbError,
-  }).pipe(
-    Effect.map((rows) => ({
-      lite: rows.filter((row) => row.skill !== "full").reduce((sum, row) => sum + Number(row.total), 0),
-      full: rows.filter((row) => row.skill === "full").reduce((sum, row) => sum + Number(row.total), 0),
-    })),
-  );
-
-// -----
 // For the Workflow, on the owner connection: one batch is one
 // transaction.
 // -----
@@ -322,19 +298,15 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
       Effect.catchTag("Conflict", activeConflictOf(db, repoId)),
       Effect.asVoid,
     ),
-  activeCounts: (nowMs) => activeCountsEffect(db, nowMs),
 });
 
 // -----
 // For POST /scans, inside a withTenant transaction. The writes of
 // a new scan run under a savepoint, so a refused insert rolls back
-// alone and the Conflict can still name the running scan. The
-// global count crosses Accounts, which the transaction cannot see,
-// so the caller hands it in.
+// alone and the Conflict can still name the running scan.
 // -----
-export const tenantScanRepo = (db: AppTxDbType, activeCounts: ScanRepo["activeCounts"]): ScanRepo => ({
+export const tenantScanRepo = (db: AppTxDbType): ScanRepo => ({
   ...scanWrites(db),
-  activeCounts,
   create: (params, repoId, nowMs) =>
     Effect.tryPromise({
       try: () =>

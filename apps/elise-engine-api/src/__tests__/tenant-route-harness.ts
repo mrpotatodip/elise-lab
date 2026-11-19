@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import { buildApp } from "#/index";
 import { realAppDeps } from "#/lib/app-deps";
 import { tenantScanRepo } from "#/modules/scan-ledger";
@@ -9,11 +8,9 @@ import type { AppDeps } from "#/types/variables";
 
 // -----
 // POST /scans on the real queries of the withTenant transaction.
-// The global count of live Scans runs on the owner role in the
-// Worker; here no other Account has one.
 // -----
 const tenantScanDeps: Partial<AppDeps> = {
-  scanRepo: (_env, db) => tenantScanRepo(db, () => Effect.succeed({ lite: 0, full: 0 })),
+  scanRepo: (_env, db) => tenantScanRepo(db),
   monthSpend: realAppDeps.monthSpend,
   holdCredit: realAppDeps.holdCredit,
   releaseCredit: realAppDeps.releaseCredit,
