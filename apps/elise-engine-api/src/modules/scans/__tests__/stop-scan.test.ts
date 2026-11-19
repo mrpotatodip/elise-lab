@@ -8,7 +8,7 @@ import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__t
 import type { ScanOptions, ScanParams } from "#/schemas";
 import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
-import { claimPairingEffect, createRunnerEffect, readRunnerJobEffect } from "#/modules/runners/queries";
+import { claimPairingEffect, claimRunnerJobEffect, createRunnerEffect, readRunnerJobEffect } from "#/modules/runners/queries";
 import { activeScansEffect, neonScanRepo } from "#/modules/scan-ledger";
 
 let test: TestDb;
@@ -119,6 +119,16 @@ describe("stopping a Scan", () => {
     expect(res.status).toBe(200);
     expect({ scan: await statusOf(scanId), job: await jobState(scanId) }).toEqual({ scan: "stopped", job: "cancelled" });
     expect({ scan: await statusOf(bystander), job: await jobState(bystander) }).toEqual({ scan: "running", job: "claimed" });
+  });
+
+  it("gives no Runner a queued job whose Scan was stopped after the job was written", async () => {
+    const scanId = await newScan("queued");
+    await test.raw.update(scans).set({ status: "stopped" }).where(eq(scans.id, scanId));
+
+    const claimed = await run(claimRunnerJobEffect(test.http, runnerId, NOW));
+
+    expect(claimed?.scanId).not.toBe(scanId);
+    expect(await jobState(scanId)).toBe("queued");
   });
 
   it("queues no job for a Scan stopped before the Workflow got to it", async () => {

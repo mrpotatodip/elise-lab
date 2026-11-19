@@ -19,20 +19,16 @@ export const stopScanSvc = (
     const stopped = yield* scanReads(db).get(accountId, scanId);
     if (!stopped) return yield* new NotFound({ message: "Scan not found" });
     if (stopped.runner) return stopped;
-    const metered = yield* Effect.promise(() =>
-      teardown(scanId).then(
-        (usage) => ({ ok: true as const, usage }),
-        (cause: unknown) => {
-          console.error(`stop scan ${scanId}: the sandbox was not torn down`, cause);
-          return { ok: false as const, usage: null };
-        },
-      ),
+    const usage = yield* Effect.promise(() =>
+      teardown(scanId).catch((cause: unknown) => {
+        console.error(`stop scan ${scanId}: the sandbox was not torn down`, cause);
+        return null;
+      }),
     );
-    if (!metered.ok) return stopped;
-    if (metered.usage) yield* stoppedUsageEffect(db, accountId, scanId, metered.usage);
+    if (usage) yield* stoppedUsageEffect(db, accountId, scanId, usage);
     const plan = yield* planOfEffect(db, accountId);
     if (plan) {
-      const settlement = settlementOf({ status: "failed", costUsd: metered.usage?.costUsd ?? null, markup: plan.creditMarkup });
+      const settlement = settlementOf({ status: "failed", costUsd: usage?.costUsd ?? null, markup: plan.creditMarkup });
       if (settlement.ok) yield* settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: settlement.chargeUsd });
     }
     return (yield* scanReads(db).get(accountId, scanId)) ?? stopped;

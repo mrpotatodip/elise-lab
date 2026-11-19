@@ -138,7 +138,7 @@ export const jobStateDoc = describeRoute({
   responses: { 200: jsonResponse("The job's state.", envelope(RunnerJobStateSchema)), ...errorResponses(400, 401, 404) },
 });
 
-export const reportJobDoc =describeRoute({
+export const reportJobDoc = describeRoute({
   tags: ["runners"],
   security: SERVICE_SECURITY,
   summary: "Report the result of a Scan the Runner ran",

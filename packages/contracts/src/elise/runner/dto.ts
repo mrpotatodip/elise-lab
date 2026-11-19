@@ -239,7 +239,6 @@ export type RunnerJobSource = z.infer<typeof RunnerJobSourceSchema>;
 export type RunnerJob = z.infer<typeof RunnerJobSchema>;
 export type RunnerClaimBody = z.infer<typeof RunnerClaimBodySchema>;
 export type RunnerJobState = z.infer<typeof RunnerJobStateSchema>;
-
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;
 export type StartRunnerLoginBody = z.infer<typeof StartRunnerLoginBodySchema>;
 export type StartedRunnerLogin = z.infer<typeof StartedRunnerLoginSchema>;
