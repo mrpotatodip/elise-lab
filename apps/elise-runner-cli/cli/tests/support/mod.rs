@@ -24,6 +24,9 @@ struct State {
     archive_downloads: Vec<String>,
     results: Vec<(String, String)>,
     remove_after_result: bool,
+    cancelled: BTreeSet<String>,
+    job_checks: Vec<String>,
+    job_checks_fail: Option<u16>,
     claims_held: bool,
     a_claim_was_held: bool,
     no_login_routes: bool,
@@ -162,6 +165,23 @@ impl Engine {
         self.state.lock().unwrap().login_refused = true;
     }
 
+    pub fn cancel_job(&self, scan_id: &str) {
+        self.state.lock().unwrap().cancelled.insert(scan_id.to_string());
+    }
+
+    pub fn fail_job_checks(&self, status: u16) {
+        self.state.lock().unwrap().job_checks_fail = Some(status);
+    }
+
+    pub fn job_checks(&self) -> Vec<String> {
+        self.state.lock().unwrap().job_checks.clone()
+    }
+
+    pub fn wait_for_a_job_check(&self) {
+        let asked = until(|| !self.state.lock().unwrap().job_checks.is_empty());
+        assert!(asked, "the Runner never asked for the job state");
+    }
+
     pub fn remove_runners_after_the_next_result(&self) {
         self.state.lock().unwrap().remove_after_result = true;
     }
@@ -271,6 +291,9 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
         return;
     }
     let (status, body) = answer(&request, &mut state.lock().unwrap());
+    if status == 0 {
+        return;
+    }
     let reason = if status == 200 { "OK" } else { "Error" };
     let _ = write!(
         stream,
@@ -363,6 +386,15 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
         ("GET", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/archive") => {
             (404, format!(r#"{{"data":null,"error":{{"code":"NOT_FOUND","message":"{ARCHIVE_REMOVED}"}}}}"#))
         }
+        ("GET", path) if live && path.starts_with("/runners/jobs/") => {
+            let scan_id = path.trim_start_matches("/runners/jobs/").to_string();
+            state.job_checks.push(scan_id.clone());
+            if let Some(status) = state.job_checks_fail {
+                return (status, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string());
+            }
+            let job_state = if state.cancelled.contains(&scan_id) { "cancelled" } else { "claimed" };
+            (200, format!(r#"{{"data":{{"state":"{job_state}"}},"error":null}}"#))
+        }
         ("POST", "/runners/claim") if live => match state.jobs.pop_front() {
             Some(job) => (200, format!(r#"{{"data":{job},"error":null}}"#)),
             None => (200, r#"{"data":null,"error":null}"#.to_string()),
@@ -405,7 +437,7 @@ impl Runner {
         Runner {
             home: temp_home(),
             url: engine.url.clone(),
-            env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string())],
+            env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string()), ("ELISE_JOB_CHECK_MS", "200".to_string())],
             engine: engine.state.clone(),
         }
     }
@@ -647,6 +679,7 @@ case "$prompt" in
     (cd repo && find . -type f | sort) > "__RECORD__/repo.txt" ;;
 esac
 case "$prompt" in *stop=crash*) echo "the agent said: boom" >&2; exit 2 ;; esac
+case "$prompt" in *stop=slow*) sleep 2 ;; esac
 case "$prompt" in
   *stop=wait*)
     echo "the agent was half way through"

@@ -28,6 +28,10 @@ export const recordScanSvc = (
     }
     const db = dbConnect(env.DATABASE_URL);
     const { repoId, status: current, branch: branchName, ref } = yield* scanRowOfEffect(db, params.accountId, params.scanId);
+    if (current === "stopped") {
+      yield* Effect.sync(() => console.warn(`scan records: ${params.scanId} was stopped by a person, so its results are not recorded`));
+      return;
+    }
     if (current === "failed" && status === "succeeded") {
       yield* Effect.sync(() => console.warn(`scan records: ${params.scanId} was closed as failed before it finished, so its results are not recorded`));
       return;

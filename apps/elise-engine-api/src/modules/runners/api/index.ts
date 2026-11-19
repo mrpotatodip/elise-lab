@@ -13,3 +13,4 @@ export { default as claimJobAPI } from "./claim-job";
 export { default as reportJobAPI } from "./report-job";
 export { default as saveTraceAPI } from "./save-trace";
 export { default as jobArchiveAPI } from "./job-archive";
+export { default as jobStateAPI } from "./job-state";

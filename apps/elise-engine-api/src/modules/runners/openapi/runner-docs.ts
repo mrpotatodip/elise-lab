@@ -5,6 +5,7 @@ import {
   RunnerDisconnectedSchema,
   RunnerIdentitySchema,
   RunnerJobReportedSchema,
+  RunnerJobStateSchema,
   RunnerJobSchema,
   RunnerRemovedSchema,
   RunnersSchema,
@@ -119,6 +120,22 @@ export const jobArchiveDoc = describeRoute({
     example: ["Download:", bash(`curl ${EXAMPLE_BASE_URL}/runners/jobs/$SCAN_ID/archive \\`, '  -H "authorization: Bearer $RUNNER_TOKEN" -o archive.zip')],
   }),
   responses: { 200: { description: "The zip." }, ...errorResponses(400, 401, 404) },
+});
+
+export const jobStateDoc = describeRoute({
+  tags: ["runners"],
+  security: SERVICE_SECURITY,
+  summary: "Read the state of a job the Runner holds",
+  description: routeText({
+    context: "A Runner that runs a Scan asks every few seconds whether the Scan is still wanted. A `cancelled` job means the Scan was stopped from Elise: the Runner kills its agent and sends nothing.",
+    steps: [
+      "The Worker reads the bearer token and finds the Runner. A removed Runner's token is 401.",
+      "The Worker reads the job. Another Runner's job, or one that does not exist, is 404.",
+      "The answer is the job's state: `queued`, `claimed`, `succeeded`, `failed` or `cancelled`.",
+    ],
+    example: ["Read:", bash(`curl ${EXAMPLE_BASE_URL}/runners/jobs/$SCAN_ID \\`, '  -H "authorization: Bearer $RUNNER_TOKEN"')],
+  }),
+  responses: { 200: jsonResponse("The job's state.", envelope(RunnerJobStateSchema)), ...errorResponses(400, 401, 404) },
 });
 
 export const reportJobDoc = describeRoute({

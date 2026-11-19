@@ -1,6 +1,6 @@
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, exists, gt, inArray, isNull } from "drizzle-orm";
 import { Effect } from "effect";
-import { partyPersons, tenantRunners, tenants } from "@repo/db-elise";
+import { partyPersons, scanRunnerJobs, scans, tenantRunners, tenants } from "@repo/db-elise";
 import type { Runner, RunnerIdentity } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Forbidden, toDbError, type DbError } from "#/lib/effect-query";
@@ -91,19 +91,40 @@ export const listRunnersEffect = (db: AppDbType, tenantId: string, now: Date): E
 
 // -----
 // An admin removes a Runner of the Account. Its token stops
-// working and an unused code is cleared. False when the
+// working and an unused code is cleared. The Scan it is
+// running (a claimed job) is stopped in the same statement (one
+// CTE chain), so it never stays running after its Runner is gone. False when the
 // Account has no such live Runner.
 // -----
 export const removeRunnerEffect = (db: AppDbType, tenantId: string, runnerId: string, now: Date): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
-    try: () =>
-      db
-        .update(tenantRunners)
-        .set({ revokedAt: now, pairingCodeHash: null, pairingExpiresAt: null })
-        .where(and(eq(tenantRunners.id, runnerId), eq(tenantRunners.tenantId, tenantId), isNull(tenantRunners.revokedAt)))
-        .returning({ id: tenantRunners.id }),
+    try: async () => {
+      const revoked = db.$with("revoked").as(
+        db
+          .update(tenantRunners)
+          .set({ revokedAt: now, pairingCodeHash: null, pairingExpiresAt: null })
+          .where(and(eq(tenantRunners.id, runnerId), eq(tenantRunners.tenantId, tenantId), isNull(tenantRunners.revokedAt)))
+          .returning({ id: tenantRunners.id }),
+      );
+      const cancelled = db.$with("cancelled").as(
+        db
+          .update(scanRunnerJobs)
+          .set({ state: "cancelled", finishedAt: now })
+          .where(and(eq(scanRunnerJobs.runnerId, runnerId), eq(scanRunnerJobs.tenantId, tenantId), eq(scanRunnerJobs.state, "claimed"), exists(db.select({ id: revoked.id }).from(revoked))))
+          .returning({ scanId: scanRunnerJobs.scanId }),
+      );
+      const stopped = db.$with("stopped").as(
+        db
+          .update(scans)
+          .set({ status: "stopped", step: null, finishedAt: now, updatedAt: now })
+          .where(and(eq(scans.tenantId, tenantId), inArray(scans.status, ["queued", "running"]), inArray(scans.id, db.select({ scanId: cancelled.scanId }).from(cancelled))))
+          .returning({ id: scans.id }),
+      );
+      const rows = await db.with(revoked, cancelled, stopped).select({ id: revoked.id }).from(revoked);
+      return rows.length > 0;
+    },
     catch: toDbError,
-  }).pipe(Effect.map((rows) => rows.length > 0));
+  });
 
 // -----
 // A Runner stops itself: its token no longer works. False

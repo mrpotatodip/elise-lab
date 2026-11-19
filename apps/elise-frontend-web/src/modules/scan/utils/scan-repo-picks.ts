@@ -50,6 +50,7 @@ const LAST_SCAN_NOTE = {
   running: "A scan is running now",
   succeeded: "Last scan succeeded",
   failed: "Last scan failed",
+  stopped: "Last scan was stopped",
 } as const;
 
 const bare = (url: string) => url.toLowerCase().replace(/(\.git)?\/?$/, "");

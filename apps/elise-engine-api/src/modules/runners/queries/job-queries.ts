@@ -1,17 +1,34 @@
 import { and, asc, eq, inArray, isNotNull, isNull, notExists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { RunnerJobSourceValue } from "@repo/contracts/elise";
-import { scanArchiveLinks, scanRunnerJobs, tenantRunners, type TScanRunnerJob } from "@repo/db-elise";
+import { scanArchiveLinks, scanRunnerJobs, scans, tenantRunners, type TScanRunnerJob } from "@repo/db-elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { JobReport, NewRunnerJob } from "#/modules/runners/types";
 
 // -----
 // The Workflow queues the job. A retried launch writes it again,
-// so the same Scan never has two.
+// so the same Scan never has two. The row is written by one
+// INSERT ... SELECT that finds the Scan not stopped, so a Stop
+// that lands first leaves no job behind.
 // -----
 export const insertRunnerJobEffect = (db: DbConnectType, job: NewRunnerJob): Effect.Effect<void, DbError> =>
-  Effect.tryPromise({ try: () => db.insert(scanRunnerJobs).values(job).onConflictDoNothing(), catch: toDbError }).pipe(Effect.asVoid);
+  Effect.tryPromise({
+    try: () =>
+      db.execute(sql`
+        insert into scan_runner_jobs (scan_id, tenant_id, runner_id, repo_url, ref, prompt, options_json, priors_json)
+        select ${job.scanId}, ${job.tenantId}::uuid, ${job.runnerId}::uuid, ${job.repoUrl}, ${job.ref}, ${job.prompt}, ${job.optionsJson}, ${job.priorsJson}
+        from scans
+        where id = ${job.scanId} and status <> 'stopped'
+        on conflict do nothing
+      `),
+    catch: toDbError,
+  }).pipe(Effect.asVoid);
+
+export const scanStoppedEffect = (db: DbConnectType, scanId: string): Effect.Effect<boolean, DbError> =>
+  Effect.tryPromise({ try: () => db.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)), catch: toDbError }).pipe(
+    Effect.map(([row]) => row?.status === "stopped"),
+  );
 
 // -----
 // The Runner takes its oldest queued job in one UPDATE. The state
@@ -31,10 +48,11 @@ export const claimRunnerJobEffect = (db: DbConnectType, runnerId: string, now: D
       const readable = readsArchive
         ? undefined
         : notExists(db.select({ scanId: scanArchiveLinks.scanId }).from(scanArchiveLinks).where(eq(scanArchiveLinks.scanId, scanRunnerJobs.scanId)));
+      const stillWanted = notExists(db.select({ id: scans.id }).from(scans).where(and(eq(scans.id, scanRunnerJobs.scanId), eq(scans.status, "stopped"))));
       const next = db
         .select({ scanId: scanRunnerJobs.scanId })
         .from(scanRunnerJobs)
-        .where(and(eq(scanRunnerJobs.runnerId, runnerId), eq(scanRunnerJobs.state, "queued"), readable))
+        .where(and(eq(scanRunnerJobs.runnerId, runnerId), eq(scanRunnerJobs.state, "queued"), readable, stillWanted))
         .orderBy(asc(scanRunnerJobs.createdAt))
         .limit(1)
         .for("update", { skipLocked: true });

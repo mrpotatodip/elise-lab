@@ -18,6 +18,7 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   connectedRunnerSources: () => Effect.succeed(["git", "archive"]),
   linkArchive: () => Effect.void,
   releaseCredit: () => Effect.succeed({ settled: true, chargeUsd: 0 }),
+  teardownScan: async () => null,
   sessionUserId: async () => undefined,
   runnerIdentity: async () => null,
   userHasAccount: async () => true,

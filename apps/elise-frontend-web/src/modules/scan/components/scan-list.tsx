@@ -20,6 +20,7 @@ import { ScanProfileBadge } from "./scan-profile-badge";
 import { ScanRepoLink } from "./scan-repo-link";
 import { ScanSeverityDots } from "./scan-severity-dots";
 import { ScanStatusBadge } from "./scan-status-badge";
+import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanTime } from "./scan-time";
 
 const FILTERS = [
@@ -27,6 +28,7 @@ const FILTERS = [
   { value: "active", label: "In progress" },
   { value: "succeeded", label: "Succeeded" },
   { value: "failed", label: "Failed" },
+  { value: "stopped", label: "Stopped" },
 ] as const;
 
 type Filter = (typeof FILTERS)[number]["value"];
@@ -41,7 +43,7 @@ const labelOf = <T extends string>(options: readonly { value: T; label: string }
 
 function FindingsCell({ scan }: { scan: ScanStatus }) {
   if (scan.status === "queued" || scan.status === "running") return <span className="text-muted-foreground">In progress</span>;
-  if (scan.status === "failed") return <span className="text-muted-foreground">No report</span>;
+  if (scan.status === "failed" || scan.status === "stopped") return <span className="text-muted-foreground">No report</span>;
   if (!scan.summary) return <span className="text-muted-foreground">Not recorded</span>;
   const { summary } = scan;
   if (summary.total === 0) return <span className="text-muted-foreground">None found</span>;
@@ -104,6 +106,11 @@ const columns = column.columns([
     ),
   }),
   column.display({ id: "started", header: "Started", cell: ({ row }) => <ScanTime value={row.original.createdAt} /> }),
+  column.display({
+    id: "stop",
+    header: () => <span className="sr-only">Stop</span>,
+    cell: ({ row }) => (canStopScan(row.original) ? <ScanStopButton scanId={row.original.scanId} onRunner={Boolean(row.original.runner)} className="relative" /> : null),
+  }),
   column.display({
     id: "open",
     header: () => <span className="sr-only">Open</span>,

@@ -5,7 +5,7 @@ use crate::Exit;
 use elise_runner_core::login::{self, LoginError, Waited};
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
 use elise_runner_core::providers::Settings;
-use elise_runner_core::scan::{self, Claimed, Event, Stop, Stopper};
+use elise_runner_core::scan::{self, Claimed, Event, JobEnd, Stop, Stopper};
 use std::collections::HashMap;
 use std::future::{poll_fn, Future};
 use std::io::{BufRead, Write};
@@ -227,20 +227,46 @@ pub async fn unpair(store: &Store) -> Exit {
     }
 }
 
-type Running<'a> = Vec<Pin<Box<dyn Future<Output = ()> + 'a>>>;
+type Running<'a> = Vec<Pin<Box<dyn Future<Output = JobEnd> + 'a>>>;
 
-async fn one_ended(running: &mut Running<'_>) {
+async fn one_ended(running: &mut Running<'_>) -> JobEnd {
     poll_fn(|cx| {
-        let ended = running.iter_mut().position(|scan| scan.as_mut().poll(cx).is_ready());
-        match ended {
-            Some(index) => {
+        for index in 0..running.len() {
+            if let Poll::Ready(end) = running[index].as_mut().poll(cx) {
                 drop(running.swap_remove(index));
-                Poll::Ready(())
+                return Poll::Ready(end);
             }
-            None => Poll::Pending,
         }
+        Poll::Pending
     })
-    .await;
+    .await
+}
+
+#[derive(Default)]
+struct Ends {
+    removed: bool,
+    stopped_from_elise: bool,
+}
+
+impl Ends {
+    fn note(&mut self, store: &Store, end: JobEnd) {
+        match end {
+            JobEnd::Removed if !self.removed => {
+                self.removed = true;
+                store.tokens().forget();
+                eprintln!("Elise rejected the token during the Scan: the Runner was removed, so the Scan was stopped and the token was forgotten. Pair again with a new code.");
+            }
+            JobEnd::StoppedFromElise => self.stopped_from_elise = true,
+            JobEnd::Removed | JobEnd::Ended => {}
+        }
+    }
+
+    async fn drain(&mut self, store: &Store, running: &mut Running<'_>) {
+        while !running.is_empty() {
+            let end = one_ended(running).await;
+            self.note(store, end);
+        }
+    }
 }
 
 pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
@@ -266,14 +292,26 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
         eprintln!("Stopped. No Scan was running.");
         Exit::Ok
     };
-    let finished = || if log.all_succeeded() { Exit::Ok } else { Exit::Error };
+    let mut ends = Ends::default();
+    let finished = |ends: &Ends| {
+        if ends.removed {
+            Exit::Revoked
+        } else if once && ends.stopped_from_elise {
+            Exit::StoppedFromElise
+        } else if log.all_succeeded() {
+            Exit::Ok
+        } else {
+            Exit::Error
+        }
+    };
     loop {
+        if ends.removed {
+            ends.drain(store, &mut running).await;
+            return Exit::Revoked;
+        }
         if stop.is_stopped() {
-            let had_scans = !running.is_empty();
-            while !running.is_empty() {
-                one_ended(&mut running).await;
-            }
-            return if had_scans { finished() } else { stopped_idle() };
+            ends.drain(store, &mut running).await;
+            return if log.any_ended() || ends.removed || (once && ends.stopped_from_elise) { finished(&ends) } else { stopped_idle() };
         }
         let claiming = !(once && claimed_any);
         if claiming && running.len() < parallel {
@@ -288,7 +326,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
                         claimed_any = true;
                         let token = token.clone();
                         running.push(Box::pin(async move {
-                            scan::run_job(&token, *job, find_tools, &Settings::load(&settings_file()), on_event, stop).await;
+                            scan::run_job(&token, *job, find_tools, &Settings::load(&settings_file()), on_event, stop).await
                         }));
                     }
                     Claimed::Removed => {
@@ -298,9 +336,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
                         } else {
                             eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
                         }
-                        while !running.is_empty() {
-                            one_ended(&mut running).await;
-                        }
+                        ends.drain(store, &mut running).await;
                         return Exit::Revoked;
                     }
                     _ if stop.is_stopped() => break,
@@ -330,7 +366,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
             }
         }
         if once && claimed_any && running.is_empty() {
-            return finished();
+            return finished(&ends);
         }
         let may_claim = !(once && claimed_any) && running.len() < parallel;
         if running.is_empty() {
@@ -340,7 +376,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
             }
         } else {
             tokio::select! {
-                _ = one_ended(&mut running) => {}
+                end = one_ended(&mut running) => ends.note(store, end),
                 _ = sleep(scan::POLL_EVERY), if may_claim => {}
                 _ = stop.stopped() => {}
             }
@@ -392,6 +428,10 @@ impl ScanLog {
             Event::RepairStarted => "the repair run started: the check failed, the agent gets one run to fix it".to_string(),
             Event::ResultSent { sent: true } => "result sent to Elise".to_string(),
             Event::ResultSent { sent: false } => "the result could not be sent to Elise".to_string(),
+            Event::StoppedFromElise { kept, .. } => {
+                let kept = kept.map(|path| format!(" Work folder kept: {}", path.display())).unwrap_or_default();
+                format!("Scan stopped from Elise.{kept}")
+            }
             Event::Ended { ok, message, kept, .. } => {
                 state.ended += 1;
                 if !ok {
@@ -406,6 +446,10 @@ impl ScanLog {
             }
         };
         println!("[{repo} {scan_id}] {line}");
+    }
+
+    fn any_ended(&self) -> bool {
+        self.state.lock().expect("the log is not poisoned").ended > 0
     }
 
     fn all_succeeded(&self) -> bool {

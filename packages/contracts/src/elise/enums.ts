@@ -38,7 +38,7 @@ export type InviteCodeStatusValue = (typeof INVITE_CODE_STATUS_VALUES)[number];
 // scans, scan_findings and scan_finding_triage in db-elise;
 // change both together.
 // -----
-export const SCAN_STATE_VALUES = ["queued", "running", "succeeded", "failed"] as const;
+export const SCAN_STATE_VALUES = ["queued", "running", "succeeded", "failed", "stopped"] as const;
 export const FINDING_STATUS_VALUES = ["confirmed", "needs_validation"] as const;
 export const FINDING_SEVERITY_VALUES = ["critical", "high", "medium", "low", "informational"] as const;
 // -----

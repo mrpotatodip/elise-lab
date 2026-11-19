@@ -64,6 +64,7 @@ Exit codes:
   4  revoked (Elise rejected the token)
   5  offline (Elise could not be reached)
   6  run --once: nothing to claim
+  7  run --once: a Scan was stopped from Elise
   (run --once with several Scans exits 0 only if every one succeeded)
 ";
 

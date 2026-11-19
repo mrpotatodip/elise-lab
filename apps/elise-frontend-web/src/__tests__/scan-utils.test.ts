@@ -68,6 +68,14 @@ describe("scanActivity", () => {
   });
 });
 
+describe("scanActivity and a stopped Scan", () => {
+  it("leaves a stopped Scan out of every bucket, so it is not counted as active", () => {
+    const days = scanActivity([{ createdAt: "2026-11-08T01:00:00Z", status: "stopped" }], 1, new Date("2026-11-08T12:00:00Z"));
+
+    expect(days[0]).toMatchObject({ succeeded: 0, failed: 0, active: 0, total: 0 });
+  });
+});
+
 describe("scanSidebarItems", () => {
   const scans = [
     { scanId: "a", repoId: "r1", repo: "https://github.com/acme/api", status: "running" as const },
