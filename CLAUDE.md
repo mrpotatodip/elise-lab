@@ -18,6 +18,8 @@ pnpm check:apps                              # tsc, oxlint and vitest for every 
 pnpm dev                                     # engine (8787), dashboard (3100) and marketing site (3200) together; first run: copy `.dev.vars.example` to `.dev.vars` in both apps (engine `DATABASE_URL`: `packages/db-elise/.env`). Up when `curl -s -o /dev/null -w "%{http_code}" localhost:8787/me` prints 401
 pnpm --filter elise-engine-api dev:log       # wrangler dev, output teed to apps/elise-engine-api/.dev.log (the dashboard has the same `dev:log`)
 pnpm dev:stop                                # free ports 8787 and 3100 from stale servers
+pnpm worktrees:prune                         # list .claude/worktrees with merged-PR state; `-- --remove` deletes only clean, merged ones
+node scripts/check-ratchets.mjs --update     # lock in lower comment and "GitHub" counts (scripts/ratchets.json); raising one needs a rule and a reviewer
 node scripts/check-changed.mjs               # the pre-commit check: only the projects with staged changes (`check:apps` runs all nine)
 pnpm --filter <app> run deploy               # live Worker: ask first. `pnpm deploy` is pnpm's own command. Ships the working tree, so it refuses uncommitted edits under the app or `packages/` (`ALLOW_DIRTY_DEPLOY=1` overrides)
 node scripts/deploy-clean.mjs apps/<app> [ref]  # live Worker: ask first. Deploys a committed ref from a temporary worktree, so the working tree never ships; `--dry` only builds the worktree. Prefer it to the override
