@@ -22,7 +22,7 @@ function SheetContent({ className, children, ...props }: SheetPrimitive.Popup.Pr
         initialFocus={popup}
         data-slot="sheet-content"
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full focus-visible:outline-none max-w-[36rem] flex-col border-l bg-popover text-popover-foreground shadow-raised transition-transform duration-300 ease-out data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full",
+          "fixed inset-y-0 right-0 z-50 flex w-full focus-visible:outline-none max-w-[56rem] flex-col border-l bg-popover text-popover-foreground shadow-raised transition-transform duration-300 ease-out data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full",
           className
         )}
         {...props}
