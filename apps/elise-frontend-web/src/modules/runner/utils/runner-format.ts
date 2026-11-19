@@ -8,6 +8,13 @@ export const runnerWhen = (iso: string): string => {
 };
 
 // -----
+// Who added the Runner. An older engine sends no name, and a
+// person with no name on record gives null: then the line is
+// left out rather than guessed.
+// -----
+export const runnerAddedBy = (runner: Runner): string | null => (runner.createdByName ? `Added by ${runner.createdByName}.` : null);
+
+// -----
 // The muted line under a Runner's name: what to do next, or
 // when it was last seen. Only facts the engine sent.
 // -----

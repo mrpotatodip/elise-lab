@@ -18,10 +18,12 @@ The folder is one Cargo workspace (`Cargo.toml`, one `Cargo.lock`, one `target`)
 | --- | --- |
 | `src/` | The page: `main.ts`, `views.ts`, `api.ts` (the Tauri commands), `copy.ts` (every string the user reads). |
 | `core/src/pairing.rs` | Enroll a code, accept or decline it, the Runner's status, unpairing. |
+| `core/src/login.rs` | Log in through the browser: start a login, wait for approval, hand back the enrolled Runner. |
 | `core/src/store.rs` | Where the token is kept: the keychain (each program has its own service name), an owner-only file, or a token given from outside (read only). |
-| `core/src/scan.rs` | The work loop: claim, clone, run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
+| `core/src/scan.rs` | The work loop: claim, clone (or unpack an upload's zip), run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
+| `core/src/providers/` | Where a Scan's code comes from: one module per provider (`github`, `gitlab`, `gitlab_sh`, `upload`), the shared address rules in `address.rs`, and `mod.rs`, the only file that knows them all. A test fails when one provider's module names another's. |
 | `src-tauri/src/lib.rs` | The desktop app: the commands, the pending pairing, the activity, the tray. |
-| `cli/src/` | The headless Runner: `args.rs` (command line, help text), `store.rs` (which token store a run uses), `commands.rs` (one function per command, and the log of `run`), `tools.rs` (the built-in Skill, `claude` and `node`). |
+| `cli/src/` | The headless Runner: `args.rs` (command line, help text), `browser.rs` (opens the login link), `store.rs` (which token store a run uses), `commands.rs` (one function per command, and the log of `run`), `tools.rs` (the built-in Skill, `claude` and `node`). |
 | `cli/tests/` | Process tests: the debug `elise-runner` run against a stub engine (`support/mod.rs`). |
 
 The app has no Scan path of its own. The Scan path (the claim, the clone, the settings file the agent runs under, the four Phases on one Pool, the validators, the repair run, collecting and sending the files, stopping a Scan) is in the core, `core/src/scan.rs`, and the headless Runner runs the same code. Its rules are in `docs/adr/0006-full-worker-and-phase-budget.md`, under "Runner Scans". A Scan from this app uses your Claude login but not your Claude Code settings, and never reads or changes your `~/.claude` folder: that is the core's rule, not this app's. Quitting the app during a Scan kills `claude` and sends no result.
@@ -35,7 +37,7 @@ The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The
 ```bash
 pnpm --filter elise-runner-cli app:dev     # tauri dev
 pnpm --filter elise-runner-cli app:build   # tauri build
-pnpm --filter elise-runner-cli check       # tsc --noEmit, then cargo test for the core and the terminal program
+pnpm --filter elise-runner-cli check       # tsc --noEmit, cargo fmt --check, cargo clippy (-D warnings) and cargo test for the core and the terminal program
 ```
 
 ## The headless Runner

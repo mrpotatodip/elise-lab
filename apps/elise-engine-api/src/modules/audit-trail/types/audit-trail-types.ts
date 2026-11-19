@@ -22,7 +22,9 @@ export type AuditAction =
   | "github.install.removed"
   | "usage.budget.updated"
   | "anthropic.key.set"
-  | "anthropic.key.removed";
+  | "anthropic.key.removed"
+  | "runner.login.approve"
+  | "runner.login.deny";
 
 // -----
 // The facts an audit row may carry about the
@@ -46,6 +48,8 @@ export type AuditDetails = {
   reconnected?: boolean;
   monthlyBudgetUsd?: number | null;
   lastFour?: string;
+  requestIp?: string;
+  approverIp?: string;
 };
 
 // -----

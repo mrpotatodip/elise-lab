@@ -1,13 +1,14 @@
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
-const SCHEMA_SOURCE = /^@repo\/contracts\/|^\.\.\/schemas(?:\/|$)/;
+const SCHEMA_SOURCE = /^@repo\/contracts\/|^\.\.\/schemas(?:\/|$)|^#\/providers\/[^/]+\/schemas(?:\/|$)/;
 
 // -----
 // A server function names a schema that lives somewhere else: the contracts
 // package for a shape the engine also uses, the module's `schemas/` for a
-// frontend-only one. A schema built or declared in the `api/` file has no
-// second reader to keep it honest.
+// frontend-only one, or a provider's own `schemas/` (a provider imports its
+// folder by `#/providers/{id}/`, never `../`). A schema built or declared in
+// the `api/` file has no second reader to keep it honest.
 // -----
 export const requireImportedServerFnSchemaRule = defineRule({
   meta: {

@@ -607,15 +607,57 @@
     {
       "idx": 86,
       "version": "7",
-      "when": 1794972797114,
-      "tag": "0086_runner_plan_only_offered",
+      "when": 1794972282713,
+      "tag": "0086_runner_device_logins",
       "breakpoints": true
     },
     {
       "idx": 87,
       "version": "7",
-      "when": 1794974421710,
-      "tag": "0087_aspiring_pixie",
+      "when": 1794974645984,
+      "tag": "0087_runner_login_check_interval",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1794975000000,
+      "tag": "0088_runner_plan_only_offered",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794975000001,
+      "tag": "0089_aspiring_pixie",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1794995109060,
+      "tag": "0090_scan_repos_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1794995674001,
+      "tag": "0091_upload_archives",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1795018360304,
+      "tag": "0092_upload_app_removed_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1795019095582,
+      "tag": "0093_runner_job_sources",
       "breakpoints": true
     },
     {

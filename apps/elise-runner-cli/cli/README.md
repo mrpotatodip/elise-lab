@@ -11,13 +11,14 @@ It supports macOS and Linux. Windows is not supported.
 - A Rust toolchain to build it: `cargo build -p elise-runner-cli --release` in `apps/elise-runner-cli` (the binary is `target/release/elise-runner`). The `full` Skill is built into the binary, so that one file is all you install.
 - Claude Code (`claude`) installed and signed in, as the user the Runner runs as. The Runner uses that login.
 - Node.js (`node`). The Skill's validators run on it.
-- A pairing code. Add a Runner in Elise to get one. A code works once and expires after 10 minutes.
+- A way to connect: `elise-runner login` (approve in the browser), or a pairing code. Add a Runner in Elise to get a code. A code works once and expires after 10 minutes.
 
 `claude` and `node` are found the way the desktop app finds them. A Scan fails with an error that names the one it could not find.
 
 ## Commands
 
 ```
+elise-runner login [--no-browser]
 elise-runner pair <code> [--yes] [--print-token]
 elise-runner status
 elise-runner run [--once]
@@ -25,7 +26,8 @@ elise-runner unpair
 elise-runner --help | --version
 ```
 
-- `pair <code>` shows the Account name and the Runner name the code belongs to and asks `y/N`. On yes it saves the token. On no it revokes the token Elise issued, so none is left. `--yes` accepts without asking, for a script. If this Runner already holds a token, the new one is saved first and then the old one is revoked; if that revoke cannot reach Elise, the program says so and names the old Runner, so an admin can remove it in Elise.
+- `login` connects this Runner with no code. It starts a login with Elise (sending this computer's name, its OS and CPU, and the program's version, nothing else), prints a link and a code, and opens the link in the browser when the computer has a desktop session: `open` on macOS, `xdg-open` on Linux only when `DISPLAY` or `WAYLAND_DISPLAY` is set, never when `SSH_CONNECTION` is set or with `--no-browser`. A browser that fails to open is not an error. The link is the dashboard's `/device` page: a signed-in member sees this computer's name, OS, CPU, the program's version and the IP that asked, picks the Account, sets the Runner's name, and approves or denies. It then checks every 5 seconds, until the expiry Elise named for the code (10 minutes), until you approve the login in Elise, and saves the token. If Elise answers "slow down" it keeps the longer interval Elise names. A denied login ends with "The request was denied in Elise." and an expired one with "The code expired; run `elise-runner login` again.", each with exit 1. Approving in the browser is the confirmation, so it does not ask `y/N`. Ctrl-C cancels the wait and exits with 1. If this Runner already holds a token, it says that logging in replaces that Runner, and revokes the old token after the new one is saved, as `pair` does. With `ELISE_RUNNER_TOKEN` set it refuses, as `pair` does. Against an Elise without the login routes it says to use `pair <code>` and exits with 1.
+- `pair <code>` is the way for CI, scripts and a box with no browser: you get the code first in Elise (Add a Runner), then give it here. It shows the Account name and the Runner name the code belongs to and asks `y/N`. On yes it saves the token. On no it revokes the token Elise issued, so none is left. `--yes` accepts without asking, for a script. If this Runner already holds a token, the new one is saved first and then the old one is revoked; if that revoke cannot reach Elise, the program says so and names the old Runner, so an admin can remove it in Elise.
 - `pair <code> --print-token` enrolls and confirms as usual, then prints the token once on standard output and saves nothing. See "In a container".
 - `status` says whether this Runner is unpaired, connected (with its name and Account), revoked or offline, and names the token store in use.
 - `run` claims and runs Scans until you stop it.
@@ -52,7 +54,7 @@ When Elise rejects the token during `run` (an admin removed the Runner), the pro
 
 In this order:
 
-1. `ELISE_RUNNER_TOKEN`, if set. It is read only: `pair` and `unpair` refuse to manage a token that came from it, and say so.
+1. `ELISE_RUNNER_TOKEN`, if set. It is read only: `pair`, `login` and `unpair` refuse to manage a token that came from it, and say so.
 2. The system keychain (macOS Keychain, or a Secret Service on Linux), under the service name `com.eliselab.runner.headless`. The desktop app uses `com.eliselab.runner`, which is why the two are separate Runners.
 3. When the computer has no keychain service, as on many Linux servers, a file in your config folder (`~/.config/elise-runner/token` on Linux), created readable by you only.
 
@@ -61,6 +63,18 @@ In this order:
 ## What a run does
 
 `run` runs a Scan as the desktop app does: clone, the four Phases on one Pool, the validators, one repair run if they fail, and upload. It logs one plain line per step on standard output, each starting `[owner/name scanId]`: claimed, each Phase started and ended with what it spent and what is left of the Pool, repair started, result sent or not, and how the Scan ended. The lines are plain so that systemd, Docker or a CI log can capture them.
+
+## Where a Scan may clone from
+
+The Runner clones only `https://` addresses, with your own git login and no terminal prompt. It checks the address before git runs, with the rules of the address's provider (`docs/adr/0008-git-providers.md`):
+
+- `github.com`: `https://github.com/owner/name`.
+- `gitlab.com`: `https://gitlab.com/group/name`, with groups inside groups. A pasted branch view (`…/-/tree/main`) or a trailing `.git` still names the repository.
+- A GitLab server your company runs: only a host you list in `settings.json`, in the same config folder as the token file (`~/.config/elise-runner/settings.json` on Linux): `{"gitlabHosts": ["git.example.com"]}`. A host that only Elise's job names is refused, so a forged job cannot send this computer to clone from somewhere else. The file is read again for every Scan. The desktop app reads a `settings.json` in its own config folder.
+
+A private `gitlab.com` repository clones with your own git login (checked 2026-11-19, #227). The Runner never asks for a password, so store the login once with a normal `git clone` in a terminal. A gitlab.com fine-grained token needs the project permission "Code: Download", and GitLab refuses an account password when two-factor sign-in is on. A private GitHub repository and a private repository on a company GitLab server are not tested yet.
+
+An upload Scan reads a zip instead of a clone. Each claim tells Elise this Runner reads zips (`{"sources":["git","archive"]}`); an older Runner says nothing, and Elise refuses to start an upload Scan on it, asking to update it. The Runner downloads the zip of the job it claimed (Elise serves it to no other Runner) and unpacks it in the work folder: a path with `..` or an absolute path refuses the whole zip, links are skipped, and the limits are 50 MB of zip, 250 MB unpacked, 20,000 files and 20 path levels. When everything sits in one top folder, that folder is removed, so `app-1.2/src/a.rs` and `app-1.3/src/a.rs` are both `src/a.rs`. The same clean-up as after a clone follows. A zip removed while its Scan waited fails the Scan with that reason.
 
 A Scan uses your Claude login but not your Claude Code settings. It runs under its own settings and tool allowlist and never reads or changes your `~/.claude` folder. The agent does not get `ELISE_RUNNER_TOKEN`, and on Linux its settings deny reading `/proc`, so a hostile repository cannot make it copy the token into a report.
 
@@ -85,11 +99,12 @@ The token is a credential that lasts until the Runner is removed in Elise. Copie
 
 ## Developing
 
-A debug build reads `ELISE_RUNNER_HOME` (the token file goes in that folder, the keychain is never touched, and `claude` and `node` are looked for on PATH only) and `ELISE_ENGINE_URL`. A release build ignores both and talks only to the production API.
+A debug build reads `ELISE_RUNNER_HOME` (the token file goes in that folder, the keychain is never touched, and `claude` and `node` are looked for on PATH only), `ELISE_ENGINE_URL` and `ELISE_LOGIN_CHECK_MS` (how often `login` checks, in milliseconds, so tests need not wait 5 seconds). A release build ignores all three and talks only to the production API.
 
 | Path | What it is |
 | --- | --- |
 | `src/args.rs` | The command line and the help text. |
+| `src/browser.rs` | Opens the login link when the computer has a desktop session. |
 | `src/store.rs` | Which token store a run uses. |
 | `src/commands.rs` | One function per command, and the log of `run`. |
 | `src/tools.rs` | The built-in Skill, `claude` and `node`. |

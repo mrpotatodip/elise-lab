@@ -7,18 +7,8 @@ import { toDbError, type DbError } from "#/lib/effect-query";
 import { SCAN_TRACE_CURSOR_OVERLAP_SECONDS } from "#/modules/scan-trace/constants";
 import type { TraceRow } from "#/modules/scan-trace/types";
 
-// -----
-// The cursor is the database's own time of a write, to the
-// microsecond, as an ISO string. A JavaScript Date keeps only the
-// millisecond, which would hand back the last write on every read.
-// -----
 const cursorOf = sql<string>`to_char(${scanTraceEntries.updatedAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
 
-// -----
-// The Runner that holds the Scan's job, or null when the Scan has
-// none. The tenant filter stays here as well as in the row-level
-// security.
-// -----
 export const findJobRunnerEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<string | null, DbError> =>
   Effect.tryPromise({
     try: () =>
@@ -30,10 +20,6 @@ export const findJobRunnerEffect = (db: AppDbType, tenantId: string, scanId: str
     catch: toDbError,
   });
 
-// -----
-// The Scan's candidate Finding count, or undefined when the Account
-// has no such Scan.
-// -----
 export const findTraceScanEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<{ candidateFindings: number | null } | undefined, DbError> =>
   Effect.tryPromise({
     try: () =>
@@ -56,10 +42,6 @@ export const countTraceEntriesEffect = (db: AppDbType, scanId: string): Effect.E
     catch: toDbError,
   });
 
-// -----
-// Which of these ids the Scan already has: sending one again
-// replaces it and never counts toward the cap.
-// -----
 export const knownTraceIdsEffect = (db: AppDbType, scanId: string, ids: readonly string[]): Effect.Effect<Set<string>, DbError> =>
   ids.length === 0
     ? Effect.succeed(new Set<string>())
@@ -73,12 +55,6 @@ export const knownTraceIdsEffect = (db: AppDbType, scanId: string, ids: readonly
         catch: toDbError,
       });
 
-// -----
-// Writes the entries, replacing any the Scan already has by id. Every
-// written row takes the database's time as updated_at, read when the
-// statement runs (clock_timestamp, not the transaction's start), so a
-// reader's cursor never depends on the producer's clock.
-// -----
 export const upsertTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId: string, entries: readonly TraceEntry[]): Effect.Effect<void, DbError> =>
   entries.length === 0
     ? Effect.void
@@ -123,10 +99,6 @@ export const setCandidateFindingsEffect = (db: AppDbType, tenantId: string, scan
     catch: toDbError,
   }).pipe(Effect.asVoid);
 
-// -----
-// The Scan's entries written after the cursor (all of them without
-// one), in display order: the producer's start time, then the id.
-// -----
 export const readTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId: string, after: string | undefined): Effect.Effect<TraceRow[], DbError> =>
   Effect.tryPromise({
     try: () =>

@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { defineConfig, type OxlintOverride } from "oxlint";
 
 // -----
@@ -18,10 +19,45 @@ const SHARED_IMPORT_RULES = [
   },
 ];
 
+// -----
+// Source providers (docs/adr/0008-git-providers.md): modules read a provider
+// only through `#/providers/port` and `#/providers/registry`, a provider
+// imports only the port and its own folder, and only the registry imports
+// every provider. The `**/` form also catches a relative path. Each folder
+// under src/providers gets its own override, so a new provider is covered as
+// soon as its folder exists.
+// -----
+const FORBID_PROVIDER_IN_CORE = {
+  group: ["**/providers/*", "**/providers/*/**", "!**/providers/port", "!**/providers/registry"],
+  message: "Modules read a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
+};
+const CORE_IMPORT_RULES = [...SHARED_IMPORT_RULES, FORBID_PROVIDER_IN_CORE];
+const PROVIDER_IDS = readdirSync(new URL("src/providers", import.meta.url), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name);
+const providerOverride = (id: string): OxlintOverride => ({
+  files: [`src/providers/${id}/**`],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        paths: [FORBID_HONO_RPC],
+        patterns: [
+          ...SHARED_IMPORT_RULES,
+          {
+            group: ["../**", "**/providers/*", "**/providers/*/**", "!**/providers/port", `!**/providers/${id}`, `!**/providers/${id}/**`],
+            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
+          },
+        ],
+      },
+    ],
+  },
+});
+
 const forbidModules = (files: string, modules: readonly string[], message: string): OxlintOverride => ({
   files: [files],
   rules: {
-    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [...SHARED_IMPORT_RULES, { group: modules.flatMap((name) => [`#/modules/${name}`, `#/modules/${name}/*`]), message }] }],
+    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [...CORE_IMPORT_RULES, { group: modules.flatMap((name) => [`#/modules/${name}`, `#/modules/${name}/*`]), message }] }],
   },
 });
 
@@ -57,20 +93,20 @@ export default defineConfig({
       rules: { "anti-slop/no-use-effect": "off" },
     },
     {
-      files: ["src/modules/*/components/**", "src/modules/*/hooks/**", "src/routes/**"],
+      files: ["src/modules/*/components/**", "src/modules/*/hooks/**", "src/providers/*/components/**", "src/providers/*/hooks/**", "src/routes/**"],
       rules: {
         "anti-slop/no-engine-client-import": "error",
       },
     },
     {
-      files: ["src/modules/**"],
+      files: ["src/modules/**", "src/providers/**"],
       excludeFiles: ["src/modules/**/__tests__/**"],
       rules: {
         "anti-slop/no-raw-colors": "error",
       },
     },
     {
-      files: ["src/modules/*/api/**"],
+      files: ["src/modules/*/api/**", "src/providers/*/api/**"],
       rules: {
         "anti-slop/require-imported-server-fn-schema": "error",
       },
@@ -98,7 +134,14 @@ export default defineConfig({
       // -----
       files: ["src/components/ui/sonner.tsx"],
       rules: {
-        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [SHARED_IMPORT_RULES[0]] }],
+        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [SHARED_IMPORT_RULES[0], FORBID_PROVIDER_IN_CORE] }],
+      },
+    },
+    ...PROVIDER_IDS.map(providerOverride),
+    {
+      files: ["src/providers/registry.ts"],
+      rules: {
+        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: SHARED_IMPORT_RULES }],
       },
     },
     {
@@ -131,7 +174,7 @@ export default defineConfig({
     "typescript/consistent-type-definitions": ["error", "type"],
     "typescript/no-explicit-any": "error",
     "import/no-default-export": "error",
-    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: SHARED_IMPORT_RULES }],
+    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: CORE_IMPORT_RULES }],
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
     "anti-slop/no-deprecated-query-client-calls": "error",

@@ -75,8 +75,20 @@ const SUBAGENT_ASK = {
   },
 } satisfies Record<ScanOptions["profile"], Record<FullPhase, string>>;
 
+// -----
+// A run that starts a sub-agent in the background, then sleeps until a
+// timed wakeup, can sit idle for twenty minutes after the work is done
+// (a Runner Scan of three small files took 47 minutes of clock for 3.5
+// minutes of work). The hunt and the check start sub-agents on every
+// profile (the quick hunt runs its one critic pass), so both are told
+// to wait for each one in the foreground and to end when the files are
+// written.
+// -----
+const WAIT_FOR_SUBAGENTS =
+  "Run each sub-agent in the foreground and wait for its result before you go on. Never run one in the background, and never sleep or schedule a wakeup. Once this run's files are written, end the run.";
+
 const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"]) =>
-  SUBAGENT_ASK[profile][phase] === "" ? PHASE_HANDOFF[phase] : `${PHASE_HANDOFF[phase]} ${SUBAGENT_ASK[profile][phase]}`;
+  [PHASE_HANDOFF[phase], SUBAGENT_ASK[profile][phase], phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : ""].filter((part) => part !== "").join(" ");
 
 const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
 

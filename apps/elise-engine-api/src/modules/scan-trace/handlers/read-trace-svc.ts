@@ -4,12 +4,6 @@ import type { AppDbType } from "#/lib/db-connection";
 import { NotFound, type DbError } from "#/lib/effect-query";
 import { findTraceScanEffect, readTraceEntriesEffect } from "#/modules/scan-trace/queries";
 
-// -----
-// The Scan's entries changed after the cursor, and the cursor to send
-// next: the newest write among them, or the same one when nothing
-// changed. A Scan with no Trace (one from before Traces, or from an
-// older Runner) reads as an empty list. Another Account's Scan is 404.
-// -----
 export const readTraceSvc = (db: AppDbType, accountId: string, scanId: string, query: TraceQuery): Effect.Effect<Trace, NotFound | DbError> =>
   Effect.gen(function* () {
     const scan = yield* findTraceScanEffect(db, accountId, scanId);

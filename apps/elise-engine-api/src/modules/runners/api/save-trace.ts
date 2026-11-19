@@ -9,11 +9,6 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-// -----
-// The same authentication as the job result: the token names the
-// Runner, and the Runner names its Account. The write then runs as
-// that Account.
-// -----
 app.post("/jobs/:scanId/trace", saveTraceDoc, zValidator("param", RunnerJobParamSchema), zValidator("json", SaveTraceBodySchema), async (c) => {
   const runner = await runnerOf(c);
   const { scanId } = c.req.valid("param");

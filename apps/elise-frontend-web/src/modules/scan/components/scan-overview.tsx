@@ -8,7 +8,6 @@ import { CreditCard } from "#/modules/credit";
 import { UsageCard } from "#/modules/usage";
 import { Suspense, type ReactNode } from "react";
 import { Skeleton } from "#/components/ui/skeleton";
-import { cn } from "#/lib/utils";
 import { isScanActive, overviewQuery, scansQuery } from "../hooks";
 import type { ScanStatus } from "../schemas";
 import { scanActivity, scanSuccessRate } from "../utils";
@@ -61,31 +60,29 @@ function RunningNow({ scans }: { scans: readonly ScanStatus[] }) {
 }
 
 // -----
-// The overview leads with what to decide, as the branch page does: the
-// repository summary (decide) and the repositories to look at first (attention)
-// come in from the screen that owns that data, so this module does not import
-// the repository module. The scan history and its health follow.
+// The overview leads with what to do: the brief (the ship answer, the counts and
+// the actions) comes in from the screen that owns that data, so this module does
+// not import the repository module. The scan history and its health follow, then
+// the budget and credit cards, which hide themselves when they do not apply.
 // -----
 type ScanOverviewProps = {
-  decide?: ReactNode;
-  attention?: ReactNode;
+  brief?: ReactNode;
 };
 
-export function ScanOverview({ decide, attention }: ScanOverviewProps) {
+export function ScanOverview({ brief }: ScanOverviewProps) {
   const [{ data: overview }, { data: list }] = useSuspenseQueries({ queries: [overviewQuery(), scansQuery()] });
   const rate = scanSuccessRate(overview.byState.succeeded, overview.byState.failed);
   const activity = scanActivity(list.scans, 14, new Date());
 
   return (
     <>
-      <ShellPageHeader title="Overview" description="What needs a decision across your repositories, and how your scans are going." />
+      <ShellPageHeader title="Overview" description="What needs your attention across your repositories, what to do about it, and how your scans are going." />
+
+      {brief}
 
       <RunningNow scans={list.scans.filter((scan) => isScanActive(scan.status))} />
 
-      {decide}
-
-      <div className={cn("grid gap-8", attention && "lg:grid-cols-2")}>
-        {attention}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card className="flex flex-col">
           <CardHeader className="flex-row items-start justify-between gap-3">
             <div className="grid gap-1.5">
@@ -128,21 +125,18 @@ export function ScanOverview({ decide, attention }: ScanOverviewProps) {
             )}
           </CardContent>
         </Card>
+        <ScanSuccessRing succeeded={overview.byState.succeeded} failed={overview.byState.failed} rate={rate} />
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-        <div className="grid content-start gap-8">
-          <Suspense fallback={<Skeleton className="h-72 w-full" />}>
-            <UsageCard />
-          </Suspense>
-          <Suspense fallback={<Skeleton className="h-40 w-full" />}>
-            <CreditCard />
-          </Suspense>
-        </div>
-        <ScanSuccessRing succeeded={overview.byState.succeeded} failed={overview.byState.failed} rate={rate} />
-        <div className="grid md:col-span-2">
-          <ScanActivityChart days={activity} />
-        </div>
+      <ScanActivityChart days={activity} />
+
+      <div className="grid gap-8 empty:hidden md:grid-cols-2 lg:grid-cols-3">
+        <Suspense fallback={<Skeleton className="h-72 w-full" />}>
+          <UsageCard />
+        </Suspense>
+        <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+          <CreditCard />
+        </Suspense>
       </div>
     </>
   );

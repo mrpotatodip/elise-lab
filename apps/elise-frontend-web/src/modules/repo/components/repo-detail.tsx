@@ -1,5 +1,5 @@
 import { Suspense, useState, type ComponentProps } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
 import { ChevronRight, ExternalLink, GitBranch, Search, ShieldCheck, Undo2 } from "lucide-react";
@@ -14,12 +14,14 @@ import { Label } from "#/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
+import { repoSiteName } from "#/lib/repo-site-name";
 import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
 import { ShellPageHeader } from "#/modules/shell";
 import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup, findingStatusKey } from "#/modules/finding";
-import { ScanFindingLocation, ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCell, fromRecorded, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
+import { ScanFindingLocation, ScanFindingSheet, ScanNewDialog, ScanSeverityBadge, ScanSeverityDots, ScanStatusBadge, ScanTime, ScanVerdictCell, fromRecorded, scanArchiveNote, scanFailure, scanNoSummaryText, scanPlural, useVerdictBlockers, type ScanStatus } from "#/modules/scan";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
 import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
 import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
@@ -202,7 +204,18 @@ const NOT_FULL_COPY = "It did not run as a full audit, so it does not count towa
 
 const scanColumn = dataTableColumns<RecentScanRow>();
 
-const recentScanColumns = scanColumn.columns([
+// -----
+// An upload app's Scans read zips, not commits: the column names the zip,
+// or says the file was removed.
+// -----
+const zipColumn = scanColumn.display({
+  id: "commit",
+  header: "Zip",
+  meta: { cell: "text-xs text-muted-foreground" },
+  cell: ({ row }) => scanArchiveNote(row.original.archive) ?? "-",
+});
+
+const recentScanColumnsOf = (zip: boolean) => scanColumn.columns([
   scanColumn.display({
     id: "started",
     header: "Started",
@@ -213,7 +226,7 @@ const recentScanColumns = scanColumn.columns([
     ),
   }),
   scanColumn.display({ id: "status", header: "Status", cell: ({ row }) => <ScanStatusBadge status={row.original.status} /> }),
-  scanColumn.display({
+  zip ? zipColumn : scanColumn.display({
     id: "commit",
     header: "Commit",
     meta: { cell: "font-mono text-xs text-muted-foreground" },
@@ -256,6 +269,9 @@ const recentScanColumns = scanColumn.columns([
     cell: () => <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />,
   }),
 ]);
+
+const RECENT_SCAN_COLUMNS = recentScanColumnsOf(false);
+const RECENT_ZIP_SCAN_COLUMNS = recentScanColumnsOf(true);
 
 // -----
 // The card takes focus (tabIndex -1) when "Review N problems"
@@ -414,10 +430,20 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
   const olderScans = branchScans.length - recentScans.length;
   const newestScan = branchScans[0];
   const github = repo.url.replace(/\.git$/, "").replace(/\/$/, "");
+  const site = repoSiteName(repo.url);
   const notFull = current ? repoNotFullScanIds(current, branchScans) : new Set<string>();
   const fullScan = current?.fullScanId ? branchScans.find((scan) => scan.scanId === current.fullScanId) : undefined;
   const recentRows = recentScans.map((scan) => ({ ...scan, oneOff: Boolean(current && !scan.branchId && scan.commitSha), notFull: notFull.has(scan.scanId) }));
-  const recentTable = useTable({ features: dataTableFeatures, columns: recentScanColumns, data: recentRows, getRowId: (scan) => scan.scanId });
+  // -----
+  // An upload app has one hidden branch and no page elsewhere: no branch
+  // switch, no link out, and its zips (with upload and remove) from the
+  // provider's own panel. Its latest version is a zip, not a commit.
+  // -----
+  const source = sourceProviderOf(repo.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
+  const isApp = source.capabilities.isArchive;
+  const latestZip = isApp ? scanArchiveNote((fullScan ?? newestScan)?.archive) : null;
+  const navigate = useNavigate();
+  const recentTable = useTable({ features: dataTableFeatures, columns: isApp ? RECENT_ZIP_SCAN_COLUMNS : RECENT_SCAN_COLUMNS, data: recentRows, getRowId: (scan) => scan.scanId });
 
   return (
     <>
@@ -426,7 +452,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         badges={<GithubPrivateBadge isPrivate={repo.isPrivate} />}
         below={
           <div className="grid gap-3">
-            {current && (
+            {current && !isApp && (
               <div className="flex min-w-0 items-center gap-2">
                 <RepoBranchSwitch repoId={repoId} branches={repo.branches} current={current} />
                 <Tooltip>
@@ -436,14 +462,14 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                         href={`${github}/tree/${encodeURI(current.name)}`}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label="Open this branch on GitHub"
+                        aria-label={`Open this branch on ${site}`}
                         className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     }
                   >
                     <ExternalLink aria-hidden="true" className="size-4" />
                   </TooltipTrigger>
-                  <TooltipContent>Open this branch on GitHub</TooltipContent>
+                  <TooltipContent>Open this branch on {site}</TooltipContent>
                 </Tooltip>
               </div>
             )}
@@ -477,7 +503,13 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                 ) : (
                   <span>Never scanned</span>
                 )}
-                {current.latestCommit && (
+                {latestZip !== null && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>Zip {latestZip}</span>
+                  </>
+                )}
+                {current.latestCommit && !isApp && (
                   <>
                     <span aria-hidden="true">·</span>
                     <span>
@@ -489,7 +521,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
                         className="rounded-sm font-mono text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {current.latestCommit.slice(0, 7)}
-                        <span className="sr-only"> (opens on GitHub)</span>
+                        <span className="sr-only"> (opens on {site})</span>
                       </a>
                     </span>
                   </>
@@ -514,7 +546,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
           </div>
         }
       >
-        {!current && (
+        {!current && !isApp && (
           <a
             href={github}
             target="_blank"
@@ -522,11 +554,17 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
             className="inline-flex min-h-6 items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ExternalLink aria-hidden="true" className="size-3.5" />
-            Open on GitHub
+            Open on {site}
           </a>
         )}
-        <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
+        {isApp ? (
+          <ScanNewDialog label="Scan a zip" size="default" repo={repo.url} provider={source.id} repoId={repoId} />
+        ) : (
+          <ScanNewDialog label={current ? "Scan this branch" : "Scan"} size="default" repo={repo.url} startBranch={current?.name} />
+        )}
       </ShellPageHeader>
+
+      {source.RepoPanel !== null && <source.RepoPanel repoId={repoId} name={repoName(repo.url)} onRemoved={() => void navigate({ to: "/repos" })} />}
 
       {current && (
         <RepoSummaryStrip

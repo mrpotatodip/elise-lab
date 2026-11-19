@@ -18,9 +18,11 @@ type ScanNewDialogProps = {
   startBranch?: string;
   startRef?: string;
   startOptions?: ComponentProps<typeof ScanNewForm>["startOptions"];
+  provider?: ComponentProps<typeof ScanNewForm>["provider"];
+  repoId?: string;
 };
 
-export function ScanNewDialog({ label = "New scan", size = "sm", variant = "default", repo, startBranch, startRef, startOptions }: ScanNewDialogProps) {
+export function ScanNewDialog({ label = "New scan", size = "sm", variant = "default", repo, startBranch, startRef, startOptions, provider, repoId }: ScanNewDialogProps) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -45,7 +47,7 @@ export function ScanNewDialog({ label = "New scan", size = "sm", variant = "defa
           <DialogTitle>Start a security audit</DialogTitle>
         </DialogHeader>
         <Suspense fallback={<Skeleton className="h-72 w-full" />}>
-          <ScanNewForm repo={repo} startBranch={startBranch} startRef={startRef} startOptions={startOptions} onDone={() => setOpen(false)} />
+          <ScanNewForm repo={repo} startBranch={startBranch} startRef={startRef} startOptions={startOptions} provider={provider} repoId={repoId} onDone={() => setOpen(false)} />
         </Suspense>
       </DialogContent>
     </Dialog>

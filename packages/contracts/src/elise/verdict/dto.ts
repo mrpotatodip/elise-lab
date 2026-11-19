@@ -11,10 +11,14 @@ export const VERDICT_VALUES = ["pass", "fail", "cannot_tell"] as const;
 // -----
 export const VERDICT_REASON_VALUES = ["not_scanned", "too_few_scans", "unchecked_priors", "too_many_priors", "over_limit"] as const;
 
+// -----
+// A git commit (40 hex digits), or for an upload app the SHA-256
+// of a zip (64), which stands in for its commit.
+// -----
 export const VerdictQuerySchema = z.object({
   commit: z
     .string()
-    .regex(/^[0-9a-fA-F]{40}$/)
+    .regex(/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/)
     .transform((sha) => sha.toLowerCase()),
 });
 

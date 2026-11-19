@@ -117,9 +117,9 @@ describe("createScanSvc", () => {
     const start = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) => Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, repoOf(name), OWN)));
     const startOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) => Effect.runPromise(createScanSvc(env, repo, account, repoOf(name), OWN));
     const startOnRunner = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
-      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, undefined, () => Effect.succeed(true))));
+      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, undefined, () => Effect.succeed(["git"]))));
     const startOnRunnerOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
-      Effect.runPromise(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, undefined, () => Effect.succeed(true)));
+      Effect.runPromise(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, undefined, () => Effect.succeed(["git"])));
 
     it("counts the Scans of one account in our cloud on MAX_ACTIVE_FULL_SCANS, and a Scan on a Runner on MAX_ACTIVE_SCANS", async () => {
       const { env } = fakeBindings({ MAX_ACTIVE_SCANS: "1", MAX_ACTIVE_FULL_SCANS: "1" });
@@ -347,8 +347,8 @@ describe("createScanSvc: the cap of a profile and the monthly budget by key", ()
   });
 });
 
-const connected = () => Effect.succeed(true);
-const gone = () => Effect.succeed(false);
+const connected = () => Effect.succeed(["git"]);
+const gone = () => Effect.succeed(null);
 const RUNNER_SPEND = (): MonthSpend => onPlan({ planKey: "runner", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0 });
 
 describe("createScanSvc: a Runner", () => {
@@ -356,7 +356,7 @@ describe("createScanSvc: a Runner", () => {
   const onRunner: CreateScanBody = { ...input, runner_id: RUNNER };
   const BYOK_PLAN: Partial<PlanState> = { planKey: "byok", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0, monthlyScanAllowance: 300 };
 
-  const outcome = (spend: MonthSpend, runnerConnected: () => Effect.Effect<boolean>, body: CreateScanBody = onRunner) => {
+  const outcome = (spend: MonthSpend, runnerConnected: () => Effect.Effect<string[] | null>, body: CreateScanBody = onRunner) => {
     const { env } = fakeBindings({ BILLING_ENFORCED: "true" });
     return Effect.runPromise(
       createScanSvc(env, memoryScanRepo().repo, "acme", body, spend, undefined, hold, runnerConnected).pipe(

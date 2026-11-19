@@ -5,7 +5,7 @@ import { partyPersons, scanFindings, scanFindingTriage, scanRepos, scans, type T
 import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
-import { canonicalRepo } from "#/modules/scan-ledger";
+import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
 
 // -----
 // Worst first; a finding that still needs
@@ -63,7 +63,7 @@ export const listFindingsEffect = (db: AppDbType, tenantId: string, query: Findi
             query.repo
               ? inArray(
                   scans.repoId,
-                  db.select({ id: scanRepos.id }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.canonical, canonicalRepo(query.repo)))),
+                  db.select({ id: scanRepos.id }).from(scanRepos).where(sameRepoIdentity(tenantId, repoIdentityOf(query.repo))),
                 )
               : undefined,
             query.severity ? eq(scanFindings.severity, query.severity) : undefined,
@@ -111,7 +111,7 @@ export const findingRepoIdEffect = (db: Pick<AppDbType, "select">, tenantId: str
         .from(scanFindings)
         .innerJoin(scans, eq(scans.id, scanFindings.scanId))
         .innerJoin(scanRepos, eq(scanRepos.id, scans.repoId))
-        .where(and(eq(scanFindings.tenantId, tenantId), eq(scanRepos.canonical, canonicalRepo(repoUrl)), eq(scanFindings.fingerprint, fingerprint)))
+        .where(and(eq(scanFindings.tenantId, tenantId), sameRepoIdentity(tenantId, repoIdentityOf(repoUrl)), eq(scanFindings.fingerprint, fingerprint)))
         .limit(1),
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows[0]?.repoId ?? null));

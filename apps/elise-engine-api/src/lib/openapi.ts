@@ -25,7 +25,8 @@ const ERROR_DESCRIPTIONS = {
   401: "The bearer token is missing or wrong, or there is no signed-in session.",
   403: "The request is refused: not allowed for this login, or an invite code or link that is not valid.",
   404: "The resource does not exist, or it belongs to another account.",
-  409: "The resource already exists, for example an email that has a login.",
+  409: "The resource already exists, for example an email that has a login, or a limit of the account is reached. The message names it.",
+  413: "The request body is over the route's size limit. The message names the limit.",
   429: "The account has too many active scans. Wait for one to end, then try again.",
 };
 

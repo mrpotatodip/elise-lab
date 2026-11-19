@@ -59,12 +59,6 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     }
   };
 
-  // -----
-  // Sends the Trace entries the running Phase's log gave since the last
-  // call. It runs inside a step that already exists (the poll), so it
-  // adds no step to the Workflow's count, and it never throws: a failed
-  // read or write drops the entries and the Scan goes on.
-  // -----
   const sendTrace = async (ended: boolean) => {
     if (sandbox.drainTrace === undefined) return;
     try {

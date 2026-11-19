@@ -198,14 +198,6 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     return { state: "failed", error: `claude exited ${exitCode}: ${await this.agentLogTail()}` };
   }
 
-  // -----
-  // The Trace entries of the running Phase: its start marker, then the
-  // entries its log gave since the last call (read from the saved byte
-  // offset, so a retry never repeats a line), then its end marker once
-  // `ended`. The state is saved before the entries are handed back, so
-  // a failed write on the Workflow's side drops entries and never
-  // repeats them. An entry that grew comes back whole under its own id.
-  // -----
   async drainTrace(ended: boolean): Promise<TraceEntry[]> {
     const stored = await this.ctx.storage.get<StoredTrace>(SCAN_SANDBOX_TRACE_KEY);
     if (stored === undefined) return [];
@@ -297,9 +289,6 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     return last === undefined ? DEFAULT_AGENT_FILES : phaseAgentFiles(last);
   }
 
-  // -----
-  // A log from a byte offset on, empty when the file is not there yet.
-  // -----
   async #logFrom(path: string, offset: number): Promise<string> {
     try {
       const process = await this.#container.exec(["tail", "-c", `+${offset + 1}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });
@@ -310,10 +299,6 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     }
   }
 
-  // -----
-  // The last bytes of a log, null when the file is not there. The first
-  // line may be cut; the lines a caller wants (the result line) are last.
-  // -----
   async #logEnd(path: string): Promise<string | null> {
     try {
       const process = await this.#container.exec(["tail", "-c", `${SCAN_SANDBOX_LOG_READ_BYTES}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });

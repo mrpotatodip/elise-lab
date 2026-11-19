@@ -1,17 +1,42 @@
 import { z } from "zod";
-import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "@repo/contracts/elise";
+import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SourceProviderSchema, VerdictQuerySchema } from "@repo/contracts/elise";
+import { DEFAULT_SOURCE_PROVIDER_ID, isGitSourceProvider, sourceProviderOf } from "#/providers/registry";
 
 export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS, RepoDetailSchema, RepoListSchema, RepoParamSchema, ScanListSchema, ScanQueuedSchema, ScanStateSchema, ScanStatusSchema, TraceSchema } from "@repo/contracts/elise";
-export type { Repo, RepoBranch, ScanState, ScanStatus, Trace, TraceEntry } from "@repo/contracts/elise";
+export type { Repo, RepoBranch, ScanState, ScanStatus, SourceProviderValue, Trace, TraceEntry } from "@repo/contracts/elise";
 
-export const CreateScanInputSchema = z.object({
-  repo: z.string().regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/, "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name."),
-  model: z.enum(SCAN_MODELS),
-  effort: z.enum(SCAN_EFFORTS),
-  profile: z.enum(SCAN_PROFILES),
-  ref: z.string().optional(),
-  runnerId: z.uuid().optional(),
-});
+// -----
+// The repo is checked by the parser of the provider the plan
+// names, github when it names none, as the engine does. An
+// archive provider (upload) reads one zip, chosen by its id,
+// and has no ref; a git provider takes no zip. A provider whose
+// flow is not built yet starts no Scan.
+// -----
+export const CreateScanInputSchema = z
+  .object({
+    provider: SourceProviderSchema.optional(),
+    repo: z.string(),
+    model: z.enum(SCAN_MODELS),
+    effort: z.enum(SCAN_EFFORTS),
+    profile: z.enum(SCAN_PROFILES),
+    ref: z.string().optional(),
+    runnerId: z.uuid().optional(),
+    archiveId: z.uuid().optional(),
+  })
+  .superRefine((input, ctx) => {
+    const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
+    if (!provider.available) {
+      ctx.addIssue({ code: "custom", path: ["provider"], message: `${provider.label} audits are not open yet.` });
+      return;
+    }
+    if (provider.capabilities.isArchive) {
+      if (input.archiveId === undefined) ctx.addIssue({ code: "custom", path: ["archiveId"], message: "Pick the zip to scan." });
+      if (input.ref !== undefined) ctx.addIssue({ code: "custom", path: ["ref"], message: "An upload app has no branches: pick a zip instead." });
+      return;
+    }
+    if (input.archiveId !== undefined) ctx.addIssue({ code: "custom", path: ["archiveId"], message: "Only an upload app takes a zip." });
+    if (isGitSourceProvider(provider) && !provider.address.pattern.test(input.repo)) ctx.addIssue({ code: "custom", path: ["repo"], message: provider.address.message });
+  });
 
 export const ScanIdInputSchema = z.object({ scanId: z.string().regex(/^[\w-]+$/) });
 
@@ -28,7 +53,11 @@ export type { DiffEntry, ScanDiff } from "@repo/contracts/elise";
 
 export type { SeverityCounts } from "@repo/contracts/elise";
 
-export const VerdictInputSchema = z.object({ repoId: z.string().regex(/^[\w-]+$/), commit: z.string().regex(/^[0-9a-fA-F]{40}$/) });
+// -----
+// The commit is the engine's own rule: a git commit, or for an
+// upload app the SHA-256 of a zip, which stands in for it.
+// -----
+export const VerdictInputSchema = VerdictQuerySchema.extend({ repoId: z.string().regex(/^[\w-]+$/) });
 
 export { VerdictSchema } from "@repo/contracts/elise";
 export type { Verdict, VerdictFinding } from "@repo/contracts/elise";

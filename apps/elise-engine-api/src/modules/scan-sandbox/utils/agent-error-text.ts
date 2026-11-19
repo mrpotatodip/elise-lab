@@ -7,13 +7,6 @@ const ErrorLineSchema = z.object({
   result: z.string().optional(),
 });
 
-// -----
-// The text of a failed run's error, from the agent's stream-json log:
-// only the `result` and `system` lines count. A tool result or an
-// assistant message can hold the repo's file contents, and this text
-// ends in scans.error, so those lines never go in. A line that is not
-// JSON is skipped for the same reason.
-// -----
 export const agentErrorText = (log: string, maxChars: number): string => {
   const parts = log.split("\n").flatMap((line) => {
     if (!line.startsWith("{")) return [];

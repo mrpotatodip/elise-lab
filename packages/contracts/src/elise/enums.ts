@@ -61,6 +61,14 @@ export const SCAN_KEY_SOURCE_VALUES = ["platform", "account"] as const;
 // the Scan ended (timed out or failed) before the Runner reported.
 // Twin of the CHECK on scan_runner_jobs.state.
 // -----
+// -----
+// Where a Runner login from the terminal has got to. pending: started,
+// waiting for a member. approved: a member chose an Account and a name.
+// denied: a member refused it. collected: the Runner took its token.
+// Twin of the CHECK on platform_runner_device_logins.state.
+// -----
+export const RUNNER_LOGIN_STATE_VALUES = ["pending", "approved", "denied", "collected"] as const;
+
 export const RUNNER_JOB_STATE_VALUES = ["queued", "claimed", "succeeded", "failed", "cancelled"] as const;
 
 // -----
@@ -86,6 +94,7 @@ export type FindingStatusValue = (typeof FINDING_STATUS_VALUES)[number];
 export type FindingSeverityValue = (typeof FINDING_SEVERITY_VALUES)[number];
 export type FindingTriageStatusValue = (typeof FINDING_TRIAGE_STATUS_VALUES)[number];
 export type ScanKeySourceValue = (typeof SCAN_KEY_SOURCE_VALUES)[number];
+export type RunnerLoginStateValue = (typeof RUNNER_LOGIN_STATE_VALUES)[number];
 export type RunnerJobStateValue = (typeof RUNNER_JOB_STATE_VALUES)[number];
 export type SubscriptionStatusValue = (typeof SUBSCRIPTION_STATUS_VALUES)[number];
 export type SubscriptionSourceValue = (typeof SUBSCRIPTION_SOURCE_VALUES)[number];
@@ -115,3 +124,23 @@ export const TRACE_LABEL_VALUES = ["reasoning", "reading_files", "searching", "r
 export type ScanStepValue = (typeof SCAN_STEP_VALUES)[number];
 export type RunnerJobPhaseValue = (typeof RUNNER_JOB_PHASE_VALUES)[number];
 export type TraceLabelValue = (typeof TRACE_LABEL_VALUES)[number];
+
+// -----
+// Where the code of a Scan comes from (docs/adr/0008-git-providers.md).
+// A Repo is known by (provider, host, path); upload has no host. A
+// request without a provider means github. Twin of the CHECK on
+// scan_repos.provider.
+// -----
+export const SOURCE_PROVIDER_VALUES = ["github", "gitlab", "gitlab-sh", "upload"] as const;
+
+export type SourceProviderValue = (typeof SOURCE_PROVIDER_VALUES)[number];
+
+export const DEFAULT_SOURCE_PROVIDER = "github" satisfies SourceProviderValue;
+
+// -----
+// What a Runner job reads: a git clone, or an uploaded zip (an
+// archive). Not a database enum: only the job carries it.
+// -----
+export const RUNNER_JOB_SOURCE_VALUES = ["git", "archive"] as const;
+
+export type RunnerJobSourceValue = (typeof RUNNER_JOB_SOURCE_VALUES)[number];

@@ -39,7 +39,7 @@ static ACTIVITY: Mutex<Activity> = Mutex::new(Activity::Idle);
 fn on_event(event: Event) {
     let next = match event {
         Event::Claimed { repo, .. } => Activity::Running { repo },
-        Event::Ended { ok, repo, message, .. } =>Activity::Finished { ok, repo, message },
+        Event::Ended { ok, repo, message, .. } => Activity::Finished { ok, repo, message },
         _ => return,
     };
     *ACTIVITY.lock().expect("the activity is not poisoned") = next;
@@ -47,11 +47,7 @@ fn on_event(event: Event) {
 
 // Where `claude`, `node` and the bundled skills are on this computer.
 fn find_tools(app: &AppHandle) -> Result<Tools, String> {
-    let skills = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?
-        .join("skills");
+    let skills = app.path().resource_dir().map_err(|e| format!("Could not find the audit skill inside the app: {e}"))?.join("skills");
     Ok(Tools::locate(skills))
 }
 
@@ -64,10 +60,7 @@ async fn runner_status() -> RunnerStatus {
 #[tauri::command]
 async fn pair_runner(code: String) -> Result<PairingOffer, RunnerError> {
     let enrolled = pairing::enroll(&code).await?;
-    let offer = PairingOffer {
-        name: enrolled.name.clone(),
-        account_name: enrolled.account_name.clone(),
-    };
+    let offer = PairingOffer { name: enrolled.name.clone(), account_name: enrolled.account_name.clone() };
     let earlier = PENDING.lock().expect("the pending pairing is not poisoned").replace(enrolled);
     if let Some(earlier) = earlier {
         pairing::decline(earlier).await;
@@ -108,26 +101,33 @@ fn show_main_window(app: &tauri::AppHandle) {
 
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![runner_status, pair_runner, accept_pairing, decline_pairing, unpair_runner, runner_activity])
+        .invoke_handler(tauri::generate_handler![
+            runner_status,
+            pair_runner,
+            accept_pairing,
+            decline_pairing,
+            unpair_runner,
+            runner_activity
+        ])
         .setup(|app| {
             // The work loop asks Elise for scans for as long as the app runs.
+            // The Runner's own settings (the GitLab servers it may clone from) are a file in the
+            // app's config folder, which only the person edits.
+            let settings_file = app.path().app_config_dir()?.join("settings.json");
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let tools = move || find_tools(&handle);
-                scan::work_loop(&STORE, &tools, &on_event).await
+                scan::work_loop(&STORE, &tools, &settings_file, &on_event).await
             });
             let open = MenuItem::with_id(app, "open", "Open Elise Runner", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &quit])?;
 
-            let mut tray = TrayIconBuilder::new()
-                .menu(&menu)
-                .tooltip("Elise Runner")
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "open" => show_main_window(app),
-                    "quit" => app.exit(0),
-                    _ => {}
-                });
+            let mut tray = TrayIconBuilder::new().menu(&menu).tooltip("Elise Runner").on_menu_event(|app, event| match event.id.as_ref() {
+                "open" => show_main_window(app),
+                "quit" => app.exit(0),
+                _ => {}
+            });
             if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
             }

@@ -38,3 +38,4 @@ dist-ssr/
 .claude/settings.local.json
 .dev.log
 .review/
+.playwright-mcp/

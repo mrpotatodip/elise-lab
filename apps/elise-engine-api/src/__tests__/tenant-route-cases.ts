@@ -56,7 +56,11 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
   "POST /team/invites/:token/accept",
   "POST /runners/enroll",
   "POST /runners/claim",
+  "POST /runners/login/start",
+  "POST /runners/login/check",
+  "GET /runners/login/lookup",
   "POST /runners/jobs/:scanId/result",
+  "GET /runners/jobs/:scanId/archive",
   "POST /runners/jobs/:scanId/trace",
   "GET /runners/me",
   "DELETE /runners/me",
@@ -105,6 +109,10 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /repos/:repoId": { kind: "run", path: `/repos/${OTHER_REPO_ID}`, expect: "not-found" },
   "GET /repos/:repoId/findings": { kind: "run", path: `/repos/${OTHER_REPO_ID}/findings`, expect: "not-found" },
   "POST /repos/:repoId/branches": { kind: "run", path: `/repos/${OTHER_REPO_ID}/branches`, method: "POST", body: { name: "release" }, expect: "not-found" },
+  "GET /repos/:repoId/archives": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives`, expect: "not-found" },
+  "POST /repos/:repoId/archives": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives?label=app.zip`, method: "POST", body: {}, expect: "not-found" },
+  "DELETE /repos/:repoId/archives/:archiveId": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives/${OTHER_REPO_ID}`, method: "DELETE", expect: "not-found" },
+  "DELETE /repos/:repoId": { kind: "run", path: `/repos/${OTHER_REPO_ID}`, method: "DELETE", expect: "not-found" },
   "GET /scans": { kind: "run", path: "/scans", expect: "empty" },
   "GET /scans/:scanId": { kind: "run", path: "/scans/theirs", expect: "not-found" },
   "GET /scans/:scanId/diff": { kind: "run", path: "/scans/theirs/diff", expect: "not-found" },
@@ -161,5 +169,7 @@ export const CROSS_ACCOUNT_CASES = {
   // in the caller's Account. It stays below "GET /runners": the
   // Account has a Runner of its own from here on.
   // -----
+  "POST /runners/login/approve": serviceTest("modules/runners/__tests__/runner-login.test.ts"),
+  "POST /runners/login/deny": serviceTest("modules/runners/__tests__/runner-login.test.ts"),
   "POST /runners": { kind: "run", path: "/runners", method: "POST", body: { name: "Guard laptop" }, expect: "created" },
 } satisfies Record<string, CrossAccountCase>;

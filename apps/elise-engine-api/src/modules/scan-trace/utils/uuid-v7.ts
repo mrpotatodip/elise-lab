@@ -1,9 +1,3 @@
-// -----
-// A UUIDv7: 48 bits of milliseconds, then a 12-bit sequence in the
-// field that follows the version, then random bits. Two ids made in the
-// same millisecond with a rising sequence sort in the order made. A
-// sequence past 4095 carries into the millisecond field, so order holds.
-// -----
 export const uuidV7 = (ms: number, seq: number): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   const time = BigInt(ms + Math.floor(seq / 4096));

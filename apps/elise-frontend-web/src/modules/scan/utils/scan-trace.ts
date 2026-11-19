@@ -4,11 +4,6 @@ import type { TraceEntry } from "../schemas";
 
 export type TracePhaseGroup = { key: string; title: string | null; entries: TraceEntry[] };
 
-// -----
-// Entries come newest first. A run of entries in one Phase is one group, so
-// the Phase name heads its run; a Scan without Phases has one group with no
-// title.
-// -----
 export function groupTraceByPhase(entries: TraceEntry[]): TracePhaseGroup[] {
   const groups: TracePhaseGroup[] = [];
   for (const entry of entries) {
@@ -20,10 +15,6 @@ export function groupTraceByPhase(entries: TraceEntry[]): TracePhaseGroup[] {
   return groups;
 }
 
-// -----
-// One line for a Phase: how many entries it holds and how long it ran, from
-// its first start to its last end.
-// -----
 export function summarizeTraceGroup(entries: TraceEntry[]) {
   const starts = entries.map((entry) => new Date(entry.startedAt).getTime());
   const ends = entries.map((entry) => new Date(entry.endedAt).getTime());
@@ -38,10 +29,6 @@ export function traceSpan(ms: number) {
 
 export const isTraceWork = (entry: TraceEntry) => entry.label !== "phase_started" && entry.label !== "phase_ended";
 
-// -----
-// How often each kind of action ran, in the fixed label order. A merged
-// entry counts as its repeats, and the Phase markers are not actions.
-// -----
 export function tallyTraceLabels(entries: TraceEntry[]) {
   const totals = new Map<TraceLabelValue, number>();
   for (const entry of entries) {

@@ -17,7 +17,7 @@ const operations = (spec: Spec) =>
 // Opened by someone with no login yet: the invitee, and a
 // Runner that pairs with a code.
 // -----
-const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll"]);
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll", "POST /runners/login/start", "POST /runners/login/check"]);
 
 describe("GET /openapi.json", () => {
   it("lists every route of the API", async () => {
@@ -29,6 +29,8 @@ describe("GET /openapi.json", () => {
       "DELETE /github/installations/{id}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",
+      "DELETE /repos/{repoId}",
+      "DELETE /repos/{repoId}/archives/{archiveId}",
       "DELETE /runners/me",
       "DELETE /runners/{runnerId}",
       "DELETE /team/invites/{inviteId}",
@@ -43,9 +45,12 @@ describe("GET /openapi.json", () => {
       "GET /me",
       "GET /repos",
       "GET /repos/{repoId}",
+      "GET /repos/{repoId}/archives",
       "GET /repos/{repoId}/findings",
       "GET /repos/{repoId}/verdict",
       "GET /runners",
+      "GET /runners/jobs/{scanId}/archive",
+      "GET /runners/login/lookup",
       "GET /runners/me",
       "GET /scans",
       "GET /scans/{scanId}",
@@ -71,12 +76,17 @@ describe("GET /openapi.json", () => {
       "POST /github/installations",
       "POST /groups",
       "POST /repos",
+      "POST /repos/{repoId}/archives",
       "POST /repos/{repoId}/branches",
       "POST /runners",
       "POST /runners/claim",
       "POST /runners/enroll",
       "POST /runners/jobs/{scanId}/result",
       "POST /runners/jobs/{scanId}/trace",
+      "POST /runners/login/approve",
+      "POST /runners/login/check",
+      "POST /runners/login/deny",
+      "POST /runners/login/start",
       "POST /scans",
       "POST /sign-up",
       "POST /team/invites",

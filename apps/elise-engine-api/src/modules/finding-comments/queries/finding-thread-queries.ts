@@ -6,7 +6,7 @@ import { accessAuditLog } from "@repo/db-elise";
 import { partyPersons, scanFindingComments, scanFindingTriage, scanRepos } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
-import { canonicalRepo } from "#/modules/scan-ledger";
+import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
 import { findingCommentView } from "./finding-comment-view";
 import { DECISION_ACTIONS, findingDecisionView } from "./finding-decision-view";
 
@@ -34,7 +34,7 @@ export const findingThreadEffect = (db: AppDbType, tenantId: string, query: Find
       const repoIds = db
         .select({ id: scanRepos.id })
         .from(scanRepos)
-        .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.canonical, canonicalRepo(query.repo))));
+        .where(sameRepoIdentity(tenantId, repoIdentityOf(query.repo)));
       const commentRows = await db
         .select({ comment: scanFindingComments, person: partyPersons })
         .from(scanFindingComments)

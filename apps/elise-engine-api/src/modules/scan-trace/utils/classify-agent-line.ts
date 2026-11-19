@@ -27,15 +27,6 @@ const labelOfTool = (name: string | undefined): TraceLabelValue => {
   }
 };
 
-// -----
-// One line of `claude --output-format stream-json --verbose` in, the
-// labels of its blocks out. A thinking or text block is Reasoning; a
-// tool_use block is named by its tool only. Tool results, system and
-// rate-limit lines, a type this code does not know and text that is not
-// JSON give none. Nothing but the label leaves this function. The
-// Runner has a twin in Rust: both must give the labels in
-// packages/contracts/fixtures/scan-trace.
-// -----
 export const classifyAgentLine = (line: string): TraceLabelValue[] => {
   let json: unknown;
   try {

@@ -1,6 +1,6 @@
 {
-  "id": "5de94fbd-ecbd-45e6-b5eb-e3d754ceec6e",
-  "prevId": "6d8d839f-e9f4-4875-aa09-971c62e7dcc9",
+  "id": "6b4d5aaa-d65c-4006-9057-1192a891cd09",
+  "prevId": "26cb5008-4480-4497-8089-f1d2079f035f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2503,13 +2503,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "hosted_scans_allowed": {
-          "name": "hosted_scans_allowed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "stripe_price_id": {
           "name": "stripe_price_id",
           "type": "text",
@@ -3331,6 +3324,228 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platform_runner_device_logins": {
+      "name": "platform_runner_device_logins",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_code_hash": {
+          "name": "user_code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_code_hash": {
+          "name": "device_code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suggested_name": {
+          "name": "suggested_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "os": {
+          "name": "os",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cpu": {
+          "name": "cpu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "runner_version": {
+          "name": "runner_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_ip": {
+          "name": "request_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "runner_id": {
+          "name": "runner_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approver_ip": {
+          "name": "approver_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "collected_at": {
+          "name": "collected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_checked_at": {
+          "name": "last_checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "check_interval_seconds": {
+          "name": "check_interval_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_platform_runner_device_logins_user_code_hash": {
+          "name": "uq_platform_runner_device_logins_user_code_hash",
+          "columns": [
+            {
+              "expression": "user_code_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_platform_runner_device_logins_device_code_hash": {
+          "name": "uq_platform_runner_device_logins_device_code_hash",
+          "columns": [
+            {
+              "expression": "device_code_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_platform_runner_device_logins_expires_at": {
+          "name": "idx_platform_runner_device_logins_expires_at",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_runner_device_logins_tenant_id_tenants_id_fk": {
+          "name": "platform_runner_device_logins_tenant_id_tenants_id_fk",
+          "tableFrom": "platform_runner_device_logins",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "platform_runner_device_logins_runner_id_tenant_runners_id_fk": {
+          "name": "platform_runner_device_logins_runner_id_tenant_runners_id_fk",
+          "tableFrom": "platform_runner_device_logins",
+          "tableTo": "tenant_runners",
+          "columnsFrom": [
+            "runner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "platform_runner_device_logins_approved_by_party_persons_party_id_fk": {
+          "name": "platform_runner_device_logins_approved_by_party_persons_party_id_fk",
+          "tableFrom": "platform_runner_device_logins",
+          "tableTo": "party_persons",
+          "columnsFrom": [
+            "approved_by"
+          ],
+          "columnsTo": [
+            "party_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "platform_runner_device_logins_state": {
+          "name": "platform_runner_device_logins_state",
+          "value": "\"platform_runner_device_logins\".\"state\" in ('pending', 'approved', 'denied', 'collected')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.scan_runner_jobs": {

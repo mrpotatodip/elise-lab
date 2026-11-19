@@ -2,6 +2,7 @@ import type { Effect } from "effect";
 import type { ScanArtifact, ScanUsage } from "@repo/contracts/elise";
 import type { Conflict, DbError } from "#/lib/effect-query";
 import type { ScanParams, ScanState, ScanStatus } from "#/schemas";
+import type { SourceProviderId } from "#/providers/registry";
 
 // -----
 // What changes on the way: state, step, error and
@@ -37,7 +38,7 @@ export type ScanPage ={ scans: ScanStatus[]; nextCursor: string | null };
 // bytes of each file, and scan_files says where.
 // -----
 export type ScanRepo = {
-  ensureRepo: (accountId: string, url: string) => Effect.Effect<RepoRecord, DbError>;
+  ensureRepo: (accountId: string, url: string, provider?: SourceProviderId) => Effect.Effect<RepoRecord, DbError>;
   create: (params: ScanParams, repoId: string, nowMs: number) => Effect.Effect<void, DbError | Conflict>;
   mark: (accountId: string, scanId: string, patch: ScanPatch) => Effect.Effect<void, DbError>;
   addFiles: (accountId: string, scanId: string, files: NewScanFile[]) => Effect.Effect<void, DbError>;

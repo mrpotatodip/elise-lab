@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { hasAccessPower } from "@repo/contracts/elise";
 import { creditQuery } from "#/modules/credit";
-import { RepoAttentionList, RepoSummaryStrip, reposQuery } from "#/modules/repo";
+import { RepoOverviewBrief, reposQuery } from "#/modules/repo";
 import { overviewQuery, ScanOverview, ScanOverviewSkeleton, scansQuery } from "#/modules/scan";
 import { usageQuery } from "#/modules/usage";
 
@@ -21,7 +22,10 @@ export const Route = createFileRoute("/_app/overview")({
 
 function OverviewWithRepos() {
   const { data } = useSuspenseQuery(reposQuery());
-  return <ScanOverview decide={<RepoSummaryStrip repos={data.repos} />} attention={<RepoAttentionList repos={data.repos} />} />;
+  const { data: usage } = useSuspenseQuery(usageQuery());
+  const { user } = Route.useRouteContext();
+  const canManageBudget = hasAccessPower(user?.powers ?? [], "company:usage:budget:update");
+  return <ScanOverview brief={<RepoOverviewBrief repos={data.repos} budget={usage} canManageBudget={canManageBudget} />} />;
 }
 
 function OverviewPage() {

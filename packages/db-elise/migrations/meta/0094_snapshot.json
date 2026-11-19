@@ -1,6 +1,6 @@
 {
   "id": "a6998a08-5aa1-4863-9425-8b36270f4bdc",
-  "prevId": "5de94fbd-ecbd-45e6-b5eb-e3d754ceec6e",
+  "prevId": "39a434b7-f98c-4a05-b477-054c5682c112",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3231,6 +3231,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "job_sources": {
+          "name": "job_sources",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{git}'::text[]"
+        },
         "revoked_at": {
           "name": "revoked_at",
           "type": "timestamp with time zone",
@@ -3331,6 +3338,228 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.platform_runner_device_logins": {
+      "name": "platform_runner_device_logins",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_code_hash": {
+          "name": "user_code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_code_hash": {
+          "name": "device_code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suggested_name": {
+          "name": "suggested_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "os": {
+          "name": "os",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cpu": {
+          "name": "cpu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "runner_version": {
+          "name": "runner_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_ip": {
+          "name": "request_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "runner_id": {
+          "name": "runner_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approver_ip": {
+          "name": "approver_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "collected_at": {
+          "name": "collected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_checked_at": {
+          "name": "last_checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "check_interval_seconds": {
+          "name": "check_interval_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_platform_runner_device_logins_user_code_hash": {
+          "name": "uq_platform_runner_device_logins_user_code_hash",
+          "columns": [
+            {
+              "expression": "user_code_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_platform_runner_device_logins_device_code_hash": {
+          "name": "uq_platform_runner_device_logins_device_code_hash",
+          "columns": [
+            {
+              "expression": "device_code_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_platform_runner_device_logins_expires_at": {
+          "name": "idx_platform_runner_device_logins_expires_at",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_runner_device_logins_tenant_id_tenants_id_fk": {
+          "name": "platform_runner_device_logins_tenant_id_tenants_id_fk",
+          "tableFrom": "platform_runner_device_logins",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "platform_runner_device_logins_runner_id_tenant_runners_id_fk": {
+          "name": "platform_runner_device_logins_runner_id_tenant_runners_id_fk",
+          "tableFrom": "platform_runner_device_logins",
+          "tableTo": "tenant_runners",
+          "columnsFrom": [
+            "runner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "platform_runner_device_logins_approved_by_party_persons_party_id_fk": {
+          "name": "platform_runner_device_logins_approved_by_party_persons_party_id_fk",
+          "tableFrom": "platform_runner_device_logins",
+          "tableTo": "party_persons",
+          "columnsFrom": [
+            "approved_by"
+          ],
+          "columnsTo": [
+            "party_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "platform_runner_device_logins_state": {
+          "name": "platform_runner_device_logins_state",
+          "value": "\"platform_runner_device_logins\".\"state\" in ('pending', 'approved', 'denied', 'collected')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.scan_runner_jobs": {
@@ -4778,6 +5007,13 @@
           "notNull": true,
           "default": "'github'"
         },
+        "host": {
+          "name": "host",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'github.com'"
+        },
         "canonical": {
           "name": "canonical",
           "type": "text",
@@ -4802,6 +5038,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "removed_at": {
+          "name": "removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -4811,27 +5053,6 @@
         }
       },
       "indexes": {
-        "uq_scan_repos_tenant_canonical": {
-          "name": "uq_scan_repos_tenant_canonical",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "canonical",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "uq_scan_repos_id_tenant": {
           "name": "uq_scan_repos_id_tenant",
           "columns": [
@@ -4870,9 +5091,29 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "uq_scan_repos_tenant_identity": {
+          "name": "uq_scan_repos_tenant_identity",
+          "nullsNotDistinct": true,
+          "columns": [
+            "tenant_id",
+            "provider",
+            "host",
+            "canonical"
+          ]
+        }
+      },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "scan_repos_provider": {
+          "name": "scan_repos_provider",
+          "value": "\"scan_repos\".\"provider\" in ('github', 'gitlab', 'gitlab-sh', 'upload')"
+        },
+        "scan_repos_host": {
+          "name": "scan_repos_host",
+          "value": "\"scan_repos\".\"host\" = lower(\"scan_repos\".\"host\")"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.scans": {
@@ -4984,12 +5225,6 @@
         "profile_met": {
           "name": "profile_met",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "trace_candidate_findings": {
-          "name": "trace_candidate_findings",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -5121,6 +5356,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "trace_candidate_findings": {
+          "name": "trace_candidate_findings",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -5436,6 +5677,262 @@
         "scan_finding_comments_body": {
           "name": "scan_finding_comments_body",
           "value": "\"scan_finding_comments\".\"deleted_at\" is not null or char_length(\"scan_finding_comments\".\"body\") between 1 and 4000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.scan_archive_links": {
+      "name": "scan_archive_links",
+      "schema": "",
+      "columns": {
+        "scan_id": {
+          "name": "scan_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "archive_id": {
+          "name": "archive_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_sha256": {
+          "name": "content_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_scan_archive_links_archive": {
+          "name": "idx_scan_archive_links_archive",
+          "columns": [
+            {
+              "expression": "archive_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scan_archive_links_scan_tenant_fk": {
+          "name": "scan_archive_links_scan_tenant_fk",
+          "tableFrom": "scan_archive_links",
+          "tableTo": "scans",
+          "columnsFrom": [
+            "scan_id",
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id",
+            "tenant_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scan_archive_links_archive_tenant_fk": {
+          "name": "scan_archive_links_archive_tenant_fk",
+          "tableFrom": "scan_archive_links",
+          "tableTo": "scan_upload_archives",
+          "columnsFrom": [
+            "archive_id",
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id",
+            "tenant_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scan_upload_archives": {
+      "name": "scan_upload_archives",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_id": {
+          "name": "repo_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "r2_key": {
+          "name": "r2_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_sha256": {
+          "name": "content_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_at": {
+          "name": "uploaded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_scan_upload_archives_id_tenant": {
+          "name": "uq_scan_upload_archives_id_tenant",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_scan_upload_archives_r2_key": {
+          "name": "uq_scan_upload_archives_r2_key",
+          "columns": [
+            {
+              "expression": "r2_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_scan_upload_archives_repo_uploaded_at": {
+          "name": "idx_scan_upload_archives_repo_uploaded_at",
+          "columns": [
+            {
+              "expression": "repo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "uploaded_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scan_upload_archives_tenant_id_tenants_id_fk": {
+          "name": "scan_upload_archives_tenant_id_tenants_id_fk",
+          "tableFrom": "scan_upload_archives",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scan_upload_archives_repo_tenant_fk": {
+          "name": "scan_upload_archives_repo_tenant_fk",
+          "tableFrom": "scan_upload_archives",
+          "tableTo": "scan_repos",
+          "columnsFrom": [
+            "repo_id",
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id",
+            "tenant_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "scan_upload_archives_label": {
+          "name": "scan_upload_archives_label",
+          "value": "length(\"scan_upload_archives\".\"label\") > 0"
+        },
+        "scan_upload_archives_sha": {
+          "name": "scan_upload_archives_sha",
+          "value": "\"scan_upload_archives\".\"content_sha256\" ~ '^[0-9a-f]{64}$'"
         }
       },
       "isRLSEnabled": false

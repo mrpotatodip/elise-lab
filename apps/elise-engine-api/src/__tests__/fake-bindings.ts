@@ -13,18 +13,34 @@ type WorkflowStatus = { status: string; error?: { name: string; message: string 
 
 export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: WorkflowStatus = { status: "running" }) {
   const store = new Map<string, string>();
+  const uploadedAt = new Map<string, Date>();
   const createdFull: Created[] = [];
 
   const reports = {
     put: async (key: string, value: string) => {
       store.set(key, value);
+      uploadedAt.set(key, new Date());
+    },
+    delete: async (keys: string | string[]) => {
+      for (const key of [keys].flat()) {
+        store.delete(key);
+        uploadedAt.delete(key);
+      }
     },
     get: async (key: string) => {
       const value = store.get(key);
       if (value === undefined) return null;
       return { body: value, json: async () => JSON.parse(value), text: async () => value };
     },
-    list: async (options: { prefix: string; limit?: number; cursor?: string }) => {
+    list: async (options: { prefix: string; limit?: number; cursor?: string; delimiter?: string }) => {
+      if (options.delimiter === undefined) {
+        const keys = [...store.keys()].filter((key) => key.startsWith(options.prefix)).toSorted();
+        const start = Number(options.cursor ?? 0);
+        const limit = options.limit ?? 1000;
+        const truncated = start + limit < keys.length;
+        const objects = keys.slice(start, start + limit).map((key) => ({ key, uploaded: uploadedAt.get(key) ?? new Date() }));
+        return { objects, delimitedPrefixes: [], truncated, cursor: truncated ? String(start + limit) : undefined };
+      }
       const prefixes = [
         ...new Set(
           [...store.keys()]
@@ -71,5 +87,5 @@ export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: 
     ...overrides,
   } as never;
 
-  return { env, store, createdFull };
+  return { env, store, uploadedAt, createdFull };
 }

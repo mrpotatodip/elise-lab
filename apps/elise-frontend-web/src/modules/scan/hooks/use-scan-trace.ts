@@ -17,15 +17,6 @@ const newestFirst = (a: TraceEntry, b: TraceEntry) => {
   return a.id < b.id ? 1 : -1;
 };
 
-// -----
-// Reads a Scan's Trace. Each read sends the cursor of the one before and
-// replaces an entry it already has by id, so an entry that grew updates in
-// place. A read can repeat entries it has, so only a new or grown entry
-// counts as a change (changedAt, this browser's time). offsetMs is the
-// server's clock minus this browser's, to age entries on the server's
-// clock. While the Scan runs it reads every 5 seconds; when the Scan ends
-// the page's refresh-on-finish reads it one last time.
-// -----
 export function useScanTrace(scanId: string, active: boolean) {
   const queryClient = useQueryClient();
   const key = [...scanKeys.detail(scanId), "trace"] as const;

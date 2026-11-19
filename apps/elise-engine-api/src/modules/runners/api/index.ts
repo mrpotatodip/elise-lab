@@ -1,5 +1,10 @@
 export { default as createRunnerAPI } from "./create-runner";
 export { default as enrollRunnerAPI } from "./enroll-runner";
+export { default as startRunnerLoginAPI } from "./start-runner-login";
+export { default as lookupRunnerLoginAPI } from "./lookup-runner-login";
+export { default as approveRunnerLoginAPI } from "./approve-runner-login";
+export { default as denyRunnerLoginAPI } from "./deny-runner-login";
+export { default as checkRunnerLoginAPI } from "./check-runner-login";
 export { default as runnerMeAPI } from "./runner-me";
 export { default as disconnectRunnerAPI } from "./disconnect-runner";
 export { default as listRunnersAPI } from "./list-runners";
@@ -7,3 +12,4 @@ export { default as removeRunnerAPI } from "./remove-runner";
 export { default as claimJobAPI } from "./claim-job";
 export { default as reportJobAPI } from "./report-job";
 export { default as saveTraceAPI } from "./save-trace";
+export { default as jobArchiveAPI } from "./job-archive";

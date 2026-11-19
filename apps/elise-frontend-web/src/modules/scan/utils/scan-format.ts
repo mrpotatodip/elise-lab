@@ -37,6 +37,16 @@ export const verdictScansToRun = (missingWeight: number) => Math.ceil(missingWei
 const FAILURE_CAUSES = [
   { test: /out of memory/i, title: "The agent ran out of memory while it read the repository.", advice: "Start a new scan with Claude Haiku 5.5 and low effort, or scan a smaller repository." },
   // -----
+  // A Runner Scan on the person's own Claude plan. The agent's own words are in
+  // the error ("You've hit your 5-hour limit · resets 5:40pm"), with the time the
+  // plan comes back, which the details show.
+  // -----
+  {
+    test: /hit your [\w-]+ limit|usage limit reached|you've reached your .*limit/i,
+    title: "Your Claude plan is out of usage.",
+    advice: "The details show when it resets. Start the scan again after that. Spend from the phases that already ran is not refunded.",
+  },
+  // -----
   // The clone's own words, as git prints them with no terminal: a repository
   // that does not exist and one that is private look the same to GitHub
   // ("Repository not found", or "could not read Username"), so the advice

@@ -120,13 +120,6 @@ export type TraceViewProps = {
   empty: ReactNode;
 };
 
-// -----
-// The Trace as a person reads it: what the agent is doing now, then a tree
-// with one branch point per Phase. The running Phase is open with its last
-// few actions; a finished Phase closes by itself and shows how often each
-// kind of action ran; a failed Scan marks the Phase it stopped in. It takes
-// plain props so a preview page can feed it made-up data.
-// -----
 export function TraceView({ entries, candidateFindings, now, active, failed, quiet, empty }: TraceViewProps) {
   const newest = entries.find(isTraceWork) ?? entries[0];
   if (!newest) return <div className="grid gap-2 text-sm text-muted-foreground">{empty}</div>;
@@ -210,10 +203,6 @@ function TraceEntries({ scan, active }: { scan: ScanStatus; active: boolean }) {
   );
 }
 
-// -----
-// The Card around the Trace. Open while the Scan runs; once it ended or
-// failed it sits closed under the report.
-// -----
 export function TraceShell({ active, children }: { active: boolean; children: ReactNode }) {
   if (active) {
     return (

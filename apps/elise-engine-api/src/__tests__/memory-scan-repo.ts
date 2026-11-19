@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { Conflict, DbError } from "#/lib/effect-query";
-import { activeWindowMsOf, canonicalRepo, displayRepoUrl } from "#/modules/scan-ledger/utils";
+import { activeWindowMsOf, displayRepoUrlOf, repoIdentityOf } from "#/modules/scan-ledger/utils";
 import type { ScanStatus } from "#/schemas";
 import type { NewScanFile, RepoRecord, ScanRepo } from "#/modules/scan-ledger";
 
@@ -36,11 +36,11 @@ export function memoryScanRepo() {
   };
 
   const repo: ScanRepo = {
-    ensureRepo: (accountId, url) =>
+    ensureRepo: (accountId, url, provider) =>
       Effect.sync(() => {
-        const canonical = canonicalRepo(url);
-        const key = `${accountId}/${canonical}`;
-        const found = repos.get(key) ?? { id: crypto.randomUUID(), canonical, url: displayRepoUrl(url) };
+        const identity = repoIdentityOf(url, provider);
+        const key = `${accountId}/${identity.provider}/${identity.host ?? ""}/${identity.canonical}`;
+        const found = repos.get(key) ?? { id: crypto.randomUUID(), canonical: identity.canonical, url: displayRepoUrlOf(url, provider) };
         repos.set(key, found);
         return found;
       }),

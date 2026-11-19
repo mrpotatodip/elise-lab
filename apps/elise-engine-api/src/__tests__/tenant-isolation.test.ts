@@ -30,6 +30,9 @@ let other: Seed;
 // - chat_bot_messages and chat_bot_thread_sessions belong to the chat
 //   runtime, which has anonymous Customers and no Scan data. The
 //   Worker does not use it yet (ADR 0001).
+// - platform_runner_device_logins is started and checked by a Runner
+//   that has no session and no Tenant, and its tenant_id stays null
+//   until a signed-in member approves the login.
 // -----
 const NO_POLICY = [
   "party_master_roles",
@@ -37,6 +40,7 @@ const NO_POLICY = [
   "platform_invite_code_redemptions",
   "chat_bot_messages",
   "chat_bot_thread_sessions",
+  "platform_runner_device_logins",
 ];
 
 const seed = async (slug: string, repoSlug: string): Promise<Seed> => {

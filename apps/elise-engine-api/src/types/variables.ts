@@ -2,7 +2,8 @@ import type { Context } from "hono";
 import type { Effect } from "effect";
 import type { AccessPower, RunnerIdentity } from "@repo/contracts/elise";
 import type { TenantDbType } from "#/lib/db-connection";
-import type { DbError } from "#/lib/effect-query";
+import type { DbError, Invalid } from "#/lib/effect-query";
+import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
 import type { GithubAccess } from "#/modules/github-installs";
 import type { ScanRepo } from "#/modules/scan-ledger";
@@ -40,6 +41,8 @@ export type Bindings = {
   TEAM_INVITE_LIMITER?: RateLimit;
   RUNNER_ENROLL_LIMITER?: RateLimit;
   RUNNER_ENROLL_TOTAL_LIMITER?: RateLimit;
+  RUNNER_LOGIN_START_LIMITER?: RateLimit;
+  RUNNER_LOGIN_START_TOTAL_LIMITER?: RateLimit;
   PASSWORD_RESET_LIMITER?: RateLimit;
   DASHBOARD_URL: string;
   INVITE_FROM: string;
@@ -59,7 +62,8 @@ export type AppDeps = {
   githubAccess: (env: Bindings, accountId: string) => GithubAccess;
   monthSpend: (db: TenantDbType, accountId: string) => Effect.Effect<MonthSpend, DbError>;
   holdCredit: (db: TenantDbType, accountId: string, scanId: string, holdUsd: number) => Effect.Effect<HoldResult, DbError>;
-  runnerConnected: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<boolean, DbError>;
+  connectedRunnerSources: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<string[] | null, DbError>;
+  linkArchive: (db: TenantDbType, accountId: string, link: ScanArchiveLink) => Effect.Effect<void, Invalid | DbError>;
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
   sessionUserId: (c: Context<AppEnv>) => Promise<string | undefined>;
   runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;

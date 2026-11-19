@@ -2,18 +2,22 @@ import { Effect } from "effect";
 import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
+import { RUNNER_ARCHIVE_UNSUPPORTED, RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
 import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
-import type { CreateScanEnv, QueuedScan, RunnerConnected, SubmitScanDeps } from "#/modules/scans/types";
+import type { CreateScanEnv, LinkArchive, QueuedScan, RunnerSources, SubmitScanDeps } from "#/modules/scans/types";
 import { budgetCapOf, budgetRefusalHintOf, limitPathOf, scanRefusalOf } from "#/modules/scans/utils";
 import { scanBlockOf } from "#/modules/billing";
 import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
 import type { TenantEffect } from "#/lib/tenant-effect";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
+import { SCANS_RUNNER_ONLY_MESSAGE } from "#/modules/scans/constants";
 import type { Bindings } from "#/types/variables";
+
+export const ARCHIVE_NOT_LINKED = "archive_id: this Scan cannot read a zip";
 
 // -----
 // Everything a new Scan writes: the checks, the Scan row and the
@@ -28,9 +32,13 @@ export const queueScanSvc = (
   spend: MonthSpend,
   access?: GithubAccess,
   hold?: HoldCredit,
-  runnerConnected?: RunnerConnected,
+  runnerSources?: RunnerSources,
+  linkArchive?: LinkArchive,
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
+    const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
+    if (!provider.capabilities.cloudScans && input.runner_id === undefined) return yield* new Invalid({ message: SCANS_RUNNER_ONLY_MESSAGE });
+
     // -----
     // The per-scan ceiling follows who pays. A scan on a Runner runs
     // on the person's own Claude and has a safety cap. A scan on the
@@ -101,11 +109,15 @@ export const queueScanSvc = (
     // A Scan on a Runner runs on the person's own Claude, so it takes
     // no credit, needs no key of the Account's, and does not count
     // against the plan's allowance or the monthly budget. The Runner
-    // must belong to the Account and be paired.
+    // must belong to the Account and be paired. An archive Scan also
+    // needs a Runner that said it reads archives: an older one would
+    // never be handed the job, so the person is told to update it.
     // -----
     const runnerId = input.runner_id;
-    if (runnerId !== undefined && !(runnerConnected ? yield* runnerConnected(runnerId) : false)) {
-      return yield* new Invalid({ message: RUNNER_JOB_NOT_CONNECTED });
+    if (runnerId !== undefined) {
+      const sources = runnerSources ? yield* runnerSources(runnerId) : null;
+      if (sources === null) return yield* new Invalid({ message: RUNNER_JOB_NOT_CONNECTED });
+      if (provider.capabilities.isArchive && !sources.includes("archive")) return yield* new Invalid({ message: RUNNER_ARCHIVE_UNSUPPORTED });
     }
     const onRunner = runnerId !== undefined;
 
@@ -156,14 +168,18 @@ export const queueScanSvc = (
       }
     }
 
-    const record = yield* repo.ensureRepo(accountId, input.repo);
+    const record = yield* repo.ensureRepo(accountId, input.repo, input.provider);
     // -----
     // One spelling per branch (refs/heads/x is x, HEAD is no ref).
     // Whether the ref is a branch, a tag or a commit is settled by
     // the clone, which tries it as a branch first.
     // -----
     const ref = input.ref === undefined ? undefined : (normalizeBranchName(input.ref) ?? undefined);
-    const github = access === undefined ? null : yield* access.forRepo(record.url);
+    // -----
+    // Only a github Repo can be covered by an Install of the
+    // GitHub App. Another provider's address never asks GitHub.
+    // -----
+    const github = access === undefined || provider.id !== DEFAULT_SOURCE_PROVIDER_ID ? null : yield* access.forRepo(record.url);
     if (onRunner && github) return yield* new Invalid({ message: RUNNER_JOB_PRIVATE });
     const params: ScanParams = {
       scanId: newScanId(),
@@ -177,6 +193,16 @@ export const queueScanSvc = (
       createdAt: new Date().toISOString(),
     };
     yield* repo.create(params, record.id, Date.now());
+    // -----
+    // An upload Scan must have its link: the schema made archive_id
+    // required for an archive provider, and here the zip must be
+    // one of this app's. A refusal rolls the Scan row back.
+    // -----
+    const { fixedBranch } = provider;
+    if (fixedBranch !== null || input.archive_id !== undefined) {
+      if (!linkArchive || fixedBranch === null || input.archive_id === undefined) return yield* new Invalid({ message: ARCHIVE_NOT_LINKED });
+      yield* linkArchive({ scanId: params.scanId, repoId: record.id, archiveId: input.archive_id, branch: fixedBranch });
+    }
     // -----
     // The check above read the balance; this takes it, under a lock.
     // A scan that lost the race to another is failed, not started.
@@ -230,10 +256,10 @@ export const createScanSvc = (
   spend: MonthSpend,
   access?: GithubAccess,
   hold?: HoldCredit,
-  runnerConnected?: RunnerConnected,
+  runnerSources?: RunnerSources,
   release?: ReleaseCredit,
 ): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
-  queueScanSvc(env, repo, accountId, input, spend, access, hold, runnerConnected).pipe(
+  queueScanSvc(env, repo, accountId, input, spend, access, hold, runnerSources).pipe(
     Effect.flatMap((queued) => startScanSvc(env, queued, (error) => abandonScanSvc(repo, queued, error, release))),
   );
 
@@ -262,7 +288,8 @@ export const submitScanSvc = (
           spend,
           deps.githubAccess(env, accountId),
           (scanId, holdUsd) => deps.holdCredit(db, accountId, scanId, holdUsd),
-          (runnerId) => deps.runnerConnected(db, accountId, runnerId),
+          (runnerId) => deps.connectedRunnerSources(db, accountId, runnerId),
+          (link) => deps.linkArchive(db, accountId, link),
         ),
       ),
     ),
