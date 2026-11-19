@@ -43,7 +43,7 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
       }}
     >
       <SheetContent
-        className="max-w-[56rem] [transition-property:transform,right] data-[nested-dialog-open]:right-[36rem]"
+        className="max-w-[48rem] [transition-property:transform,right] data-[nested-dialog-open]:right-[36rem]"
         aria-keyshortcuts="ArrowLeft ArrowRight"
         onKeyDown={(event) => {
           if (selected === undefined || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
