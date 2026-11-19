@@ -11,7 +11,8 @@
     "dev:stop": "node scripts/dev-stop.mjs",
     "engine:probe": "node scripts/engine-probe.mjs",
     "scan:run": "node scripts/scan-run.mjs",
-    "check:apps": "node scripts/check-changed.mjs --all"
+    "check:apps": "node scripts/check-changed.mjs --all",
+    "worktrees:prune": "node scripts/worktrees-prune.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",
