@@ -1,0 +1,4 @@
+# The code was written with long lines and one-line structs and calls; the defaults (100 columns)
+# would rewrite 349 spots, these settings 85.
+max_width = 140
+use_small_heuristics = "Max"

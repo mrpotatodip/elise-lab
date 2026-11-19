@@ -42,7 +42,12 @@ impl Settings {
         };
         match serde_json::from_str::<SettingsFile>(&text) {
             Ok(read) => Settings {
-                gitlab_hosts: read.gitlab_hosts.iter().map(|host| host.trim().to_ascii_lowercase()).filter(|host| !host.is_empty()).collect(),
+                gitlab_hosts: read
+                    .gitlab_hosts
+                    .iter()
+                    .map(|host| host.trim().to_ascii_lowercase())
+                    .filter(|host| !host.is_empty())
+                    .collect(),
                 ..settings
             },
             Err(error) => Settings { problem: Some(format!("it is not valid: {error}")), ..settings },
@@ -144,14 +149,50 @@ mod tests {
     fn an_address_resolves_to_its_provider_and_repository() {
         let settings = with_hosts(&["git.acme.dev"]);
         for (pasted, provider, host, path, clone_url) in [
-            ("https://github.com/octocat/Hello-World", "github", "github.com", "octocat/Hello-World", "https://github.com/octocat/Hello-World"),
-            ("https://github.com/octocat/Hello-World.git", "github", "github.com", "octocat/Hello-World", "https://github.com/octocat/Hello-World.git"),
+            (
+                "https://github.com/octocat/Hello-World",
+                "github",
+                "github.com",
+                "octocat/Hello-World",
+                "https://github.com/octocat/Hello-World",
+            ),
+            (
+                "https://github.com/octocat/Hello-World.git",
+                "github",
+                "github.com",
+                "octocat/Hello-World",
+                "https://github.com/octocat/Hello-World.git",
+            ),
             ("https://gitlab.com/acme/app", "gitlab", "gitlab.com", "acme/app", "https://gitlab.com/acme/app.git"),
-            ("https://gitlab.com/acme/platform/team/app.git", "gitlab", "gitlab.com", "acme/platform/team/app", "https://gitlab.com/acme/platform/team/app.git"),
-            ("https://gitlab.com/acme/platform/app/-/tree/main?ref_type=heads", "gitlab", "gitlab.com", "acme/platform/app", "https://gitlab.com/acme/platform/app.git"),
+            (
+                "https://gitlab.com/acme/platform/team/app.git",
+                "gitlab",
+                "gitlab.com",
+                "acme/platform/team/app",
+                "https://gitlab.com/acme/platform/team/app.git",
+            ),
+            (
+                "https://gitlab.com/acme/platform/app/-/tree/main?ref_type=heads",
+                "gitlab",
+                "gitlab.com",
+                "acme/platform/app",
+                "https://gitlab.com/acme/platform/app.git",
+            ),
             ("https://gitlab.com/acme/app/", "gitlab", "gitlab.com", "acme/app", "https://gitlab.com/acme/app.git"),
-            ("https://git.acme.dev/infra/tools/deployer", "gitlab-sh", "git.acme.dev", "infra/tools/deployer", "https://git.acme.dev/infra/tools/deployer.git"),
-            ("https://Git.Acme.Dev/infra/app/-/blob/main/README.md", "gitlab-sh", "git.acme.dev", "infra/app", "https://git.acme.dev/infra/app.git"),
+            (
+                "https://git.acme.dev/infra/tools/deployer",
+                "gitlab-sh",
+                "git.acme.dev",
+                "infra/tools/deployer",
+                "https://git.acme.dev/infra/tools/deployer.git",
+            ),
+            (
+                "https://Git.Acme.Dev/infra/app/-/blob/main/README.md",
+                "gitlab-sh",
+                "git.acme.dev",
+                "infra/app",
+                "https://git.acme.dev/infra/app.git",
+            ),
         ] {
             let address = clone_address(pasted, &settings).unwrap_or_else(|error| panic!("{pasted}: {error}"));
             assert_eq!(
@@ -192,7 +233,8 @@ mod tests {
     // refusal says which file to edit.
     #[test]
     fn a_gitlab_server_host_only_the_job_names_is_refused() {
-        let settings = Settings { file: Some(PathBuf::from("/home/me/.config/elise-runner/settings.json")), ..with_hosts(&["git.acme.dev"]) };
+        let settings =
+            Settings { file: Some(PathBuf::from("/home/me/.config/elise-runner/settings.json")), ..with_hosts(&["git.acme.dev"]) };
 
         let error = clone_address("https://git.evil.example/acme/app", &settings).unwrap_err();
 
@@ -229,7 +271,10 @@ mod tests {
             let path = entry.unwrap().path();
             let own = path.file_stem().unwrap().to_string_lossy().to_string();
             if !PROVIDER_MODULES.contains(&own.as_str()) {
-                assert!(["mod", "address"].contains(&own.as_str()), "{own}.rs is neither a provider nor shared: add it to PROVIDER_MODULES");
+                assert!(
+                    ["mod", "address"].contains(&own.as_str()),
+                    "{own}.rs is neither a provider nor shared: add it to PROVIDER_MODULES"
+                );
                 continue;
             }
             let source = std::fs::read_to_string(&path).unwrap();

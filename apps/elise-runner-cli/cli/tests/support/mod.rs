@@ -99,7 +99,11 @@ impl Engine {
     // The bodies of the claims the Runner sent, as JSON (null for an empty body).
     pub fn claims(&self) -> Vec<serde_json::Value> {
         let state = self.state.lock().unwrap();
-        state.claims.iter().map(|body| if body.is_empty() { serde_json::Value::Null } else { serde_json::from_str(body).expect("a claim is JSON") }).collect()
+        state
+            .claims
+            .iter()
+            .map(|body| if body.is_empty() { serde_json::Value::Null } else { serde_json::from_str(body).expect("a claim is JSON") })
+            .collect()
     }
 
     pub fn archive_downloads(&self) -> Vec<String> {
@@ -207,7 +211,7 @@ pub fn zip_of(files: &[(&str, &str)]) -> Vec<u8> {
     writer.finish().unwrap().into_inner()
 }
 
-pub const REPO_URL: &str ="https://github.com/acme/widgets";
+pub const REPO_URL: &str = "https://github.com/acme/widgets";
 pub const REPO: &str = "acme/widgets";
 
 fn token_number(n: usize) -> String {
@@ -258,7 +262,11 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
         hold_while_claims_are_held(state);
     }
     if let Some(zip) = archive_of(&request, &mut state.lock().unwrap()) {
-        let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/zip\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", zip.len());
+        let _ = write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: application/zip\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            zip.len()
+        );
         let _ = stream.write_all(&zip);
         return;
     }
@@ -292,7 +300,7 @@ fn archive_of(request: &Request, state: &mut State) -> Option<Vec<u8>> {
 
 pub const ARCHIVE_REMOVED: &str = "The zip this Scan reads was removed before the Runner could download it, so the Scan did not run.";
 
-const REJECTED: (u16, &str) =(401, r#"{"data":null,"error":{"code":"unauthorized"}}"#);
+const REJECTED: (u16, &str) = (401, r#"{"data":null,"error":{"code":"unauthorized"}}"#);
 
 fn answer(request: &Request, state: &mut State) -> (u16, String) {
     let live = request.bearer.as_ref().is_some_and(|token| state.live.contains(token));
@@ -339,18 +347,13 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             state.issued += 1;
             let token = token_number(state.issued);
             state.live.insert(token.clone());
-            let body = format!(
-                r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}","token":"{token}"}},"error":null}}"#
-            );
+            let body = format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}","token":"{token}"}},"error":null}}"#);
             (200, body)
         }
-        ("GET", "/runners/me") if live => (
-            200,
-            format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#),
-        ),
-        ("DELETE", "/runners/me") if state.revokes_fail => {
-            (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string())
+        ("GET", "/runners/me") if live => {
+            (200, format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#))
         }
+        ("DELETE", "/runners/me") if state.revokes_fail => (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string()),
         ("DELETE", "/runners/me") if live => {
             let token = request.bearer.clone().unwrap();
             state.live.remove(&token);
@@ -378,11 +381,7 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
 
 pub fn temp_home() -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let dir = std::env::temp_dir().join(format!(
-        "elise-runner-test-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::SeqCst)
-    ));
+    let dir = std::env::temp_dir().join(format!("elise-runner-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir

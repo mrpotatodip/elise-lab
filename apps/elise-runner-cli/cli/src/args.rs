@@ -87,11 +87,9 @@ pub fn parse(args: &[String]) -> Parsed {
     }
     let has = |name: &str| flags.iter().any(|flag| flag.as_str() == name);
     match (command.as_str(), positional.as_slice()) {
-        ("pair", [code]) => Parsed::Command(Command::Pair {
-            code: code.to_string(),
-            yes: has("--yes") || has("-y"),
-            print_token: has("--print-token"),
-        }),
+        ("pair", [code]) => {
+            Parsed::Command(Command::Pair { code: code.to_string(), yes: has("--yes") || has("-y"), print_token: has("--print-token") })
+        }
         ("pair", []) => Parsed::Usage("`pair` needs the pairing code from Elise".to_string()),
         ("login", []) => Parsed::Command(Command::Login { no_browser: has("--no-browser") }),
         ("status", []) => Parsed::Command(Command::Status),

@@ -217,10 +217,7 @@ pub async fn unpair(store: &Store) -> Exit {
             Exit::Ok
         }
         Err(_) => {
-            eprintln!(
-                "Could not reach Elise. The token is kept in {}, so you can run `elise-runner unpair` again.",
-                store.describe()
-            );
+            eprintln!("Could not reach Elise. The token is kept in {}, so you can run `elise-runner unpair` again.", store.describe());
             Exit::Offline
         }
     }

@@ -24,14 +24,19 @@ pub(super) fn split(url: &str) -> Result<(String, &str), String> {
         .ok_or_else(|| "This Runner clones only https:// addresses. Use the repository's https address.".to_string())?;
     let (host, rest) = rest.split_once('/').unwrap_or((rest, ""));
     if !plain_host(host) {
-        return Err(format!("\"{host}\" is not a host this Runner will clone from: use the plain host name, with no user, password or port."));
+        return Err(format!(
+            "\"{host}\" is not a host this Runner will clone from: use the plain host name, with no user, password or port."
+        ));
     }
     Ok((host.to_ascii_lowercase(), rest))
 }
 
 fn plain_host(host: &str) -> bool {
     let label_ok = |label: &str| {
-        (1..=63).contains(&label.len()) && !label.starts_with('-') && !label.ends_with('-') && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        (1..=63).contains(&label.len())
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
     };
     host.len() <= HOST_MAX && host.contains('.') && host.split('.').all(label_ok)
 }
@@ -47,7 +52,8 @@ pub(super) fn repo_path(rest: &str) -> Option<String> {
     let rest = rest.strip_suffix(".git").unwrap_or(rest);
     let parts: Vec<&str> = rest.split('/').collect();
     let part_ok = |part: &&str| {
-        part.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_') && part.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+        part.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_')
+            && part.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
     };
     ((2..=PATH_PARTS_MAX).contains(&parts.len()) && parts.iter().all(part_ok)).then(|| parts.join("/"))
 }

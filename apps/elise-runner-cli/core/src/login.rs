@@ -59,11 +59,17 @@ struct CheckBody<'a> {
 #[serde(tag = "status", rename_all = "lowercase", rename_all_fields = "camelCase")]
 enum Check {
     Pending,
-    Approved { name: String, account_name: String, token: String },
+    Approved {
+        name: String,
+        account_name: String,
+        token: String,
+    },
     Denied,
     Expired,
     #[serde(rename = "slow_down")]
-    SlowDown { interval: u64 },
+    SlowDown {
+        interval: u64,
+    },
 }
 
 enum Checked {
@@ -87,22 +93,14 @@ fn suggested_name() -> String {
 
 pub async fn start(version: &str) -> Result<StartedLogin, LoginError> {
     let body = StartBody { name: suggested_name(), os: std::env::consts::OS, cpu: std::env::consts::ARCH, version };
-    let response = client()
-        .post(format!("{}/runners/login/start", engine_url()))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|_| LoginError::Unreachable)?;
+    let response =
+        client().post(format!("{}/runners/login/start", engine_url())).json(&body).send().await.map_err(|_| LoginError::Unreachable)?;
     match response.status() {
         StatusCode::OK => {}
         StatusCode::NOT_FOUND => return Err(LoginError::Unsupported),
         _ => return Err(LoginError::Unreachable),
     }
-    let started = response
-        .json::<Envelope<StartedAnswer>>()
-        .await
-        .map_err(|_| LoginError::Unreachable)?
-        .data;
+    let started = response.json::<Envelope<StartedAnswer>>().await.map_err(|_| LoginError::Unreachable)?.data;
     let lifetime = started
         .expires_at
         .as_deref()
@@ -118,11 +116,8 @@ pub async fn start(version: &str) -> Result<StartedLogin, LoginError> {
 }
 
 async fn check(login: &StartedLogin) -> Checked {
-    let answer = client()
-        .post(format!("{}/runners/login/check", engine_url()))
-        .json(&CheckBody { device_code: &login.device_code })
-        .send()
-        .await;
+    let answer =
+        client().post(format!("{}/runners/login/check", engine_url())).json(&CheckBody { device_code: &login.device_code }).send().await;
     let Ok(response) = answer else {
         return Checked::Pending;
     };
@@ -173,10 +168,7 @@ fn unix_seconds(text: &str) -> Option<i64> {
 }
 
 fn now_unix_seconds() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs() as i64)
-        .unwrap_or(0)
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|elapsed| elapsed.as_secs() as i64).unwrap_or(0)
 }
 
 // -----
