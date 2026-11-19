@@ -142,7 +142,7 @@ export function ScanDetail({ scanId }: { scanId: string }) {
         badges={<GithubPrivateBadge isPrivate={scan.isPrivate} />}
         below={<ScanHeaderMeta scan={scan} />}
       >
-        {canStopScan(scan) && <ScanStopButton scanId={scan.scanId} size="default" />}
+        {canStopScan(scan) && <ScanStopButton scanId={scan.scanId} onRunner={Boolean(scan.runner)} size="default" />}
         {scan.archive ? (
           <ScanNewDialog label="Scan a zip again" size="default" variant="outline" repo={scan.repo} provider="upload" repoId={scan.repoId} />
         ) : (

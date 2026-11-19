@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, inArray, ne, notExists, sql } from "drizzle-orm";
 import { Effect } from "effect";
+import type { ScanUsage } from "@repo/contracts/elise";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
@@ -313,6 +314,24 @@ export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string,
       catch: toDbError,
     });
   });
+
+export const stoppedUsageEffect = (db: AppDbType, accountId: string, scanId: string, usage: ScanUsage): Effect.Effect<void, DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .update(scans)
+        .set({
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          cacheReadTokens: usage.cacheReadTokens,
+          cacheWriteTokens: usage.cacheWriteTokens,
+          costUsd: usage.costUsd.toFixed(4),
+          turns: usage.turns,
+          durationMs: usage.durationMs,
+        })
+        .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), eq(scans.status, "stopped"))),
+    catch: toDbError,
+  }).pipe(Effect.asVoid);
 
 // -----
 // How many live scans each path holds, over every Account. It is
