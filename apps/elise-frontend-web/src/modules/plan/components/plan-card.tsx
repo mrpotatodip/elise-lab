@@ -1,48 +1,68 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { LayoutDashboard, Laptop, Users } from "lucide-react";
+import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
-import { creditScansLabel } from "#/modules/credit";
+import { useNow } from "#/lib/use-now";
+import { cn } from "#/lib/utils";
+import { runnerShownState, runnersQuery } from "#/modules/runner";
+import { ShellPageHeader, ShellStatCell as Cell } from "#/modules/shell";
 import { usageUsd } from "#/modules/usage";
 import { planOffersQuery, planQuery } from "../hooks";
-import { PLAN_STATUS_VIEW, planDateLabel, planKeyLabel, planSeatsLabel, planSourceLabel } from "../utils";
+import { PLAN_STATUS_VIEW, planDateLabel, planSourceLabel } from "../utils";
+
+const PER_MONTH = <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>;
+
+const ALERT_VARIANT = { success: "success", warning: "warning", destructive: "destructive", neutral: "info" } as const;
 
 function PlanOfferCard() {
   const { data: offers } = useSuspenseQuery(planOffersQuery());
   const offer = offers[0];
 
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>Plan</CardTitle>
-        <p className="text-sm leading-relaxed text-muted-foreground">This account has no plan yet.</p>
-      </CardHeader>
-      {offer !== undefined && (
-        <CardContent className="grid gap-5">
-          <p className="text-sm font-medium">{offer.label}</p>
-          <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
-            {usageUsd(offer.monthlyPriceUsd)}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>
-          </p>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place. To subscribe, contact us.
-          </p>
-        </CardContent>
-      )}
-    </Card>
+    <>
+      <ShellPageHeader title="Plan" description="What this account pays for." />
+      <Card className="max-w-3xl">
+        <CardHeader>
+          <CardTitle>No plan yet</CardTitle>
+        </CardHeader>
+        {offer !== undefined && (
+          <CardContent className="grid gap-5">
+            <p className="text-sm font-medium">{offer.label}</p>
+            <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
+              {usageUsd(offer.monthlyPriceUsd)}
+              {PER_MONTH}
+            </p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place. To subscribe, contact us.
+            </p>
+          </CardContent>
+        )}
+      </Card>
+    </>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+type FeatureProps = { icon: ReactNode; title: string; children: ReactNode };
+
+function Feature({ icon, title, children }: FeatureProps) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium tabular-nums">{value}</dd>
-    </div>
+    <li className="grid content-start gap-3 p-6">
+      <span aria-hidden="true" className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
+        {icon}
+      </span>
+      <h3 className="text-[15px] font-semibold leading-snug">{title}</h3>
+      <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{children}</p>
+    </li>
   );
 }
 
 export function PlanCard() {
   const { data } = useSuspenseQuery(planQuery());
+  const { data: runners } = useQuery(runnersQuery());
+  const now = useNow();
   const { plan } = data;
 
   if (plan === null || data.status === null || data.source === null) {
@@ -50,30 +70,96 @@ export function PlanCard() {
   }
 
   const status = PLAN_STATUS_VIEW[data.status];
+  const paired = (runners ?? []).filter((runner) => runner.state === "connected");
+  const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
+  const people = data.seats.members + data.seats.pendingInvites;
 
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle>{plan.label}</CardTitle>
-          <Badge variant={status.variant}>{status.label}</Badge>
-        </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">{status.note ?? "To change your plan, contact us."}</p>
-      </CardHeader>
-      <CardContent className="grid gap-5">
-        <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
-          {usageUsd(plan.monthlyPriceUsd)}
-          <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>
-        </p>
-        <dl className="grid gap-3 border-t pt-5 text-sm">
-          <Row label="Billing" value={planSourceLabel(data.source)} />
-          {data.currentPeriodEnd !== null && <Row label="Renews" value={planDateLabel(data.currentPeriodEnd)} />}
-          <Row label="Scans use" value={planKeyLabel("account")} />
-          <Row label="Scans this month" value={creditScansLabel(data.scans, plan.scanAllowance)} />
-          <Row label="People" value={planSeatsLabel(data.seats, plan.maxMembers)} />
-        </dl>
-        {status.note !== null && <p className="border-t pt-5 text-sm text-muted-foreground">To change your plan, contact us.</p>}
-      </CardContent>
-    </Card>
+    <>
+      <ShellPageHeader
+        title="Plan"
+        description="What this account pays for."
+        badges={<Badge variant={status.variant}>{status.label}</Badge>}
+        below={
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-relaxed text-muted-foreground">
+            <span>{plan.label} plan</span>
+            <span aria-hidden="true">·</span>
+            <span>{planSourceLabel(data.source)}</span>
+            {data.currentPeriodEnd !== null && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>Renews {planDateLabel(data.currentPeriodEnd)}</span>
+              </>
+            )}
+          </p>
+        }
+      />
+
+      {status.note !== null && (
+        <Alert variant={ALERT_VARIANT[status.variant]}>
+          <AlertDescription>{status.note}</AlertDescription>
+        </Alert>
+      )}
+
+      <section aria-label="Plan summary">
+        <Card className="grid divide-y overflow-hidden lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+          <Cell
+            lead
+            label={`${plan.label} plan`}
+            value={
+              <>
+                {usageUsd(plan.monthlyPriceUsd)}
+                {PER_MONTH}
+              </>
+            }
+            note="Flat. Elise charges nothing per scan."
+          />
+          <Cell
+            label="People"
+            value={
+              <>
+                {people}
+                <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {plan.maxMembers}</span>
+              </>
+            }
+            note={data.seats.pendingInvites > 0 ? `Includes ${data.seats.pendingInvites} waiting ${data.seats.pendingInvites === 1 ? "invite" : "invites"}.` : "Everyone on this account."}
+          />
+          <Cell
+            label="Runners running"
+            value={
+              <>
+                {running}
+                <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {paired.length}</span>
+              </>
+            }
+            note={
+              <Link to="/settings/providers" className="font-medium text-primary-ink underline underline-offset-4">
+                {paired.length === 0 ? "Add a Runner" : "Manage Runners"}
+              </Link>
+            }
+          />
+        </Card>
+      </section>
+
+      <Card>
+        <CardHeader className="gap-1.5">
+          <CardTitle>What the plan covers</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">To change your plan, contact us.</p>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ul className={cn("grid divide-y border-t md:grid-cols-3 md:divide-x md:divide-y-0")}>
+            <Feature icon={<Laptop className="size-4" />} title="Scans on your own Claude">
+              Each scan runs on a computer you pair, with that computer&apos;s Claude and git login.
+            </Feature>
+            <Feature icon={<Users className="size-4" />} title={`Up to ${plan.maxMembers} people`}>
+              One account for the team, with shared reports, findings and decisions.
+            </Feature>
+            <Feature icon={<LayoutDashboard className="size-4" />} title="Every result in one place">
+              Runners, scans, files, findings and the Verdict across all your repositories and branches.
+            </Feature>
+          </ul>
+        </CardContent>
+      </Card>
+    </>
   );
 }
