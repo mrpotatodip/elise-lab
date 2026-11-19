@@ -16,7 +16,16 @@ export const saveTraceSvc = (db: AppDbType, runner: RunnerIdentity, scanId: stri
   Effect.gen(function* () {
     const holder = yield* findJobRunnerEffect(db, runner.accountId, scanId);
     if (holder !== runner.runnerId) return yield* Effect.fail(new NotFound({ message: SCAN_TRACE_JOB_NOT_FOUND }));
+    return yield* keepTraceBatchSvc(db, runner.accountId, scanId, body);
+  });
 
+// -----
+// The batch itself, for a caller that already knows the Scan is its
+// own: a Runner's route (after the holder check above) and the cloud
+// Workflow, which runs the Scan.
+// -----
+export const keepTraceBatchSvc = (db: AppDbType, tenantId: string, scanId: string, body: SaveTraceBody): Effect.Effect<TraceSaved, DbError> =>
+  Effect.gen(function* () {
     const entries = [...new Map(body.entries.map((entry) => [entry.id, entry])).values()];
     const known = yield* knownTraceIdsEffect(
       db,
@@ -28,7 +37,7 @@ export const saveTraceSvc = (db: AppDbType, runner: RunnerIdentity, scanId: stri
     const fresh = entries.filter((entry) => !known.has(entry.id)).slice(0, room);
     const kept = [...entries.filter((entry) => known.has(entry.id)), ...fresh];
 
-    yield* upsertTraceEntriesEffect(db, runner.accountId, scanId, kept);
-    if (body.candidateFindings !== undefined) yield* setCandidateFindingsEffect(db, runner.accountId, scanId, body.candidateFindings);
+    yield* upsertTraceEntriesEffect(db, tenantId, scanId, kept);
+    if (body.candidateFindings !== undefined) yield* setCandidateFindingsEffect(db, tenantId, scanId, body.candidateFindings);
     return { accepted: kept.length, dropped: body.entries.length - kept.length };
   });

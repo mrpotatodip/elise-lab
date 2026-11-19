@@ -90,6 +90,12 @@ export const SCAN_SANDBOX_FULL_PHASES = ["recon", "hunt", "check", "report"] as 
 export const SCAN_SANDBOX_PHASES_KEY = "phases";
 
 // -----
+// The key that holds the running Phase's Trace: how far its log was
+// read, the entry that can still grow, and the markers not yet sent.
+// -----
+export const SCAN_SANDBOX_TRACE_KEY = "trace";
+
+// -----
 // Which of the skill's six phases each Phase runs. The skill's own
 // numbering is its workflow; a Phase here is one run of the agent.
 // -----

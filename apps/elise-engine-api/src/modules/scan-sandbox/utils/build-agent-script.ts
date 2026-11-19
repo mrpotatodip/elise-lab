@@ -14,7 +14,7 @@ const dropRepoClaudeConfig = ["/.claude", "/CLAUDE.md", "/CLAUDE.local.md", "/.m
 // -----
 export function buildAgentScript(options: ScanOptions, files: AgentFiles = DEFAULT_AGENT_FILES, maxBudgetUsd: number = options.maxBudgetUsd): string {
   const agent = [
-    "claude --print --output-format json --dangerously-skip-permissions --no-session-persistence --setting-sources user",
+    "claude --print --output-format stream-json --verbose --dangerously-skip-permissions --no-session-persistence --setting-sources user",
     `--model ${options.model} --effort ${options.effort} --max-budget-usd ${maxBudgetUsd}`,
     `"$(cat ${files.prompt})"`,
   ].join(" ");

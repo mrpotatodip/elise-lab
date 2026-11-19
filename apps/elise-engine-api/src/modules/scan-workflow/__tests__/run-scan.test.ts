@@ -95,10 +95,13 @@ const setup = (options: SetupOptions = {}) => {
       calls.push(`record:${status}:${ledger.rows.get("scan-1")?.status}`);
       if (options.recordFails === status) throw new Error("database down");
     },
+    saveTrace: async () => ({ accepted: 0, dropped: 0 }),
     settleCredit: async (_params: ScanParams, status: "succeeded" | "failed") => void settles.push(status),
   };
   return { names, calls, ledger, bindings, prepares, githubs, anthropicKeys, settles, deps };
 };
+
+const failingSaveTrace = async () => Promise.reject(new Error("database down"));
 
 const queue = async (ledger: ReturnType<typeof memoryScanRepo>, input: ScanParams) => {
   await Effect.runPromise(ledger.repo.create(input, REPO_ID, 0));
@@ -155,6 +158,42 @@ describe("runScan, a full scan in phases", () => {
 
     await expect(runScan(deps, full(), fakeStep(names))).rejects.toThrow("the recon phase timed out after 10 minutes");
     expect(names.filter((name) => name.startsWith("poll-recon-"))).toHaveLength(60);
+  });
+
+  it("never fails the scan when its trace cannot be read or written", async () => {
+    const { names, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES });
+    await queue(ledger, full());
+    const entry = { id: "0190f1a2-b3c4-7d5e-8f60-000000000001", label: "searching", phase: "recon", startedAt: "2026-11-19T09:00:00.000Z", endedAt: "2026-11-19T09:00:00.000Z", count: 1 } as const;
+    const sandbox: SandboxPort = {
+      ...deps.sandbox,
+      drainTrace: async (ended) => {
+        if (ended) throw new Error("container gone");
+        return [entry];
+      },
+    };
+
+    await runScan({ ...deps, sandbox, saveTrace: failingSaveTrace }, full(), fakeStep(names));
+
+    expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded" });
+  });
+
+  it("sends the entries a phase's log gave, and an end marker once the phase is over", async () => {
+    const { names, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES });
+    await queue(ledger, full());
+    const calls: boolean[] = [];
+    const saved: number[] = [];
+    const sandbox: SandboxPort = {
+      ...deps.sandbox,
+      drainTrace: async (ended) => {
+        calls.push(ended);
+        return [{ id: "0190f1a2-b3c4-7d5e-8f60-000000000001", label: "searching", phase: "recon", startedAt: "2026-11-19T09:00:00.000Z", endedAt: "2026-11-19T09:00:00.000Z", count: 1 }];
+      },
+    };
+
+    await runScan({ ...deps, sandbox, saveTrace: async (_params, body) => (saved.push(body.entries.length), { accepted: body.entries.length, dropped: 0 }) }, full(), fakeStep(names));
+
+    expect(calls.filter(Boolean)).toHaveLength(4);
+    expect(saved.length).toBeGreaterThanOrEqual(4);
   });
 
   it("runs a lite scan as one run, whatever phases a Workflow has", async () => {

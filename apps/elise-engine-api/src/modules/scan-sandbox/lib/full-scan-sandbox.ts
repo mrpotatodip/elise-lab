@@ -1,6 +1,6 @@
 import { Files } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
-import type { ScanUsage } from "@repo/contracts/elise";
+import type { ScanUsage, TraceEntry } from "@repo/contracts/elise";
 import { SCAN_REPORT_FILES } from "#/constants";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions } from "#/schemas";
@@ -22,9 +22,11 @@ import {
   SCAN_SANDBOX_PHASES_KEY,
   SCAN_SANDBOX_PROMPT_PATH,
   SCAN_SANDBOX_REPO_DIR,
+  SCAN_SANDBOX_TRACE_KEY,
   SCAN_SANDBOX_TRUST_ENV,
   SCAN_SANDBOX_WORK_DIR,
 } from "#/modules/scan-sandbox/constants";
+import { drainTrace as drainLog, emptyTraceState, phaseMarker, type TraceState } from "#/modules/scan-trace/utils";
 import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, OutboundGithub, ScanCheckout } from "#/modules/scan-sandbox/types";
 import {
   buildAgentPrompt,
@@ -44,6 +46,8 @@ import {
 } from "#/modules/scan-sandbox/utils";
 
 type SandboxContext = DurableObjectState & { exports: { Outbound: OutboundExport } };
+
+type StoredTrace = TraceState & { phase: FullPhase; pending: TraceEntry[]; ended: boolean };
 
 // -----
 // The Sandbox of a Scan: one Durable Object and the container it starts
@@ -152,7 +156,10 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async launchPhase(options: ScanOptions, phase: FullPhase): Promise<void> {
     const meter = await this.#openMeter(options.maxBudgetUsd);
     const started = await this.#startedPhases();
-    if (!started.includes(phase)) await this.ctx.storage.put<FullPhase[]>(SCAN_SANDBOX_PHASES_KEY, [...started, phase]);
+    if (!started.includes(phase)) {
+      await this.ctx.storage.put<FullPhase[]>(SCAN_SANDBOX_PHASES_KEY, [...started, phase]);
+      await this.ctx.storage.put<StoredTrace>(SCAN_SANDBOX_TRACE_KEY, { ...emptyTraceState(), phase, pending: [phaseMarker("phase_started", phase, new Date())], ended: false });
+    }
     const remaining = remainingUsd(meter);
     console.log(`scan: phase ${phase} starts, $${remaining.toFixed(4)} of the $${options.maxBudgetUsd} cap left`);
     // -----
@@ -187,6 +194,26 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     if (!exitCode) return { state: "running" };
     if (exitCode === "0") return { state: "succeeded" };
     return { state: "failed", error: `claude exited ${exitCode}: ${await this.agentLogTail()}` };
+  }
+
+  // -----
+  // The Trace entries of the running Phase: its start marker, then the
+  // entries its log gave since the last call (read from the saved byte
+  // offset, so a retry never repeats a line), then its end marker once
+  // `ended`. The state is saved before the entries are handed back, so
+  // a failed write on the Workflow's side drops entries and never
+  // repeats them. An entry that grew comes back whole under its own id.
+  // -----
+  async drainTrace(ended: boolean): Promise<TraceEntry[]> {
+    const stored = await this.ctx.storage.get<StoredTrace>(SCAN_SANDBOX_TRACE_KEY);
+    if (stored === undefined) return [];
+    const now = new Date();
+    const chunk = stored.ended ? "" : await this.#logFrom(phaseAgentFiles(stored.phase).log, stored.offset);
+    const drained = drainLog({ offset: stored.offset, open: stored.open }, chunk, stored.phase, now);
+    const entries = [...stored.pending, ...drained.entries];
+    if (ended && !stored.ended) entries.push(phaseMarker("phase_ended", stored.phase, now));
+    await this.ctx.storage.put<StoredTrace>(SCAN_SANDBOX_TRACE_KEY, { ...drained.state, phase: stored.phase, pending: [], ended: stored.ended || ended });
+    return entries;
   }
 
   async agentLogTail(): Promise<string> {
@@ -265,6 +292,19 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async #currentFiles(): Promise<AgentFiles> {
     const last = (await this.#startedPhases()).at(-1);
     return last === undefined ? DEFAULT_AGENT_FILES : phaseAgentFiles(last);
+  }
+
+  // -----
+  // A log from a byte offset on, empty when the file is not there yet.
+  // -----
+  async #logFrom(path: string, offset: number): Promise<string> {
+    try {
+      const process = await this.#container.exec(["tail", "-c", `+${offset + 1}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });
+      const output = await process.output();
+      return output.exitCode === 0 ? new TextDecoder().decode(output.stdout) : "";
+    } catch {
+      return "";
+    }
   }
 
   async #readText(path: string): Promise<string | null> {
