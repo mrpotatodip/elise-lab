@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "#/components/ui/collapsible";
 import { cn } from "#/lib/utils";
 import { TRACE_LABEL_COPY } from "../../constants";
@@ -11,15 +11,7 @@ const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
 function Count({ value }: { value: number }) {
   return (
-    <motion.span
-      key={value}
-      initial={{ opacity: 0.3 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25, ease: EASE_OUT }}
-      className="font-normal tabular-nums text-muted-foreground/70"
-    >
-      ×{value}
-    </motion.span>
+    <span className="font-normal tabular-nums text-muted-foreground/70">×{value}</span>
   );
 }
 
@@ -30,13 +22,8 @@ function Time({ children }: { children: ReactNode }) {
 function Branch({ last, children }: { last: boolean; children: ReactNode }) {
   const reduce = useReducedMotion();
   return (
-    <motion.li layout={reduce ? false : "position"} transition={{ duration: 0.2, ease: EASE_OUT }} exit={{ opacity: 0, transition: { duration: 0.12 } }}>
-      <motion.div
-        initial={{ opacity: 0, transform: reduce ? "translateY(0px)" : "translateY(-6px)" }}
-        animate={{ opacity: 1, transform: "translateY(0px)" }}
-        transition={{ duration: 0.2, ease: EASE_OUT }}
-        className="relative pl-6"
-      >
+    <motion.li layout={reduce ? false : "position"} transition={{ duration: 0.2, ease: EASE_OUT }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="relative pl-6">
         <span aria-hidden="true" className="absolute left-0 top-0 h-[1.0625rem] w-4 rounded-bl-lg border-b border-l border-foreground/20" />
         {!last && <span aria-hidden="true" className="absolute bottom-0 left-0 top-[1.0625rem] w-px bg-foreground/20" />}
         <div className="flex min-h-8 items-center gap-2 text-sm">{children}</div>
@@ -54,17 +41,11 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
       {newest && (
         <div className="flex items-center gap-3 rounded-xl bg-primary/5 px-4 py-3 ring-1 ring-primary/15">
           <span className="relative flex size-2.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/60" />
+            <span className="absolute inline-flex size-full animate-ping rounded-full motion-reduce:animate-none bg-primary/60" />
             <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
           </span>
           <p className="flex-1 text-base font-semibold">
-            <motion.span
-              key={newest.id}
-              initial={{ opacity: 0, transform: reduce ? "translateY(0px)" : "translateY(4px)" }}
-              animate={{ opacity: 1, transform: "translateY(0px)" }}
-              transition={{ duration: 0.18, ease: EASE_OUT }}
-              className="inline-block"
-            >
+            <span className="inline-block">
               {TRACE_LABEL_COPY[newest.label]}
               {newest.count > 1 && (
                 <>
@@ -72,14 +53,13 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                   <Count value={newest.count} />
                 </>
               )}
-            </motion.span>
+            </span>
             <Time>{traceAgo(newest.endedAt, now)}</Time>
           </p>
           {candidateFindings !== null && <p className="text-xs tabular-nums text-muted-foreground/70">{candidateFindings} candidates</p>}
         </div>
       )}
       <ol>
-        <AnimatePresence initial={false}>
         {groups.map((group, index) => {
           const current = index === 0;
           const work = group.entries.filter(isWork);
@@ -106,7 +86,7 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                       current ? "border-primary text-primary" : "border-foreground/20 bg-muted text-muted-foreground",
                     )}
                   >
-                    {current ? <span className="size-2 animate-pulse rounded-full bg-primary" /> : <Check aria-hidden="true" className="size-3.5" />}
+                    {current ? <span className="size-2 rounded-full bg-primary" /> : <Check aria-hidden="true" className="size-3.5" />}
                   </span>
                   <span className="text-sm font-semibold">
                     {group.title}
@@ -116,7 +96,6 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                 </CollapsibleTrigger>
                 <CollapsiblePanel>
                   <ul className="ml-[2.375rem] pb-2 pt-0.5">
-                    <AnimatePresence initial={false}>
                     {leaves.map((entry, leaf) => {
                       const Icon = LABEL_ICON[entry.label];
                       return (
@@ -143,14 +122,12 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                         </Branch>
                       );
                     })}
-                    </AnimatePresence>
                   </ul>
                 </CollapsiblePanel>
               </Collapsible>
             </motion.li>
           );
         })}
-        </AnimatePresence>
       </ol>
     </div>
   );
