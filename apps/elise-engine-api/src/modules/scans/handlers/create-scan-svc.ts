@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { RUNNER_ARCHIVE_UNSUPPORTED, RUNNER_JOB_NOT_CONNECTED, RUNNER_JOB_PRIVATE, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
+import { RUNNER_ARCHIVE_UNSUPPORTED, RUNNER_JOB_NOT_CONNECTED, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
 import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
@@ -176,13 +176,12 @@ export const queueScanSvc = (
     // GitHub App. Another provider's address never asks GitHub.
     // -----
     const github = access === undefined || provider.id !== DEFAULT_SOURCE_PROVIDER_ID ? null : yield* access.forRepo(record.url);
-    if (onRunner && github) return yield* new Invalid({ message: RUNNER_JOB_PRIVATE });
     const params: ScanParams = {
       scanId: newScanId(),
       accountId,
       repo: record.url,
       ref,
-      github: github ?? undefined,
+      github: onRunner ? undefined : (github ?? undefined),
       options,
       keySource: usesOwnKey ? "account" : "platform",
       runnerId,
