@@ -14,6 +14,7 @@ type ScanFindingSheetProps = {
   facts?: ReactNode;
   decision?: ReactNode;
   decisionHint?: ReactNode;
+  comment?: ReactNode;
 };
 
 // -----
@@ -22,7 +23,7 @@ type ScanFindingSheetProps = {
 // without going back to the list. The list keeps the selection, so closing
 // the panel leaves the reviewer where they were.
 // -----
-export function ScanFindingSheet({ findings, selected, onSelect, status, facts, decision, decisionHint }: ScanFindingSheetProps) {
+export function ScanFindingSheet({ findings, selected, onSelect, status, facts, decision, decisionHint, comment }: ScanFindingSheetProps) {
   const [closing, setClosing] = useState(false);
   const finding = selected === undefined ? undefined : findings[selected];
   const hasPrevious = selected !== undefined && selected > 0;
@@ -42,7 +43,7 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
       }}
     >
       <SheetContent
-        className="max-w-[56rem]"
+        className="max-w-[56rem] [transition-property:transform,right] data-[nested-dialog-open]:right-[36rem]"
         aria-keyshortcuts="ArrowLeft ArrowRight"
         onKeyDown={(event) => {
           if (selected === undefined || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
@@ -70,7 +71,10 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
               )}
             </SheetBody>
             <SheetFooter>
-              <div className="flex items-center gap-3">{decision}</div>
+              <div className="flex items-center gap-3">
+                {decision}
+                {comment}
+              </div>
               <p className="sr-only">Use the left and right arrow keys to move between findings.</p>
               <div className="ml-auto flex items-center gap-2">
                 <Button variant="outline" size="sm" disabled={!hasPrevious} onClick={() => onSelect(selected - 1)}>

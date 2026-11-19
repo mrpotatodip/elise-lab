@@ -403,6 +403,16 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
             </div>
           ))
         }
+        comment={
+          selectedFinding && (
+            <FindingDiscussionButton
+              repo={selectedFinding.repo}
+              fingerprint={selectedFinding.fingerprint}
+              finding={fromRecorded(selectedFinding)}
+              status={<FindingStatusBadge state={selectedFinding.state} triage={selectedFinding.triage} />}
+            />
+          )
+        }
         decisionHint={selectedFinding && selectedFinding.state !== "fixed_by_code" && <p className="text-sm leading-normal text-muted-foreground">Your choice is added to the discussion with your name.</p>}
       />
     </Card>
