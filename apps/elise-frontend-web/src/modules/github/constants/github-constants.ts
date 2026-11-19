@@ -11,5 +11,5 @@ export const GITHUB_NOTICE =
 // -----
 export const GITHUB_INSTALLATIONS_URL = "https://github.com/settings/installations";
 
-export const GITHUB_NOT_CONNECTED = "Connect GitHub so Elise can scan your private repositories. Public repositories need no connection.";
-export const GITHUB_ASK_ADMIN = "Private repositories need GitHub to be connected. Ask an admin of this account to connect it.";
+export const GITHUB_NOT_CONNECTED = "Connect GitHub so Elise can list your private repositories and their branches. A Runner clones with its own git login.";
+export const GITHUB_ASK_ADMIN = "Listing private repositories needs GitHub to be connected. Ask an admin of this account to connect it.";

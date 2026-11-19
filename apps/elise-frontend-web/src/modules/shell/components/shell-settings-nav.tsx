@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useRouteContext, useRouterState } from "@tanstack/react-router";
-import { ChevronUp, CreditCard, History, KeyRound, Settings, Wallet, type LucideIcon } from "lucide-react";
+import { ChevronUp, CreditCard, KeyRound, Settings, type LucideIcon } from "lucide-react";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "#/components/ui/collapsible";
 import { cn } from "#/lib/utils";
 import type { SETTINGS_PAGES } from "../constants";
@@ -9,10 +9,8 @@ import { NAV_ACTIVE, NAV_CHEVRON, NAV_ICON, NAV_ROW, NAV_TOGGLE, NavHint } from 
 import { TREE_ITEM, TREE_ITEM_LINE, TREE_LINK } from "./shell-repo-tree";
 
 const PAGE_ICONS = {
-  "/settings/budget": Wallet,
   "/settings/plan": CreditCard,
   "/settings/providers": KeyRound,
-  "/settings/history": History,
 } as const satisfies Record<(typeof SETTINGS_PAGES)[number]["to"], LucideIcon>;
 
 // -----

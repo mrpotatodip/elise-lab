@@ -99,7 +99,7 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger render={<Button variant="outline" size="sm" aria-label="Refresh" onClick={() => queryClient.invalidateQueries()} />}>
-              <RefreshCw className={cn("size-3.5", fetching && "animate-spin")} />
+              <RefreshCw className={cn("size-3.5", hydrated && fetching && "animate-spin")} />
               <span className="hidden sm:inline">Refresh</span>
             </TooltipTrigger>
             <TooltipContent>Reload scans and findings</TooltipContent>

@@ -4,10 +4,7 @@ import { ArrowUpRight, Layers, LoaderCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
 import { ShellPageHeader } from "#/modules/shell";
-import { CreditCard } from "#/modules/credit";
-import { UsageCard } from "#/modules/usage";
-import { Suspense, type ReactNode } from "react";
-import { Skeleton } from "#/components/ui/skeleton";
+import type { ReactNode } from "react";
 import { isScanActive, overviewQuery, scansQuery } from "../hooks";
 import type { ScanStatus } from "../schemas";
 import { scanActivity, scanSuccessRate } from "../utils";
@@ -129,15 +126,6 @@ export function ScanOverview({ brief }: ScanOverviewProps) {
       </div>
 
       <ScanActivityChart days={activity} />
-
-      <div className="grid gap-8 empty:hidden md:grid-cols-2 lg:grid-cols-3">
-        <Suspense fallback={<Skeleton className="h-72 w-full" />}>
-          <UsageCard />
-        </Suspense>
-        <Suspense fallback={<Skeleton className="h-40 w-full" />}>
-          <CreditCard />
-        </Suspense>
-      </div>
     </>
   );
 }

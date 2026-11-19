@@ -119,7 +119,8 @@ function RunningFor({ since }: { since: string }) {
 }
 
 function ScanStatusLine({ scan }: { scan: ScanStatus }) {
-  const duration = scanDuration(scan.usage?.durationMs);
+  const wallClockMs = scan.finishedAt ? Date.parse(scan.finishedAt) - Date.parse(scan.createdAt) : null;
+  const duration = scanDuration(scan.usage?.durationMs ?? wallClockMs);
   const commit = scan.commitSha?.slice(0, 7);
   const coverage = scan.skill === "full" ? SCAN_PROFILE_OPTIONS.find((option) => option.value === scan.profile)?.label : undefined;
 

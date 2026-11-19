@@ -13,13 +13,22 @@ import { removeRunner } from "../api";
 import { RUNNER_STATE_COPY } from "../constants";
 import { runnerKeys, runnersQuery } from "../hooks";
 import type { Runner } from "../schemas";
-import { runnerAddedBy, runnerDetail } from "../utils";
+import { runnerAddedBy, runnerDetail, runnerShownState } from "../utils";
+import { useHydrated } from "#/lib/use-hydrated";
+import { useNow } from "#/lib/use-now";
 import { RunnerAddDialog } from "./runner-add-dialog";
 import { RunnerRemoveDialog } from "./runner-remove-dialog";
 
 type RunnerRow = { runner: Runner; busy: boolean; remove: () => Promise<void> };
 
 const column = dataTableColumns<RunnerRow>();
+
+function RunnerStateBadge({ runner }: { runner: Runner }) {
+  const hydrated = useHydrated();
+  const now = useNow();
+  const state = RUNNER_STATE_COPY[hydrated ? runnerShownState(runner, now) : runner.state];
+  return <Badge variant={state.variant}>{state.label}</Badge>;
+}
 
 const columns = column.columns([
   column.display({
@@ -35,10 +44,7 @@ const columns = column.columns([
   column.display({
     id: "state",
     header: "Status",
-    cell: ({ row }) => {
-      const state = RUNNER_STATE_COPY[row.original.runner.state];
-      return <Badge variant={state.variant}>{state.label}</Badge>;
-    },
+    cell: ({ row }) => <RunnerStateBadge runner={row.original.runner} />,
   }),
   column.display({
     id: "actions",
@@ -75,7 +81,7 @@ export function RunnersCard() {
       <CardHeader className="flex-row items-center justify-between">
         <div className="grid gap-1.5">
           <CardTitle>Runners</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Computers you control that can run this account&apos;s scans, in place of Elise&apos;s cloud container.</p>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">The computers that run this account&apos;s scans, on their own Claude and git login. Elise charges nothing per scan.</p>
         </div>
         <Suspense fallback={<Skeleton className="h-8 w-32" />}>
           <RunnerAddDialog />

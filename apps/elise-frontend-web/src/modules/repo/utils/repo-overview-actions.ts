@@ -183,4 +183,5 @@ export function overviewVerdict(actions: readonly OverviewAction[]): OverviewVer
   return { tone: "success", word: "Ready to ship", line: "Nothing needs anyone right now." };
 }
 
-export const overviewLatestScanAt = (repos: readonly Repo[]) => repos.reduce<string | null>((latest, repo) => (repo.lastScanAt !== null && (latest === null || repo.lastScanAt > latest) ? repo.lastScanAt : latest), null);
+export const overviewLatestScanAt = (repos: readonly Repo[]) =>
+  repos.reduce<string | null>((latest, repo) => (repo.lastScanStatus === "succeeded" && repo.lastScanAt !== null && (latest === null || repo.lastScanAt > latest) ? repo.lastScanAt : latest), null);

@@ -50,7 +50,6 @@ export function PlanCard() {
   }
 
   const status = PLAN_STATUS_VIEW[data.status];
-  const usesCredit = plan.keySource === "platform";
 
   return (
     <Card>
@@ -69,9 +68,7 @@ export function PlanCard() {
         <dl className="grid gap-3 border-t pt-5 text-sm">
           <Row label="Billing" value={planSourceLabel(data.source)} />
           {data.currentPeriodEnd !== null && <Row label="Renews" value={planDateLabel(data.currentPeriodEnd)} />}
-          <Row label="Scans use" value={planKeyLabel(plan.keySource)} />
-          {usesCredit && <Row label="Credit added each month" value={usageUsd(plan.includedCreditUsd)} />}
-          {usesCredit && plan.carryCapUsd !== null && <Row label="Credit carry-over cap" value={usageUsd(plan.carryCapUsd)} />}
+          <Row label="Scans use" value={planKeyLabel("account")} />
           <Row label="Scans this month" value={creditScansLabel(data.scans, plan.scanAllowance)} />
           <Row label="People" value={planSeatsLabel(data.seats, plan.maxMembers)} />
         </dl>

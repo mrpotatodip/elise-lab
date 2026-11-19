@@ -477,7 +477,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-relaxed text-muted-foreground">
                 {newestScan ? (
                   <>
-                    <ScanStatusBadge status={(fullScan ?? newestScan).status} />
+                    <ScanStatusBadge status={(notFull.has(newestScan.scanId) ? (fullScan ?? newestScan) : newestScan).status} />
                     {notFull.has(newestScan.scanId) ? (
                       <>
                         <span>

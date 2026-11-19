@@ -9,7 +9,7 @@ import { Collapsible, CollapsiblePanel } from "#/components/ui/collapsible";
 import { cn } from "#/lib/utils";
 import { SEVERITIES, ScanTime, scanPlural } from "#/modules/scan";
 import type { Repo } from "../schemas";
-import { overviewActions, overviewLatestScanAt, overviewVerdict, repoTotals, type OverviewAction, type OverviewBudget, type OverviewTone } from "../utils";
+import { overviewActions, overviewLatestScanAt, overviewVerdict, repoTotals, type OverviewAction, type OverviewTone } from "../utils";
 import { RepoAddDialog } from "./repo-add-dialog";
 
 const TONE = {
@@ -23,24 +23,16 @@ const MARK = { critical: "bg-mark-critical", high: "bg-mark-high", medium: "bg-m
 const noun = (count: number, one: string, many: string) => (count === 1 ? one : many);
 const LINK ="inline-flex min-h-6 items-center gap-1 rounded-sm text-xs font-medium text-primary-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-function ActionLink({ action, canManageBudget }: { action: OverviewAction; canManageBudget: boolean }) {
-  const className = buttonVariants({ size: "sm" });
-  if (action.repoId !== null) {
-    return (
-      <Link to="/repos/$repoId" params={{ repoId: action.repoId }} className={className}>
-        {action.primary}
-      </Link>
-    );
-  }
-  if (!canManageBudget) return null;
+function ActionLink({ action }: { action: OverviewAction }) {
+  if (action.repoId === null) return null;
   return (
-    <Link to="/settings/budget" className={className}>
+    <Link to="/repos/$repoId" params={{ repoId: action.repoId }} className={buttonVariants({ size: "sm" })}>
       {action.primary}
     </Link>
   );
 }
 
-function ActionRow({ action, open, onOpenChange, first, canManageBudget }: { action: OverviewAction; open: boolean; onOpenChange: (open: boolean) => void; first: boolean; canManageBudget: boolean }) {
+function ActionRow({ action, open, onOpenChange, first }: { action: OverviewAction; open: boolean; onOpenChange: (open: boolean) => void; first: boolean }) {
   const tone = TONE[action.tone];
   const Icon = tone.icon;
   const hasRepos = action.repos.length > 0;
@@ -69,7 +61,7 @@ function ActionRow({ action, open, onOpenChange, first, canManageBudget }: { act
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 md:justify-end">
-            <ActionLink action={action} canManageBudget={canManageBudget} />
+            <ActionLink action={action} />
             {hasRepos && (
               <Button variant="outline" size="sm" aria-expanded={open} onClick={() => onOpenChange(!open)}>
                 {open ? "Hide" : "Show"} where
@@ -124,9 +116,9 @@ function KpiTile({ kpi, onJump }: { kpi: Kpi; onJump: (key: string) => void }) {
   );
 }
 
-type RepoOverviewBriefProps = { repos: readonly Repo[]; budget?: OverviewBudget; canManageBudget: boolean };
+type RepoOverviewBriefProps = { repos: readonly Repo[] };
 
-export function RepoOverviewBrief({ repos, budget, canManageBudget }: RepoOverviewBriefProps) {
+export function RepoOverviewBrief({ repos }: RepoOverviewBriefProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
@@ -144,7 +136,7 @@ export function RepoOverviewBrief({ repos, budget, canManageBudget }: RepoOvervi
     );
   }
 
-  const actions = overviewActions(repos, budget);
+  const actions = overviewActions(repos);
   const verdict = overviewVerdict(actions);
   const visible = showAll ? actions : actions.filter((a) => a.tone !== "info");
   const hidden = actions.length - visible.length;
@@ -236,7 +228,7 @@ export function RepoOverviewBrief({ repos, budget, canManageBudget }: RepoOvervi
           <CardContent className="grid gap-5">
             <ol className="grid divide-y">
               {visible.map((action, index) => (
-                <ActionRow key={action.key} action={action} first={index === 0} open={openKey === action.key} onOpenChange={(next) => setOpenKey(next ? action.key : null)} canManageBudget={canManageBudget} />
+                <ActionRow key={action.key} action={action} first={index === 0} open={openKey === action.key} onOpenChange={(next) => setOpenKey(next ? action.key : null)} />
               ))}
             </ol>
             {(hidden > 0 || showAll) && (
