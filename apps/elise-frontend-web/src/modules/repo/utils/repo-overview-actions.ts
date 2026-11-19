@@ -37,13 +37,6 @@ const sum = (shares: readonly OverviewRepoShare[]) => shares.reduce((total, shar
 const serious = (repo: Repo) => repo.open.severity.critical + repo.open.severity.high;
 const lowerRisk = (repo: Repo) => repo.open.severity.medium + repo.open.severity.low;
 
-// -----
-// What a person should do next, most urgent first, from the repository list
-// alone (the counts of each default branch). A finding can count in two groups: a
-// serious problem that also came back is in both, and each group states its own
-// count. An empty list is the good answer. The budget joins only when the engine
-// says it applies, and only when it is nearly used up.
-// -----
 export function overviewActions(repos: readonly Repo[], budget?: OverviewBudget): OverviewAction[] {
   const actions: OverviewAction[] = [];
 

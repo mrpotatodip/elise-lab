@@ -126,12 +126,6 @@ function KpiTile({ kpi, onJump }: { kpi: Kpi; onJump: (key: string) => void }) {
 
 type RepoOverviewBriefProps = { repos: readonly Repo[]; budget?: OverviewBudget; canManageBudget: boolean };
 
-// -----
-// The first thing on the Overview, for a reader who does not read findings: the
-// ship answer in one line, four counts that each jump to their group, then the
-// groups most urgent first, each with who it is for and one button. Lower-risk
-// groups stay folded until asked, so the urgent ones are never pushed down.
-// -----
 export function RepoOverviewBrief({ repos, budget, canManageBudget }: RepoOverviewBriefProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
