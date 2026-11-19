@@ -7,7 +7,11 @@ import { groupTraceByPhase, summarizeTraceGroup, traceAgo, traceSpan } from "../
 import { LABEL_ICON, isWork, tallyByLabel, type ConceptProps } from "./shared";
 
 function Count({ value }: { value: number }) {
-  return <span className="font-medium tabular-nums">×{value}</span>;
+  return <span className="font-normal tabular-nums text-muted-foreground/70">×{value}</span>;
+}
+
+function Time({ children }: { children: ReactNode }) {
+  return <span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground/70">{children}</span>;
 }
 
 function Branch({ last, children }: { last: boolean; children: ReactNode }) {
@@ -39,13 +43,9 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                 <Count value={newest.count} />
               </>
             )}
+            <Time>{traceAgo(newest.endedAt, now)}</Time>
           </p>
-          <p className="text-xs text-muted-foreground tabular-nums">{traceAgo(newest.endedAt, now)}</p>
-          {candidateFindings !== null && (
-            <p className="text-xs text-muted-foreground">
-              <span className="text-sm font-medium tabular-nums text-foreground">{candidateFindings}</span> candidates
-            </p>
-          )}
+          {candidateFindings !== null && <p className="text-xs tabular-nums text-muted-foreground/70">{candidateFindings} candidates</p>}
         </div>
       )}
       <ol>
@@ -70,9 +70,11 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                   >
                     {current ? <span className="size-2 animate-pulse rounded-full bg-primary" /> : <Check aria-hidden="true" className="size-3.5" />}
                   </span>
-                  <span className="text-sm font-semibold">{group.title}</span>
-                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">{traceSpan(summary.spentMs)}</span>
-                  <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180" />
+                  <span className="text-sm font-semibold">
+                    {group.title}
+                    <Time>{traceSpan(summary.spentMs)}</Time>
+                  </span>
+                  <ChevronDown aria-hidden="true" className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180" />
                 </CollapsibleTrigger>
                 <CollapsiblePanel>
                   <ul className="ml-[2.375rem] pb-2 pt-0.5">
@@ -83,15 +85,13 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                           <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
                           <span>{TRACE_LABEL_COPY[entry.label]}</span>
                           {entry.count > 1 && <Count value={entry.count} />}
-                          <span className="ml-auto text-xs text-muted-foreground tabular-nums">{traceAgo(entry.endedAt, now)}</span>
+                          <Time>{traceAgo(entry.endedAt, now)}</Time>
                         </Branch>
                       );
                     })}
                     {earlier > 0 && (
                       <Branch last>
-                        <span className="text-xs text-muted-foreground">
-                          <span className="text-sm font-medium tabular-nums text-foreground">{earlier}</span> earlier
-                        </span>
+                        <span className="text-xs tabular-nums text-muted-foreground/70">{earlier} earlier</span>
                       </Branch>
                     )}
                     {tally.map(({ label, count }, leaf) => {
