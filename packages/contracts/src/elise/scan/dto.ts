@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ACCEPTED_RISK_MAX_DAYS } from "../constants";
 import { ScanArchiveRefSchema } from "../upload/dto";
-import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STEP_VALUES, SOURCE_PROVIDER_VALUES } from "../enums";
+import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STATE_VALUES, SCAN_STEP_VALUES, SOURCE_PROVIDER_VALUES } from "../enums";
 
 export const SCAN_MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"] as const;
 // Opus is not offered for new scans, but a stored scan may still carry it.
@@ -19,7 +19,7 @@ export type ProfileMetValue = (typeof PROFILE_MET_VALUES)[number];
 // -----
 // Responses: what GET /scans and GET /scans/:scanId answer
 // -----
-export const ScanStateSchema = z.enum(["queued", "running", "succeeded", "failed"]);
+export const ScanStateSchema = z.enum(SCAN_STATE_VALUES);
 
 export const ScanOptionsSchema = z.object({
   skill: z.enum(SCAN_SKILLS),

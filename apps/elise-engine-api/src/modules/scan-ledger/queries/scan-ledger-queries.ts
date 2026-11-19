@@ -2,7 +2,7 @@ import { and, asc, eq, gt, inArray, ne, notExists, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
-import { Conflict, toDbError, type DbError } from "#/lib/effect-query";
+import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
@@ -12,6 +12,7 @@ import { displayRepoUrlOf, liveScansSql, repoIdentityOf, sameRepoIdentity, scanR
 type ScanRow = typeof scans.$inferSelect;
 
 const ACTIVE_SCAN_CONFLICT = "This repo already has an active scan";
+export const SCAN_ALREADY_ENDED = "This Scan already ended";
 
 // -----
 // The Runner each of these scans is on, from its job row. A scan
@@ -255,7 +256,7 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> =>
             }),
             updatedAt: new Date(),
           })
-          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), patch.status === "failed" ? undefined : ne(scans.status, "failed"))),
+          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), ne(scans.status, "stopped"), patch.status === "failed" ? undefined : ne(scans.status, "failed"))),
       catch: toDbError,
     }).pipe(Effect.asVoid);
   },
@@ -286,6 +287,32 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> =>
 
   activeSince: (accountId, nowMs) => activeScansEffect(db, accountId, nowMs),
 });
+
+export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string, now: Date): Effect.Effect<void, NotFound | Conflict | DbError> =>
+  Effect.gen(function* () {
+    const stopped = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(scans)
+          .set({ status: "stopped", step: null, finishedAt: now, updatedAt: now })
+          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), inArray(scans.status, ["queued", "running"])))
+          .returning({ id: scans.id }),
+      catch: toDbError,
+    });
+    if (stopped.length === 0) {
+      const [found] = yield* Effect.tryPromise({ try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))), catch: toDbError });
+      if (!found) return yield* new NotFound({ message: "Scan not found" });
+      return yield* new Conflict({ message: SCAN_ALREADY_ENDED });
+    }
+    yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(scanRunnerJobs)
+          .set({ state: "cancelled", finishedAt: now })
+          .where(and(eq(scanRunnerJobs.scanId, scanId), inArray(scanRunnerJobs.state, ["queued", "claimed"]))),
+      catch: toDbError,
+    });
+  });
 
 // -----
 // How many live scans each path holds, over every Account. It is

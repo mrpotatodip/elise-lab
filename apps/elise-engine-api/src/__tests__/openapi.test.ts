@@ -88,6 +88,7 @@ describe("GET /openapi.json", () => {
       "POST /runners/login/deny",
       "POST /runners/login/start",
       "POST /scans",
+      "POST /scans/{scanId}/stop",
       "POST /sign-up",
       "POST /team/invites",
       "POST /team/invites/{token}/accept",

@@ -60,6 +60,14 @@ The `standard` and `deep` Phase prompts now ask for sub-agents. The hunt prompt 
 
 `quick` (Focused) now also asks for verifiers, in the `check` prompt only: the same three sentences as `standard`, from one constant, with no critic and no final verifiers. Why: the Focused rows of the profile check (`fresh-verifier-per-candidate`, `not-declared-incomplete`) need a check by an agent that is not the unit's owner for every candidate unit, and a real Focused Scan on a big repo had candidates with no fresh verifier, so it read unmet (weight 0). A Focused Scan that finds no candidate has nothing to verify, so the sentence costs it nothing. Same words in the cloud's place and the Runner's. The Focused hunt, recon and report prompts do not change.
 
+## Stopping a Scan (#248)
+
+A person can end a `queued` or `running` Scan on purpose: `POST /scans/:scanId/stop`, behind the same access as starting one. In one transaction the Scan becomes `stopped` (a Scan state of its own, never `failed`) and its Runner job, if it has one, becomes `cancelled`. Why `cancelled`: no Runner claims a cancelled job, and a late report for it is refused, as for a Scan that timed out. A Scan that already ended answers a conflict and changes nothing; a Scan of another Account is not found.
+
+A Stopped Scan keeps no Report and no findings. It frees the Account's active-Scan slot (only `queued` and `running` count), weighs 0 in the Verdict and is never a Branch's latest Scan, because every one of those reads takes `succeeded` Scans only. The Workflow that is still polling can no longer overwrite it: `ledger.mark` never writes over `stopped`, the record step skips it, and a Runner sandbox queues no job for a Scan stopped before the Workflow got to it. The Workflow ends by itself on its next poll, when it finds the job cancelled.
+
+This ticket stops Runner Scans. A cloud Scan's Sandbox and credit are #251; a headless Runner learns of the stop from the job-state route in #250. A Runner built before that keeps running until it finishes, and its result is refused.
+
 ## Not built here
 
 - The numbers: the profile caps, `MAX_BUDGET_FULL_USD` and the Verdict weights are guesses until #142 measures real Scans.
