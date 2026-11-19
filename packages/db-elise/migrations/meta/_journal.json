@@ -666,6 +666,13 @@
       "when": 1795057768378,
       "tag": "0094_scan_trace_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1795072183900,
+      "tag": "0095_scan_state_stopped",
+      "breakpoints": true
     }
   ]
 }

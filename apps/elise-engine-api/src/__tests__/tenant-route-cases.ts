@@ -60,6 +60,7 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
   "POST /runners/login/check",
   "GET /runners/login/lookup",
   "POST /runners/jobs/:scanId/result",
+  "GET /runners/jobs/:scanId",
   "GET /runners/jobs/:scanId/archive",
   "POST /runners/jobs/:scanId/trace",
   "GET /runners/me",
@@ -124,6 +125,7 @@ export const CROSS_ACCOUNT_CASES = {
   // the caller's, so the answer is "created", not 409 or 429.
   // -----
   "POST /scans": { kind: "run", path: "/scans", method: "POST", body: { repo: OTHER_REPO }, as: "stranger", expect: "created" },
+  "POST /scans/:scanId/stop": { kind: "run", path: "/scans/theirs/stop", method: "POST", expect: "not-found" },
   "GET /files": { kind: "run", path: "/files", listedIn: "files", expect: "empty" },
   "GET /repos/:repoId/verdict": { kind: "run", path: `/repos/${OTHER_REPO_ID}/verdict?commit=${"c".repeat(40)}`, expect: "not-found" },
   "GET /usage": { kind: "run", path: "/usage", expect: "own", own: { budgetUsd: 20, spentUsd: 0, reservedUsd: 0, remainingUsd: 20, scans: 0 } },

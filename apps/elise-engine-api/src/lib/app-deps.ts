@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { ScanUsageSchema } from "@repo/contracts/elise";
 import { createAuth } from "#/lib/auth";
 import { dbConnect, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
@@ -29,6 +30,15 @@ export const realAppDeps: AppDeps = {
   connectedRunnerSources: findConnectedRunnerEffect,
   linkArchive: linkScanArchiveEffect,
   releaseCredit: (db, accountId, scanId) => settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 }),
+  teardownScan: async (env, scanId) => {
+    await env.SCAN_WORKFLOW_FULL.get(scanId)
+      .then((workflow) => workflow.terminate())
+      .catch(() => undefined);
+    const sandbox = env.SANDBOX_FULL.getByName(scanId);
+    const usage = ScanUsageSchema.nullable().parse(await sandbox.readUsage());
+    await sandbox.destroy();
+    return usage;
+  },
   sessionUserId,
   runnerIdentity: (c, token) => runEffect(runnerIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),

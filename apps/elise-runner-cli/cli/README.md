@@ -47,8 +47,9 @@ The program never prints the token in its log, in `status` or in an error. `pair
 | 4 | revoked (Elise rejected the token) |
 | 5 | offline (Elise could not be reached) |
 | 6 | `run --once`: nothing to claim |
+| 7 | `run --once`: the Scan was stopped from Elise |
 
-When Elise rejects the token during `run` (an admin removed the Runner), the program forgets the token, says so and exits with 4. Pair again with a new code.
+When Elise rejects the token during `run` (an admin removed the Runner), the program forgets the token, says so and exits with 4. Pair again with a new code. The same goes for a rejection while a Scan runs: the agent is stopped first, nothing is sent and the work folder is kept.
 
 ## Where the token is kept
 
@@ -82,9 +83,11 @@ A succeeded Scan's work folder is removed once its result is sent. A failed Scan
 
 Ctrl-C (`SIGINT`) or `SIGTERM` with no Scan running exits at once with 0. During a Scan it stops the running `claude`, reports the Scan to Elise as failed with a reason that says the Runner was stopped, keeps the work folder and exits with 1. A stop that comes after the Scan already succeeded changes nothing: the result is sent and the program exits with 0. Signals after the first are ignored until the result is sent.
 
+A Scan stopped from Elise (the Stop button in the dashboard) is found within about 5 seconds: while a Scan runs, the program asks Elise for the job's state every 5 seconds, and a `cancelled` job stops the running `claude` through the same path as Ctrl-C. It sends no result (Elise already ended the Scan), keeps the work folder and prints `Scan stopped from Elise.` with the folder's path. `run` then goes back to waiting for Scans; `run --once` exits with 7. A network error or a server error on that check never stops a Scan.
+
 ## Under a service manager
 
-Run `elise-runner run` as the user that is signed in to Claude Code, as a long-running service. A stop signal (`SIGTERM`, what systemd sends) ends a running Scan as described above, so give the service enough stop time to send that result. Pair once by hand first (`elise-runner pair <code>`); with no keychain service the token is then in the config file of that user. For a build job or a timer, use `elise-runner run --once` and read the exit code: 0 a Scan ran and succeeded, 1 it failed, 6 there was nothing to claim.
+Run `elise-runner run` as the user that is signed in to Claude Code, as a long-running service. A stop signal (`SIGTERM`, what systemd sends) ends a running Scan as described above, so give the service enough stop time to send that result. Pair once by hand first (`elise-runner pair <code>`); with no keychain service the token is then in the config file of that user. For a build job or a timer, use `elise-runner run --once` and read the exit code: 0 a Scan ran and succeeded, 1 it failed, 6 there was nothing to claim, 7 the Scan was stopped from Elise.
 
 ## In a container
 

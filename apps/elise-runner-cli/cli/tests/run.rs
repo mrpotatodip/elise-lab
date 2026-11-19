@@ -327,3 +327,86 @@ fn run_once_stopped_while_its_claim_is_in_flight_exits_with_code_0() {
     assert!(output.stderr.contains("No Scan was running"), "{}", output.stderr);
     assert!(engine.results().is_empty());
 }
+
+#[test]
+fn a_scan_stopped_from_elise_kills_the_agent_sends_nothing_keeps_the_folder_and_exits_with_code_7() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job("scan_12", ["phase=recon cost=1", "phase=hunt stop=wait", "phase=check", "phase=report"]));
+    let running = runner.start(&["run", "--once"]);
+    let agent = stubs.waiting_agent();
+
+    engine.cancel_job("scan_12");
+    let output = running.finish();
+
+    assert_eq!(output.code, 7, "{}{}", output.stdout, output.stderr);
+    assert!(!alive(agent), "the stub claude is still running");
+    assert!(engine.results().is_empty(), "{:?}", engine.results());
+    let work = stubs.work_folder("scan_12");
+    assert!(work.join("agent-hunt.log").is_file(), "the work folder is kept");
+    let last = output.stdout.lines().last().unwrap();
+    assert_eq!(last, format!("[acme/widgets scan_12] Scan stopped from Elise. Work folder kept: {}", work.display()));
+}
+
+#[test]
+fn run_goes_back_to_waiting_after_a_stop_from_elise() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job("scan_13", ["phase=recon cost=1", "phase=hunt stop=wait", "phase=check", "phase=report"]));
+    let running = runner.start(&["run"]);
+    stubs.waiting_agent();
+
+    engine.cancel_job("scan_13");
+    running.wait_for_output("Scan stopped from Elise.");
+    engine.queue_job(job("scan_14", PLAIN));
+    running.wait_for_output("[acme/widgets scan_14] Scan succeeded.");
+    running.signal("TERM");
+    let output = running.finish();
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    let results = engine.results();
+    assert_eq!(results.len(), 1, "{results:?}");
+    assert_eq!(results[0].0, "scan_14");
+}
+
+#[test]
+fn a_runner_removed_mid_scan_kills_the_agent_sends_nothing_keeps_the_folder_forgets_the_token_and_exits_with_code_4() {
+    for args in [&["run", "--once"][..], &["run"][..]] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        let stubs = runner.stub_tools(&["claude", "node"]);
+        engine.queue_job(job("scan_16", ["phase=recon cost=1", "phase=hunt stop=wait", "phase=check", "phase=report"]));
+        let running = runner.start(args);
+        let agent = stubs.waiting_agent();
+
+        engine.remove_all_runners();
+        let output = running.finish();
+
+        assert_eq!(output.code, 4, "{args:?}: {}{}", output.stdout, output.stderr);
+        assert!(output.stderr.contains("removed"), "{args:?}: {}", output.stderr);
+        assert!(!alive(agent), "{args:?}: the stub claude is still running");
+        assert!(engine.results().is_empty(), "{args:?}: {:?}", engine.results());
+        assert!(stubs.work_folder("scan_16").join("agent-hunt.log").is_file(), "{args:?}: the work folder is kept");
+        assert!(runner.home_files().is_empty(), "{args:?}: {:?}", runner.home_files());
+    }
+}
+
+#[test]
+fn a_job_state_check_that_fails_does_not_stop_the_scan() {
+    for status in [0, 503] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        runner.stub_tools(&["claude", "node"]);
+        engine.fail_job_checks(status);
+        engine
+            .queue_job(job("scan_15", ["phase=recon cost=1", "phase=hunt stop=slow cost=1", "phase=check cost=1", "phase=report cost=1"]));
+
+        let output = runner.run(&["run", "--once"], "");
+
+        assert_eq!(output.code, 0, "{status}: {}{}", output.stdout, output.stderr);
+        assert!(!engine.job_checks().is_empty(), "{status}: the Runner never asked");
+        assert_eq!(engine.results()[0].1["state"], "succeeded", "{status}");
+    }
+}

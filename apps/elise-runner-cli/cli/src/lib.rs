@@ -15,6 +15,7 @@ pub enum Exit {
     Revoked = 4,
     Offline = 5,
     NothingToClaim = 6,
+    StoppedFromElise = 7,
 }
 
 pub fn main(args: &[String]) -> Exit {

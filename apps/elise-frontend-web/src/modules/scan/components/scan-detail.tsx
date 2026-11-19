@@ -20,6 +20,7 @@ import { ScanHeaderMeta } from "./scan-header-meta";
 import { ScanMarkdown } from "./scan-markdown";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanRunDetails } from "./scan-run-details";
+import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanSummary } from "./scan-summary";
 import { ScanTrace } from "./scan-trace";
 
@@ -61,6 +62,17 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
               <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-background/60 p-3 font-mono [overflow-wrap:anywhere]">{failure.detail}</pre>
             </details>
           )}
+        </div>
+      </Alert>
+    );
+  }
+  if (scan.status === "stopped") {
+    return (
+      <Alert>
+        <OctagonX />
+        <div className="grid gap-1">
+          <AlertDescription className="font-medium">You stopped this scan.</AlertDescription>
+          <AlertDescription>It kept no report and no findings, and it does not count toward a Verdict. Start a new scan when you are ready.</AlertDescription>
         </div>
       </Alert>
     );
@@ -130,6 +142,7 @@ export function ScanDetail({ scanId }: { scanId: string }) {
         badges={<GithubPrivateBadge isPrivate={scan.isPrivate} />}
         below={<ScanHeaderMeta scan={scan} />}
       >
+        {canStopScan(scan) && <ScanStopButton scanId={scan.scanId} onRunner={Boolean(scan.runner)} size="default" />}
         {scan.archive ? (
           <ScanNewDialog label="Scan a zip again" size="default" variant="outline" repo={scan.repo} provider="upload" repoId={scan.repoId} />
         ) : (
