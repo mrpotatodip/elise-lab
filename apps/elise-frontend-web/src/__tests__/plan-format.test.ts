@@ -36,8 +36,8 @@ describe("creditAmountLabel", () => {
 describe("plan words", () => {
   it("names who bills the plan and whose key a scan uses", () => {
     expect([planSourceLabel("grant"), planSourceLabel("stripe"), planKeyLabel("account"), planKeyLabel("platform")]).toEqual([
-      "Granted by us",
-      "Stripe",
+      "Granted by Elise, no invoice",
+      "Card, through Stripe",
       "Your own Claude, through a Runner",
       "Our key, paid with credit",
     ]);

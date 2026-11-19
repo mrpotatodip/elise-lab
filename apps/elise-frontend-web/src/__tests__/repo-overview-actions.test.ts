@@ -73,4 +73,9 @@ describe("overviewLatestScanAt", () => {
     expect(overviewLatestScanAt([repo("a", {}, { lastScanAt: "2026-11-18T10:00:00Z" }), repo("b", {}, { lastScanAt: "2026-11-19T09:00:00Z" })])).toBe("2026-11-19T09:00:00Z");
     expect(overviewLatestScanAt([repo("a", {}, { lastScanAt: null })])).toBeNull();
   });
+
+  it("skips a scan that was stopped or failed, because it read nothing", () => {
+    const stopped = repo("a", {}, { lastScanStatus: "stopped", lastScanAt: "2026-11-19T09:00:00Z" });
+    expect(overviewLatestScanAt([repo("b", {}, { lastScanAt: "2026-11-18T10:00:00Z" }), stopped])).toBe("2026-11-18T10:00:00Z");
+  });
 });

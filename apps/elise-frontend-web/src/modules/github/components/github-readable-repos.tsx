@@ -21,7 +21,7 @@ function GithubReadableReposView() {
   const visible = repos.filter((repo) => query === "" || repo.fullName.toLowerCase().includes(query));
 
   return (
-    <Card>
+    <Card className="max-w-4xl">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
         <div className="grid gap-1.5">
           <CardTitle>Repositories Elise can read</CardTitle>

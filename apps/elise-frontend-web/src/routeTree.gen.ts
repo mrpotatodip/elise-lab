@@ -18,6 +18,7 @@ import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AppConnectionsRouteImport } from './routes/_app/connections'
 import { Route as AppFilesRouteImport } from './routes/_app/files'
+import { Route as AppGroupsRouteImport } from './routes/_app/groups'
 import { Route as AppOverviewRouteImport } from './routes/_app/overview'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppTeamRouteImport } from './routes/_app/team'
@@ -78,6 +79,11 @@ const AppConnectionsRoute = AppConnectionsRouteImport.update({
 const AppFilesRoute = AppFilesRouteImport.update({
   id: '/files',
   path: '/files',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppGroupsRoute = AppGroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppOverviewRoute = AppOverviewRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/connections': typeof AppConnectionsRoute
   '/files': typeof AppFilesRoute
+  '/groups': typeof AppGroupsRoute
   '/overview': typeof AppOverviewRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/team': typeof AppTeamRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/connections': typeof AppConnectionsRoute
   '/files': typeof AppFilesRoute
+  '/groups': typeof AppGroupsRoute
   '/overview': typeof AppOverviewRoute
   '/team': typeof AppTeamRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_app/connections': typeof AppConnectionsRoute
   '/_app/files': typeof AppFilesRoute
+  '/_app/groups': typeof AppGroupsRoute
   '/_app/overview': typeof AppOverviewRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/team': typeof AppTeamRoute
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/connections'
     | '/files'
+    | '/groups'
     | '/overview'
     | '/settings'
     | '/team'
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/connections'
     | '/files'
+    | '/groups'
     | '/overview'
     | '/team'
     | '/invite/$token'
@@ -314,6 +325,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_app/connections'
     | '/_app/files'
+    | '/_app/groups'
     | '/_app/overview'
     | '/_app/settings'
     | '/_app/team'
@@ -407,6 +419,13 @@ declare module '@tanstack/react-router' {
       path: '/files'
       fullPath: '/files'
       preLoaderRoute: typeof AppFilesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/groups': {
+      id: '/_app/groups'
+      path: '/groups'
+      fullPath: '/groups'
+      preLoaderRoute: typeof AppGroupsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/overview': {
@@ -554,6 +573,7 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 interface AppRouteRouteChildren {
   AppConnectionsRoute: typeof AppConnectionsRoute
   AppFilesRoute: typeof AppFilesRoute
+  AppGroupsRoute: typeof AppGroupsRoute
   AppOverviewRoute: typeof AppOverviewRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppTeamRoute: typeof AppTeamRoute
@@ -570,6 +590,7 @@ interface AppRouteRouteChildren {
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppConnectionsRoute: AppConnectionsRoute,
   AppFilesRoute: AppFilesRoute,
+  AppGroupsRoute: AppGroupsRoute,
   AppOverviewRoute: AppOverviewRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppTeamRoute: AppTeamRoute,

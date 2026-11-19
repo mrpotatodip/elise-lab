@@ -27,7 +27,7 @@ import type { RepoFinding } from "../schemas";
 import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
-import { RepoSummaryStrip } from "./repo-summary-strip";
+import { RepoBranchSummary } from "./repo-branch-summary";
 
 const RECENT_SCAN_COUNT = 3;
 
@@ -120,7 +120,11 @@ const severityColumn = findingColumn.display({
       <span className="grid justify-items-start gap-1.5">
         <ScanSeverityBadge severity={finding.severity} />
         {plainOpen ? <span className="sr-only">Open</span> : <FindingStatusBadge state={finding.state} triage={finding.triage} />}
-        {blocks && <Badge variant="destructive">Blocks shipping</Badge>}
+        {blocks && (
+          <Badge variant="destructive" title="This problem is serious enough that the commit should not ship until it is fixed or a person accepts the risk.">
+            Blocks shipping
+          </Badge>
+        )}
       </span>
     );
   },
@@ -399,6 +403,16 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
             </div>
           ))
         }
+        comment={
+          selectedFinding && (
+            <FindingDiscussionButton
+              repo={selectedFinding.repo}
+              fingerprint={selectedFinding.fingerprint}
+              finding={fromRecorded(selectedFinding)}
+              status={<FindingStatusBadge state={selectedFinding.state} triage={selectedFinding.triage} />}
+            />
+          )
+        }
         decisionHint={selectedFinding && selectedFinding.state !== "fixed_by_code" && <p className="text-sm leading-normal text-muted-foreground">Your choice is added to the discussion with your name.</p>}
       />
     </Card>
@@ -477,7 +491,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-relaxed text-muted-foreground">
                 {newestScan ? (
                   <>
-                    <ScanStatusBadge status={(fullScan ?? newestScan).status} />
+                    <ScanStatusBadge status={(notFull.has(newestScan.scanId) ? (fullScan ?? newestScan) : newestScan).status} />
                     {notFull.has(newestScan.scanId) ? (
                       <>
                         <span>
@@ -567,8 +581,9 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
       {source.RepoPanel !== null && <source.RepoPanel repoId={repoId} name={repoName(repo.url)} onRemoved={() => void navigate({ to: "/repos" })} />}
 
       {current && (
-        <RepoSummaryStrip
-          branch={open}
+        <RepoBranchSummary
+          open={open}
+          scans={recentScans}
           verdict={current.latestCommit && <ScanVerdictCell repoId={repoId} commit={current.latestCommit} repoUrl={repo.url} branchOpen={open.total} findingsHref="#branch-findings" />}
         />
       )}

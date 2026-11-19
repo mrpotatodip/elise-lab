@@ -41,7 +41,9 @@ const crumbs = (pathname: string, names: RouteNames | null, when: FormatTime): C
   if (pathname.startsWith("/github/")) return [{ label: "Connections", to: "/connections" }, { label: "Finish connecting GitHub" }];
   if (pathname.startsWith("/connections")) return [{ label: "Connections" }];
   if (pathname.startsWith("/team")) return [{ label: "Team" }];
-  if (pathname.startsWith("/settings")) return [{ label: "Settings" }];
+  if (pathname.startsWith("/groups")) return [{ label: "Groups" }];
+  if (pathname.startsWith("/settings/plan")) return [{ label: "Plan" }];
+  if (pathname.startsWith("/settings/providers")) return [{ label: "Runners" }];
   if (pathname.startsWith("/summary/")) return [{ label: "Security status", to: "/summary" }, { label: names?.name ?? "Repository" }];
   if (pathname.startsWith("/summary")) return [{ label: "Security status" }];
   return [{ label: "Overview" }];
@@ -99,7 +101,7 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger render={<Button variant="outline" size="sm" aria-label="Refresh" onClick={() => queryClient.invalidateQueries()} />}>
-              <RefreshCw className={cn("size-3.5", fetching && "animate-spin")} />
+              <RefreshCw className={cn("size-3.5", hydrated && fetching && "animate-spin")} />
               <span className="hidden sm:inline">Refresh</span>
             </TooltipTrigger>
             <TooltipContent>Reload scans and findings</TooltipContent>

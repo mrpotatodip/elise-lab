@@ -16,13 +16,16 @@ type ShellFrameProps = {
   repos: readonly ShellRepo[];
   repoCount: number;
   showTeam?: boolean;
-  showSettings?: boolean;
+  showRunners?: boolean;
+  showPlan?: boolean;
+  runnersPaired?: number;
+  runnersRunning?: number;
   showDashboard?: boolean;
   actions?: ReactNode;
   children: ReactNode;
 };
 
-export function ShellFrame({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam = false, showSettings = false, showDashboard = true, actions, children }: ShellFrameProps) {
+export function ShellFrame({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam = false, showRunners = false, showPlan = false, runnersPaired = 0, runnersRunning = 0, showDashboard = true, actions, children }: ShellFrameProps) {
   const { collapsed: preferred, toggle: flip } = useSidebarCollapsed();
   const [animate, setAnimate] = useState(false);
   const narrow = useNarrow();
@@ -51,7 +54,7 @@ export function ShellFrame({ accountName, userName, email, scanCount, running, r
         Skip to content
       </a>
       <div className={cn("grid min-h-svh", animate && "transition-[grid-template-columns] duration-200 ease-out", collapsed ? "grid-cols-[4.75rem_minmax(0,1fr)]" : "grid-cols-[16.5rem_minmax(0,1fr)]")}>
-        <ShellSidebar accountName={accountName} userName={userName} email={email} scanCount={scanCount} running={running} repos={repos} repoCount={repoCount} showTeam={showTeam} showSettings={showSettings} showDashboard={showDashboard} collapsed={collapsed} canToggle={!narrow} onToggle={toggle} />
+        <ShellSidebar accountName={accountName} userName={userName} email={email} scanCount={scanCount} running={running} repos={repos} repoCount={repoCount} showTeam={showTeam} showRunners={showRunners} showPlan={showPlan} runnersPaired={runnersPaired} runnersRunning={runnersRunning} showDashboard={showDashboard} collapsed={collapsed} canToggle={!narrow} onToggle={toggle} />
         <div className="min-w-0">
           <ShellTopbar actions={actions} />
           <main id="main" tabIndex={-1} className="mx-auto focus-visible:outline-none grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-8 sm:py-8 lg:gap-8">{children}</main>

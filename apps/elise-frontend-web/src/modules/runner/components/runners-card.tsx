@@ -1,25 +1,29 @@
-import { Suspense } from "react";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
-import { Laptop } from "lucide-react";
+import { Bot } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "#/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
-import { Skeleton } from "#/components/ui/skeleton";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { removeRunner } from "../api";
 import { RUNNER_STATE_COPY } from "../constants";
 import { runnerKeys, runnersQuery } from "../hooks";
 import type { Runner } from "../schemas";
-import { runnerAddedBy, runnerDetail } from "../utils";
-import { RunnerAddDialog } from "./runner-add-dialog";
+import { runnerAddedBy, runnerDetail, runnerShownState } from "../utils";
+import { useNow } from "#/lib/use-now";
 import { RunnerRemoveDialog } from "./runner-remove-dialog";
 
 type RunnerRow = { runner: Runner; busy: boolean; remove: () => Promise<void> };
 
 const column = dataTableColumns<RunnerRow>();
+
+function RunnerStateBadge({ runner }: { runner: Runner }) {
+  const now = useNow();
+  const state = RUNNER_STATE_COPY[runnerShownState(runner, now)];
+  return <Badge variant={state.variant}>{state.label}</Badge>;
+}
 
 const columns = column.columns([
   column.display({
@@ -35,10 +39,7 @@ const columns = column.columns([
   column.display({
     id: "state",
     header: "Status",
-    cell: ({ row }) => {
-      const state = RUNNER_STATE_COPY[row.original.runner.state];
-      return <Badge variant={state.variant}>{state.label}</Badge>;
-    },
+    cell: ({ row }) => <RunnerStateBadge runner={row.original.runner} />,
   }),
   column.display({
     id: "actions",
@@ -72,21 +73,16 @@ export function RunnersCard() {
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <div className="grid gap-1.5">
-          <CardTitle>Runners</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Computers you control that can run this account&apos;s scans, in place of Elise&apos;s cloud container.</p>
-        </div>
-        <Suspense fallback={<Skeleton className="h-8 w-32" />}>
-          <RunnerAddDialog />
-        </Suspense>
+      <CardHeader>
+        <CardTitle>All computers</CardTitle>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one runs scans while its Runner is open. Remove a computer to stop it taking scans.</p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         {rows.length === 0 ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <Laptop aria-hidden="true" />
+                <Bot aria-hidden="true" />
               </EmptyMedia>
               <EmptyTitle>No runners yet</EmptyTitle>
               <EmptyDescription>Add a computer to get a pairing code, then type the code into the Elise Runner app on it.</EmptyDescription>

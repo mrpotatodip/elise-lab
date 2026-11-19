@@ -30,11 +30,11 @@ function GithubConnectView({ canConnect }: GithubConnectCardProps) {
   const { connect } = useGithubActions();
 
   return (
-    <Card>
+    <Card className="max-w-4xl">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
         <div className="grid gap-1.5">
           <CardTitle>GitHub</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{installs.length === 0 ? (canConnect ? GITHUB_NOT_CONNECTED : GITHUB_ASK_ADMIN) : "Elise reads the repositories you chose. It can read code and cannot change it."}</p>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{installs.length === 0 ? (canConnect ? GITHUB_NOT_CONNECTED : GITHUB_ASK_ADMIN) : "Elise lists the repositories you chose and their branches. It cannot change them."}</p>
         </div>
         {canConnect && (
           <Button size="sm" variant={installs.length === 0 ? "default" : "outline"} disabled={connect.isPending} onClick={() => connect.mutate()}>

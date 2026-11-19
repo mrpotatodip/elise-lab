@@ -1,3 +1,4 @@
+import { RUNNER_OFFLINE_AFTER_MS, type RUNNER_STATE_COPY } from "../constants";
 import type { Runner } from "../schemas";
 
 const WHEN = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
@@ -5,6 +6,12 @@ const WHEN = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hou
 export const runnerWhen = (iso: string): string => {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : `${WHEN.format(date)} UTC`;
+};
+
+export const runnerShownState = (runner: Runner, nowMs: number): keyof typeof RUNNER_STATE_COPY => {
+  if (runner.state !== "connected") return runner.state;
+  const seenMs = runner.lastSeenAt === null ? Number.NaN : Date.parse(runner.lastSeenAt);
+  return Number.isNaN(seenMs) || nowMs - seenMs > RUNNER_OFFLINE_AFTER_MS ? "offline" : "connected";
 };
 
 // -----

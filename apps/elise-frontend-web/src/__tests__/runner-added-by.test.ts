@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runnerAddedBy } from "#/modules/runner/utils";
+import { runnerAddedBy, runnerShownState } from "#/modules/runner/utils";
 import type { Runner } from "#/modules/runner/schemas";
 
 const runner = (createdByName?: string | null): Runner => ({
@@ -11,6 +11,18 @@ const runner = (createdByName?: string | null): Runner => ({
   pairedAt: null,
   lastSeenAt: null,
   createdByName,
+});
+
+describe("whether a paired Runner is running", () => {
+  const now = Date.parse("2026-11-19T12:00:00.000Z");
+
+  it.each([
+    { seen: "2026-11-19T11:58:00.000Z", expected: "connected" },
+    { seen: "2026-11-19T11:50:00.000Z", expected: "offline" },
+    { seen: null, expected: "offline" },
+  ])("reads $expected when last seen $seen", ({ seen, expected }) => {
+    expect(runnerShownState({ ...runner(), lastSeenAt: seen }, now)).toBe(expected);
+  });
 });
 
 describe("who added a Runner", () => {

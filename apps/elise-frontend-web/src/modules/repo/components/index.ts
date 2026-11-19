@@ -3,6 +3,7 @@ export * from "./repo-detail-skeleton";
 export * from "./repo-list";
 export * from "./repo-list-skeleton";
 export * from "./repo-open-findings";
+export * from "./repo-summary";
 export * from "./repo-summary-strip";
 export * from "./repo-add-dialog";
 export * from "./repo-branch-switch";

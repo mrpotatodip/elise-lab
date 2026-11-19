@@ -1,21 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { GithubConnectCard, GithubReadableRepos, githubInstallationsQuery } from "#/modules/github";
-import { ShellPageHeader } from "#/modules/shell";
-import { hasAccessPower } from "@repo/contracts/elise";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/connections")({
-  head: () => ({ meta: [{ title: "Connections · Elise" }] }),
-  loader: ({ context }) => context.queryClient.query({ ...githubInstallationsQuery(), staleTime: "static" }),
-  component: ConnectionsPage,
+  head: () => ({ meta: [{ title: "Elise" }] }),
+  beforeLoad: () => {
+    throw redirect({ to: "/overview" });
+  },
 });
-
-function ConnectionsPage() {
-  const { user } = Route.useRouteContext();
-  return (
-    <>
-      <ShellPageHeader title="Connections" description="Where Elise reads your code from. Connect GitHub to scan your private repositories; public ones need no connection." />
-      <GithubConnectCard canConnect={hasAccessPower(user?.powers ?? [], "company:github:installations:create")} />
-      <GithubReadableRepos />
-    </>
-  );
-}

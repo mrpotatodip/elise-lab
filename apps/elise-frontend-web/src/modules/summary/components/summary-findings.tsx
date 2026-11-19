@@ -1,10 +1,12 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Link2 } from "lucide-react";
+import { ChevronUp, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "#/components/ui/collapsible";
 import { range, SkeletonBar } from "#/components/ui/skeleton";
+import { useHydrated } from "#/lib/use-hydrated";
 import { cn } from "#/lib/utils";
 import { repoFindingsQuery, type Repo, type RepoFinding } from "#/modules/repo";
 import { ScanSeverityBadge } from "#/modules/scan";
@@ -53,39 +55,54 @@ const scrollWhenLinked = (row: HTMLLIElement | null) => {
   if (row !== null && (row.id === hash || encodeURIComponent(row.id) === hash)) row.scrollIntoView({ block: "start" });
 };
 
-function SummaryFinding({ repoId, finding }: { repoId: string; finding: RepoFinding }) {
+function SummaryFinding({ repoId, finding, first }: { repoId: string; finding: RepoFinding; first: boolean }) {
   const needs = finding.status === "needs_validation" ? finding.needs : null;
   const where = findingWhere(finding);
+  const hasDetail = Boolean(finding.impact || finding.fix || needs);
+  const hydrated = useHydrated();
+  const hash = hydrated ? window.location.hash.slice(1) : "";
+  const linked = hash === findingAnchor(finding.id) || hash === encodeURIComponent(findingAnchor(finding.id));
+  const open = first || linked;
 
   return (
-    <li ref={scrollWhenLinked} id={findingAnchor(finding.id)} className="grid scroll-mt-20 gap-4 px-6 py-5 target:bg-accent/40 target:shadow-[inset_3px_0_0_0_var(--primary)]">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          {finding.severity !== null && <ScanSeverityBadge severity={finding.severity} />}
-          <Badge variant={stateVariant(finding)}>{findingStateLabel(finding)}</Badge>
-        </div>
-        <CopyLink repoId={repoId} finding={finding} />
-      </div>
-      <div className="grid gap-1.5">
-        <h3 className="max-w-copy text-[15px] font-semibold leading-relaxed">{finding.title}</h3>
-        {where && (
-          <p className="font-mono text-xs text-muted-foreground">
-            <span className="sr-only">{SUMMARY_COPY.whereLabel}: </span>
-            {where}
-          </p>
-        )}
-      </div>
-      {(finding.impact || finding.fix || needs) && (
-        <dl className="grid gap-x-12 gap-y-4 lg:grid-cols-2">
-          {finding.impact && <Fact label={SUMMARY_COPY.impactLabel}>{finding.impact}</Fact>}
-          {finding.fix && <Fact label={SUMMARY_COPY.fixLabel}>{finding.fix}</Fact>}
-          {needs && (
-            <Fact label={SUMMARY_COPY.needsLabel} className="lg:col-span-2">
-              {needs}
-            </Fact>
+    <li ref={scrollWhenLinked} id={findingAnchor(finding.id)} className="scroll-mt-20 target:bg-accent/40 target:shadow-[inset_3px_0_0_0_var(--primary)]">
+      <Collapsible key={open ? "open" : "closed"} defaultOpen={open}>
+        <div className="grid items-center gap-x-6 gap-y-2 px-6 py-4 lg:grid-cols-[12rem_minmax(0,1fr)_auto_auto]">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {finding.severity !== null && <ScanSeverityBadge severity={finding.severity} />}
+            <Badge variant={stateVariant(finding)}>{findingStateLabel(finding)}</Badge>
+          </div>
+          <div className="grid min-w-0 gap-0.5">
+            <h3 className="max-w-copy text-[15px] font-semibold leading-snug">{finding.title}</h3>
+            {where && (
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                <span className="sr-only">{SUMMARY_COPY.whereLabel}: </span>
+                {where}
+              </p>
+            )}
+          </div>
+          <CopyLink repoId={repoId} finding={finding} />
+          {hasDetail && (
+            <CollapsibleTrigger aria-label={`Read: ${finding.title}`} className="group inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              Read
+              <ChevronUp aria-hidden="true" className="size-4 rotate-180 transition-transform group-data-[panel-open]:rotate-0" />
+            </CollapsibleTrigger>
           )}
-        </dl>
-      )}
+        </div>
+        {hasDetail && (
+          <CollapsiblePanel>
+            <dl className="grid gap-x-12 gap-y-4 border-t bg-muted/30 px-6 py-5 lg:grid-cols-2">
+              {finding.impact && <Fact label={SUMMARY_COPY.impactLabel}>{finding.impact}</Fact>}
+              {finding.fix && <Fact label={SUMMARY_COPY.fixLabel}>{finding.fix}</Fact>}
+              {needs && (
+                <Fact label={SUMMARY_COPY.needsLabel} className="lg:col-span-2">
+                  {needs}
+                </Fact>
+              )}
+            </dl>
+          </CollapsiblePanel>
+        )}
+      </Collapsible>
     </li>
   );
 }
@@ -108,11 +125,7 @@ export function SummaryFindings({ repo }: { repo: Repo }) {
     <Card>
       <CardHeader className="gap-1.5">
         <CardTitle>{SUMMARY_COPY.findingsTitle}</CardTitle>
-        <div className="grid gap-x-10 gap-y-2 text-sm leading-relaxed text-muted-foreground lg:grid-cols-3">
-          <p className="max-w-copy">{SUMMARY_COPY.findingsNext}</p>
-          <p className="max-w-copy">{SUMMARY_COPY.findingsPrivate}</p>
-          <p className="max-w-copy">{SUMMARY_COPY.findingsLegend}</p>
-        </div>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one says where it is in the code, what could happen, and how your developer fixes it.</p>
       </CardHeader>
       {isPending ? (
         <FindingsPending />
@@ -131,8 +144,8 @@ export function SummaryFindings({ repo }: { repo: Repo }) {
             <p className="px-6 py-5 text-sm text-muted-foreground">{SUMMARY_COPY.nothingOpen}</p>
           ) : (
             <ul className="divide-y border-t">
-              {findings.map((finding) => (
-                <SummaryFinding key={finding.id} repoId={repo.id} finding={finding} />
+              {findings.map((finding, index) => (
+                <SummaryFinding key={finding.id} repoId={repo.id} finding={finding} first={index === 0} />
               ))}
             </ul>
           )}

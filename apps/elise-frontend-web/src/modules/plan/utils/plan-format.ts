@@ -16,7 +16,7 @@ export const PLAN_STATUS_VIEW = {
   incomplete: { label: "Not active yet", variant: "neutral", note: "The plan is not active yet." },
 } as const satisfies Record<NonNullable<PlanDetails["status"]>, StatusView>;
 
-export const planSourceLabel = (source: NonNullable<PlanDetails["source"]>) => (source === "grant" ? "Granted by us" : "Stripe");
+export const planSourceLabel = (source: NonNullable<PlanDetails["source"]>) => (source === "grant" ? "Granted by Elise, no invoice" : "Card, through Stripe");
 
 export const planKeyLabel = (keySource: NonNullable<PlanDetails["plan"]>["keySource"]) =>
   keySource === "account" ? "Your own Claude, through a Runner" : "Our key, paid with credit";
