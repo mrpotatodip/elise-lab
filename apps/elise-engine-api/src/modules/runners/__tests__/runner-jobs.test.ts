@@ -7,7 +7,7 @@ import { SCAN_PROFILE_CAPS_USD } from "#/constants";
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
-import { claimJobSvc, jobArchiveSvc, reportJobSvc } from "#/modules/runners/handlers";
+import { claimJobSvc, jobArchiveSvc, jobStateSvc, reportJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
 import { buildScanRecordSvc, writeScanRecordEffect } from "#/modules/scan-records";
@@ -169,6 +169,26 @@ describe("claiming a job", () => {
     await queue(await newScan());
 
     expect(await run(claimRunnerJobEffect(test.http, otherRunnerId, NOW))).toBeNull();
+  });
+});
+
+describe("reading a job's state", () => {
+  it("tells the Runner that holds the job its state, and claimed turns cancelled when the Scan is stopped", async () => {
+    const scanId = await queue(await newScan());
+    await run(claimRunnerJobEffect(test.http, runnerId, NOW));
+    const running = await run(jobStateSvc(test.http, runnerId, scanId));
+    await runnerSandbox(test.http, paramsFor(scanId), runnerId, () => NOW).destroy();
+    const stopped = await run(jobStateSvc(test.http, runnerId, scanId));
+
+    expect([running, stopped]).toEqual([{ state: "claimed" }, { state: "cancelled" }]);
+  });
+
+  it("does not find a job another Runner holds, or one that does not exist", async () => {
+    const scanId = await queue(await newScan());
+    const other = await Effect.runPromise(Effect.flip(jobStateSvc(test.http, otherRunnerId, scanId)));
+    const missing = await Effect.runPromise(Effect.flip(jobStateSvc(test.http, runnerId, "no-such-scan")));
+
+    expect([other._tag, missing._tag]).toEqual(["NotFound", "NotFound"]);
   });
 });
 

@@ -5,7 +5,7 @@ use crate::Exit;
 use elise_runner_core::login::{self, LoginError, Waited};
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
 use elise_runner_core::providers::Settings;
-use elise_runner_core::scan::{self, Claimed, Event, Stop, Stopper};
+use elise_runner_core::scan::{self, Claimed, Event, JobEnd, Stop, Stopper};
 use std::io::{BufRead, Write};
 use std::sync::Mutex;
 use tokio::signal::unix::{signal, SignalKind};
@@ -252,9 +252,23 @@ pub async fn run(store: &Store, once: bool) -> Exit {
         match claimed_even_if_stopped_meanwhile {
             Claimed::Job(job) => {
                 offline = false;
-                scan::run_job(&token, *job, &find_tools, &Settings::load(&settings_file()), &on_event, &stop).await;
-                if once || stop.is_stopped() {
-                    return if log.succeeded() { Exit::Ok } else { Exit::Error };
+                match scan::run_job(&token, *job, &find_tools, &Settings::load(&settings_file()), &on_event, &stop).await {
+                    JobEnd::Removed => {
+                        store.tokens().forget();
+                        eprintln!("Elise rejected the token during the Scan: the Runner was removed, so the Scan was stopped and the token was forgotten. Pair again with a new code.");
+                        return Exit::Revoked;
+                    }
+                    JobEnd::StoppedFromElise if once => return Exit::StoppedFromElise,
+                    JobEnd::StoppedFromElise => {
+                        if stop.is_stopped() {
+                            return stopped_idle();
+                        }
+                    }
+                    JobEnd::Ended => {
+                        if once || stop.is_stopped() {
+                            return if log.succeeded() { Exit::Ok } else { Exit::Error };
+                        }
+                    }
                 }
                 continue;
             }
@@ -329,6 +343,10 @@ impl ScanLog {
             Event::RepairStarted => "the repair run started: the check failed, the agent gets one run to fix it".to_string(),
             Event::ResultSent { sent: true } => "result sent to Elise".to_string(),
             Event::ResultSent { sent: false } => "the result could not be sent to Elise".to_string(),
+            Event::StoppedFromElise { kept, .. } => {
+                let kept = kept.map(|path| format!(" Work folder kept: {}", path.display())).unwrap_or_default();
+                format!("Scan stopped from Elise.{kept}")
+            }
             Event::Ended { ok, message, kept, .. } => {
                 *self.succeeded.lock().expect("the log is not poisoned") = ok;
                 let kept = kept.map(|path| format!(" Work folder kept: {}", path.display())).unwrap_or_default();

@@ -208,6 +208,7 @@ pub enum Event {
     PhaseEnded { phase: String, cost_usd: Option<f64>, pool_left_usd: f64 },
     RepairStarted,
     ResultSent { sent: bool },
+    StoppedFromElise { repo: String, kept: Option<PathBuf> },
     Ended { ok: bool, repo: String, message: String, kept: Option<PathBuf> },
 }
 
@@ -255,7 +256,9 @@ pub async fn work_loop(store: &dyn TokenStore, tools: FindTools<'_>, settings_fi
         if let Some(token) = store.token() {
             match claim(&token).await {
                 Claimed::Job(job) => {
-                    run_job(&token, *job, tools, &Settings::load(settings_file), on_event, &never).await;
+                    if run_job(&token, *job, tools, &Settings::load(settings_file), on_event, &never).await == JobEnd::Removed {
+                        store.forget();
+                    }
                     continue;
                 }
                 Claimed::Removed => store.forget(),
@@ -289,15 +292,86 @@ pub async fn claim(token: &str) -> Claimed {
     }
 }
 
-pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Settings, on_event: OnEvent<'_>, stop: &Stop) {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JobEnd {
+    Ended,
+    StoppedFromElise,
+    Removed,
+}
+
+#[derive(Clone, Copy)]
+enum Unwanted {
+    Cancelled,
+    Removed,
+}
+
+fn check_every() -> Duration {
+    #[cfg(debug_assertions)]
+    if let Some(millis) = std::env::var("ELISE_JOB_CHECK_MS").ok().and_then(|text| text.parse().ok()) {
+        return Duration::from_millis(millis);
+    }
+    POLL_EVERY
+}
+
+async fn watch_job(token: &str, scan_id: &str) -> Unwanted {
+    #[derive(Deserialize)]
+    struct JobState {
+        state: String,
+    }
+    loop {
+        sleep(check_every()).await;
+        let Ok(response) = client().get(format!("{}/runners/jobs/{scan_id}", engine_url())).bearer_auth(token).send().await else {
+            continue;
+        };
+        match response.status() {
+            StatusCode::UNAUTHORIZED => return Unwanted::Removed,
+            StatusCode::OK => {
+                if let Ok(Envelope { data: JobState { state } }) = response.json::<Envelope<JobState>>().await {
+                    if state == "cancelled" {
+                        return Unwanted::Cancelled;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Settings, on_event: OnEvent<'_>, stop: &Stop) -> JobEnd {
     let label = label_of(&job.repo);
     on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
 
     let work = std::env::temp_dir().join(format!("eliselab-runner-{}", job.scan_id));
-    let ended = match tools() {
-        Ok(tools) => execute(token, &tools, &job, settings, &work, on_event, stop).await,
-        Err(error) => Err(error),
+    let (job_stopper, job_stop) = Stopper::new();
+    let unwanted = std::sync::Mutex::new(None);
+    let ended = {
+        let running = async {
+            match tools() {
+                Ok(tools) => execute(token, &tools, &job, settings, &work, on_event, &job_stop).await,
+                Err(error) => Err(error),
+            }
+        };
+        let watching = async {
+            tokio::select! {
+                _ = stop.stopped() => {}
+                why = watch_job(token, &job.scan_id) => *unwanted.lock().expect("the flag is not poisoned") = Some(why),
+            }
+            job_stopper.stop();
+            std::future::pending::<()>().await
+        };
+        tokio::select! {
+            ended = running => ended,
+            _ = watching => unreachable!("the watch never ends"),
+        }
     };
+    if let Some(why) = unwanted.into_inner().expect("the flag is not poisoned") {
+        let kept = work.is_dir().then(|| work.clone());
+        on_event(Event::StoppedFromElise { repo: label, kept });
+        return match why {
+            Unwanted::Cancelled => JobEnd::StoppedFromElise,
+            Unwanted::Removed => JobEnd::Removed,
+        };
+    }
     let ended = ended.map_err(|error| blame_the_stop_for_any_failure_after_it(stop, error));
     let report = ended.unwrap_or_else(|error| failed_report(&work, error));
     let ok = report.state == "succeeded";
@@ -316,6 +390,7 @@ pub async fn run_job(token: &str, job: Job, tools: FindTools<'_>, settings: &Set
         },
         kept,
     });
+    JobEnd::Ended
 }
 
 fn blame_the_stop_for_any_failure_after_it(stop: &Stop, error: String) -> String {
