@@ -108,11 +108,7 @@ export function SummaryFindings({ repo }: { repo: Repo }) {
     <Card>
       <CardHeader className="gap-1.5">
         <CardTitle>{SUMMARY_COPY.findingsTitle}</CardTitle>
-        <div className="grid gap-x-10 gap-y-2 text-sm leading-relaxed text-muted-foreground lg:grid-cols-3">
-          <p className="max-w-copy">{SUMMARY_COPY.findingsNext}</p>
-          <p className="max-w-copy">{SUMMARY_COPY.findingsPrivate}</p>
-          <p className="max-w-copy">{SUMMARY_COPY.findingsLegend}</p>
-        </div>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one says where it is in the code, what could happen, and how your developer fixes it.</p>
       </CardHeader>
       {isPending ? (
         <FindingsPending />
