@@ -62,6 +62,14 @@ export const RUNNER_JOB_SOURCES_MAX = 10;
 export const RUNNER_JOB_SOURCE_NAME_MAX = 40;
 
 // -----
+// A Scan's Trace: the most entries one Scan keeps (a sanity cap, so a
+// runaway producer cannot fill the table) and the most one batch may
+// carry. A producer sends a batch every few seconds, far below both.
+// -----
+export const TRACE_ENTRIES_PER_SCAN_MAX = 5000;
+export const TRACE_BATCH_MAX = 500;
+
+// -----
 // Groups and team invites: caps the form and the
 // server share, so one Tenant cannot grow without
 // bound

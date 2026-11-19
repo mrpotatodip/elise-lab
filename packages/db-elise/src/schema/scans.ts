@@ -141,6 +141,8 @@ export const scans = pgTable(
     partial: boolean("partial"),
     // Set with the findings of a succeeded Runner Scan whose profile check ran: the profile it met (quick, standard or deep) or none. Null: not checked (a cloud Scan, a Partial Scan, a Scan that did not succeed, or a row from before this column). Plain text, not a database enum; the agent's own files are what it measures.
     profileMet: text("profile_met").$type<ProfileMetValue>(),
+    // The number of candidate Findings the Trace producer last reported while the Scan ran (a count, never a title). Null: no producer has sent one.
+    traceCandidateFindings: integer("trace_candidate_findings"),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),

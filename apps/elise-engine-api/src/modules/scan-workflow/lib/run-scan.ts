@@ -59,6 +59,16 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     }
   };
 
+  const sendTrace = async (ended: boolean) => {
+    if (sandbox.drainTrace === undefined) return;
+    try {
+      const entries = await sandbox.drainTrace(ended);
+      if (entries.length > 0) await deps.saveTrace(params, { entries });
+    } catch (cause) {
+      console.error("scan: could not send the trace", cause instanceof Error ? cause.message : cause);
+    }
+  };
+
   // -----
   // One Phase of a full Scan: start it and wait for it within its own
   // time slot. The Phases share one pool, the Scan's Budget cap. A Phase
@@ -80,7 +90,14 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
       await step.sleep(`wait-${phase}-${i}`, `${SCAN_WORKFLOW_POLL_SECONDS} seconds`);
       outcome = await step.do(`poll-${phase}-${i}`, async () => {
         const polled = await sandbox.pollAgent();
+        await sendTrace(false);
         return polled.state === "failed" ? { state: "failed" as const, error: polled.error } : { state: polled.state };
+      });
+    }
+    if (sandbox.drainTrace !== undefined) {
+      await step.do(`trace-end-${phase}`, async () => {
+        await sendTrace(true);
+        return true;
       });
     }
     if (outcome.state === "running") {

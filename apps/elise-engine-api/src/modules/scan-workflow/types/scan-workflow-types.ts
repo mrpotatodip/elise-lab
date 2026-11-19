@@ -1,4 +1,4 @@
-import type { ScanUsage } from "@repo/contracts/elise";
+import type { SaveTraceBody, ScanUsage, TraceEntry, TraceSaved } from "@repo/contracts/elise";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions, ScanParams, ScanState } from "#/schemas";
 import type { ScanRepo } from "#/modules/scan-ledger";
@@ -23,6 +23,12 @@ export type SandboxPort = {
   pollAgent: () => Promise<AgentState>;
   agentLogTail: () => Promise<string>;
   readUsage: () => Promise<ScanUsage | null>;
+  // -----
+  // The Trace entries that are new or grew in the running Phase's log
+  // since the last call, and a Phase's end marker when `ended`. Only
+  // the cloud Sandbox has it: a Runner sends its own entries.
+  // -----
+  drainTrace?: (ended: boolean) => Promise<TraceEntry[]>;
   readFiles: () => Promise<ScanFiles>;
   // -----
   // Only a sandbox that learns the commit after the agent ends has
@@ -48,6 +54,7 @@ export type ScanRunDeps = {
   reports: R2Bucket;
   sealedKeyFor: (accountId: string) => Promise<string | null>;
   recordScan: (params: ScanParams, status: ScanState, error: string | null, usage: ScanUsage | null) => Promise<void>;
+  saveTrace: (params: ScanParams, body: SaveTraceBody) => Promise<TraceSaved>;
   settleCredit: (params: ScanParams, status: "succeeded" | "failed", usage: ScanUsage | null) => Promise<void>;
 };
 

@@ -659,6 +659,13 @@
       "when": 1795019095582,
       "tag": "0093_runner_job_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1795057768378,
+      "tag": "0094_scan_trace_entries",
+      "breakpoints": true
     }
   ]
 }

@@ -2,8 +2,8 @@ import { z } from "zod";
 import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SourceProviderSchema, VerdictQuerySchema } from "@repo/contracts/elise";
 import { DEFAULT_SOURCE_PROVIDER_ID, isGitSourceProvider, sourceProviderOf } from "#/providers/registry";
 
-export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS, RepoDetailSchema, RepoListSchema, RepoParamSchema, ScanListSchema, ScanQueuedSchema, ScanStateSchema, ScanStatusSchema } from "@repo/contracts/elise";
-export type { Repo, RepoBranch, ScanState, ScanStatus, SourceProviderValue } from "@repo/contracts/elise";
+export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS, RepoDetailSchema, RepoListSchema, RepoParamSchema, ScanListSchema, ScanQueuedSchema, ScanStateSchema, ScanStatusSchema, TraceSchema } from "@repo/contracts/elise";
+export type { Repo, RepoBranch, ScanState, ScanStatus, SourceProviderValue, Trace, TraceEntry } from "@repo/contracts/elise";
 
 // -----
 // The repo is checked by the parser of the provider the plan
@@ -39,6 +39,8 @@ export const CreateScanInputSchema = z
   });
 
 export const ScanIdInputSchema = z.object({ scanId: z.string().regex(/^[\w-]+$/) });
+
+export const ScanTraceInputSchema = ScanIdInputSchema.extend({ after: z.string().optional() });
 
 export const ScanFileInputSchema = ScanIdInputSchema.extend({ file: z.string().regex(/^[\w.-]+$/) });
 

@@ -20,6 +20,7 @@ import meRoutes from "#/modules/me";
 import reposRoutes from "#/modules/repos";
 import runnersRoutes from "#/modules/runners";
 import scansRoutes from "#/modules/scans";
+import scanTraceRoutes from "#/modules/scan-trace";
 import signUpRoutes from "#/modules/sign-up";
 import teamRoutes from "#/modules/team";
 import type { QueuedEmail } from "#/modules/auth/types";
@@ -85,7 +86,7 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     return c.json({ data: null, error: { code: "INTERNAL_ERROR", message: "Internal server error" } }, 500);
   });
 
-  const routes = app.route("/scans", scansRoutes).route("/auth", authRoutes).route("/sign-up", signUpRoutes).route("/me", meRoutes).route("/usage", usageRoutes).route("/usage/anthropic-key", anthropicKeyRoutes).route("/usage/credit", creditRoutes).route("/usage/plan", planRoutes).route("/findings", findingsRoutes).route("/findings/comments", findingCommentsRoutes).route("/files", filesRoutes).route("/github", githubRoutes).route("/team", teamRoutes).route("/groups", groupsRoutes).route("/repos", reposRoutes).route("/repos", verdictRoutes).route("/repos", archivesRoutes).route("/runners", runnersRoutes);
+  const routes = app.route("/scans", scansRoutes).route("/scans", scanTraceRoutes).route("/auth", authRoutes).route("/sign-up", signUpRoutes).route("/me", meRoutes).route("/usage", usageRoutes).route("/usage/anthropic-key", anthropicKeyRoutes).route("/usage/credit", creditRoutes).route("/usage/plan", planRoutes).route("/findings", findingsRoutes).route("/findings/comments", findingCommentsRoutes).route("/files", filesRoutes).route("/github", githubRoutes).route("/team", teamRoutes).route("/groups", groupsRoutes).route("/repos", reposRoutes).route("/repos", verdictRoutes).route("/repos", archivesRoutes).route("/runners", runnersRoutes);
 
   // -----
   // The OpenAPI spec, for developers only.

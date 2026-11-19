@@ -4,7 +4,9 @@ import type { ScanUsage } from "@repo/contracts/elise";
 const Count = z.number().int().min(0).catch(0);
 
 // -----
-// The final report of `claude --print --output-format json`.
+// The final `result` line of `claude --print --output-format
+// stream-json --verbose`, which has the fields of the old single
+// JSON result.
 // Every field is optional: a missing one counts as zero.
 // -----
 const AgentResultSchema = z.object({
@@ -30,8 +32,8 @@ const parseResult = (text: string) => {
 };
 
 // -----
-// The log holds one JSON object. A stray line before it
-// is skipped: the last line that starts with "{" wins.
+// The log is one JSON object per line, the report last. A stray
+// line is skipped: the last line that starts with "{" wins.
 // -----
 export const parseAgentUsage = (log: string): ScanUsage | null => {
   const lastObjectLine = log.trim().split("\n").findLast((line) => line.startsWith("{"));
