@@ -6,6 +6,10 @@ import { TRACE_LABEL_COPY } from "../../constants";
 import { groupTraceByPhase, summarizeTraceGroup, traceAgo, traceSpan } from "../../utils";
 import { LABEL_ICON, isWork, tallyByLabel, type ConceptProps } from "./shared";
 
+function Count({ value }: { value: number }) {
+  return <span className="font-medium tabular-nums">×{value}</span>;
+}
+
 function Branch({ last, children }: { last: boolean; children: ReactNode }) {
   return (
     <li className="relative pl-6">
@@ -29,10 +33,19 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
           </span>
           <p className="flex-1 text-base font-semibold">
             {TRACE_LABEL_COPY[newest.label]}
-            {newest.count > 1 && <span className="font-normal text-muted-foreground tabular-nums"> ×{newest.count}</span>}
+            {newest.count > 1 && (
+              <>
+                {" "}
+                <Count value={newest.count} />
+              </>
+            )}
           </p>
           <p className="text-xs text-muted-foreground tabular-nums">{traceAgo(newest.endedAt, now)}</p>
-          {candidateFindings !== null && <p className="text-xs text-muted-foreground">{candidateFindings} candidates</p>}
+          {candidateFindings !== null && (
+            <p className="text-xs text-muted-foreground">
+              <span className="text-sm font-medium tabular-nums text-foreground">{candidateFindings}</span> candidates
+            </p>
+          )}
         </div>
       )}
       <ol>
@@ -69,14 +82,16 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                         <Branch key={entry.id} last={leaf === leaves.length - 1 && earlier === 0}>
                           <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
                           <span>{TRACE_LABEL_COPY[entry.label]}</span>
-                          {entry.count > 1 && <span className="text-muted-foreground tabular-nums">×{entry.count}</span>}
+                          {entry.count > 1 && <Count value={entry.count} />}
                           <span className="ml-auto text-xs text-muted-foreground tabular-nums">{traceAgo(entry.endedAt, now)}</span>
                         </Branch>
                       );
                     })}
                     {earlier > 0 && (
                       <Branch last>
-                        <span className="text-xs text-muted-foreground tabular-nums">{earlier} earlier</span>
+                        <span className="text-xs text-muted-foreground">
+                          <span className="text-sm font-medium tabular-nums text-foreground">{earlier}</span> earlier
+                        </span>
                       </Branch>
                     )}
                     {tally.map(({ label, count }, leaf) => {
@@ -85,7 +100,7 @@ export function ConceptTimeline({ entries, now, candidateFindings }: ConceptProp
                         <Branch key={label} last={leaf === tally.length - 1}>
                           <Icon aria-hidden="true" className="size-3.5 text-muted-foreground" />
                           <span>{TRACE_LABEL_COPY[label]}</span>
-                          <span className="ml-auto font-medium tabular-nums">{count}</span>
+                          <Count value={count} />
                         </Branch>
                       );
                     })}
