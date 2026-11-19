@@ -1,0 +1,20 @@
+{"type":"system","subtype":"init","session_id":"fixture-session","tools":["Read","Grep"],"model":"fixture-model"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"FIXTURE-THINKING"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"FIXTURE-TEXT"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_01","name":"Read","input":{"file_path":"fixture/placeholder-a"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_fixture_01","content":"FIXTURE-RESULT"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_02","name":"Glob","input":{"pattern":"fixture/*"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_03","name":"Grep","input":{"pattern":"FIXTURE-PATTERN"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_04","name":"Bash","input":{"command":"fixture-command"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_05","name":"Write","input":{"file_path":"fixture/placeholder-b","content":"FIXTURE-CONTENT"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_06","name":"Edit","input":{"file_path":"fixture/placeholder-b","old_string":"A","new_string":"B"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_07","name":"Task","input":{"prompt":"FIXTURE-PROMPT"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_08","name":"FixtureToolFromTheFuture","input":{}}]}}
+{"type":"assistant","parent_tool_use_id":"toolu_fixture_07","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_09","name":"Read","input":{"file_path":"fixture/placeholder-c"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"FIXTURE-THINKING"},{"type":"tool_use","id":"toolu_fixture_10","name":"Grep","input":{"pattern":"FIXTURE-PATTERN"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"image","source":"FIXTURE"}]}}
+{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}
+{"type":"fixture_line_type_from_the_future","payload":{"anything":true}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_fixture_11","name":"Read","input":{"file_path":"fixture/placeholder-d"
+not json at all
+{"type":"result","subtype":"success","is_error":false,"result":"FIXTURE-RESULT","total_cost_usd":0.5,"usage":{"input_tokens":1,"output_tokens":1}}
