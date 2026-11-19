@@ -20,6 +20,7 @@ import { Route as AppFilesRouteImport } from './routes/_app/files'
 import { Route as AppOverviewRouteImport } from './routes/_app/overview'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppTeamRouteImport } from './routes/_app/team'
+import { Route as DevTraceRouteImport } from './routes/dev.trace'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AppGithubCallbackRouteImport } from './routes/_app/github.callback'
 import { Route as AppReposIndexRouteImport } from './routes/_app/repos/index'
@@ -88,6 +89,11 @@ const AppTeamRoute = AppTeamRouteImport.update({
   id: '/team',
   path: '/team',
   getParentRoute: () => AppRouteRoute,
+} as any)
+const DevTraceRoute = DevTraceRouteImport.update({
+  id: '/dev/trace',
+  path: '/dev/trace',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
@@ -172,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/overview': typeof AppOverviewRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/team': typeof AppTeamRoute
+  '/dev/trace': typeof DevTraceRoute
   '/invite/$token': typeof InviteTokenRoute
   '/github/callback': typeof AppGithubCallbackRoute
   '/repos/$repoId': typeof AppReposRepoIdRoute
@@ -197,6 +204,7 @@ export interface FileRoutesByTo {
   '/files': typeof AppFilesRoute
   '/overview': typeof AppOverviewRoute
   '/team': typeof AppTeamRoute
+  '/dev/trace': typeof DevTraceRoute
   '/invite/$token': typeof InviteTokenRoute
   '/github/callback': typeof AppGithubCallbackRoute
   '/repos/$repoId': typeof AppReposRepoIdRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/_app/overview': typeof AppOverviewRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/team': typeof AppTeamRoute
+  '/dev/trace': typeof DevTraceRoute
   '/invite/$token': typeof InviteTokenRoute
   '/_app/github/callback': typeof AppGithubCallbackRoute
   '/_app/repos/$repoId': typeof AppReposRepoIdRoute
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/overview'
     | '/settings'
     | '/team'
+    | '/dev/trace'
     | '/invite/$token'
     | '/github/callback'
     | '/repos/$repoId'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/files'
     | '/overview'
     | '/team'
+    | '/dev/trace'
     | '/invite/$token'
     | '/github/callback'
     | '/repos/$repoId'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/_app/overview'
     | '/_app/settings'
     | '/_app/team'
+    | '/dev/trace'
     | '/invite/$token'
     | '/_app/github/callback'
     | '/_app/repos/$repoId'
@@ -328,6 +340,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
+  DevTraceRoute: typeof DevTraceRoute
   InviteTokenRoute: typeof InviteTokenRoute
 }
 
@@ -409,6 +422,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/team'
       preLoaderRoute: typeof AppTeamRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/dev/trace': {
+      id: '/dev/trace'
+      path: '/dev/trace'
+      fullPath: '/dev/trace'
+      preLoaderRoute: typeof DevTraceRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/invite/$token': {
       id: '/invite/$token'
@@ -574,6 +594,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
+  DevTraceRoute: DevTraceRoute,
   InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport

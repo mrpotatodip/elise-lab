@@ -20,6 +20,7 @@ export * from "./scan-new-dialog";
 export * from "./scan-status-badge";
 export * from "./scan-summary";
 export * from "./scan-trace";
+export * from "./scan-trace-preview";
 export * from "./scan-time";
 export * from "./scan-verdict-cell";
 export * from "./scan-success-ring";

@@ -1,3 +1,4 @@
+import { RUNNER_JOB_PHASE_VALUES, type RunnerJobPhaseValue } from "@repo/contracts/elise";
 import { TRACE_PHASE_COPY } from "../constants";
 import type { TraceEntry } from "../schemas";
 
@@ -17,6 +18,38 @@ export function groupTraceByPhase(entries: TraceEntry[]): TracePhaseGroup[] {
     else groups.push({ key: entry.id, title, entries: [entry] });
   }
   return groups;
+}
+
+// -----
+// One line for a Phase: how many entries it holds and how long it ran, from
+// its first start to its last end.
+// -----
+export function summarizeTraceGroup(entries: TraceEntry[]) {
+  const starts = entries.map((entry) => new Date(entry.startedAt).getTime());
+  const ends = entries.map((entry) => new Date(entry.endedAt).getTime());
+  return { entries: entries.length, spentMs: Math.max(...ends) - Math.min(...starts) };
+}
+
+export function traceSpan(ms: number) {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+export type TracePhaseState = "done" | "current" | "pending";
+export type TracePhaseStep = { phase: RunnerJobPhaseValue; state: TracePhaseState };
+
+// -----
+// Each Phase in run order with where it stands: done once it has an end
+// entry, current when it holds the newest entry of a running Scan.
+// -----
+export function tracePhaseStates(entries: TraceEntry[], active: boolean): TracePhaseStep[] {
+  const currentPhase = active ? entries[0]?.phase : null;
+  return RUNNER_JOB_PHASE_VALUES.map((phase) => {
+    const ended = entries.some((entry) => entry.phase === phase && entry.label === "phase_ended");
+    const state: TracePhaseState = ended ? "done" : phase === currentPhase ? "current" : "pending";
+    return { phase, state };
+  });
 }
 
 export function traceAgo(iso: string, now: number) {
