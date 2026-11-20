@@ -3,6 +3,7 @@
 // person's own login (their Claude subscription), and sends back what the agent wrote.
 
 use crate::engine::{client, engine_url, Envelope};
+use crate::git_access;
 use crate::providers::{clone_address, label_of, read_archive, Settings, JOB_SOURCES};
 use crate::store::{TokenStore, TOKEN_VARIABLE};
 use crate::trace;
@@ -487,6 +488,10 @@ async fn execute(
             let git_ref = job.git_ref.clone().unwrap_or_default();
             if !git_ref.is_empty() && !safe_ref(&git_ref) {
                 return Err("That branch, tag or commit name is not one this runner will fetch.".into());
+            }
+            tokio::select! {
+                access = git_access::check(&address) => access?,
+                _ = stop.stopped() => return Err(STOPPED.to_string()),
             }
             Some((address.clone_url, git_ref))
         }

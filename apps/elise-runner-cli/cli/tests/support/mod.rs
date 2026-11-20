@@ -631,6 +631,10 @@ impl Stubs {
         std::fs::read_to_string(self.record.join("git.txt")).unwrap_or_default()
     }
 
+    pub fn fail_branch_list(&self, stderr: &str) {
+        std::fs::write(self.record.join("ls-remote.stderr"), stderr).unwrap();
+    }
+
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
@@ -661,6 +665,7 @@ fn executable(path: &std::path::Path, text: &str) {
 const STUB_GIT: &str = r#"#!/bin/sh
 echo "$@" >> "__RECORD__/git.txt"
 case "$1" in
+  ls-remote) if [ -f "__RECORD__/ls-remote.stderr" ]; then cat "__RECORD__/ls-remote.stderr" >&2; exit 128; fi ;;
   clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
   -C) case "$3 $4" in
         "rev-parse HEAD") echo 0123456789abcdef0123456789abcdef01234567 ;;
