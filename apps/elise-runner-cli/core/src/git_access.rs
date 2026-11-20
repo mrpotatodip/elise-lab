@@ -32,19 +32,34 @@ pub fn classify(stderr: &str) -> Option<Failure> {
     }
 }
 
-pub fn message(address: &Address, failure: Failure) -> String {
-    let host = &address.host;
-    let path = &address.path;
-    let fix = login_fix(address);
+fn cause(host: &str, failure: Failure) -> String {
     match failure {
-        Failure::NoLogin => format!("This Runner cannot read {path} on {host}: git has no login for {host}. {fix}"),
-        Failure::Rejected => format!(
-            "This Runner cannot read {path} on {host}: the login git saved for {host} was rejected (it may have been revoked or expired). {fix}"
-        ),
+        Failure::NoLogin => format!("git has no login for {host}"),
+        Failure::Rejected => format!("the login git saved for {host} was rejected (it may have been revoked or expired)"),
+    }
+}
+
+pub fn message(address: &Address, failure: Failure) -> String {
+    let (host, path) = (&address.host, &address.path);
+    format!("This Runner cannot read {path} on {host}: {}. {}", cause(host, failure), login_fix(address))
+}
+
+pub async fn check_host(address: &Address) -> Result<(), String> {
+    let helper = Helper::for_host("doctor", &address.host)?;
+    match probe(address, helper.as_ref()).await {
+        Some(failure) => Err(format!("{}. {}", cause(&address.host, failure), login_fix(address))),
+        None => Ok(()),
     }
 }
 
 pub async fn check(address: &Address, helper: Option<&Helper>) -> Result<(), String> {
+    match probe(address, helper).await {
+        Some(failure) => Err(message(address, failure)),
+        None => Ok(()),
+    }
+}
+
+async fn probe(address: &Address, helper: Option<&Helper>) -> Option<Failure> {
     let mut command = Command::new("git");
     command
         .args(["ls-remote", "--heads", "--", &address.clone_url])
@@ -55,12 +70,9 @@ pub async fn check(address: &Address, helper: Option<&Helper>) -> Result<(), Str
     if let Some(helper) = helper {
         helper.apply(&mut command);
     }
-    let Ok(Ok(output)) = timeout(CHECK_TIMEOUT, command.output()).await else { return Ok(()) };
+    let Ok(Ok(output)) = timeout(CHECK_TIMEOUT, command.output()).await else { return None };
     if output.status.success() {
-        return Ok(());
+        return None;
     }
-    match classify(&String::from_utf8_lossy(&output.stderr)) {
-        Some(failure) => Err(message(address, failure)),
-        None => Ok(()),
-    }
+    classify(&String::from_utf8_lossy(&output.stderr))
 }
