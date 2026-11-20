@@ -3,6 +3,7 @@
 // person's own login (their Claude subscription), and sends back what the agent wrote.
 
 use crate::engine::{client, engine_url, Envelope};
+use crate::git_access;
 use crate::git_token;
 use crate::providers::{clone_address, label_of, read_archive, Settings, JOB_SOURCES};
 use crate::store::{TokenStore, TOKEN_VARIABLE};
@@ -489,7 +490,12 @@ async fn execute(
             if !git_ref.is_empty() && !safe_ref(&git_ref) {
                 return Err("That branch, tag or commit name is not one this runner will fetch.".into());
             }
-            Some((address.clone_url, git_ref, address.host))
+            let helper = git_token::Helper::for_host(&job.scan_id, &address.host)?;
+            tokio::select! {
+                access = git_access::check(&address, helper.as_ref()) => access?,
+                _ = stop.stopped() => return Err(STOPPED.to_string()),
+            }
+            Some((address.clone_url, git_ref, helper))
         }
         Source::Archive {} => None,
     };
@@ -502,10 +508,7 @@ async fn execute(
     }
 
     match clone {
-        Some((clone_url, git_ref, host)) => {
-            let helper = git_token::Helper::for_host(&job.scan_id, &host)?;
-            clone_repo(work, &clone_url, &git_ref, helper.as_ref(), stop).await?
-        }
+        Some((clone_url, git_ref, helper)) => clone_repo(work, &clone_url, &git_ref, helper.as_ref(), stop).await?,
         None => tokio::select! {
             read = read_archive(token, &job.scan_id, work) => read?,
             _ = stop.stopped() => return Err(STOPPED.to_string()),

@@ -4,6 +4,10 @@ use super::address::Address;
 
 pub(super) const HOST: &str = "github.com";
 
+pub(super) fn login_fix() -> String {
+    "Sign git in to GitHub: run `gh auth login`, then `gh auth setup-git` (GitHub CLI). Without the GitHub CLI, make a read-only token at https://github.com/settings/personal-access-tokens/new and give it to git's credential helper when git asks for a password.".to_string()
+}
+
 // Exactly an owner and a name, each letters, digits, `.`, `_` or `-`, with an optional `.git` or
 // trailing slash. The address is cloned as sent.
 pub(super) fn parse(rest: &str) -> Result<Address, String> {

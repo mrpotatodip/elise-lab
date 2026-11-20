@@ -631,6 +631,10 @@ impl Stubs {
         std::fs::read_to_string(self.record.join("git.txt")).unwrap_or_default()
     }
 
+    pub fn fail_branch_list(&self, stderr: &str) {
+        std::fs::write(self.record.join("ls-remote.stderr"), stderr).unwrap();
+    }
+
     pub fn git_config(&self) -> String {
         std::fs::read_to_string(self.record.join("git-config.txt")).unwrap_or_default()
     }
@@ -685,8 +689,9 @@ if [ -n "$GIT_CONFIG_COUNT" ]; then
     i=$((i + 1))
   done
 fi
-if [ -n "$STUB_GIT_FAILS" ]; then echo "fatal: Authentication failed" >&2; exit 128; fi
+if [ -n "$STUB_GIT_FAILS" ] && [ "$1" != ls-remote ]; then echo "fatal: Authentication failed" >&2; exit 128; fi
 case "$1" in
+  ls-remote) if [ -f "__RECORD__/ls-remote.stderr" ]; then cat "__RECORD__/ls-remote.stderr" >&2; exit 128; fi ;;
   clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
   -C) case "$3 $4" in
         "rev-parse HEAD") echo 0123456789abcdef0123456789abcdef01234567 ;;

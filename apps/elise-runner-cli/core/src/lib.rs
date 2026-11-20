@@ -1,4 +1,5 @@
 mod engine;
+pub mod git_access;
 mod git_token;
 pub mod login;
 pub mod pairing;

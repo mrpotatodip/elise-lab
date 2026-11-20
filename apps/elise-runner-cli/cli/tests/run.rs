@@ -232,6 +232,67 @@ fn a_gitlab_server_the_runner_does_not_list_is_refused_before_git_runs() {
     assert_eq!(stubs.git_calls(), "");
 }
 
+const NO_LOGIN: &str = "fatal: could not read Username for 'https://HOST': terminal prompts disabled\n";
+const REJECTED: &str = "remote: Invalid username or password.\nfatal: Authentication failed for 'https://HOST/acme/app.git/'\n";
+
+#[test]
+fn a_repo_git_cannot_log_in_to_fails_the_scan_with_the_host_and_the_fix_and_no_clone() {
+    for (repo, host, fix) in [
+        ("https://github.com/acme/app", "github.com", "gh auth login"),
+        ("https://gitlab.com/acme/app", "gitlab.com", "glab auth login"),
+        ("https://git.acme.dev/infra/app", "git.acme.dev", "credential helper"),
+    ] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        std::fs::write(runner.home.join("settings.json"), r#"{"gitlabHosts":["git.acme.dev"]}"#).unwrap();
+        let stubs = runner.stub_tools(&["claude", "node"]);
+        stubs.fail_branch_list(&NO_LOGIN.replace("HOST", host));
+        engine.queue_job(job_at("scan_10", repo, PLAIN));
+
+        let output = runner.run(&["run", "--once"], "");
+
+        assert_eq!(output.code, 1, "{repo}: {}{}", output.stdout, output.stderr);
+        let (_, result) = &engine.results()[0];
+        assert_eq!(result["state"], "failed", "{repo}");
+        let error = result["error"].as_str().unwrap();
+        assert!(error.contains(host) && error.contains(fix) && error.contains("no login"), "{repo}: {error}");
+        assert!(stubs.git_calls().contains("ls-remote"), "{repo}: {}", stubs.git_calls());
+        assert!(!stubs.git_calls().contains("clone"), "{repo}: {}", stubs.git_calls());
+    }
+}
+
+#[test]
+fn a_saved_login_the_host_rejects_gets_its_own_wording() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    stubs.fail_branch_list(&REJECTED.replace("HOST", "github.com"));
+    engine.queue_job(job_at("scan_11", "https://github.com/acme/app", PLAIN));
+
+    runner.run(&["run", "--once"], "");
+
+    let (_, result) = &engine.results()[0];
+    let error = result["error"].as_str().unwrap();
+    assert!(error.contains("github.com") && error.contains("rejected") && error.contains("gh auth login"), "{error}");
+    assert!(!stubs.git_calls().contains("clone"), "{}", stubs.git_calls());
+}
+
+#[test]
+fn a_passing_branch_list_prints_nothing_new_and_the_clone_goes_on() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job_at("scan_12", "https://github.com/acme/app", PLAIN));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    let calls = stubs.git_calls();
+    assert!(calls.starts_with("ls-remote --heads -- https://github.com/acme/app"), "{calls}");
+    assert!(calls.contains("clone --depth 1 -- https://github.com/acme/app repo"), "{calls}");
+    assert!(!output.stdout.contains("ls-remote") && !output.stdout.contains("login"), "{}", output.stdout);
+}
+
 // The Runner tells Elise which job sources it reads, so Elise hands it upload Scans.
 #[test]
 fn a_claim_reports_that_this_runner_reads_git_and_archives() {
