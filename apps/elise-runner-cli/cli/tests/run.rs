@@ -572,3 +572,74 @@ fn a_job_state_check_that_fails_does_not_stop_the_scan() {
         assert_eq!(engine.results()[0].1["state"], "succeeded", "{status}");
     }
 }
+
+const GIT_TOKEN: &str = "git-token-9d41c7e2";
+
+fn files_under(folder: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(folder).into_iter().flatten().map(|entry| entry.unwrap().path()) {
+        if entry.is_dir() {
+            found.extend(files_under(&entry));
+        } else {
+            found.push((entry.clone(), String::from_utf8_lossy(&std::fs::read(&entry).unwrap()).into_owned()));
+        }
+    }
+    found
+}
+
+#[test]
+fn a_git_token_reaches_the_clone_for_the_jobs_host_only_and_is_left_nowhere() {
+    for (repo, host, git_fails) in [
+        ("https://github.com/acme/widgets", "github.com", false),
+        ("https://github.com/acme/widgets", "github.com", true),
+        ("https://gitlab.com/acme/app", "gitlab.com", false),
+    ] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        runner.env.push(("ELISE_GIT_TOKEN", GIT_TOKEN.to_string()));
+        if git_fails {
+            runner.env.push(("STUB_GIT_FAILS", "1".to_string()));
+        }
+        let stubs = runner.stub_tools(&["claude", "node"]);
+        engine.queue_job(job_at("scan_17", repo, PLAIN));
+
+        let output = runner.run(&["run", "--once"], "");
+
+        assert_eq!(output.code, i32::from(git_fails), "{repo}: {}{}", output.stdout, output.stderr);
+        let key = format!("credential.https://{host}.helper=");
+        let config = stubs.git_config();
+        assert_eq!(config.lines().filter(|line| line.starts_with(&key)).count(), 2, "{repo}: {config}");
+        assert!(config.lines().all(|line| line.starts_with(&key)), "{repo}: the helper is set for another host too: {config}");
+        let answers = stubs.git_helper_answers();
+        assert_eq!(
+            answers.lines().collect::<Vec<_>>(),
+            [format!("{host} username=x-access-token"), format!("{host} password={GIT_TOKEN}")],
+            "{repo}"
+        );
+        assert!(!output.stdout.contains(GIT_TOKEN) && !output.stderr.contains(GIT_TOKEN));
+        for folder in [&stubs.tmp, &runner.home] {
+            let left: Vec<_> = files_under(folder).into_iter().filter(|(_, text)| text.contains(GIT_TOKEN)).map(|(path, _)| path).collect();
+            assert!(left.is_empty(), "{repo}: the token is left in {left:?}");
+        }
+        let in_tmp: Vec<_> = std::fs::read_dir(&stubs.tmp).unwrap().map(|entry| entry.unwrap().file_name()).collect();
+        let expected = if git_fails { vec![std::ffi::OsString::from("eliselab-runner-scan_17")] } else { vec![] };
+        assert_eq!(in_tmp, expected, "{repo}: the helper is left in the temporary folder");
+        if !git_fails {
+            let env = std::fs::read_to_string(stubs.record.join("env.txt")).unwrap();
+            assert!(!env.contains("ELISE_GIT_TOKEN") && !env.contains(GIT_TOKEN), "{env}");
+        }
+    }
+}
+
+#[test]
+fn without_a_git_token_the_clone_gets_no_helper() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job("scan_18", PLAIN));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    assert_eq!((stubs.git_config(), stubs.git_calls().is_empty()), (String::new(), false));
+}

@@ -635,6 +635,14 @@ impl Stubs {
         std::fs::write(self.record.join("ls-remote.stderr"), stderr).unwrap();
     }
 
+    pub fn git_config(&self) -> String {
+        std::fs::read_to_string(self.record.join("git-config.txt")).unwrap_or_default()
+    }
+
+    pub fn git_helper_answers(&self) -> String {
+        std::fs::read_to_string(self.record.join("git-helper.txt")).unwrap_or_default()
+    }
+
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
@@ -664,6 +672,24 @@ fn executable(path: &std::path::Path, text: &str) {
 
 const STUB_GIT: &str = r#"#!/bin/sh
 echo "$@" >> "__RECORD__/git.txt"
+# The credential helper the Runner set for this call, and what it answers for two hosts.
+if [ -n "$GIT_CONFIG_COUNT" ]; then
+  : > "__RECORD__/git-config.txt"
+  : > "__RECORD__/git-helper.txt"
+  i=0
+  while [ "$i" -lt "$GIT_CONFIG_COUNT" ]; do
+    eval "key=\$GIT_CONFIG_KEY_$i; value=\$GIT_CONFIG_VALUE_$i"
+    echo "$key=$value" >> "__RECORD__/git-config.txt"
+    case "$value" in
+      '!'*)
+        for host in github.com gitlab.com evil.example; do
+          printf 'protocol=https\nhost=%s\n\n' "$host" | sh -c "${value#!} get" | sed "s/^/$host /" >> "__RECORD__/git-helper.txt"
+        done ;;
+    esac
+    i=$((i + 1))
+  done
+fi
+if [ -n "$STUB_GIT_FAILS" ] && [ "$1" != ls-remote ]; then echo "fatal: Authentication failed" >&2; exit 128; fi
 case "$1" in
   ls-remote) if [ -f "__RECORD__/ls-remote.stderr" ]; then cat "__RECORD__/ls-remote.stderr" >&2; exit 128; fi ;;
   clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;

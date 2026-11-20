@@ -1,3 +1,4 @@
+use crate::git_token::Helper;
 use crate::providers::{login_fix, Address};
 use std::process::Stdio;
 use std::time::Duration;
@@ -43,7 +44,7 @@ pub fn message(address: &Address, failure: Failure) -> String {
     }
 }
 
-pub async fn check(address: &Address) -> Result<(), String> {
+pub async fn check(address: &Address, helper: Option<&Helper>) -> Result<(), String> {
     let mut command = Command::new("git");
     command
         .args(["ls-remote", "--heads", "--", &address.clone_url])
@@ -51,6 +52,9 @@ pub async fn check(address: &Address) -> Result<(), String> {
         .env("GIT_TERMINAL_PROMPT", "0")
         .stdin(Stdio::null())
         .kill_on_drop(true);
+    if let Some(helper) = helper {
+        helper.apply(&mut command);
+    }
     let Ok(Ok(output)) = timeout(CHECK_TIMEOUT, command.output()).await else { return Ok(()) };
     if output.status.success() {
         return Ok(());
