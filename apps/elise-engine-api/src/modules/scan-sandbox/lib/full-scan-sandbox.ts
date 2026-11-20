@@ -28,7 +28,7 @@ import {
   SCAN_SANDBOX_WORK_DIR,
 } from "#/modules/scan-sandbox/constants";
 import { drainTrace as drainLog, emptyTraceState, phaseMarker, type TraceState } from "#/modules/scan-trace/utils";
-import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, OutboundGithub, ScanCheckout } from "#/modules/scan-sandbox/types";
+import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, ScanCheckout } from "#/modules/scan-sandbox/types";
 import {
   agentErrorText,
   buildAgentPrompt,
@@ -116,9 +116,9 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   // it was fetched as a branch, nothing for a tag or a commit. A second call after a
   // retry finds the marker and returns the same commit.
   // -----
-  async prepare(repoUrl: string, ref?: string, github?: OutboundGithub, anthropicKey?: OutboundAnthropicKey): Promise<ScanCheckout> {
+  async prepare(repoUrl: string, ref?: string, anthropicKey?: OutboundAnthropicKey): Promise<ScanCheckout> {
     console.log("scan: starting container");
-    await this.#start(canonicalRepo(repoUrl), github, anthropicKey);
+    await this.#start(canonicalRepo(repoUrl), anthropicKey);
     if ((await this.#readText(SCAN_SANDBOX_CLONED_MARKER)) === null) {
       console.log("scan: cloning", repoUrl, ref ?? "");
       await this.#sh(buildCloneScript(), ref ? [repoUrl, ref] : [repoUrl], SCAN_SANDBOX_CLONE_GUARD_MS);
@@ -317,9 +317,9 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     }
   }
 
-  async #start(repo: string, github?: OutboundGithub, anthropicKey?: OutboundAnthropicKey): Promise<void> {
+  async #start(repo: string, anthropicKey?: OutboundAnthropicKey): Promise<void> {
     if (this.#container.running) return;
-    const outbound = this.#context.exports.Outbound({ props: { sandboxId: this.#context.id.toString(), repo, github, anthropicKey } });
+    const outbound = this.#context.exports.Outbound({ props: { sandboxId: this.#context.id.toString(), repo, anthropicKey } });
     this.#container.start({
       image: this.#container.images.sandbox,
       instance: SCAN_SANDBOX_INSTANCE_TYPE,

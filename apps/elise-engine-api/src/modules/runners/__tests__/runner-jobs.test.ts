@@ -304,13 +304,6 @@ describe("the runner as a sandbox", () => {
     expect(await sandbox.readCheckout()).toEqual({ commitSha: "b".repeat(40), branch: "main" });
   });
 
-  it("refuses a private repository before anything is queued", async () => {
-    const github = { installationRowId: crypto.randomUUID(), installationId: 1, repoId: 1, repo: "o/n", isPrivate: true };
-    const sandbox = runnerSandbox(test.http, paramsFor("job-scan-private", { github }), runnerId);
-
-    await expect(sandbox.prepare("https://github.com/o/n")).rejects.toThrow("private repository");
-  });
-
   it("keeps a Runner scan out of the month's scan count and counts a plain one", async () => {
     const monthStart = new Date("2026-11-01T00:00:00Z");
     const before = (await run(monthSpendEffect(test.http, tenantId, monthStart))).scans;

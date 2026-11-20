@@ -15,7 +15,6 @@ import { Segmented } from "#/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { cn } from "#/lib/utils";
-import { githubReposQuery } from "#/modules/github";
 import { RUNNER_GIT_LOGIN_HINT, runnersQuery } from "#/modules/runner";
 import {
   SCAN_DEFAULT_BRANCH,
@@ -23,7 +22,6 @@ import {
   SCAN_MODEL_OPTIONS,
   SCAN_OTHER_BRANCH,
   SCAN_PRIVATE_BRANCH_FAILED,
-  SCAN_PRIVATE_TRUNCATED,
   SCAN_PROFILE_OPTIONS,
   type ScanOption,
 } from "../constants";
@@ -128,23 +126,20 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions,
   // -----
   const [providerId, setProviderId] = useState<SourceProviderValue>(() => startProvider ?? (repo === undefined ? undefined : sourceProviderOfAddress(repo)?.id) ?? DEFAULT_SOURCE_PROVIDER_ID);
   const provider = sourceProviderOf(providerId);
-  const listsRepos = provider.capabilities.canListRepos;
   const hasBranches = provider.capabilities.hasBranches;
   const [startProblem, setStartProblem] = useState<string | null>(null);
   const [picked, setPicked] = useState<ScanRepoPick | null | undefined>(undefined);
   const [branchPick, setBranchPick] = useState(startRef ? SCAN_OTHER_BRANCH : (startBranch ?? SCAN_DEFAULT_BRANCH));
   const { data: list } = useQuery(scansQuery());
   const { data: repoList } = useQuery(scanReposQuery());
-  const { data: connected, isPending: connecting } = useQuery(githubReposQuery());
   const everyKnown = repoList ? scanRepoChoices(repoList.repos, list?.scans ?? []) : scanKnownRepos(list?.scans ?? []);
-  const picks = scanRepoPicks(everyKnown, connected ?? [], providerId);
+  const picks = scanRepoPicks(everyKnown, providerId);
   const fromProp = repo === undefined || provider.capabilities.isArchive ? null : (picks.find((item) => scanRepoPickSame(item.url, repo)) ?? scanRepoLinkPick(repo, providerId));
   // -----
   // The choice is remembered as a repository, not as the row that was clicked:
-  // the list changes when the GitHub connection's repositories arrive (a
-  // repository the account scanned turns out to be private), and the card
-  // must follow it. A pasted link is in no list, so it keeps its own row, and
-  // so does an upload app's pick, which carries its zip.
+  // the list changes as scans load, and the card must follow it. A pasted
+  // link is in no list, so it keeps its own row, and so does an upload app's
+  // pick, which carries its zip.
   // -----
   const selected = picked === undefined ? fromProp : picked === null ? null : picked.archive ? picked : (picks.find((item) => scanRepoPickSame(item.url, picked.url)) ?? picked);
   // -----
@@ -221,7 +216,6 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions,
                 key={provider.id}
                 provider={provider}
                 picks={picks}
-                loading={listsRepos && connecting}
                 onPick={choose}
                 hint={
                   provider.Help !== null ? (
@@ -254,7 +248,6 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions,
                   <AlertDescription>{SCAN_PRIVATE_BRANCH_FAILED}</AlertDescription>
                 </Alert>
               )}
-              {branches.truncated && <p className="px-1 text-sm leading-relaxed text-muted-foreground">{SCAN_PRIVATE_TRUNCATED}</p>}
               {typedBranch && (
                 <form.Field name="ref">
                   {(field) => (
@@ -381,7 +374,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions,
             {runner !== undefined ? `This audit runs on ${runner.name}'s own Claude. Elise charges nothing per audit. It stops at its own spend limit and shows what it would have cost.` : "Connect a Runner to start an audit."}
           </p>
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="submit" disabled={start.isPending || (listsRepos && connecting) || selected === null || selected.running || noRunner}>
+          <Button type="submit" disabled={start.isPending || selected === null || selected.running || noRunner}>
             {start.isPending ? "Starting…" : "Start audit"}
           </Button>
         </div>

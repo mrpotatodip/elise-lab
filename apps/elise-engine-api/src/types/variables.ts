@@ -5,7 +5,6 @@ import type { TenantDbType } from "#/lib/db-connection";
 import type { DbError, Invalid } from "#/lib/effect-query";
 import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
-import type { GithubAccess } from "#/modules/github-installs";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { MonthSpend } from "#/modules/usage";
 import type { FullScanSandbox } from "#/modules/scan-sandbox";
@@ -29,10 +28,6 @@ export type Bindings = {
   DATABASE_URL: string;
   HYPERDRIVE_TENANT: Hyperdrive;
   AUTH_SECRET: string;
-  GITHUB_APP_ID?: string;
-  GITHUB_APP_PRIVATE_KEY?: string;
-  GITHUB_APP_CLIENT_ID?: string;
-  GITHUB_APP_CLIENT_SECRET?: string;
   AUTH_BASE_URL: string;
   AUTH_TRUSTED_ORIGINS: string;
   SIGN_UP_LIMITER?: RateLimit;
@@ -58,7 +53,6 @@ export type Bindings = {
 // -----
 export type AppDeps = {
   scanRepo: (env: Bindings, db: TenantDbType) => ScanRepo;
-  githubAccess: (env: Bindings, accountId: string) => GithubAccess;
   monthSpend: (db: TenantDbType, accountId: string) => Effect.Effect<MonthSpend, DbError>;
   holdCredit: (db: TenantDbType, accountId: string, scanId: string, holdUsd: number) => Effect.Effect<HoldResult, DbError>;
   connectedRunnerSources: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<string[] | null, DbError>;

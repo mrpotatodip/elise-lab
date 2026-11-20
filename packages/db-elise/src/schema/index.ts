@@ -16,7 +16,6 @@ export * from "./tenant-anthropic-keys";
 export * from "./tenant-runners";
 export * from "./platform-runner-device-logins";
 export * from "./scan-runner-jobs";
-export * from "./tenant-github-installations";
 export * from "./tenant-groups";
 export * from "./scans";
 export * from "./scan-finding-comments";

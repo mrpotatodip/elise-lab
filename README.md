@@ -2,7 +2,7 @@
 
 EliseLAB runs a Claude Code security audit on a GitHub repo and keeps the report. You give it a repo URL. A Worker clones the repo into a Cloudflare sandbox, the agent reads the code and writes `findings.json` and a report, and the dashboard shows the result.
 
-Public repos work with no setup. Private repos need the GitHub App installed on the account (`docs/adr/0005-private-repos-github-app.md`).
+Public repos work with no setup. Private repos run on a Runner with the person's own Git login (`docs/adr/0010-runner-git-login.md`).
 
 ## How a scan runs
 
@@ -65,4 +65,4 @@ This runs `tsc`, oxlint and vitest for every project and prints one line per pro
 
 ## Decisions
 
-Architecture decision records are in `docs/adr/`: Repo history and team management, the ship verdict, Repo branches, private repos through the GitHub App, and the chat-bot packages.
+Architecture decision records are in `docs/adr/`: Repo history and team management, the ship verdict, Repo branches, private repos on a Runner, and the chat-bot packages.

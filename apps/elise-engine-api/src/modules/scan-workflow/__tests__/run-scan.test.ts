@@ -5,7 +5,7 @@ import type { ScanUsage } from "@repo/contracts/elise";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { memoryScanRepo } from "#/__tests__/memory-scan-repo";
 import type { ScanParams, ScanState } from "#/schemas";
-import { SCAN_SANDBOX_FULL_PHASES, type FullPhase, type OutboundAnthropicKey, type OutboundGithub } from "#/modules/scan-sandbox";
+import { SCAN_SANDBOX_FULL_PHASES, type FullPhase, type OutboundAnthropicKey } from "#/modules/scan-sandbox";
 import { runScan } from "#/modules/scan-workflow/lib";
 import type { SandboxPort } from "#/modules/scan-workflow/types";
 
@@ -56,12 +56,10 @@ const setup = (options: SetupOptions = {}) => {
   const ledger = memoryScanRepo();
   const bindings = fakeBindings();
   const prepares: { ref?: string }[] = [];
-  const githubs: (OutboundGithub | undefined)[] = [];
   const anthropicKeys: (OutboundAnthropicKey | undefined)[] = [];
   const sandbox: SandboxPort = {
-    prepare: async (_url, ref, github, anthropicKey) => {
+    prepare: async (_url, ref, anthropicKey) => {
       prepares.push({ ref });
-      githubs.push(github);
       anthropicKeys.push(anthropicKey);
       return { commitSha: "abc123", branch: ref && /^v\d/.test(ref) ? null : (ref ?? "main") };
     },
@@ -98,7 +96,7 @@ const setup = (options: SetupOptions = {}) => {
     saveTrace: async () => ({ accepted: 0, dropped: 0 }),
     settleCredit: async (_params: ScanParams, status: "succeeded" | "failed") => void settles.push(status),
   };
-  return { names, calls, ledger, bindings, prepares, githubs, anthropicKeys, settles, deps };
+  return { names, calls, ledger, bindings, prepares, anthropicKeys, settles, deps };
 };
 
 const failingSaveTrace = async () => Promise.reject(new Error("database down"));
@@ -226,19 +224,6 @@ describe("runScan", () => {
     expect(calls).toEqual(["record:succeeded:running", "destroy"]);
     expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded", error: null, usage, commitSha: "abc123" });
     expect(names.indexOf("record-scan-succeeded")).toBeLessThan(names.indexOf("status-succeeded"));
-  });
-
-  it("hands the clone the install and repo to sign for, and nothing else of the install", async () => {
-    const github = { installationRowId: "7c1e4a52-9d3b-4f60-8a71-2b3c4d5e6f70", installationId: 42, repoId: 7, repo: "octocat/hello-world", isPrivate: true };
-    const signed = setup();
-    await queue(signed.ledger, params({ github }));
-    await runScan(signed.deps, params({ github }), fakeStep(signed.names));
-    const open = setup();
-    await queue(open.ledger, params());
-    await runScan(open.deps, params(), fakeStep(open.names));
-
-    expect(signed.githubs).toEqual([{ installationId: 42, repoId: 7, repo: "octocat/hello-world" }]);
-    expect(open.githubs).toEqual([undefined]);
   });
 
   it("hands the sandbox the account's sealed Anthropic key, and nothing for an account on the platform key", async () => {

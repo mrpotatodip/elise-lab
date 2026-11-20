@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
 import { Skeleton } from "#/components/ui/skeleton";
-import { githubReposQuery } from "#/modules/github";
 import { scanReposQuery } from "../hooks";
 
 const loadScanNewForm = () => import("./scan-new-form");
@@ -27,13 +26,12 @@ export function ScanNewDialog({ label = "New scan", size = "sm", variant = "defa
   const queryClient = useQueryClient();
 
   // -----
-  // The form's code and the repositories it lists, scanned and on GitHub, load when the pointer or
+  // The form's code and the repositories it lists load when the pointer or
   // focus reaches the button, so the dialog opens with both already in hand.
   // -----
   const warm = () => {
     void loadScanNewForm();
     void queryClient.query(scanReposQuery()).catch(noop);
-    void queryClient.query(githubReposQuery()).catch(noop);
   };
 
   return (

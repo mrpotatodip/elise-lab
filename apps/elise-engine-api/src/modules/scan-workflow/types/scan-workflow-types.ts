@@ -2,14 +2,14 @@ import type { SaveTraceBody, ScanUsage, TraceEntry, TraceSaved } from "@repo/con
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions, ScanParams, ScanState } from "#/schemas";
 import type { ScanRepo } from "#/modules/scan-ledger";
-import type { AgentState, FullPhase, OutboundAnthropicKey, OutboundGithub, ScanCheckout } from "#/modules/scan-sandbox";
+import type { AgentState, FullPhase, OutboundAnthropicKey, ScanCheckout } from "#/modules/scan-sandbox";
 
 // -----
 // The sandbox as the Workflow uses it. Its Durable Object
 // stub fits, and a test can stand in a fake.
 // -----
 export type SandboxPort = {
-  prepare: (repoUrl: string, ref?: string, github?: OutboundGithub, anthropicKey?: OutboundAnthropicKey) => Promise<ScanCheckout>;
+  prepare: (repoUrl: string, ref?: string, anthropicKey?: OutboundAnthropicKey) => Promise<ScanCheckout>;
   launchAgent: (options: ScanOptions) => Promise<void>;
   // -----
   // The two calls of a full Scan's Phases. A Phase is one run of the agent;

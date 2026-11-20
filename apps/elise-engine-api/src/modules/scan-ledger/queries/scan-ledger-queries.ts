@@ -191,12 +191,8 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
       profile: params.options.profile,
       maxBudgetUsd: params.options.maxBudgetUsd.toFixed(2),
       keySource: params.keySource ?? "platform",
-      installationId: params.github?.installationRowId ?? null,
-      githubRepoId: params.github?.repoId ?? null,
-      isPrivate: params.github?.isPrivate ?? null,
       createdAt: new Date(params.createdAt),
     }),
-    ...(params.github ? [db.update(scanRepos).set({ isPrivate: params.github.isPrivate }).where(eq(scanRepos.id, repoId))] : []),
   ] as const;
 };
 

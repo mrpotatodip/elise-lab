@@ -7,7 +7,6 @@ import { linkScanArchiveEffect } from "#/modules/archives/queries";
 import { holdCreditEffect, settleCreditEffect } from "#/modules/credit";
 import { runnerIdentitySvc } from "#/modules/runners/handlers";
 import { findConnectedRunnerEffect } from "#/modules/runners/queries";
-import { githubAccessFor, neonInstallationRepo } from "#/modules/github-installs";
 import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
 import { tenantScanRepo } from "#/modules/scan-ledger";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
@@ -24,7 +23,6 @@ const sessionUserId = async (c: Context<AppEnv>): Promise<string | undefined> =>
 
 export const realAppDeps: AppDeps = {
   scanRepo: (_env, db) => tenantScanRepo(db),
-  githubAccess: (env, accountId) => githubAccessFor(env, neonInstallationRepo(dbConnect(env.DATABASE_URL)), accountId),
   monthSpend: (db, accountId) => monthSpendEffect(db, accountId, monthStartOf(new Date())),
   holdCredit: (db, accountId, scanId, holdUsd) => holdCreditEffect(db, { tenantId: accountId, scanId, holdUsd }),
   connectedRunnerSources: findConnectedRunnerEffect,

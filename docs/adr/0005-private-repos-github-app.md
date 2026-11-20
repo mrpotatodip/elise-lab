@@ -1,5 +1,7 @@
 # Private repos: a GitHub App, and the key stays outside the Container
 
+**Status: superseded by `0010-runner-git-login.md`. Retired in #277.** The GitHub App, the Install table, the `/github/*` routes and the credential the Outbound handler added are removed. Kept as history only.
+
 How a Scan reads a private GitHub repo in `apps/elise-engine-api`. Terms: `apps/elise-engine-api/GLOSSARY.md` (Install, Outbound handler, Allowlist). GitHub only; GitLab is not built.
 
 ## The rule

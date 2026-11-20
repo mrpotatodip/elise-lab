@@ -6,5 +6,4 @@
 export const SCAN_DEFAULT_BRANCH = "";
 export const SCAN_OTHER_BRANCH = "\u0000other";
 
-export const SCAN_PRIVATE_TRUNCATED = "Showing the first 100 branches. For any other, choose Other and type the exact name.";
 export const SCAN_PRIVATE_BRANCH_FAILED = "We couldn't read this repository's branches. Type the branch name below.";

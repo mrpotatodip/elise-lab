@@ -1,44 +1,24 @@
 import { describe, expect, it } from "vitest";
-import type { GithubRepo } from "#/modules/github";
 import type { KnownRepo } from "#/modules/scan/utils/scan-known-repos";
 import { scanRepoLinkPick, scanRepoPickMatches, scanRepoPicks } from "#/modules/scan/utils/scan-repo-picks";
 
 const known = (over: Partial<KnownRepo>): KnownRepo => ({ provider: "github", repoId: "r1", url: "https://github.com/acme/api", label: "acme/api", last: "succeeded", running: false, isPrivate: false, ...over });
-const connected = (over: Partial<GithubRepo>): GithubRepo => ({ installationId: "7", fullName: "acme/api", url: "https://github.com/acme/api", private: false, ...over });
 
 describe("scanRepoPicks", () => {
   it("lists a scanned public repository once, with its engine branches", () => {
-    const picks = scanRepoPicks([known({})], []);
+    const picks = scanRepoPicks([known({})]);
     expect(picks).toHaveLength(1);
-    expect(picks[0]).toMatchObject({ repoId: "r1", connection: null, isPrivate: false, note: "Last scan succeeded" });
-  });
-
-  it("merges a scanned repository with the connection that can read it, and takes privacy from the connection", () => {
-    const picks = scanRepoPicks([known({})], [connected({ private: true })]);
-    expect(picks).toHaveLength(1);
-    expect(picks[0]).toMatchObject({ repoId: "r1", isPrivate: true });
-    expect(picks[0]?.connection?.installationId).toBe("7");
-  });
-
-  it("drops a private scanned repository that no connection can read now", () => {
-    expect(scanRepoPicks([known({ isPrivate: true })], [])).toEqual([]);
-  });
-
-  it("adds connected repositories that were never scanned after the scanned ones", () => {
-    const picks = scanRepoPicks([known({})], [connected({ fullName: "acme/web", url: "https://github.com/acme/web", private: true })]);
-    expect(picks.map((item) => item.label)).toEqual(["acme/api", "acme/web"]);
-    expect(picks[1]).toMatchObject({ repoId: null, isPrivate: true, running: false });
+    expect(picks[0]).toMatchObject({ repoId: "r1", isPrivate: false, note: "Last scan succeeded" });
   });
 
   it("says a repository with a queued or running scan is running", () => {
-    expect(scanRepoPicks([known({ running: true })], [])[0]).toMatchObject({ running: true, note: "A scan is running now" });
+    expect(scanRepoPicks([known({ running: true })])[0]).toMatchObject({ running: true, note: "A scan is running now" });
   });
 
-  it("lists only the chosen provider's repositories, and GitHub connections only under github", () => {
+  it("lists only the chosen provider's repositories", () => {
     const repos = [known({}), known({ provider: "gitlab", repoId: "r2", url: "https://gitlab.com/acme/platform/api", label: "acme/platform/api" })];
-    const github = [connected({ fullName: "acme/web", url: "https://github.com/acme/web" })];
-    expect(scanRepoPicks(repos, github, "gitlab").map((item) => [item.provider, item.label])).toEqual([["gitlab", "acme/platform/api"]]);
-    expect(scanRepoPicks(repos, github, "github").map((item) => item.label)).toEqual(["acme/api", "acme/web"]);
+    expect(scanRepoPicks(repos, "gitlab").map((item) => [item.provider, item.label])).toEqual([["gitlab", "acme/platform/api"]]);
+    expect(scanRepoPicks(repos, "github").map((item) => item.label)).toEqual(["acme/api"]);
   });
 });
 
@@ -76,7 +56,7 @@ describe("scanRepoLinkPick", () => {
 });
 
 describe("scanRepoPickMatches", () => {
-  const picks = scanRepoPicks([known({}), known({ repoId: "r2", url: "https://github.com/honojs/hono", label: "honojs/hono" })], []);
+  const picks = scanRepoPicks([known({}), known({ repoId: "r2", url: "https://github.com/honojs/hono", label: "honojs/hono" })]);
 
   it("filters by name, ignoring case", () => {
     expect(scanRepoPickMatches(picks, "HONO").map((item) => item.label)).toEqual(["honojs/hono"]);

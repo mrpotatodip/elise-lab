@@ -673,6 +673,13 @@
       "when": 1795072183900,
       "tag": "0095_scan_state_stopped",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1795203740794,
+      "tag": "0096_retire_github_app",
+      "breakpoints": true
     }
   ]
 }

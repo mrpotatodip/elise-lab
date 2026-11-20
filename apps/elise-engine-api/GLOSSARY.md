@@ -1,6 +1,6 @@
 # EliseLAB Engine API Glossary
 
-The words used by the scan service: a Worker that clones a GitHub repo (public, or private through an Install) into a sandbox, runs an AI security review, and keeps the report. Use these words in route text, tickets and lessons.
+The words used by the scan service: a Worker that clones a public GitHub repo into a sandbox, runs an AI security review, and keeps the report. Use these words in route text, tickets and lessons.
 
 ## Parts
 
@@ -175,20 +175,16 @@ _Avoid_: Async run
 ## Safety and cost
 
 **Outbound handler**:
-Worker code that sees every network request the container makes and decides to block it or pass it on. It also adds the credentials the container never holds: the Anthropic key, and for a private Repo a one-hour GitHub token for that Scan's own repo (ADR 0005).
+Worker code that sees every network request the container makes and decides to block it or pass it on. It also adds the credential the container never holds: the Anthropic key. Git may read only that Scan's own public repo, with no credential (the GitHub App token of ADR 0005 is retired).
 _Avoid_: Proxy, firewall
 
 **Allowlist**:
 The short list of hosts the container may reach: `github.com` (only the read steps of git) and `api.anthropic.com`.
 _Avoid_: Whitelist
 
-**Install**:
-One installation of the EliseLAB GitHub App on a GitHub account, connected to one Account by a `tenant_admin` or `workspace_admin` (`tenant_github_installations`). It holds IDs and a status, never a token. Its status is `active`, `suspended` or `removed`, as the last check saw it. The dashboard calls it a connection ("Connections").
-_Avoid_: Integration, token, GitHub login
-
 **Private Scan**:
-A Scan whose Repo GitHub said is private when it was requested (`scans.is_private`), read through an active Install of its own Account. The Repo keeps the last answer for display only.
-_Avoid_: Authenticated scan
+A Scan of a private repo. It runs only on a Runner, which clones with the person's own Git login (ADR 0010); the cloud never reads a private repo, and there are no Installs or GitHub App any more (retired, #277). `scans.is_private` and `scan_repos.is_private` are kept for old rows and nothing writes them.
+_Avoid_: Authenticated scan, Install
 
 **Secret**:
 A value stored in the Worker, not in git, such as `ANTHROPIC_API_KEY` or `SCAN_API_TOKEN`.
@@ -259,7 +255,7 @@ A login whose Role is `workspace_watcher`: it holds only `company:summary:read`.
 _Avoid_: Viewer, guest
 
 **Audit trail**:
-`access_audit_log`. It holds every kind of change an Account makes to itself, each with the actor's Party and the Tenant in `after`: Team invites, Groups, triage decisions (`finding.triage.set`, `finding.risk.accepted`), comment deletes (`finding.comment.deleted`), GitHub installs, the monthly budget and the Anthropic key.
+`access_audit_log`. It holds every kind of change an Account makes to itself, each with the actor's Party and the Tenant in `after`: Team invites, Groups, triage decisions (`finding.triage.set`, `finding.risk.accepted`), comment deletes (`finding.comment.deleted`), the monthly budget and the Anthropic key.
 
 **Party**:
 Any actor that the system knows. Its type is a row in `party_master_types`: a Person or an Organization.
