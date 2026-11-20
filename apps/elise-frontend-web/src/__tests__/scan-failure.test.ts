@@ -34,8 +34,8 @@ describe("scanFailure", () => {
     expect(scanFailure(error).title).toBe(title);
   });
 
-  it("points a missing repository at the Connections page, since a private one looks the same", () => {
-    expect(scanFailure(NOT_FOUND).advice).toContain("Connections");
+  it("points a missing repository at `elise-runner doctor`, since a private one looks the same", () => {
+    expect(scanFailure(NOT_FOUND).advice).toContain("elise-runner doctor");
   });
 
   it("keeps git's own text as the detail", () => {
