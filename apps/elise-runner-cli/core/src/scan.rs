@@ -503,7 +503,6 @@ async fn execute(
 
     match clone {
         Some((clone_url, git_ref, host)) => {
-            // Held until the clone ends, success or failure: dropping it deletes the helper.
             let helper = git_token::Helper::for_host(&job.scan_id, &host)?;
             clone_repo(work, &clone_url, &git_ref, helper.as_ref(), stop).await?
         }

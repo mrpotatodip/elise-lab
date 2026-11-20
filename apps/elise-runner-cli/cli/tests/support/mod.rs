@@ -631,8 +631,6 @@ impl Stubs {
         std::fs::read_to_string(self.record.join("git.txt")).unwrap_or_default()
     }
 
-    // What the stub git was told by the Runner through `GIT_CONFIG_*`, and the lines the helper
-    // among them answered per host; both empty when the Runner set no helper.
     pub fn git_config(&self) -> String {
         std::fs::read_to_string(self.record.join("git-config.txt")).unwrap_or_default()
     }

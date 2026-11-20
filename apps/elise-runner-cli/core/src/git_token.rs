@@ -1,15 +1,8 @@
-// The opt-in git token of a headless Runner (CI, a container), which has no keychain to hold a
-// Git login. `ELISE_GIT_TOKEN` carries it. For one clone this builds a credential helper that
-// answers only for the host being cloned, hands it to git through `GIT_CONFIG_*` (so no file of
-// the checkout and no argument holds anything), and deletes the helper when dropped. The helper
-// script holds no token: it reads it from the clone's own environment.
-
 use std::fs;
 use std::path::PathBuf;
 
 pub const VARIABLE: &str = "ELISE_GIT_TOKEN";
 
-// The variable the clone's environment carries the token in, for the helper to read.
 const CLONE_VARIABLE: &str = "ELISE_CLONE_GIT_TOKEN";
 
 pub struct Helper {
@@ -19,8 +12,6 @@ pub struct Helper {
 }
 
 impl Helper {
-    // None when no token is set. The host is the one the validated address names, a plain host
-    // name, so it is safe in a shell test and in a git config key.
     pub fn for_host(scan_id: &str, host: &str) -> Result<Option<Helper>, String> {
         let Some(token) = std::env::var(VARIABLE).ok().map(|token| token.trim().to_string()).filter(|token| !token.is_empty()) else {
             return Ok(None);
@@ -29,12 +20,10 @@ impl Helper {
         let _ = fs::remove_dir_all(&folder);
         write_helper(&folder, host).map_err(|e| format!("Could not set up the git token for the clone: {e}"))?;
         let key = format!("credential.https://{host}.helper");
-        // The empty value first: the token wins over any other helper, the keychain's included.
         let config = vec![(key.clone(), String::new()), (key, format!("!'{}'", folder.join("helper.sh").display()))];
         Ok(Some(Helper { folder, token, config }))
     }
 
-    // What the clone's `git` processes are started with.
     pub fn apply(&self, command: &mut tokio::process::Command) {
         command.env("GIT_CONFIG_COUNT", self.config.len().to_string()).env(CLONE_VARIABLE, &self.token);
         for (index, (key, value)) in self.config.iter().enumerate() {

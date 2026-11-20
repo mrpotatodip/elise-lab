@@ -514,7 +514,6 @@ fn a_job_state_check_that_fails_does_not_stop_the_scan() {
 
 const GIT_TOKEN: &str = "git-token-9d41c7e2";
 
-// Every file under a folder, as text, to look for a token that was left behind.
 fn files_under(folder: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
     let mut found = Vec::new();
     for entry in std::fs::read_dir(folder).into_iter().flatten().map(|entry| entry.unwrap().path()) {
@@ -527,8 +526,6 @@ fn files_under(folder: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
     found
 }
 
-// ELISE_GIT_TOKEN is for a headless Runner with no keychain: the clone gets a temporary credential
-// helper for the job's host only, the agent never sees the token, and nothing of it is left behind.
 #[test]
 fn a_git_token_reaches_the_clone_for_the_jobs_host_only_and_is_left_nowhere() {
     for (repo, host, git_fails) in [
@@ -560,8 +557,7 @@ fn a_git_token_reaches_the_clone_for_the_jobs_host_only_and_is_left_nowhere() {
         );
         assert!(!output.stdout.contains(GIT_TOKEN) && !output.stderr.contains(GIT_TOKEN));
         for folder in [&stubs.tmp, &runner.home] {
-            let left: Vec<_> =
-                files_under(folder).into_iter().filter(|(_, text)| text.contains(GIT_TOKEN)).map(|(path, _)| path).collect();
+            let left: Vec<_> = files_under(folder).into_iter().filter(|(_, text)| text.contains(GIT_TOKEN)).map(|(path, _)| path).collect();
             assert!(left.is_empty(), "{repo}: the token is left in {left:?}");
         }
         let in_tmp: Vec<_> = std::fs::read_dir(&stubs.tmp).unwrap().map(|entry| entry.unwrap().file_name()).collect();
