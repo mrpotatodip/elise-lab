@@ -58,9 +58,9 @@ const FAILURE_CAUSES = [
   {
     test: /repository .*not found|could not read username|authentication failed|returned error: (401|403|404)/i,
     title: "Elise could not read this repository.",
-    advice: "Check that the link is correct. If the repository is private, connect GitHub on the Connections page and include this repository in the install.",
+    advice: "Check that the link is correct. If the repository is private, make sure this computer's git login can read it: run `elise-runner doctor`.",
   },
-  { test: /clone|could not read from remote/i, title: "The repository could not be cloned.", advice: "Check the link. If the repository is private, connect GitHub on the Connections page first." },
+  { test: /clone|could not read from remote/i, title: "The repository could not be cloned.", advice: "Check the link. If the repository is private, run `elise-runner doctor` to check this computer's git login." },
   // -----
   // Before the budget line: this text says "budget" among its guesses, and a
   // review that ended without a file is not a scan that hit its spend limit.
@@ -92,7 +92,7 @@ export function scanFailure(error: string | null | undefined) {
   const firstLine = raw.split("\n")[0]?.slice(0, 160) ?? "";
   return {
     title: cause?.title ?? (firstLine === "" ? "The scan failed." : firstLine),
-    advice: cause?.advice ?? "Start a new scan of this repository to try again. If it fails the same way, check the link, and connect GitHub first if the repository is private.",
+    advice: cause?.advice ?? "Start a new scan of this repository to try again. If it fails the same way, check the link, and run `elise-runner doctor` if the repository is private.",
     detail: raw === "" ? null : raw.length > DETAIL_LIMIT ? `${raw.slice(0, DETAIL_LIMIT)}\n... (${raw.length - DETAIL_LIMIT} more characters)` : raw,
   };
 }

@@ -2,6 +2,7 @@ use crate::browser;
 use crate::store::{settings_file, Store, TOKEN_VARIABLE};
 use crate::tools::Skill;
 use crate::Exit;
+use elise_runner_core::git_access;
 use elise_runner_core::login::{self, LoginError, Waited};
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
 use elise_runner_core::providers::Settings;
@@ -200,6 +201,94 @@ pub async fn status(store: &Store) -> Exit {
             println!("offline: Elise could not be reached.\nToken store: {place}");
             Exit::Offline
         }
+    }
+}
+
+async fn tool_output(program: &std::path::Path, args: &[&str]) -> Option<std::process::Output> {
+    let mut command = tokio::process::Command::new(program);
+    command.args(args).stdin(std::process::Stdio::null()).kill_on_drop(true);
+    tokio::time::timeout(std::time::Duration::from_secs(30), command.output()).await.ok()?.ok()
+}
+
+async fn git_installed() -> Result<String, String> {
+    let output = tool_output(std::path::Path::new("git"), &["--version"]).await.filter(|output| output.status.success());
+    match output {
+        Some(output) => Ok(Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| "installed".to_string())),
+        None => {
+            Err("git was not found on this computer. Install it from https://git-scm.com/downloads, then run doctor again.".to_string())
+        }
+    }
+}
+
+async fn claude_signed_in() -> Result<String, String> {
+    let Some(claude) = crate::tools::find_claude() else {
+        return Err("`claude` (Claude Code) was not found on this computer. Install Claude Code, then run `claude auth login` as the user the Runner runs as.".to_string());
+    };
+    match tool_output(&claude, &["auth", "status"]).await {
+        Some(output) if output.status.success() => Ok(format!("signed in ({})", claude.display())),
+        _ => Err("`claude` is not signed in. Run `claude auth login` as the user the Runner runs as.".to_string()),
+    }
+}
+
+async fn runner_paired(store: &Store) -> Result<String, String> {
+    match pairing::status(store.tokens()).await {
+        RunnerStatus::Connected { name, account_name } => Ok(format!("Runner \"{name}\" in {account_name}")),
+        RunnerStatus::Unpaired => {
+            Err("this computer is not paired. Run `elise-runner login`, or `elise-runner pair <code>` with a code from Elise.".to_string())
+        }
+        RunnerStatus::Revoked => {
+            Err("Elise rejected this Runner's token. Run `elise-runner login` or `elise-runner pair <code>` again.".to_string())
+        }
+        RunnerStatus::Offline => Err("Elise could not be reached. Check the connection, then run doctor again.".to_string()),
+    }
+}
+
+pub async fn doctor(store: &Store, named: &[String]) -> Exit {
+    let mut all_passed = true;
+    let mut report = |name: &str, result: Result<String, String>| match result {
+        Ok(detail) => println!("pass  {name}: {detail}"),
+        Err(fix) => {
+            all_passed = false;
+            println!("FAIL  {name}: {fix}");
+        }
+    };
+    let git = git_installed().await;
+    let git_found = git.is_ok();
+    report("git", git);
+    report("claude", claude_signed_in().await);
+    report("paired", runner_paired(store).await);
+
+    let settings = Settings::load(&settings_file());
+    if let Some(problem) = &settings.problem {
+        report("settings", Err(format!("the Runner's settings file was not used: {problem}.")));
+    }
+    let defaults = ["github.com".to_string(), "gitlab.com".to_string()];
+    let mut hosts: Vec<&String> = Vec::new();
+    for host in named.iter().chain(&settings.gitlab_hosts) {
+        if !hosts.contains(&host) {
+            hosts.push(host);
+        }
+    }
+    if hosts.is_empty() {
+        hosts.extend(defaults.iter());
+    }
+    for host in hosts {
+        if !git_found {
+            println!("skip  {host}: needs git");
+            continue;
+        }
+        let result = match elise_runner_core::providers::probe_address(host, &settings) {
+            Ok(address) => git_access::check_host(&address).await.map(|()| "git can read from this host".to_string()),
+            Err(refusal) => Err(refusal),
+        };
+        report(host, result);
+    }
+    if all_passed {
+        Exit::Ok
+    } else {
+        Exit::Error
     }
 }
 

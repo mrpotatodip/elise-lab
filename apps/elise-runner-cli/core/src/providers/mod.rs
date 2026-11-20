@@ -67,6 +67,18 @@ pub fn clone_address(repo: &str, settings: &Settings) -> Result<Address, String>
     }
 }
 
+pub fn probe_address(host: &str, settings: &Settings) -> Result<Address, String> {
+    clone_address(&format!("https://{host}/doctor/probe"), settings)
+}
+
+pub fn login_fix(address: &Address) -> String {
+    match address.provider {
+        "github" => github::login_fix(),
+        "gitlab" => gitlab::login_fix(),
+        _ => gitlab_sh::login_fix(&address.host),
+    }
+}
+
 // The job sources this Runner reads, sent with every claim: Elise hands an `archive` job (an
 // upload Scan) only to a Runner that lists it.
 pub const JOB_SOURCES: [&str; 2] = ["git", "archive"];

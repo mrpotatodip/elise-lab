@@ -56,6 +56,14 @@ impl Drop for Skill {
     }
 }
 
+pub fn find_claude() -> Option<PathBuf> {
+    if crate::store::debug_only_runner_home_override().is_some() {
+        on_path("claude")
+    } else {
+        Tools::locate(PathBuf::new()).claude
+    }
+}
+
 #[cfg(unix)]
 fn make_private_dir(dir: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::DirBuilderExt;

@@ -524,12 +524,22 @@ impl Runner {
     }
 
     pub fn stub_tools(&mut self, tools: &[&str]) -> Stubs {
+        self.stub_tool_folder(tools, true)
+    }
+
+    pub fn stub_tools_without_git(&mut self, tools: &[&str]) -> Stubs {
+        self.stub_tool_folder(tools, false)
+    }
+
+    fn stub_tool_folder(&mut self, tools: &[&str], with_git: bool) -> Stubs {
         let root = temp_home();
         let (bin, record, tmp) = (root.join("bin"), root.join("record"), root.join("tmp"));
         for dir in [&bin, &record, &tmp] {
             std::fs::create_dir_all(dir).unwrap();
         }
-        executable(&bin.join("git"), &STUB_GIT.replace("__RECORD__", &record.display().to_string()));
+        if with_git {
+            executable(&bin.join("git"), &STUB_GIT.replace("__RECORD__", &record.display().to_string()));
+        }
         for tool in tools {
             let text = match *tool {
                 "claude" => STUB_CLAUDE.replace("__RECORD__", &record.display().to_string()),
@@ -538,7 +548,8 @@ impl Runner {
             };
             executable(&bin.join(tool), &text);
         }
-        self.env.push(("PATH", format!("{}:/usr/bin:/bin", bin.display())));
+        let rest = if with_git { ":/usr/bin:/bin" } else { "" };
+        self.env.push(("PATH", format!("{}{rest}", bin.display())));
         self.env.push(("TMPDIR", tmp.display().to_string()));
         Stubs { record, tmp }
     }
@@ -631,6 +642,22 @@ impl Stubs {
         std::fs::read_to_string(self.record.join("git.txt")).unwrap_or_default()
     }
 
+    pub fn sign_claude_out(&self) {
+        std::fs::write(self.record.join("claude-signed-out"), "").unwrap();
+    }
+
+    pub fn fail_branch_list(&self, stderr: &str) {
+        std::fs::write(self.record.join("ls-remote.stderr"), stderr).unwrap();
+    }
+
+    pub fn git_config(&self) -> String {
+        std::fs::read_to_string(self.record.join("git-config.txt")).unwrap_or_default()
+    }
+
+    pub fn git_helper_answers(&self) -> String {
+        std::fs::read_to_string(self.record.join("git-helper.txt")).unwrap_or_default()
+    }
+
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
@@ -660,7 +687,26 @@ fn executable(path: &std::path::Path, text: &str) {
 
 const STUB_GIT: &str = r#"#!/bin/sh
 echo "$@" >> "__RECORD__/git.txt"
+# The credential helper the Runner set for this call, and what it answers for two hosts.
+if [ -n "$GIT_CONFIG_COUNT" ]; then
+  : > "__RECORD__/git-config.txt"
+  : > "__RECORD__/git-helper.txt"
+  i=0
+  while [ "$i" -lt "$GIT_CONFIG_COUNT" ]; do
+    eval "key=\$GIT_CONFIG_KEY_$i; value=\$GIT_CONFIG_VALUE_$i"
+    echo "$key=$value" >> "__RECORD__/git-config.txt"
+    case "$value" in
+      '!'*)
+        for host in github.com gitlab.com evil.example; do
+          printf 'protocol=https\nhost=%s\n\n' "$host" | sh -c "${value#!} get" | sed "s/^/$host /" >> "__RECORD__/git-helper.txt"
+        done ;;
+    esac
+    i=$((i + 1))
+  done
+fi
+if [ -n "$STUB_GIT_FAILS" ] && [ "$1" != ls-remote ]; then echo "fatal: Authentication failed" >&2; exit 128; fi
 case "$1" in
+  ls-remote) if [ -f "__RECORD__/ls-remote.stderr" ]; then cat "__RECORD__/ls-remote.stderr" >&2; exit 128; fi ;;
   clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
   -C) case "$3 $4" in
         "rev-parse HEAD") echo 0123456789abcdef0123456789abcdef01234567 ;;
@@ -670,6 +716,10 @@ esac
 "#;
 
 const STUB_CLAUDE: &str = r#"#!/bin/sh
+if [ "$1 $2" = "auth status" ]; then
+  if [ -f "__RECORD__/claude-signed-out" ]; then echo "Not logged in" >&2; exit 1; fi
+  echo "Logged in"; exit 0
+fi
 for a in "$@"; do prompt="$a"; done
 case "$prompt" in
   *phase=recon*)
