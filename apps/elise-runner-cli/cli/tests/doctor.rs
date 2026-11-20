@@ -37,15 +37,30 @@ fn doctor_with_everything_in_order_prints_a_pass_line_per_check_and_exits_0() {
 }
 
 #[test]
-fn doctor_without_a_host_to_check_says_how_to_name_one_and_still_exits_0() {
+fn doctor_without_a_host_to_check_checks_github_and_gitlab_com() {
     let engine = Engine::start();
     let mut runner = paired(&engine);
-    runner.stub_tools(&["claude"]);
+    let stubs = runner.stub_tools(&["claude"]);
 
     let output = runner.run(&["doctor"], "");
 
     assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
-    assert!(output.stdout.contains("elise-runner doctor github.com"), "{}", output.stdout);
+    let calls = stubs.git_calls();
+    assert!(calls.contains("https://github.com/") && calls.contains("https://gitlab.com/"), "{calls}");
+    assert!(output.stdout.contains("pass  github.com") && output.stdout.contains("pass  gitlab.com"), "{}", output.stdout);
+}
+
+#[test]
+fn a_host_git_cannot_reach_fails_with_the_tail_of_gits_message() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude"]);
+    stubs.fail_branch_list("fatal: unable to access 'https://github.com/doctor/probe.git/': Could not resolve host: github.com\n");
+
+    let output = runner.run(&["doctor", "github.com"], "");
+
+    assert_eq!(output.code, 1, "{}{}", output.stdout, output.stderr);
+    assert!(output.stdout.contains("FAIL  github.com") && output.stdout.contains("Could not resolve host"), "{}", output.stdout);
 }
 
 #[test]

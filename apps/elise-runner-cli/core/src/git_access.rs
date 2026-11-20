@@ -10,7 +10,15 @@ const CHECK_TIMEOUT: Duration = Duration::from_secs(60);
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Failure {
     NoLogin,
+    Forbidden,
     Rejected,
+}
+
+#[derive(Debug)]
+enum Probe {
+    Reachable,
+    Login(Failure),
+    Other(String),
 }
 
 pub fn classify(stderr: &str) -> Option<Failure> {
@@ -22,9 +30,10 @@ pub fn classify(stderr: &str) -> Option<Failure> {
         "invalid credentials",
         "http basic: access denied",
         "returned error: 401",
-        "returned error: 403",
     ]) {
         Some(Failure::Rejected)
+    } else if has(&["returned error: 403"]) {
+        Some(Failure::Forbidden)
     } else if has(&["could not read username", "could not read password", "terminal prompts disabled"]) {
         Some(Failure::NoLogin)
     } else {
@@ -35,6 +44,7 @@ pub fn classify(stderr: &str) -> Option<Failure> {
 fn cause(host: &str, failure: Failure) -> String {
     match failure {
         Failure::NoLogin => format!("git has no login for {host}"),
+        Failure::Forbidden => format!("git has no login for {host} that can read this repository"),
         Failure::Rejected => format!("the login git saved for {host} was rejected (it may have been revoked or expired)"),
     }
 }
@@ -47,19 +57,26 @@ pub fn message(address: &Address, failure: Failure) -> String {
 pub async fn check_host(address: &Address) -> Result<(), String> {
     let helper = Helper::for_host("doctor", &address.host)?;
     match probe(address, helper.as_ref()).await {
-        Some(failure) => Err(format!("{}. {}", cause(&address.host, failure), login_fix(address))),
-        None => Ok(()),
+        Probe::Reachable => Ok(()),
+        Probe::Login(failure) => Err(format!("{}. {}", cause(&address.host, failure), login_fix(address))),
+        Probe::Other(detail) => Err(format!("git could not reach {}: {detail}", address.host)),
     }
 }
 
 pub async fn check(address: &Address, helper: Option<&Helper>) -> Result<(), String> {
     match probe(address, helper).await {
-        Some(failure) => Err(message(address, failure)),
-        None => Ok(()),
+        Probe::Login(failure) => Err(message(address, failure)),
+        Probe::Reachable | Probe::Other(_) => Ok(()),
     }
 }
 
-async fn probe(address: &Address, helper: Option<&Helper>) -> Option<Failure> {
+fn tail(stderr: &str) -> String {
+    let lines: Vec<&str> = stderr.lines().map(str::trim).filter(|line| !line.is_empty()).collect();
+    let start = lines.len().saturating_sub(3);
+    lines[start..].join(" ")
+}
+
+async fn probe(address: &Address, helper: Option<&Helper>) -> Probe {
     let mut command = Command::new("git");
     command
         .args(["ls-remote", "--heads", "--", &address.clone_url])
@@ -70,9 +87,17 @@ async fn probe(address: &Address, helper: Option<&Helper>) -> Option<Failure> {
     if let Some(helper) = helper {
         helper.apply(&mut command);
     }
-    let Ok(Ok(output)) = timeout(CHECK_TIMEOUT, command.output()).await else { return None };
+    let output = match timeout(CHECK_TIMEOUT, command.output()).await {
+        Err(_) => return Probe::Other(format!("git did not answer within {} seconds", CHECK_TIMEOUT.as_secs())),
+        Ok(Err(error)) => return Probe::Other(error.to_string()),
+        Ok(Ok(output)) => output,
+    };
     if output.status.success() {
-        return None;
+        return Probe::Reachable;
     }
-    classify(&String::from_utf8_lossy(&output.stderr))
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    match classify(&stderr) {
+        Some(failure) => Probe::Login(failure),
+        None => Probe::Other(tail(&stderr)),
+    }
 }
