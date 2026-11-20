@@ -110,7 +110,7 @@ const columns = column.columns([
         <span className="grid gap-0.5">
           <span className="flex items-center gap-2.5">
             {repoStatus(repo) === "attention" ? (
-              <Link to="/summary/$repoId" params={{ repoId: repo.id }} className="rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Link to="/summary/$repoId" params={{ repoId: repo.id }} className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 {repoName(repo.url)}
               </Link>
             ) : (

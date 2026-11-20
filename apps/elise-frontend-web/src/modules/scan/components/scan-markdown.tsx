@@ -37,8 +37,8 @@ const components = {
       {children}
     </a>
   ),
-  code: (props) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-[12.5px] [overflow-wrap:anywhere]" />,
-  pre: (props) => <pre {...props} className="mt-3 overflow-x-auto rounded-md border bg-muted/50 p-3 font-mono text-[12.5px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0" />,
+  code: (props) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-[13px] [overflow-wrap:anywhere]" />,
+  pre: (props) => <pre {...props} className="mt-3 overflow-x-auto rounded-md border bg-muted/50 p-3 font-mono text-[13px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0" />,
   table: (props) => (
     <div className="mt-4 overflow-x-auto rounded-md border">
       <table {...props} className="w-full text-left text-sm" />

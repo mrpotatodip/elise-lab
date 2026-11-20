@@ -31,7 +31,7 @@ const columns = column.columns([
       return (
         <span className="grid gap-0.5">
           <span className="flex items-center gap-2">
-            <Link to="/repos/$repoId" params={{ repoId: repo.id }} className="rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Link to="/repos/$repoId" params={{ repoId: repo.id }} className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {repoName(repo.url)}
             </Link>
             <GithubPrivateBadge isPrivate={repo.isPrivate} />
@@ -58,7 +58,7 @@ const columns = column.columns([
               to="/repos/$repoId"
               params={{ repoId: repo.id }}
               search={{ branch }}
-              className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex min-h-6 items-center rounded-md bg-secondary px-2 font-mono text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {branch}
               {branch === repo.defaultBranch ? " (default)" : ""}

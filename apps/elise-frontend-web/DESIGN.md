@@ -29,16 +29,16 @@ All tokens are CSS variables in `src/styles/globals.css` (`:root`), mapped to Ta
 | Primary | `bg-primary` | 0.27, a deep dark gray, text on it near-white |
 | Accent as text or tint | `text-primary-ink` | 0.30 |
 
-- **Rule** Use semantic classes. No hex values and no raw palette classes (`bg-zinc-800`, `text-red-500`) in a feature module.
+- **Rule** Use semantic classes. No hex values and no raw palette classes (`bg-zinc-800`, `text-red-500`) in a feature module. *(lint: `no-raw-colors`)*
 - **Rule** Status colour is a pair: `text-status-x` on `bg-status-x-soft` with a `border-status-x/25` edge. The soft fill is the same hue at about 13% alpha, so it works on any surface. States: `success`, `danger`, `warning`, `info`, `neutral`.
 - **Rule** Severity has its own five tokens (`severity-critical`, `-high`, `-medium`, `-low`, `-informational`): red, orange, yellow, blue, gray. Use them for severity only.
-- **Rule** Ink and mark are two different jobs. A status or severity colour that carries **text** is an ink (`text-status-x`, `text-severity-x`) and has to clear 4.5:1. A colour used as a **shape** (a chart bar, a ring, a progress fill, a dot) is a mark (`bg-mark-success`, `-danger`, `-warning`, `-info`, `-neutral`, `-critical`, `-high`, `-medium`, `-low`, `-informational`): brighter and more saturated, opaque, and clearing 3:1 against a card. Never fill a shape with an ink at partial opacity: in Daylight that is what made the charts muddy. Measured 2026-11-09: marks are 3.09 or better in Default, 3.17 in Daylight and 6.13 in Moonlight; inks are 8.3 or better in all three. Daylight and Default share the marks (a teal-leaning green and a rose-leaning red that sit well on the pastel sky); Moonlight has its own, lighter set. Colour is never the only signal: every mark has a label or number beside it.
+- **Rule** Ink and mark are two different jobs. A status or severity colour that carries **text** is an ink (`text-status-x`, `text-severity-x`) and has to clear 4.5:1. A colour used as a **shape** (a chart bar, a ring, a progress fill, a dot) is a mark (`bg-mark-success`, `-danger`, `-warning`, `-info`, `-neutral`, `-critical`, `-high`, `-medium`, `-low`, `-informational`): brighter and more saturated, opaque, and clearing 3:1 against a card. Never fill a shape with an ink at partial opacity: in Daylight that is what made the charts muddy. *(lint: `no-off-design-classes` catches a solid `bg-status-x`, a mark at partial opacity and `text-mark-x`; the contrast numbers stay a browser check)* Measured 2026-11-09: marks are 3.09 or better in Default, 3.17 in Daylight and 6.13 in Moonlight; inks are 8.3 or better in all three. Daylight and Default share the marks (a teal-leaning green and a rose-leaning red that sit well on the pastel sky); Moonlight has its own, lighter set. Colour is never the only signal: every mark has a label or number beside it.
 - **Verified** Contrast: body text on a card is above 9:1, muted text above 5:1, and the primary button is near-white on dark gray at well above 4.5:1 (Lighthouse reports 100 for accessibility). Status and severity inks are deliberately dark (lightness 0.38 to 0.44) so they read on the light surfaces and on their own tinted fills.
 - **Verified** System font stacks only. No web fonts. Code, file paths, model names and report text use `font-mono`.
 - **Verified** Radius `--radius: 0.75rem`. Cards use `rounded-xl`, controls `rounded-lg`, pills `rounded-full`.
 - **Verified** Elevation tokens: `shadow-card` (cards), `shadow-raised` (the auth card, toasts), `shadow-control` (outline buttons, inputs), `shadow-primary` (the accent button, with a soft accent glow).
 - **Verified** One soft white glow at the top right of the page (`body` background).
-- **Verified** Icons are `lucide-react` at one thin stroke (1.5), set once for every `svg.lucide` in `globals.css`.
+- **Verified** Icons are `lucide-react` at one thin stroke (1.5), set once for every `svg.lucide` in `globals.css`. *(lint: `no-off-design-classes` rejects any other `strokeWidth`, and raw or arbitrary shadows, arbitrary radius and off-scale `text-[Npx]`)*
 
 ## Layout
 
@@ -99,7 +99,7 @@ All tokens are CSS variables in `src/styles/globals.css` (`:root`), mapped to Ta
 ## Text and spacing
 
 - **Rule** Reading text (a hint, an explanation, an impact line) is 14px or larger, has a line height of 1.5 or more, and runs at most about 65 characters per line (`max-w-copy`, 52ch: Tailwind's `max-w-prose` is 65ch, which fits 71 to 80 letters of this font). 12px is for labels, table headers, badges, timestamps and file paths.
-- **Rule** A link or control is at least 24px tall (`min-h-6`), a button or select at least 32px. Space follows one scale: 6px from a heading to its hint, 12px from a hint to its object, 24px between groups, 32px between cards. Measure it with `measure.js` in the `chrome-review` skill, and do not judge it by eye.
+- **Rule** A link or control is at least 24px tall (`min-h-6`), a button or select at least 32px. *(lint: `require-link-target-size` for a link outside a sentence; `no-off-design-classes` bans `max-w-prose` for `max-w-copy`)* Space follows one scale: 6px from a heading to its hint, 12px from a hint to its object, 24px between groups, 32px between cards. Measure it with `measure.js` in the `chrome-review` skill, and do not judge it by eye.
 
 ## Design standard
 

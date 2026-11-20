@@ -116,7 +116,7 @@ export function ScanDiffCard({ scanId }: { scanId: string }) {
           <Link
             to="/scans/$scanId"
             params={{ scanId: data.previousScanId }}
-            className="rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-6 items-center rounded-sm text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Open the previous scan
           </Link>

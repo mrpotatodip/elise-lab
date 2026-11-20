@@ -72,7 +72,7 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
                 {index > 0 && <BreadcrumbSeparator />}
                 <BreadcrumbItem className="min-w-0">
                   {crumb.to ? (
-                    <Link to={crumb.to} className="rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Link to={crumb.to} className="inline-flex min-h-6 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {crumb.label}
                     </Link>
                   ) : crumb.branch ? (
@@ -80,7 +80,7 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
                       to="/repos/$repoId/branches/$branchId"
                       params={crumb.branch}
                       title={crumb.label}
-                      className="block truncate rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="block min-h-6 truncate rounded-sm leading-6 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {crumb.label}
                     </Link>

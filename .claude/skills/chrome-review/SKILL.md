@@ -19,6 +19,8 @@ claude mcp add chrome-devtools --scope project -- npx -y chrome-devtools-mcp@lat
 
 Take the URL from the user. With none given, find the dev script and port in the project's `package.json` or framework config, and start it in the background if nothing answers. `navigate_page` to the route under review. Done when `take_snapshot` shows the route's content, not an error or a login wall. On the Elise dashboard a login wall means the MCP's Chrome profile has no `elise_session` cookie (it lasts 7 days): ask the user to sign in once in that window, then continue. Never ask for or type their password.
 
+The server must run from the checkout under review: a dev server started from another worktree serves that worktree's pages, and every measurement describes the wrong code. `node .claude/skills/chrome-review/measure-routes.mjs <routes>` checks it and exits with the fix when the server's directory differs; run it before the first measurement (for one page, the check alone is `lsof -a -p $(lsof -ti tcp:3100 | head -1) -d cwd`).
+
 If navigation fails because another instance holds the browser ("already running", profile lock), kill that instance and retry:
 
 ```
@@ -47,6 +49,7 @@ Run every pass; each ends with a finding or an explicit "clean".
 
 - **Look**: `take_screenshot` at desktop, then `resize_page` to phone width and again. Compare against the project's design doc or style guide if one exists. A full-page screenshot draws a sticky sidebar and top bar over the middle of the page: crop one region with `uid`, or take the viewport.
 - **Measure**: pass `measure.js` (next to this file) as the `function` of `evaluate_script`. It returns the type sizes, contrast under 4.5:1, paragraph line height and length, targets under 24px and heading gaps. A design finding about size, space or contrast cites these numbers. `needsEyes.textOnGlass` counts the text on translucent surfaces, whose contrast the script cannot see: an empty `contrastBelow4_5` does not clear it. Read those on the screenshot, in every theme.
+- **Sweep**: for several routes at once, run `measure-routes.mjs /a /b /c` and pass the file it writes (`.review/measure-routes.js`) as `sourcePath` of one `evaluate_script` call. It reports per route where it ended up (a redirect shows), contrast, small targets, paragraphs off the line rules, and links to pages for the next run's dynamic routes. A finding in the sweep is confirmed with the single-page pass above.
 - **Console**: `list_console_messages`; every error and warning accounted for.
 - **Network**: `list_network_requests`; every 4xx/5xx and slow request accounted for.
 - **Behaviour**: drive the changed flow with `click`, `fill`, `press_key`; re-check console and network after each action.
