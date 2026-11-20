@@ -116,6 +116,10 @@ _Avoid_: Project, target
 Where the code of a Scan comes from: `github`, `gitlab`, `gitlab-sh` or `upload`. The user picks it first, and each Provider is its own flow with its own address or file rules, contract schemas and dashboard screens. Core knows only the `SourceProvider` port and one registry, and lint fails when core reads a Provider's folder or one Provider reads another. A request with no `provider` means `github`. On a Runner the clone happens on the user's computer with their own git login, so EliseLAB stores no token for any Provider. `gitlab-sh` takes only hosts the user listed in their own Runner settings: a host that only the job names is refused. ADR 0008 (git providers) holds the rules.
 _Avoid_: Source (too loose), host (that is the server inside an address)
 
+**Git login**:
+The credentials the git on a Runner's computer already holds for a host (a credential helper, the keychain, or a token the person sets for a headless Runner). A Runner clones with it, so a private repo or a locked GitLab server works when the person's own git can read it. EliseLAB never sees or stores it. A public repo needs none, though a saved login that the host rejects can still fail a public clone.
+_Avoid_: Connection, token (that is the Runner token)
+
 **Upload app**:
 A named app whose code comes from zips the user uploaded, not from a git host: a Repo with Provider `upload`, the name as its path, no host and one hidden Branch named `upload`. The name is unique inside an Account. All its zips are versions of the same code and share one History, with the Archive's content hash standing in for the commit.
 _Avoid_: Project, upload (as a noun for the zip: that is an Archive)
