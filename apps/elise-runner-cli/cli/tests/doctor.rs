@@ -64,6 +64,24 @@ fn a_host_git_cannot_reach_fails_with_the_tail_of_gits_message() {
 }
 
 #[test]
+fn a_host_that_answers_not_found_for_the_probe_path_passes() {
+    for stderr in [
+        "remote: Repository not found.\nfatal: repository 'https://github.com/doctor/probe/' not found\n",
+        "remote: The project you were looking for could not be found or you don't have permission to view it.\nfatal: repository 'https://gitlab.com/doctor/probe.git/' not found\n",
+    ] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        let stubs = runner.stub_tools(&["claude"]);
+        stubs.fail_branch_list(stderr);
+
+        let output = runner.run(&["doctor", "github.com"], "");
+
+        assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+        assert!(output.stdout.contains("pass  github.com"), "{}", output.stdout);
+    }
+}
+
+#[test]
 fn a_failing_check_prints_its_fix_the_others_still_run_and_the_exit_is_1() {
     for (broken, fix) in [
         ("git", "https://git-scm.com"),

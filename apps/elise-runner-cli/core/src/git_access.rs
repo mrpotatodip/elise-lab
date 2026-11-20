@@ -70,6 +70,11 @@ pub async fn check(address: &Address, helper: Option<&Helper>) -> Result<(), Str
     }
 }
 
+fn answered_not_found(stderr: &str) -> bool {
+    let text = stderr.to_ascii_lowercase();
+    text.contains("repository not found") || text.contains("could not be found") || text.contains("returned error: 404")
+}
+
 fn tail(stderr: &str) -> String {
     let lines: Vec<&str> = stderr.lines().map(str::trim).filter(|line| !line.is_empty()).collect();
     let start = lines.len().saturating_sub(3);
@@ -98,6 +103,7 @@ async fn probe(address: &Address, helper: Option<&Helper>) -> Probe {
     let stderr = String::from_utf8_lossy(&output.stderr);
     match classify(&stderr) {
         Some(failure) => Probe::Login(failure),
+        None if answered_not_found(&stderr) => Probe::Reachable,
         None => Probe::Other(tail(&stderr)),
     }
 }
