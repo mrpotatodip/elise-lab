@@ -1,14 +1,11 @@
 import { queryOptions } from "@tanstack/react-query";
-import { fetchGithubBranches, fetchGithubInstallations, fetchGithubRepos } from "../api";
+import { fetchGithubBranches, fetchGithubRepos } from "../api";
 
 export const githubKeys = {
   all: ["github"] as const,
-  installations: () => [...githubKeys.all, "installations"] as const,
   repos: () => [...githubKeys.all, "repos"] as const,
   branches: (installationId: string, repo: string) => [...githubKeys.all, "branches", installationId, repo] as const,
 };
-
-export const githubInstallationsQuery = () => queryOptions({ queryKey: githubKeys.installations(), queryFn: () => fetchGithubInstallations() });
 
 // -----
 // A branch list can change at any push, so it is kept a minute and then read again.

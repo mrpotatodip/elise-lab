@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { cn } from "#/lib/utils";
 import { githubReposQuery } from "#/modules/github";
-import { runnersQuery } from "#/modules/runner";
+import { RUNNER_GIT_LOGIN_HINT, runnersQuery } from "#/modules/runner";
 import {
   SCAN_DEFAULT_BRANCH,
   SCAN_EFFORT_OPTIONS,
@@ -375,6 +375,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions,
         <p className="sr-only" aria-live="polite">
           {summary ?? (selected === null ? "Choose a repository and we'll summarise what is about to run." : "")}
         </p>
+        <p className="text-xs text-muted-foreground">{RUNNER_GIT_LOGIN_HINT}</p>
         <div className="flex items-center justify-end gap-3">
           <p className="mr-auto text-sm leading-relaxed text-muted-foreground">
             {runner !== undefined ? `This audit runs on ${runner.name}'s own Claude. Elise charges nothing per audit. It stops at its own spend limit and shows what it would have cost.` : "Connect a Runner to start an audit."}

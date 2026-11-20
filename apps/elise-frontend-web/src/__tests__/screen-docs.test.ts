@@ -19,8 +19,6 @@ const SCREEN_WORD = {
   team: "Team",
   groups: "Groups",
   settings: "Settings",
-  connections: "Connections",
-  github: "GitHub",
 } as const;
 
 type Segment = keyof typeof SCREEN_WORD;
