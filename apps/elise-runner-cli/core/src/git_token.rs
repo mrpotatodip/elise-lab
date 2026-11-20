@@ -16,11 +16,11 @@ impl Helper {
         let Some(token) = std::env::var(VARIABLE).ok().map(|token| token.trim().to_string()).filter(|token| !token.is_empty()) else {
             return Ok(None);
         };
-        let folder = std::env::temp_dir().join(format!("eliselab-git-helper-{scan_id}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&folder);
+        let folder = std::env::temp_dir().join(format!("eliselab-git-helper-{scan_id}-{}", uuid::Uuid::new_v4().simple()));
         write_helper(&folder, host).map_err(|e| format!("Could not set up the git token for the clone: {e}"))?;
         let key = format!("credential.https://{host}.helper");
-        let config = vec![(key.clone(), String::new()), (key, format!("!'{}'", folder.join("helper.sh").display()))];
+        let quoted = folder.join("helper.sh").display().to_string().replace('\'', "'\\''");
+        let config = vec![(key.clone(), String::new()), (key, format!("!'{quoted}'"))];
         Ok(Some(Helper { folder, token, config }))
     }
 
@@ -40,7 +40,6 @@ impl Drop for Helper {
 
 fn write_helper(folder: &std::path::Path, host: &str) -> std::io::Result<()> {
     let mut folders = fs::DirBuilder::new();
-    folders.recursive(true);
     #[cfg(unix)]
     std::os::unix::fs::DirBuilderExt::mode(&mut folders, 0o700);
     folders.create(folder)?;

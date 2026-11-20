@@ -264,6 +264,7 @@ pub async fn doctor(store: &Store, named: &[String]) -> Exit {
     if let Some(problem) = &settings.problem {
         report("settings", Err(format!("the Runner's settings file was not used: {problem}.")));
     }
+    let defaults = ["github.com".to_string(), "gitlab.com".to_string()];
     let mut hosts: Vec<&String> = Vec::new();
     for host in named.iter().chain(&settings.gitlab_hosts) {
         if !hosts.contains(&host) {
@@ -271,7 +272,7 @@ pub async fn doctor(store: &Store, named: &[String]) -> Exit {
         }
     }
     if hosts.is_empty() {
-        println!("note  git access: no host to check. Name one, for example `elise-runner doctor github.com`.");
+        hosts.extend(defaults.iter());
     }
     for host in hosts {
         if !git_found {

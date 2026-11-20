@@ -278,6 +278,21 @@ fn a_saved_login_the_host_rejects_gets_its_own_wording() {
 }
 
 #[test]
+fn a_403_from_the_host_is_not_called_a_rejected_login() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    stubs.fail_branch_list("fatal: unable to access 'https://github.com/acme/app/': The requested URL returned error: 403\n");
+    engine.queue_job(job_at("scan_13", "https://github.com/acme/app", PLAIN));
+
+    runner.run(&["run", "--once"], "");
+
+    let (_, result) = &engine.results()[0];
+    let error = result["error"].as_str().unwrap();
+    assert!(error.contains("no login") && error.contains("gh auth login") && !error.contains("rejected"), "{error}");
+}
+
+#[test]
 fn a_passing_branch_list_prints_nothing_new_and_the_clone_goes_on() {
     let engine = Engine::start();
     let mut runner = paired(&engine);
