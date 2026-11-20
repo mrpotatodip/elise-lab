@@ -3,6 +3,7 @@ pub enum Command {
     Pair { code: String, yes: bool, print_token: bool },
     Login { no_browser: bool },
     Status,
+    Doctor { hosts: Vec<String> },
     Unpair,
     Run { once: bool, parallel: usize },
 }
@@ -22,6 +23,7 @@ Usage:
   elise-runner pair <code> [--yes] [--print-token]
   elise-runner login [--no-browser]
   elise-runner status
+  elise-runner doctor [host...]
   elise-runner run [--once] [--parallel N]
   elise-runner unpair
   elise-runner --help | --version
@@ -38,6 +40,11 @@ Commands:
     --no-browser  Only print the link and the code.
   status          Say whether this Runner is unpaired, connected, revoked or offline, and where
                   its token is kept.
+  doctor [host...]
+                  Check this computer's setup and print one line per check, with the fix beside
+                  each failure: git is installed, `claude` is signed in, this Runner is paired,
+                  and git can read from each host you name (github.com, gitlab.com or a server
+                  in settings) or list in settings. Exits 1 when any check fails.
   run             Claim and run Scans until stopped.
     --once        Claim the Scans that are queued, up to the number --parallel allows, run them and exit.
     --parallel N  Run up to N Scans at once, from 1 to 3 (default 1). Elise allows 3 live Runner
@@ -113,7 +120,7 @@ pub fn parse(args: &[String]) -> Parsed {
         "pair" => &["--yes", "-y", "--print-token"],
         "login" => &["--no-browser"],
         "run" => &["--once"],
-        "status" | "unpair" => &[],
+        "status" | "unpair" | "doctor" => &[],
         "help" => return Parsed::Help,
         other => return Parsed::Usage(format!("unknown command `{other}`")),
     };
@@ -128,6 +135,7 @@ pub fn parse(args: &[String]) -> Parsed {
         ("pair", []) => Parsed::Usage("`pair` needs the pairing code from Elise".to_string()),
         ("login", []) => Parsed::Command(Command::Login { no_browser: has("--no-browser") }),
         ("status", []) => Parsed::Command(Command::Status),
+        ("doctor", hosts) => Parsed::Command(Command::Doctor { hosts: hosts.iter().map(|host| host.to_ascii_lowercase()).collect() }),
         ("unpair", []) => Parsed::Command(Command::Unpair),
         ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel }),
         _ => Parsed::Usage(format!("too many arguments for `{command}`")),

@@ -524,12 +524,22 @@ impl Runner {
     }
 
     pub fn stub_tools(&mut self, tools: &[&str]) -> Stubs {
+        self.stub_tool_folder(tools, true)
+    }
+
+    pub fn stub_tools_without_git(&mut self, tools: &[&str]) -> Stubs {
+        self.stub_tool_folder(tools, false)
+    }
+
+    fn stub_tool_folder(&mut self, tools: &[&str], with_git: bool) -> Stubs {
         let root = temp_home();
         let (bin, record, tmp) = (root.join("bin"), root.join("record"), root.join("tmp"));
         for dir in [&bin, &record, &tmp] {
             std::fs::create_dir_all(dir).unwrap();
         }
-        executable(&bin.join("git"), &STUB_GIT.replace("__RECORD__", &record.display().to_string()));
+        if with_git {
+            executable(&bin.join("git"), &STUB_GIT.replace("__RECORD__", &record.display().to_string()));
+        }
         for tool in tools {
             let text = match *tool {
                 "claude" => STUB_CLAUDE.replace("__RECORD__", &record.display().to_string()),
@@ -538,7 +548,8 @@ impl Runner {
             };
             executable(&bin.join(tool), &text);
         }
-        self.env.push(("PATH", format!("{}:/usr/bin:/bin", bin.display())));
+        let rest = if with_git { ":/usr/bin:/bin" } else { "" };
+        self.env.push(("PATH", format!("{}{rest}", bin.display())));
         self.env.push(("TMPDIR", tmp.display().to_string()));
         Stubs { record, tmp }
     }
@@ -631,6 +642,10 @@ impl Stubs {
         std::fs::read_to_string(self.record.join("git.txt")).unwrap_or_default()
     }
 
+    pub fn sign_claude_out(&self) {
+        std::fs::write(self.record.join("claude-signed-out"), "").unwrap();
+    }
+
     pub fn fail_branch_list(&self, stderr: &str) {
         std::fs::write(self.record.join("ls-remote.stderr"), stderr).unwrap();
     }
@@ -701,6 +716,10 @@ esac
 "#;
 
 const STUB_CLAUDE: &str = r#"#!/bin/sh
+if [ "$1 $2" = "auth status" ]; then
+  if [ -f "__RECORD__/claude-signed-out" ]; then echo "Not logged in" >&2; exit 1; fi
+  echo "Logged in"; exit 0
+fi
 for a in "$@"; do prompt="$a"; done
 case "$prompt" in
   *phase=recon*)
