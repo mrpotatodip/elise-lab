@@ -3,6 +3,7 @@
 // person's own login (their Claude subscription), and sends back what the agent wrote.
 
 use crate::engine::{client, engine_url, Envelope};
+use crate::git_token;
 use crate::providers::{clone_address, label_of, read_archive, Settings, JOB_SOURCES};
 use crate::store::{TokenStore, TOKEN_VARIABLE};
 use crate::trace;
@@ -488,7 +489,7 @@ async fn execute(
             if !git_ref.is_empty() && !safe_ref(&git_ref) {
                 return Err("That branch, tag or commit name is not one this runner will fetch.".into());
             }
-            Some((address.clone_url, git_ref))
+            Some((address.clone_url, git_ref, address.host))
         }
         Source::Archive {} => None,
     };
@@ -501,7 +502,10 @@ async fn execute(
     }
 
     match clone {
-        Some((clone_url, git_ref)) => clone_repo(work, &clone_url, &git_ref, stop).await?,
+        Some((clone_url, git_ref, host)) => {
+            let helper = git_token::Helper::for_host(&job.scan_id, &host)?;
+            clone_repo(work, &clone_url, &git_ref, helper.as_ref(), stop).await?
+        }
         None => tokio::select! {
             read = read_archive(token, &job.scan_id, work) => read?,
             _ = stop.stopped() => return Err(STOPPED.to_string()),
@@ -800,7 +804,7 @@ fn strip_untrusted(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-async fn clone_repo(work: &Path, repo: &str, git_ref: &str, stop: &Stop) -> Result<(), String> {
+async fn clone_repo(work: &Path, repo: &str, git_ref: &str, helper: Option<&git_token::Helper>, stop: &Stop) -> Result<(), String> {
     let mut command = Command::new("sh");
     command
         .arg("-c")
@@ -812,6 +816,9 @@ async fn clone_repo(work: &Path, repo: &str, git_ref: &str, stop: &Stop) -> Resu
         .env("GIT_ALLOW_PROTOCOL", "https")
         .env("GIT_TERMINAL_PROMPT", "0")
         .kill_on_drop(true);
+    if let Some(helper) = helper {
+        helper.apply(&mut command);
+    }
     let output = tokio::select! {
         output = timeout(CLONE_TIMEOUT, command.output()) => output,
         _ = stop.stopped() => return Err(STOPPED.to_string()),
@@ -1051,6 +1058,7 @@ async fn run_agent(
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("ANTHROPIC_AUTH_TOKEN")
         .env_remove(TOKEN_VARIABLE)
+        .env_remove(git_token::VARIABLE)
         .stdin(Stdio::null())
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(err))
