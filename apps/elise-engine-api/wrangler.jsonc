@@ -54,6 +54,4 @@
   // MAX_ACTIVE_FULL_SCANS is how many scans in our cloud one account may have live at once. MAX_ACTIVE_SCANS is the same count for scans on a Runner only.
   // Secrets (wrangler secret put / --secrets-file): ANTHROPIC_API_KEY, SCAN_API_TOKEN, DATABASE_URL, AUTH_SECRET
   // Optional, for accounts that bring their own Anthropic key: KEY_ENCRYPTION_SECRET (any long random string; changing it makes every saved key unreadable, and those accounts' scans stop until they save the key again)
-  // Optional, for private repos: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY (PKCS#8 PEM)
-  // Optional, for Connect GitHub: GITHUB_APP_CLIENT_ID, GITHUB_APP_CLIENT_SECRET
 }

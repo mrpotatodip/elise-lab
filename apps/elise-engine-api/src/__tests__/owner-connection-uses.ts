@@ -12,9 +12,8 @@
 // -----
 export const OWNER_CONNECTION_USES = {
   "lib/app-deps.ts": {
-    uses: 8,
-    reason:
-      "The GitHub Install lookup of POST /scans runs outside its withTenant transaction; the membership checks read a person's Roles across Accounts before one is chosen; a Runner token names the Runner, and only the Runner row names its Account",
+    uses: 6,
+    reason: "The membership checks read a person's Roles across Accounts before one is chosen; a Runner token names the Runner, and only the Runner row names its Account",
   },
   "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
   "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },

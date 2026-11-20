@@ -1,13 +1,11 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 import type { Bindings } from "#/types/variables";
 import { ANTHROPIC_KEY_UNREADABLE, openKey } from "#/modules/anthropic-key";
-import { mintRepoToken } from "#/modules/github-app";
 import { SCAN_SANDBOX_MAX_OUTPUT_TOKENS } from "#/modules/scan-sandbox/constants";
 import type { OutboundProps } from "#/modules/scan-sandbox/types";
 import {
   allowedOutboundTarget,
   createUsageScanner,
-  gitBasicAuth,
   MessagesBodySchema,
   messagesBlockedReason,
   repoOfGitPath,
@@ -56,24 +54,12 @@ export class Outbound extends WorkerEntrypoint<Bindings, OutboundProps> {
   // -----
   // Git may read the one repo this scan was set up for, and no
   // other: a request for another repo is a way to send data out in
-  // which repos are asked for. The key is added here, outside the
-  // container, and only for a private scan's repo.
+  // which repos are asked for. The clone is anonymous: nothing is
+  // added to the request.
   // -----
   async #github(request: Request, url: URL): Promise<Response> {
-    const { github, repo } = this.ctx.props;
-    if (repoOfGitPath(url.pathname) !== repo) return blocked(`${request.method} ${url.hostname}${url.pathname} is not this scan's repo`);
-    if (github === undefined) return fetch(request);
-    const { GITHUB_APP_ID: appId, GITHUB_APP_PRIVATE_KEY: privateKey } = this.env;
-    if (appId === undefined || privateKey === undefined) return blocked("the GitHub App is not set up");
-    try {
-      const token = await mintRepoToken({ appId, privateKey }, github.installationId, github.repoId);
-      const headers = new Headers(request.headers);
-      headers.set("authorization", gitBasicAuth(token));
-      return await fetch(new Request(request, { headers }));
-    } catch (error) {
-      console.error("github token failed", error instanceof Error ? error.message : "unknown");
-      return blocked("GitHub access failed");
-    }
+    if (repoOfGitPath(url.pathname) !== this.ctx.props.repo) return blocked(`${request.method} ${url.hostname}${url.pathname} is not this scan's repo`);
+    return fetch(request);
   }
 
   async #meteredMessages(request: Request, headers: Headers): Promise<Response> {

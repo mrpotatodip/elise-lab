@@ -14,7 +14,7 @@ export type CrossAccountCase =
 // -----
 // A write that takes no ID but the caller's own Account, so
 // there is no other Account's ID to pass, and that needs the
-// GitHub App or the key secret, which the guard has not got.
+// key secret, which the guard has not got.
 // The test it names shows the write stays in the caller's
 // Account.
 // -----
@@ -30,7 +30,6 @@ const OTHER_FINGERPRINT = "b".repeat(64);
 export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
 export const OTHER_REPO_ID = "00000000-0000-4000-8000-0000000000b2";
 export const OTHER_SECOND_REPO = "https://github.com/octocat/Spoon-Knife";
-export const OTHER_INSTALL_ID = "00000000-0000-4000-8000-0000000000b3";
 export const OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000b5";
 export const OTHER_GROUP_NAME = "Backend";
 export const OTHER_INVITE_ID = "00000000-0000-4000-8000-0000000000b6";
@@ -155,12 +154,6 @@ export const CROSS_ACCOUNT_CASES = {
   "DELETE /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "DELETE", expect: "not-found" },
   "PUT /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "PUT", expect: "not-found" },
   "DELETE /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "DELETE", expect: "not-found" },
-  "POST /github/connect": serviceTest("modules/github-installs/__tests__/github-installs-svc.test.ts"),
-  "POST /github/installations": serviceTest("modules/github-installs/__tests__/github-installs-svc.test.ts"),
-  "GET /github/installations": { kind: "run", path: "/github/installations", expect: "empty" },
-  "DELETE /github/installations/:id": { kind: "run", path: `/github/installations/${OTHER_INSTALL_ID}`, method: "DELETE", expect: "not-found" },
-  "GET /github/branches": { kind: "run", path: `/github/branches?installationId=${OTHER_INSTALL_ID}&repo=octo/hello`, expect: "not-found" },
-  "GET /github/repos": { kind: "run", path: "/github/repos", expect: "empty" },
   "GET /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", expect: "own", own: { source: "platform", lastFour: null } },
   "PUT /usage/anthropic-key": serviceTest("modules/anthropic-key/__tests__/anthropic-key-svc.test.ts"),
   "DELETE /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", method: "DELETE", expect: "own", own: { source: "platform", lastFour: null } },

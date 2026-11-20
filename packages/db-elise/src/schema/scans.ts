@@ -38,7 +38,6 @@ import {
 } from "@repo/contracts/elise";
 import { parties } from "./party";
 import { tenants } from "./tenant";
-import { tenantGithubInstallations } from "./tenant-github-installations";
 
 const inList = (values: readonly string[]) => sql.raw(values.map((value) => `'${value}'`).join(", "));
 
@@ -129,9 +128,7 @@ export const scans = pgTable(
     branch: text("branch"),
     branchId: uuid("branch_id"),
     untrackedReason: text("untracked_reason"),
-    // Set when an install of the Account covered the repo at the request. Null: cloned anonymously.
-    installationId: uuid("installation_id"),
-    githubRepoId: bigint("github_repo_id", { mode: "number" }),
+    // Nothing writes it since the GitHub App was retired: null on every new Scan, and the dashboard still reads old rows.
     isPrivate: boolean("is_private"),
     priorsGiven: integer("priors_given"),
     priorsCarried: integer("priors_carried"),
@@ -178,11 +175,6 @@ export const scans = pgTable(
       foreignColumns: [scanRepos.id, scanRepos.tenantId],
     }).onDelete("cascade"),
     idxRepoCreated: index("idx_scans_repo_id_created_at").on(t.repoId, t.createdAt),
-    fkInstallationTenant: foreignKey({
-      name: "scans_installation_tenant_fk",
-      columns: [t.installationId, t.tenantId],
-      foreignColumns: [tenantGithubInstallations.id, tenantGithubInstallations.tenantId],
-    }).onDelete("restrict"),
     fkBranchTenant: foreignKey({
       name: "scans_branch_tenant_fk",
       columns: [t.branchId, t.tenantId],

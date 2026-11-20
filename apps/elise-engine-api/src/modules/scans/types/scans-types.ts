@@ -9,7 +9,7 @@ import type { AppDeps, Bindings } from "#/types/variables";
 // -----
 export type CreateScanEnv = Pick<Bindings, "SCAN_WORKFLOW_FULL" | "MODEL" | "EFFORT" | "MAX_BUDGET_FULL_USD" | "MAX_ACTIVE_SCANS" | "MAX_ACTIVE_FULL_SCANS" | "MONTHLY_BUDGET_USD" | "BUDGET_ALLOWANCE_USD" | "BILLING_ENFORCED">;
 export type DetailScanEnv = Pick<Bindings, "SCAN_WORKFLOW_FULL">;
-export type SubmitScanDeps = Pick<AppDeps, "scanRepo" | "githubAccess" | "monthSpend" | "holdCredit" | "releaseCredit" | "connectedRunnerSources" | "linkArchive">;
+export type SubmitScanDeps = Pick<AppDeps, "scanRepo" |"monthSpend" | "holdCredit" | "releaseCredit" | "connectedRunnerSources" | "linkArchive">;
 
 // -----
 // The job sources a Runner of the Account last reported (git,

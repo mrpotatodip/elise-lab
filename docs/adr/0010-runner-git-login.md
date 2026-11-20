@@ -12,9 +12,9 @@ A headless Runner with no keychain may take one opt-in token in `ELISE_GIT_TOKEN
 
 The Connections page, its callback route, the connect card and the repo picker are gone. A Repo is added by pasting its address, with one hint pointing at `doctor`.
 
-## ADR 0005 stays for the cloud path
+## ADR 0005 is retired
 
-`0005-private-repos-github-app.md` still describes how the cloud path reads a private GitHub repo. No dashboard flow uses it. The engine routes and the Install tables stay until a person decides on their retirement (#277).
+`0005-private-repos-github-app.md` is superseded by this record (#277). The engine no longer has the `/github/*` routes, the Install lookup in create-scan, the `GITHUB_APP_*` secrets or the Outbound credential. The `tenant_github_installations` table and the `scans.installation_id` and `scans.github_repo_id` columns are dropped (migration 0096). The cloud container clones public repos only, with no credential; a private repo runs on a Runner. `scans.is_private` and `scan_repos.is_private` stay, because the dashboard still reads them for old rows; nothing writes them now.
 
 ## Not decided here
 

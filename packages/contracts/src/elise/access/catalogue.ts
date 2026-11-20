@@ -32,11 +32,6 @@ export const ACCESS_CATALOGUE = [
           { key: "groups", label: "Group", actions: ["read", "create", "update", "delete"] },
         ],
       },
-      {
-        key: "github",
-        label: "GitHub",
-        children: [{ key: "installations", label: "GitHub installation", actions: ["create", "delete"] }],
-      },
       { key: "runners", label: "Runner", actions: ["create", "delete"] },
       {
         key: "findings",

@@ -3,7 +3,6 @@ import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, typ
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
 import { RUNNER_ARCHIVE_UNSUPPORTED, RUNNER_JOB_NOT_CONNECTED, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
-import type { GithubAccess } from "#/modules/github-installs";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
@@ -30,7 +29,6 @@ export const queueScanSvc = (
   accountId: string,
   input: CreateScanBody,
   spend: MonthSpend,
-  access?: GithubAccess,
   hold?: HoldCredit,
   runnerSources?: RunnerSources,
   linkArchive?: LinkArchive,
@@ -171,17 +169,11 @@ export const queueScanSvc = (
     // the clone, which tries it as a branch first.
     // -----
     const ref = input.ref === undefined ? undefined : (normalizeBranchName(input.ref) ?? undefined);
-    // -----
-    // Only a github Repo can be covered by an Install of the
-    // GitHub App. Another provider's address never asks GitHub.
-    // -----
-    const github = access === undefined || provider.id !== DEFAULT_SOURCE_PROVIDER_ID ? null : yield* access.forRepo(record.url);
     const params: ScanParams = {
       scanId: newScanId(),
       accountId,
       repo: record.url,
       ref,
-      github: onRunner ? undefined : (github ?? undefined),
       options,
       keySource: usesOwnKey ? "account" : "platform",
       runnerId,
@@ -249,12 +241,11 @@ export const createScanSvc = (
   accountId: string,
   input: CreateScanBody,
   spend: MonthSpend,
-  access?: GithubAccess,
   hold?: HoldCredit,
   runnerSources?: RunnerSources,
   release?: ReleaseCredit,
 ): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
-  queueScanSvc(env, repo, accountId, input, spend, access, hold, runnerSources).pipe(
+  queueScanSvc(env, repo, accountId, input, spend, hold, runnerSources).pipe(
     Effect.flatMap((queued) => startScanSvc(env, queued, (error) => abandonScanSvc(repo, queued, error, release))),
   );
 
@@ -281,7 +272,6 @@ export const submitScanSvc = (
           accountId,
           input,
           spend,
-          deps.githubAccess(env, accountId),
           (scanId, holdUsd) => deps.holdCredit(db, accountId, scanId, holdUsd),
           (runnerId) => deps.connectedRunnerSources(db, accountId, runnerId),
           (link) => deps.linkArchive(db, accountId, link),

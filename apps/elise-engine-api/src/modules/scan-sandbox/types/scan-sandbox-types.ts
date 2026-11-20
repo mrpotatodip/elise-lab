@@ -30,12 +30,6 @@ export type Meter = MeteredTokens & { budgetUsd: number; spentUsd: number; reser
 // -----
 export type FullPhase = "recon" | "hunt" | "check" | "report";
 // -----
-// A private repo the Outbound handler signs for: the install and the
-// repo it may mint a token for, and repo as owner/name in lowercase.
-// Absent for a public clone. It holds IDs, never a token.
-// -----
-export type OutboundGithub = { installationId: number; repoId: number; repo: string };
-// -----
 // The Anthropic key an account brought, still sealed (encrypted):
 // Outbound opens it at the moment of a model call. Absent for an
 // account on the platform key.
@@ -45,4 +39,4 @@ export type OutboundAnthropicKey = { accountId: string; sealed: string };
 // repo is the one repo this scan reads, as owner/name in lowercase.
 // Outbound passes git requests for no other repo, public or not.
 // -----
-export type OutboundProps = { sandboxId: string; repo: string; github?: OutboundGithub; anthropicKey?: OutboundAnthropicKey };
+export type OutboundProps = { sandboxId: string; repo: string; anthropicKey?: OutboundAnthropicKey };

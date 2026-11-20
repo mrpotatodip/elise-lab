@@ -18,8 +18,6 @@ export type AuditAction =
   | "finding.triage.set"
   | "finding.risk.accepted"
   | "finding.comment.deleted"
-  | "github.install.connected"
-  | "github.install.removed"
   | "usage.budget.updated"
   | "anthropic.key.set"
   | "anthropic.key.removed"
@@ -41,11 +39,6 @@ export type AuditDetails = {
   status?: string;
   note?: string | null;
   acceptedUntil?: string | null;
-  installationId?: number;
-  accountLogin?: string;
-  repositorySelection?: string;
-  noticeAcceptedAt?: string;
-  reconnected?: boolean;
   monthlyBudgetUsd?: number | null;
   lastFour?: string;
   requestIp?: string;

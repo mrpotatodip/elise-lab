@@ -63,6 +63,6 @@ Each of these has an ADR in `docs/adr/` at the repo root:
 - Repo history and team management: `0002`
 - The ship verdict and accepted risks: `0003`
 - Branches: `0004`
-- Private repos and the GitHub App: `0005`
+- Private repos on a Runner: `0010` (the GitHub App, `0005`, is retired)
 
 Lint is strict. The `anti-slop` rules reject a `try`/`catch` in a route, a bare `async` around Promise work, and a cast without a `// SAFETY:` line. The engine has no Node types, so use WebCrypto and `atob`, not `node:crypto` or `Buffer`. Run lint right after your first edit.

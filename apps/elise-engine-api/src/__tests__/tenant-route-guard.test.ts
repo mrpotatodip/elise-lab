@@ -17,7 +17,6 @@ import {
   scans,
   tenantAnthropicKeys,
   tenantCreditLedger,
-  tenantGithubInstallations,
   tenantGroupMembers,
   tenantGroups,
   tenantRunners,
@@ -37,7 +36,6 @@ import {
   OTHER_COMMENT_ID,
   OTHER_GROUP_ID,
   OTHER_GROUP_NAME,
-  OTHER_INSTALL_ID,
   OTHER_INVITE_ID,
   OTHER_PARTY_ID,
   OTHER_REPO_ID,
@@ -119,16 +117,6 @@ beforeAll(async () => {
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
   await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs, to delete or edit" });
-  await test.raw.insert(tenantGithubInstallations).values({
-    id: OTHER_INSTALL_ID,
-    tenantId: otherTenantId,
-    installationId: 99,
-    accountLogin: "theirs",
-    repositorySelection: "all",
-    status: "active",
-    connectedBy: other.partyId,
-    noticeAcceptedAt: new Date("2026-11-01T00:00:00Z"),
-  });
   await test.raw.insert(tenantAnthropicKeys).values({ tenantId: otherTenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
   await seedOtherUsage(otherTenantId, otherRepoId);
   await ensureTenantRoles(test.raw, otherTenantId);

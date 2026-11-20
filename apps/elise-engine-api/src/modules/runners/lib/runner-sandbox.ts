@@ -5,7 +5,7 @@ import type { DbConnectType } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanParams } from "#/schemas";
-import { RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_PICKED_UP, RUNNER_JOB_PRIVATE, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
+import { RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_PICKED_UP, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { cancelRunnerJobEffect, insertRunnerJobEffect, readRunnerJobEffect } from "#/modules/runners/queries";
 import { buildAgentPrompt } from "#/modules/scan-sandbox";
 import type { SandboxPort } from "#/modules/scan-workflow/types";
@@ -22,14 +22,7 @@ const FilesSchema = z.record(z.string(), z.string());
 export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: string, now: () => Date = () => new Date()): SandboxPort => {
   const read = () => runEffect(readRunnerJobEffect(db, params.scanId));
   return {
-    // -----
-    // A private repo needs a token that only the container's
-    // outbound proxy makes, so it cannot run on a Runner yet.
-    // -----
-    prepare: async () => {
-      if (params.github) throw new Error(RUNNER_JOB_PRIVATE);
-      return { commitSha: null, branch: null };
-    },
+    prepare: async () => ({ commitSha: null, branch: null }),
 
     launchAgent: async (options) => {
       await runEffect(

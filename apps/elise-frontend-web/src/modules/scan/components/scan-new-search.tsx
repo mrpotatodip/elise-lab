@@ -1,7 +1,6 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Globe, Link2, Lock, Search } from "lucide-react";
 import { Input } from "#/components/ui/input";
-import { Skeleton } from "#/components/ui/skeleton";
 import type { GitSourceProvider } from "#/providers/port";
 import { scanRepoPickMatches, type ScanRepoPick } from "../utils";
 
@@ -17,7 +16,6 @@ export function ScanRepoIcon({ pick }: { pick: ScanRepoPick }) {
 type ScanNewSearchProps = {
   provider: GitSourceProvider;
   picks: readonly ScanRepoPick[];
-  loading?: boolean;
   onPick: (pick: ScanRepoPick) => void;
   hint?: ReactNode;
 };
@@ -27,13 +25,10 @@ type ScanNewSearchProps = {
 // whether the repository is public or private: the list shows every
 // repository the account can scan, a lock marks the private ones, and the
 // choice itself says which kind it is. The arrow keys walk the field and the
-// rows as one list. Until the GitHub connection's repositories have arrived
-// the list cannot tell which scanned repositories are private, so it shows
-// placeholders instead of rows that would move; a pasted link needs no list
-// and shows at once. The field reads a link by the chosen provider's rules,
+// rows as one list. The field reads a link by the chosen provider's rules,
 // and lists only that provider's repositories.
 // -----
-export function ScanNewSearch({ provider, picks, loading = false, onPick, hint }: ScanNewSearchProps) {
+export function ScanNewSearch({ provider, picks, onPick, hint }: ScanNewSearchProps) {
   const [query, setQuery] = useState("");
   const wrap = useRef<HTMLDivElement>(null);
   const matches = scanRepoPickMatches(picks, query, provider.id);
@@ -42,8 +37,7 @@ export function ScanNewSearch({ provider, picks, loading = false, onPick, hint }
   // private; another provider's rows claim neither.
   // -----
   const knowsPrivacy = provider.capabilities.canListRepos;
-  const shown = loading ? matches.filter((item) => item.fromLink) : matches;
-  const rows = [...shown.filter((item) => !item.isPrivate), ...shown.filter((item) => item.isPrivate)];
+  const rows = [...matches.filter((item) => !item.isPrivate), ...matches.filter((item) => item.isPrivate)];
 
   const walk = (event: KeyboardEvent) => {
     const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
@@ -75,18 +69,8 @@ export function ScanNewSearch({ provider, picks, loading = false, onPick, hint }
           }}
         />
       </div>
-      <div className="grid max-h-[min(24rem,50svh)] gap-0.5 overflow-y-auto" aria-busy={loading}>
-        {loading &&
-          [0, 1, 2].map((slot) => (
-            <div key={slot} className="flex items-center gap-3 px-3 py-2">
-              <Skeleton className="size-8 shrink-0 rounded-lg" />
-              <span className="grid flex-1 gap-1.5">
-                <Skeleton className="h-3.5 w-48" />
-                <Skeleton className="h-3 w-28" />
-              </span>
-            </div>
-          ))}
-        {!loading && rows.length === 0 && (
+      <div className="grid max-h-[min(24rem,50svh)] gap-0.5 overflow-y-auto">
+        {rows.length === 0 && (
           <p className="px-3 py-6 text-center text-sm leading-relaxed text-muted-foreground">{query.trim() === "" ? provider.address.emptyNote : `No repository matches. ${provider.address.emptyNote}`}</p>
         )}
         {rows.map((row, index) => {
