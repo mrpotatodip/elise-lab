@@ -35,15 +35,15 @@ beforeAll(async () => {
   partyId = seeded.partyId;
   repoId = await seedRepo(test, tenantId, REPO);
   await test.raw.insert(authUser).values({ id: "admin", name: "Ada Rossi", email: "ada@example.com", partyId });
-  await test.raw.insert(scans).values(scanValues(tenantId, repoId, "s1", "2026-11-01T00:00:00Z", { status: "succeeded" }));
-  const letters = ["a", "b", "c", "d", "e"];
-  await test.raw.insert(scanFindings).values(
-    letters.map((letter) => ({ tenantId, scanId: "s1", findingId: `F-${letter}`, fingerprint: fp(letter), status: "confirmed" as const, severity: "high" as const, title: letter, class: "authz" })),
-  );
   const [dev] = await test.raw.insert(scanRepoBranches).values({ tenantId, repoId, name: "dev" }).returning();
   const main = await branchIdOf(test, repoId);
-  const history = (branchId: string, letter: string) => ({ tenantId, repoId, branchId, fingerprint: fp(letter), state: "open" as const, firstSeenScanId: "s1", lastSeenScanId: "s1" });
-  await test.raw.insert(scanRepoFindings).values([...["a", "b", "c", "d"].map((letter) => history(main, letter)), history(dev.id, "e")]);
+  await test.raw.insert(scans).values([
+    scanValues(tenantId, repoId, "s1", "2026-11-01T00:00:00Z", { skill: "full", branchId: main }),
+    scanValues(tenantId, repoId, "s2", "2026-11-02T00:00:00Z", { skill: "full", branchId: dev.id }),
+  ]);
+  const found = (scanId: string, letter: string) => ({ tenantId, scanId, findingId: `F-${letter}`, fingerprint: fp(letter), status: "confirmed" as const, severity: "high" as const, title: letter, class: "authz" });
+  await test.raw.insert(scanFindings).values([...["a", "b", "c", "d", "g"].map((letter) => found("s1", letter)), found("s2", "e")]);
+  await test.raw.insert(scanRepoFindings).values({ tenantId, repoId, branchId: main, fingerprint: fp("g"), state: "fixed_by_code", firstSeenScanId: "s1", lastSeenScanId: "s1", fixedInScanId: "s1" });
 });
 
 afterAll(async () => {
@@ -67,6 +67,10 @@ describe("a duplicate decision", () => {
     ["a Finding with no record on the Branch", body("duplicate", "a", "f"), "same Branch"],
   ])("refuses %s", async (_name, input, message) => {
     expect(await refusal(input)).toMatchObject({ tag: "Invalid", message: expect.stringContaining(message) });
+  });
+
+  it("refuses a target a later Scan found fixed", async () => {
+    expect(await refusal(body("duplicate", "a", "g"))).toMatchObject({ tag: "Invalid", message: expect.stringContaining("found that Finding fixed") });
   });
 
   it("refuses a target that is itself a duplicate, and a Finding others point to", async () => {
