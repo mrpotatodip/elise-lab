@@ -13,6 +13,7 @@ import { tenantScanRepo } from "#/modules/scan-ledger";
 import { InternalServiceError } from "#/lib/errors";
 import { STRIPE_NOT_CONFIGURED_MESSAGE } from "#/modules/stripe/constants";
 import { stripeGateway } from "#/modules/stripe/lib";
+import { typesafeGateway } from "#/modules/typesafe";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 import type { AppEnv, AppDeps } from "#/types/variables";
 
@@ -52,4 +53,5 @@ export const realAppDeps: AppDeps = {
     if (!env.STRIPE_SECRET_KEY) throw new InternalServiceError(STRIPE_NOT_CONFIGURED_MESSAGE);
     return stripeGateway(env.STRIPE_SECRET_KEY);
   },
+  typesafe: (env) => (env.TYPESAFE_API_KEY ? typesafeGateway(env.TYPESAFE_API_KEY) : null),
 };

@@ -19,5 +19,6 @@ export * from "./scan-runner-jobs";
 export * from "./tenant-groups";
 export * from "./scans";
 export * from "./scan-finding-comments";
+export * from "./scan-signals";
 export * from "./scan-trace-entries";
 export * from "./scan-upload-archives";

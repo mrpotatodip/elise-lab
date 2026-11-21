@@ -3,6 +3,7 @@ import type { Effect } from "effect";
 import type { AccessPower, RunnerIdentity, ScanUsage } from "@repo/contracts/elise";
 import type { PoolDbType, TenantDbType } from "#/lib/db-connection";
 import type { StripeGateway } from "#/modules/stripe/types";
+import type { TypeSafeGateway } from "#/modules/typesafe";
 import type { DbError, Invalid } from "#/lib/effect-query";
 import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
@@ -24,6 +25,7 @@ export type Bindings = {
   BILLING_ENFORCED: string;
   ANTHROPIC_API_KEY: string;
   KEY_ENCRYPTION_SECRET?: string;
+  TYPESAFE_API_KEY?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   SCAN_API_TOKEN: string;
@@ -70,6 +72,7 @@ export type AppDeps = {
   withTenant: <T>(c: Context<AppEnv>, accountId: string, run: (db: TenantDbType) => Promise<T>) => Promise<T>;
   withOwner: <T>(c: Context<AppEnv>, run: (db: PoolDbType) => Promise<T>) => Promise<T>;
   stripe: (env: Bindings) => StripeGateway;
+  typesafe: (env: Bindings) => TypeSafeGateway | null;
 };
 
 export type Variables = { userId?: string; deps: AppDeps };

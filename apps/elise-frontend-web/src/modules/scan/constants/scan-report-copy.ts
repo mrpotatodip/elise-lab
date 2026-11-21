@@ -9,6 +9,7 @@ export const SCAN_TRIAGE_COPY = {
   fixed: "Fixed",
   false_positive: "False positive",
   accepted_risk: "Accepted risk",
+  duplicate: "Duplicate",
 } as const;
 
 export const SCAN_FINDING_STATE_COPY = {

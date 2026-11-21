@@ -55,7 +55,7 @@ export type FindingDetail = {
   evidence: string | null;
   fix: string | null;
   needs: string | null;
-  triage: { status: "open" | "fixed" | "false_positive" | "accepted_risk"; note: string | null } | null;
+  triage: { status: "open" | "fixed" | "false_positive" | "accepted_risk" | "duplicate"; note: string | null } | null;
 };
 
 export type Finding = {

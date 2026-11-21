@@ -1,11 +1,12 @@
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
-import type { Finding, FindingsQuery, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
-import { partyPersons, scanFindings, scanFindingTriage, scanRepos, scans, type TFindingTriage } from "@repo/db-elise/schema";
+import { WEAK_REASON_SIGNAL_KIND, type Finding, type FindingsQuery, type FindingTriage, type FindingTriageBody } from "@repo/contracts/elise";
+import { partyPersons, scanFindings, scanFindingTriage, scanRepoFindings, scanRepos, scanSignals, scans, type TFindingTriage } from "@repo/db-elise/schema";
 import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
 
 // -----
 // Worst first; a finding that still needs
@@ -30,6 +31,7 @@ export const triageView = (triage: TFindingTriage, decidedBy: DecidedBy | undefi
   status: triage.status,
   note: triage.note,
   acceptedUntil: triage.acceptedUntil?.toISOString() ?? null,
+  duplicateOf: triage.duplicateOf,
   updatedAt: triage.updatedAt.toISOString(),
   decidedBy: decidedByName(decidedBy),
 });
@@ -118,6 +120,60 @@ export const findingRepoIdEffect = (db: Pick<AppDbType, "select">, tenantId: str
 
 const DAY_MS = 86_400_000;
 
+const RESOLVED_TARGET_MESSAGE = {
+  fixed: "That Finding is marked fixed; point to a Finding that is still open",
+  false_positive: "That Finding is a false positive; point to a Finding that is still open",
+  accepted_risk: "That Finding is an accepted risk; point to a Finding that is still open",
+} as const;
+
+const FIXED_BY_SCAN_MESSAGE = "A later Scan found that Finding fixed; point to a Finding that is still open";
+const DIFFERENT_BRANCH_MESSAGE = "Both Findings must appear in Scans of the same Branch. Pick one from this Branch's list";
+
+const duplicateRefusal = (db: TenantDbType, tenantId: string, repoId: string, fingerprint: string, target: string, now: Date): Effect.Effect<string | null, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      if (target === fingerprint) return "A Finding cannot be a duplicate of itself";
+      await db.execute(sql`select pg_advisory_xact_lock(hashtext(${`duplicate:${tenantId}:${repoId}`}))`);
+      const shared = await db
+        .select({ branchId: scans.branchId })
+        .from(scanFindings)
+        .innerJoin(scans, eq(scans.id, scanFindings.scanId))
+        .where(
+          and(
+            eq(scanFindings.tenantId, tenantId),
+            eq(scans.repoId, repoId),
+            eq(scans.status, "succeeded"),
+            eq(scans.skill, SCAN_RECORDS_PROFILE_SKILL),
+            isNotNull(scans.branchId),
+            inArray(scanFindings.fingerprint, [fingerprint, target]),
+          ),
+        )
+        .groupBy(scans.branchId)
+        .having(sql`count(distinct ${scanFindings.fingerprint}) = 2`);
+      const branchIds = shared.flatMap((row) => (row.branchId ? [row.branchId] : []));
+      if (branchIds.length === 0) return DIFFERENT_BRANCH_MESSAGE;
+      const closed = await db
+        .select({ branchId: scanRepoFindings.branchId })
+        .from(scanRepoFindings)
+        .where(and(eq(scanRepoFindings.tenantId, tenantId), inArray(scanRepoFindings.branchId, branchIds), eq(scanRepoFindings.fingerprint, target), eq(scanRepoFindings.state, "fixed_by_code")));
+      if (closed.length === branchIds.length) return FIXED_BY_SCAN_MESSAGE;
+      const [kept] = await db
+        .select({ status: scanFindingTriage.status, acceptedUntil: scanFindingTriage.acceptedUntil })
+        .from(scanFindingTriage)
+        .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId), eq(scanFindingTriage.fingerprint, target)));
+      if (kept?.status === "duplicate") return "That Finding is itself a duplicate; point to the Finding it keeps";
+      const expired = kept?.status === "accepted_risk" && (!kept.acceptedUntil || kept.acceptedUntil.getTime() <= now.getTime());
+      if (kept && !expired && (kept.status === "fixed" || kept.status === "false_positive" || kept.status === "accepted_risk")) return RESOLVED_TARGET_MESSAGE[kept.status];
+      const pointing = await db
+        .select({ id: scanFindingTriage.id })
+        .from(scanFindingTriage)
+        .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId), eq(scanFindingTriage.status, "duplicate"), eq(scanFindingTriage.duplicateOf, fingerprint)))
+        .limit(1);
+      return pointing.length > 0 ? "Other Findings are duplicates that point to it; undo them first" : null;
+    },
+    catch: toDbError,
+  });
+
 // -----
 // Every triage decision, with its audit row, in the transaction
 // db already is (withTenant), so a decision is never saved without
@@ -138,6 +194,23 @@ export const setTriageEffect = (
     const accepting = body.status === "accepted_risk";
     const note = body.note?.trim() ? body.note : null;
     if (accepting && (body.acceptDays === undefined || !note)) return yield* new Invalid({ message: "An accepted risk needs a reason and a number of days" });
+    const duplicateOf = body.status === "duplicate" ? (body.duplicateOf ?? null) : null;
+    if (body.status === "duplicate" && !duplicateOf) return yield* new Invalid({ message: "A duplicate needs the Finding it duplicates" });
+    if (duplicateOf) {
+      const refusal = yield* duplicateRefusal(db, tenantId, repoId, body.fingerprint, duplicateOf, now);
+      if (refusal) return yield* new Invalid({ message: refusal });
+    }
+    if (body.signalId) {
+      const warned = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ id: scanSignals.id })
+            .from(scanSignals)
+            .where(and(eq(scanSignals.id, body.signalId ?? ""), eq(scanSignals.tenantId, tenantId), eq(scanSignals.repoId, repoId), eq(scanSignals.fingerprint, body.fingerprint), eq(scanSignals.kind, WEAK_REASON_SIGNAL_KIND))),
+        catch: toDbError,
+      });
+      if (warned.length === 0) return yield* new Invalid({ message: "That Signal is not a weak-reason warning for this Finding" });
+    }
     const actorPartyId = userId ? yield* Effect.tryPromise({ try: () => actorPartyOf(db, userId), catch: toDbError }) : null;
     if (accepting && !actorPartyId) return yield* new Forbidden({ message: "Forbidden" });
     const acceptedUntil = accepting && body.acceptDays !== undefined ? new Date(now.getTime() + body.acceptDays * DAY_MS) : null;
@@ -147,10 +220,10 @@ export const setTriageEffect = (
         const [previous] = await db.select().from(scanFindingTriage).where(key);
         const [row] = await db
           .insert(scanFindingTriage)
-          .values({ tenantId, repoId, fingerprint: body.fingerprint, status: body.status, note, acceptedUntil, setByPartyId: actorPartyId })
+          .values({ tenantId, repoId, fingerprint: body.fingerprint, status: body.status, note, acceptedUntil, duplicateOf, setByPartyId: actorPartyId })
           .onConflictDoUpdate({
             target: [scanFindingTriage.tenantId, scanFindingTriage.repoId, scanFindingTriage.fingerprint],
-            set: { status: body.status, note, acceptedUntil, setByPartyId: actorPartyId, updatedAt: now },
+            set: { status: body.status, note, acceptedUntil, duplicateOf, setByPartyId: actorPartyId, updatedAt: now },
           })
           .returning();
         await insertAuditEntry(db, {
@@ -158,8 +231,8 @@ export const setTriageEffect = (
           action: accepting ? "finding.risk.accepted" : "finding.triage.set",
           subjectId: row.id,
           tenantId,
-          before: previous ? { status: previous.status, note: previous.note, acceptedUntil: previous.acceptedUntil?.toISOString() ?? null } : undefined,
-          after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null },
+          before: previous ? { status: previous.status, note: previous.note, acceptedUntil: previous.acceptedUntil?.toISOString() ?? null, duplicateOf: previous.duplicateOf } : undefined,
+          after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null, duplicateOf, signalId: body.signalId },
         });
         const [person] = actorPartyId ? await db.select().from(partyPersons).where(eq(partyPersons.partyId, actorPartyId)) : [];
         return triageView(row, person);

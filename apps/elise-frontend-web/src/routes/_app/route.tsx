@@ -50,6 +50,7 @@ function AppLayout() {
       showTeam={hasAccessPower(user?.powers ?? [], "company:team:members:read")}
       showRunners={showRunners}
       showPlan={showDashboard && hasAccessPower(user?.powers ?? [], "company:plan:read")}
+      showSignals={showDashboard && hasAccessPower(user?.powers ?? [], "company:signals:update")}
       runnersPaired={pairedRunners.length}
       runnersRunning={runnersRunning}
       showDashboard={showDashboard}

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Users } from "lucide-react";
+import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, Radio, ScanSearch, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -32,6 +32,7 @@ type ShellSidebarProps = {
   showTeam: boolean;
   showRunners: boolean;
   showPlan: boolean;
+  showSignals: boolean;
   runnersPaired: number;
   runnersRunning: number;
   showDashboard: boolean;
@@ -50,7 +51,7 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onReopenGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
+export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, showSignals, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onReopenGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
   const { open: reposOpen, setOpen: setReposOpen } = useSidebarReposOpen();
   const scansLabel = running > 0 ? `Scans, ${running} in progress` : "Scans";
   const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
@@ -209,6 +210,15 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
             <Link to="/settings/plan" aria-label="Plan and billing" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <CreditCard className={ICON} strokeWidth={1.5} />
               {!collapsed && "Plan and billing"}
+            </Link>
+          </Hint>
+        )}
+
+        {showSignals && (
+          <Hint label="Signals" collapsed={collapsed}>
+            <Link to="/settings/signals" aria-label="Signals" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <Radio className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Signals"}
             </Link>
           </Hint>
         )}

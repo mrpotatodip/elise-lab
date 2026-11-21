@@ -2,6 +2,8 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloud
 import { runEffect } from "#/lib/effect-query";
 import { dbConnect } from "#/lib/db-connection";
 import type { ScanParams } from "#/schemas";
+import { realAppDeps } from "#/lib/app-deps";
+import { detectDuplicateSignalsSvc } from "#/modules/signals";
 import { findSealedKeyEffect } from "#/modules/anthropic-key";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
@@ -33,6 +35,7 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
         sealedKeyFor: (accountId) => runEffect(findSealedKeyEffect(dbConnect(this.env.DATABASE_URL), accountId)),
         recordScan: (params, status, error, usage) => runEffect(recordScanSvc(this.env, params, status, error, usage)),
         saveTrace: (params, body) => runEffect(keepTraceBatchSvc(dbConnect(this.env.DATABASE_URL), params.accountId, params.scanId, body)),
+        detectSignals: (params) => runEffect(detectDuplicateSignalsSvc(dbConnect(this.env.DATABASE_URL), realAppDeps.typesafe(this.env), params.accountId, params.scanId)),
         settleCredit: (params, status, usage) => settleScanCredit(this.env, params, status, usage),
       },
       event.payload,
