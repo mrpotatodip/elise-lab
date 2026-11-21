@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { PlanChangeResult, PlanSessionUrl } from "@repo/contracts/elise";
+import type { BillingIntervalValue, PlanChangeResult, PlanSessionUrl } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import { billingContextEffect, planByKeyEffect, seatsEffect } from "#/modules/plan/queries";
@@ -8,12 +8,15 @@ import type { StripeGateway } from "#/modules/stripe/types";
 
 const planPageUrl = (dashboardUrl: string, query = ""): string => `${dashboardUrl.replace(/\/+$/, "")}/settings/plan${query}`;
 
-const offeredPlanEffect = (db: AppDbType, planKey: string): Effect.Effect<PlanByKey & { priceId: string }, DbError | Invalid> =>
+const offeredPlanEffect = (db: AppDbType, planKey: string, interval: BillingIntervalValue): Effect.Effect<PlanByKey & { priceId: string }, DbError | Invalid> =>
   Effect.gen(function* () {
     const plan = yield* planByKeyEffect(db, planKey);
     if (!plan || !plan.enabled) return yield* Effect.fail(new Invalid({ message: `The plan "${planKey}" is not offered` }));
-    if (!plan.priceId) return yield* Effect.fail(new Invalid({ message: `The ${plan.label} plan has no Stripe price yet` }));
-    return { ...plan, priceId: plan.priceId };
+    const priceId = interval === "year" ? plan.yearlyPriceId : plan.priceId;
+    if (!priceId) {
+      return yield* Effect.fail(new Invalid({ message: interval === "year" ? `The ${plan.label} plan has no yearly price` : `The ${plan.label} plan has no Stripe price yet` }));
+    }
+    return { ...plan, priceId };
   });
 
 const seatCapEffect = (db: AppDbType, accountId: string, target: PlanByKey, now: Date): Effect.Effect<void, DbError | Conflict> =>
@@ -35,6 +38,7 @@ export const startPlanCheckoutSvc = (
   accountId: string,
   userId: string,
   planKey: string,
+  interval: BillingIntervalValue,
   now: Date,
 ): Effect.Effect<PlanSessionUrl, DbError | Conflict | Invalid | ExternalError> =>
   Effect.gen(function* () {
@@ -43,7 +47,7 @@ export const startPlanCheckoutSvc = (
     if (subscription?.source === "stripe" && (subscription.status === "active" || subscription.status === "past_due")) {
       return yield* Effect.fail(new Conflict({ message: "This account already has a subscription. Manage it in the billing portal." }));
     }
-    const target = yield* offeredPlanEffect(db, planKey);
+    const target = yield* offeredPlanEffect(db, planKey, interval);
     yield* seatCapEffect(db, accountId, target, now);
     const { priceId } = target;
     const known = subscription?.stripeCustomerId ?? (yield* Effect.tryPromise({ try: () => stripe.findCustomer({ accountId }), catch: toExternalError }))?.id;
@@ -61,6 +65,7 @@ export const changePlanSvc = (
   accountId: string,
   userId: string,
   planKey: string,
+  interval: BillingIntervalValue | undefined,
   now: Date,
 ): Effect.Effect<PlanChangeResult, DbError | Conflict | Invalid | ExternalError> =>
   Effect.gen(function* () {
@@ -68,8 +73,19 @@ export const changePlanSvc = (
     if (subscription?.source !== "stripe" || subscription.status !== "active" || !subscription.stripeSubscriptionId) {
       return yield* Effect.fail(new Conflict({ message: "Only an account with an active Stripe subscription can change plan." }));
     }
-    const target = yield* offeredPlanEffect(db, planKey);
-    if (target.id === subscription.planId) return yield* Effect.fail(new Conflict({ message: `This account is already on the ${target.label} plan.` }));
+    const current = subscription.billingInterval ?? "month";
+    const requested = interval ?? current;
+    const target = yield* offeredPlanEffect(db, planKey, requested);
+    const samePlan = target.id === subscription.planId;
+    if (samePlan && requested === current) {
+      return yield* Effect.fail(new Conflict({ message: `This account is already on the ${target.label} plan, billed ${current === "year" ? "yearly" : "monthly"}.` }));
+    }
+    if (requested === "month" && current === "year") {
+      return yield* Effect.fail(new Conflict({ message: "A yearly subscription cannot switch to monthly. Cancel it in the billing portal, and subscribe monthly when the paid year ends." }));
+    }
+    if (requested !== current && !samePlan) {
+      return yield* Effect.fail(new Conflict({ message: "Change the plan or the billing interval, not both at once." }));
+    }
     yield* seatCapEffect(db, accountId, target, now);
     const subscriptionId = subscription.stripeSubscriptionId;
     yield* Effect.tryPromise({ try: () => stripe.changeSubscriptionPrice({ subscriptionId, priceId: target.priceId }), catch: toExternalError });

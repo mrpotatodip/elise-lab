@@ -9,6 +9,7 @@ import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 
 const PRICE = "price_runner_test";
+const YEARLY_PRICE = "price_runner_year_test";
 const USER = "checkout-admin";
 const DASHBOARD = "https://dashboard.example.test";
 const UrlBodySchema = z.object({ data: z.object({ url: z.string() }).nullable() });
@@ -58,7 +59,7 @@ beforeAll(async () => {
   if (!role) throw new Error("workspace_member role missing");
   roleId = role.id;
   await test.raw.insert(authUser).values({ id: USER, name: "Admin", email: "admin@example.com", emailVerified: true, partyId: acme.partyId });
-  await test.raw.update(platformMasterPlans).set({ stripePriceId: PRICE }).where(eq(platformMasterPlans.key, "runner"));
+  await test.raw.update(platformMasterPlans).set({ stripePriceId: PRICE, stripeYearlyPriceId: YEARLY_PRICE }).where(eq(platformMasterPlans.key, "runner"));
   [{ id: runnerPlanId }] = await test.raw.select({ id: platformMasterPlans.id }).from(platformMasterPlans).where(eq(platformMasterPlans.key, "runner"));
 });
 
@@ -85,6 +86,26 @@ describe("POST /usage/plan/checkout", () => {
       [{ customerId: stripe.customers[0].id, accountId, priceId: PRICE, successUrl: `${DASHBOARD}/settings/plan?checkout=success`, cancelUrl: `${DASHBOARD}/settings/plan?checkout=cancelled` }],
     ]);
     expect(stripe.customers).toMatchObject([{ name: "acme", email: "admin@example.com", accountId }]);
+  });
+
+  it.each([
+    { name: "year", body: { planKey: "runner", interval: "year" }, priceId: YEARLY_PRICE },
+    { name: "month", body: { planKey: "runner", interval: "month" }, priceId: PRICE },
+    { name: "no interval (an old dashboard)", body: { planKey: "runner" }, priceId: PRICE },
+  ])("checks out the price of the interval: $name", async ({ body, priceId }) => {
+    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body, env: { DASHBOARD_URL: DASHBOARD } });
+    expect([response.status, stripe.checkouts.map((checkout) => checkout.priceId)]).toEqual([200, [priceId]]);
+  });
+
+  it("refuses a yearly checkout for a plan with no yearly price and asks Stripe for nothing", async () => {
+    await test.raw.update(platformMasterPlans).set({ stripePriceId: "price_starter_test", stripeYearlyPriceId: null, enabled: true }).where(eq(platformMasterPlans.key, "starter"));
+    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "starter", interval: "year" }, env: { DASHBOARD_URL: DASHBOARD } });
+    expect([response.status, stripe.checkouts.length, stripe.customers.length]).toEqual([400, 0, 0]);
+  });
+
+  it("refuses an interval Stripe does not sell", async () => {
+    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "runner", interval: "week" }, env: { DASHBOARD_URL: DASHBOARD } });
+    expect([response.status, stripe.checkouts.length]).toEqual([400, 0]);
   });
 
   it("starts a checkout on the Starter price for planKey starter", async () => {

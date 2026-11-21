@@ -9,6 +9,8 @@ import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 
 const RUNNER_PRICE = "price_runner_test";
 const STARTER_PRICE = "price_starter_test";
+const RUNNER_YEARLY = "price_runner_year_test";
+const STARTER_YEARLY = "price_starter_year_test";
 const USER = "change-admin";
 
 let test: TestDb;
@@ -25,12 +27,12 @@ const app = tenantRouteApp(() => test, {
   userHasPower: async (_c, _userId, _accountId, power) => powers.includes(power),
 });
 
-const planChange = async (planKey: string) => {
-  const response = await callAs(app, accountId, "/usage/plan/change", { method: "POST", body: { planKey } });
+const planChange = async (planKey: string, interval?: string) => {
+  const response = await callAs(app, accountId, "/usage/plan/change", { method: "POST", body: { planKey, interval } });
   return { status: response.status, text: await response.text() };
 };
-const subscribe = (planId: string) =>
-  test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId, status: "active", source: "stripe", stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1" });
+const subscribe = (planId: string, billingInterval: "month" | "year" = "month") =>
+  test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId, status: "active", source: "stripe", billingInterval, stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1" });
 const grant = (planId: string) => test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId, status: "active", source: "grant" });
 const setPeople = async (count: number) => {
   if (count === 0) return;
@@ -60,8 +62,8 @@ beforeAll(async () => {
   if (!role) throw new Error("workspace_member role missing");
   roleId = role.id;
   await test.raw.insert(authUser).values({ id: USER, name: "Admin", email: "admin@example.com", emailVerified: true, partyId: acme.partyId });
-  await test.raw.update(platformMasterPlans).set({ stripePriceId: RUNNER_PRICE }).where(eq(platformMasterPlans.key, "runner"));
-  await test.raw.update(platformMasterPlans).set({ stripePriceId: STARTER_PRICE, enabled: true }).where(eq(platformMasterPlans.key, "starter"));
+  await test.raw.update(platformMasterPlans).set({ stripePriceId: RUNNER_PRICE, stripeYearlyPriceId: RUNNER_YEARLY }).where(eq(platformMasterPlans.key, "runner"));
+  await test.raw.update(platformMasterPlans).set({ stripePriceId: STARTER_PRICE, stripeYearlyPriceId: STARTER_YEARLY, enabled: true }).where(eq(platformMasterPlans.key, "starter"));
   [{ id: runnerPlanId }] = await test.raw.select({ id: platformMasterPlans.id }).from(platformMasterPlans).where(eq(platformMasterPlans.key, "runner"));
   [{ id: starterPlanId }] = await test.raw.select({ id: platformMasterPlans.id }).from(platformMasterPlans).where(eq(platformMasterPlans.key, "starter"));
 });
@@ -132,6 +134,63 @@ describe("POST /usage/plan/change", () => {
     await addInvites(invites);
     const answer = await planChange("starter");
     expect([answer.status, answer.text.includes(counts), stripe.changes.length]).toEqual([status, true, status === 200 ? 1 : 0]);
+  });
+
+  it("switches the same plan from monthly to yearly", async () => {
+    await subscribe(runnerPlanId);
+    await setPeople(1);
+    const { status } = await planChange("runner", "year");
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_YEARLY }]]);
+  });
+
+  it("refuses yearly to monthly on the same plan, telling the admin to cancel at period end", async () => {
+    await subscribe(runnerPlanId, "year");
+    const { status, text } = await planChange("runner", "month");
+    expect([status, text.includes("Cancel it in the billing portal"), stripe.changes.length]).toEqual([409, true, 0]);
+  });
+
+  it.each([
+    { name: "no interval", interval: undefined },
+    { name: "the interval it is on", interval: "year" },
+  ])("refuses the plan and interval the Account is already on ($name)", async ({ interval }) => {
+    await subscribe(runnerPlanId, "year");
+    const { status } = await planChange("runner", interval);
+    expect([status, stripe.changes.length]).toEqual([409, 0]);
+  });
+
+  it("refuses a change of plan and interval in one step", async () => {
+    await subscribe(runnerPlanId);
+    await setPeople(1);
+    const { status } = await planChange("starter", "year");
+    expect([status, stripe.changes.length]).toEqual([409, 0]);
+  });
+
+  it("keeps a yearly interval when the plan changes", async () => {
+    await subscribe(runnerPlanId, "year");
+    await setPeople(1);
+    const { status } = await planChange("starter");
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: STARTER_YEARLY }]]);
+  });
+
+  it("refuses a yearly change over the member cap", async () => {
+    await subscribe(runnerPlanId, "year");
+    await setPeople(3);
+    const { status } = await planChange("starter");
+    expect([status, stripe.changes.length]).toEqual([409, 0]);
+  });
+
+  it("refuses a switch to yearly for a plan with no yearly price", async () => {
+    await test.raw.update(platformMasterPlans).set({ stripeYearlyPriceId: null }).where(eq(platformMasterPlans.key, "runner"));
+    await subscribe(runnerPlanId);
+    const { status } = await planChange("runner", "year");
+    await test.raw.update(platformMasterPlans).set({ stripeYearlyPriceId: RUNNER_YEARLY }).where(eq(platformMasterPlans.key, "runner"));
+    expect([status, stripe.changes.length]).toEqual([400, 0]);
+  });
+
+  it("treats an old Stripe row with no interval as monthly", async () => {
+    await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runnerPlanId, status: "active", source: "stripe", stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1" });
+    const { status } = await planChange("runner", "year");
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_YEARLY }]]);
   });
 
   it("moves up from Starter to Runner", async () => {

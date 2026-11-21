@@ -89,6 +89,13 @@ export const SUBSCRIPTION_STATUS_VALUES = ["active", "past_due", "canceled", "un
 export const SUBSCRIPTION_SOURCE_VALUES = ["stripe", "grant"] as const;
 
 // -----
+// Billing interval: how often a Subscription is charged. Twin of the
+// CHECK on tenant_subscriptions.billing_interval. An operator grant
+// has none.
+// -----
+export const BILLING_INTERVAL_VALUES = ["month", "year"] as const;
+
+// -----
 // What a credit ledger entry is. grant and topup add credit; scan_hold
 // takes what a running scan may spend; scan_settle gives back the hold
 // and takes the real charge; expiry takes credit that lapsed; adjustment
@@ -107,6 +114,7 @@ export type RunnerLoginStateValue = (typeof RUNNER_LOGIN_STATE_VALUES)[number];
 export type RunnerJobStateValue = (typeof RUNNER_JOB_STATE_VALUES)[number];
 export type SubscriptionStatusValue = (typeof SUBSCRIPTION_STATUS_VALUES)[number];
 export type SubscriptionSourceValue = (typeof SUBSCRIPTION_SOURCE_VALUES)[number];
+export type BillingIntervalValue = (typeof BILLING_INTERVAL_VALUES)[number];
 export type CreditEntryKindValue = (typeof CREDIT_ENTRY_KIND_VALUES)[number];
 
 // -----

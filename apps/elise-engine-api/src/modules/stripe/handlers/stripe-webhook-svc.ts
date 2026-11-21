@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { AppDbType } from "#/lib/db-connection";
 import { Invalid, toExternalError, toParseError, type DbError, type ExternalError, type ParseError } from "#/lib/effect-query";
 import { STRIPE_WEBHOOK_SESSION_EVENTS, STRIPE_WEBHOOK_SUBSCRIPTION_EVENTS } from "#/modules/stripe/constants";
-import { planIdOfPriceEffect, tenantExistsEffect, tenantOfStripeCustomerEffect, upsertStripeSubscriptionEffect } from "#/modules/stripe/queries";
+import { planOfPriceEffect, tenantExistsEffect, tenantOfStripeCustomerEffect, upsertStripeSubscriptionEffect } from "#/modules/stripe/queries";
 import { StripeEventObjectSchema, StripeEventSchema, type StripeEvent } from "#/modules/stripe/schemas";
 import type { StripeGateway } from "#/modules/stripe/types";
 import { subscriptionStatusOf } from "#/modules/stripe/utils";
@@ -21,8 +21,8 @@ export const handleStripeEventSvc = (db: AppDbType, stripe: StripeGateway, event
 
     const subscription = yield* Effect.tryPromise({ try: () => stripe.retrieveSubscription(subscriptionId), catch: toExternalError });
     if (!subscription.priceId) return { handled: false };
-    const planId = yield* planIdOfPriceEffect(db, subscription.priceId);
-    if (!planId) {
+    const plan = yield* planOfPriceEffect(db, subscription.priceId);
+    if (!plan) {
       console.warn("Stripe event ignored: no plan has this stripe_price_id", { eventType: event.type, subscriptionId: subscription.id, priceId: subscription.priceId });
       return { handled: false };
     }
@@ -39,7 +39,8 @@ export const handleStripeEventSvc = (db: AppDbType, stripe: StripeGateway, event
       db,
       {
         tenantId,
-        planId,
+        planId: plan.id,
+        billingInterval: plan.interval,
         status: subscriptionStatusOf(subscription.status),
         stripeCustomerId: subscription.customerId,
         stripeSubscriptionId: subscription.id,
