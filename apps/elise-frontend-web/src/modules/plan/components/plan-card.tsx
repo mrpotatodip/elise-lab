@@ -12,11 +12,11 @@ import { runnerShownState, runnersQuery, runnerWhen } from "#/modules/runner";
 import { ShellPageHeader } from "#/modules/shell";
 import { teamQuery, teamRoleLabel } from "#/modules/team";
 import { usageUsd } from "#/modules/usage";
-import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS } from "../constants";
+import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS, PLAN_REFUND_LINE, PLAN_YEARLY_BACK_LINE } from "../constants";
 import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
 import type { PlanDetails, PlanOffer } from "../schemas";
 import type { PlanCheckoutReturn } from "../types";
-import { PLAN_STATUS_VIEW, planBillingAction, planCardViews, planConfirmingPayment, planPeriodSentence, planSourceLabel, planSwitchPending } from "../utils";
+import { PLAN_STATUS_VIEW, planBilledYearlySentence, planBillingAction, planConfirmingPayment, planPeriodSentence, planPriceView, planSourceLabel, planSwitchPending, type PlanSwitchTarget } from "../utils";
 import { ComparePlans } from "./compare-plans";
 
 function RedirectButton({ label, variant = "default", busy, onClick }: { label: string; variant?: "default" | "outline"; busy: boolean; onClick: () => void }) {
@@ -51,8 +51,6 @@ function CheckoutNote({ checkout, confirming, gaveUp }: { checkout: PlanCheckout
   return null;
 }
 
-const PER_MONTH = <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>;
-
 const ALERT_VARIANT = { success: "success", warning: "warning", destructive: "destructive", neutral: "info" } as const;
 
 const ACTION = buttonVariants({ variant: "outline", size: "sm" });
@@ -64,7 +62,7 @@ function NoPlanView({ data, offers, checkout, confirming, gaveUp }: { data: Plan
     <>
       <ShellPageHeader title="Plan and billing" description="No plan yet. Scans start once this account has a plan." />
       <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
-      <ComparePlans views={planCardViews(data, offers)} from={null} canManage={canManage} switching={false} onSwitched={() => undefined} />
+      <ComparePlans data={data} offers={offers} from={null} canManage={canManage} switching={false} onSwitched={() => undefined} />
     </>
   );
 }
@@ -86,14 +84,14 @@ function Column({ label, aside, footer, children }: ColumnProps) {
 
 export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const queryClient = useQueryClient();
-  const [switching, setSwitching] = useState<{ planKey: string; baseline: number } | null>(null);
+  const [switching, setSwitching] = useState<(PlanSwitchTarget & { baseline: number }) | null>(null);
   const { data } = useSuspenseQuery({
     ...planQuery(),
     refetchInterval: (query) => {
       const { data: latest, dataUpdateCount } = query.state;
       if (latest === undefined) return false;
       const checkoutPolling = planConfirmingPayment(checkout, latest) && dataUpdateCount < PLAN_CONFIRM_POLL_MAX;
-      const switchPolling = switching !== null && planSwitchPending(switching.planKey, latest) && dataUpdateCount - switching.baseline < PLAN_CONFIRM_POLL_MAX;
+      const switchPolling = switching !== null && planSwitchPending(switching, latest) && dataUpdateCount - switching.baseline < PLAN_CONFIRM_POLL_MAX;
       return checkoutPolling || switchPolling ? PLAN_CONFIRM_POLL_MS : false;
     },
   });
@@ -106,7 +104,7 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const confirming = planConfirmingPayment(checkout, data);
   const updateCount = queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0;
   const gaveUp = updateCount >= PLAN_CONFIRM_POLL_MAX;
-  const switchWaiting = switching !== null && planSwitchPending(switching.planKey, data);
+  const switchWaiting = switching !== null && planSwitchPending(switching, data);
   const switchGaveUp = switching !== null && switchWaiting && updateCount - switching.baseline >= PLAN_CONFIRM_POLL_MAX;
 
   if (plan === null || data.status === null || data.source === null) {
@@ -116,6 +114,8 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const status = PLAN_STATUS_VIEW[data.status];
   const billing = planBillingAction(data);
   const granted = data.source === "grant";
+  const yearly = !granted && data.interval === "year";
+  const price = planPriceView(plan, yearly ? "year" : "month") ?? { amount: usageUsd(plan.monthlyPriceUsd), unit: "month" as const, perMonth: null };
   const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
   const people = data.seats.members + data.seats.pendingInvites;
@@ -167,13 +167,21 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
           ) : (
             <>
               <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
-                {usageUsd(plan.monthlyPriceUsd)}
-                {PER_MONTH}
+                {price.amount}
+                <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per {price.unit}</span>
               </p>
+              {price.perMonth !== null && <p className="text-sm tabular-nums text-muted-foreground">{price.perMonth}</p>}
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
                 {planSourceLabel(data.source)}
                 {planPeriodSentence(data)}. Elise charges nothing per scan.
               </p>
+              {yearly && (
+                <>
+                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{planBilledYearlySentence(data)}</p>
+                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{PLAN_YEARLY_BACK_LINE}</p>
+                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{PLAN_REFUND_LINE}</p>
+                </>
+              )}
             </>
           )}
         </Column>
@@ -253,11 +261,12 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
       </Card>
 
       <ComparePlans
-        views={planCardViews(data, offers)}
+        data={data}
+        offers={offers}
         from={plan}
         canManage={canManage}
         switching={switchWaiting && !switchGaveUp}
-        onSwitched={(planKey) => setSwitching({ planKey, baseline: queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0 })}
+        onSwitched={(target) => setSwitching({ ...target, baseline: queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0 })}
       />
     </>
   );

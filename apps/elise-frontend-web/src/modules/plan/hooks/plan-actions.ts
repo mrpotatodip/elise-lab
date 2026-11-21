@@ -1,7 +1,7 @@
 import { useRouteContext } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { hasAccessPower } from "@repo/contracts/elise";
+import { hasAccessPower, type PlanChangeBody, type PlanCheckoutBody } from "@repo/contracts/elise";
 import { changePlan, openBillingPortal, startPlanCheckout } from "../api";
 
 const redirect = {
@@ -10,9 +10,9 @@ const redirect = {
 };
 
 export const usePlanActions = () => ({
-  checkout: useMutation({ mutationFn: (planKey: string) => startPlanCheckout({ data: { planKey } }), onSuccess: redirect.onSuccess }),
+  checkout: useMutation({ mutationFn: (body: PlanCheckoutBody) => startPlanCheckout({ data: body }), onSuccess: redirect.onSuccess }),
   portal: useMutation({ mutationFn: () => openBillingPortal(), ...redirect }),
-  change: useMutation({ mutationFn: (planKey: string) => changePlan({ data: { planKey } }) }),
+  change: useMutation({ mutationFn: (body: PlanChangeBody) => changePlan({ data: body }) }),
 });
 
 export const useCanManagePlan = () => {
