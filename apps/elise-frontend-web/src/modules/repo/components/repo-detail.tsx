@@ -46,9 +46,9 @@ const FILTER_COPY = {
 } as const satisfies Record<FindingFilter, { label: string; note: string }>;
 
 const inFilter = (f: RepoFinding, value: FindingFilter) =>
-  value === "all" || (value === "duplicate" ? f.triage?.status === "duplicate" : findingGroup(f.state, f.triage) === value);
+  value === "all" || (value === "duplicate" ? f.triage?.status === "duplicate" : f.triage?.status !== "duplicate" && findingGroup(f.state, f.triage) === value);
 
-const asFilter =(value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
+const asFilter = (value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
 
 type ScanStarts = ReadonlyMap<string, ScanStatus["createdAt"]>;
 

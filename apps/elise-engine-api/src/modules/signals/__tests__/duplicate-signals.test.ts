@@ -164,14 +164,15 @@ describe("detectDuplicateSignalsSvc", () => {
     expect(await skippedOf(next)).toBeNull();
   });
 
-  it("fails when TypeSafe fails, and leaves the Scan succeeded", async () => {
+  it("goes on when TypeSafe fails, counts the failed pair as skipped and leaves the Scan succeeded", async () => {
     await recordScan("s1", [confirmed("old", "a")]);
     const next = await recordScan("s2", [confirmed("new", "b")]);
     const broken: TypeSafeGateway = { noul: async () => Promise.reject(new Error("TypeSafe answered 500")) };
 
-    await expect(detect(next, broken)).rejects.toThrow("An error has occurred");
+    await detect(next, broken);
 
     const [row] = await test.raw.select({ status: scans.status }).from(scans).where(eq(scans.id, next));
     expect(row?.status).toBe("succeeded");
+    expect(await skippedOf(next)).toBe(1);
   });
 });

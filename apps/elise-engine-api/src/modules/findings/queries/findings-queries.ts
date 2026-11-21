@@ -119,10 +119,17 @@ export const findingRepoIdEffect = (db: Pick<AppDbType, "select">, tenantId: str
 
 const DAY_MS = 86_400_000;
 
-const duplicateRefusal = (db: TenantDbType, tenantId: string, repoId: string, fingerprint: string, target: string): Effect.Effect<string | null, DbError> =>
+const RESOLVED_TARGET_MESSAGE = {
+  fixed: "That Finding is marked fixed; point to a Finding that is still open",
+  false_positive: "That Finding is a false positive; point to a Finding that is still open",
+  accepted_risk: "That Finding is an accepted risk; point to a Finding that is still open",
+} as const;
+
+const duplicateRefusal = (db: TenantDbType, tenantId: string, repoId: string, fingerprint: string, target: string, now: Date): Effect.Effect<string | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       if (target === fingerprint) return "A Finding cannot be a duplicate of itself";
+      await db.execute(sql`select pg_advisory_xact_lock(hashtext(${`duplicate:${tenantId}:${repoId}`}))`);
       const shared = await db
         .select({ branchId: scanRepoFindings.branchId })
         .from(scanRepoFindings)
@@ -131,10 +138,12 @@ const duplicateRefusal = (db: TenantDbType, tenantId: string, repoId: string, fi
         .having(sql`count(distinct ${scanRepoFindings.fingerprint}) = 2`);
       if (shared.length === 0) return "A duplicate must point to a Finding of the same Branch";
       const [kept] = await db
-        .select({ status: scanFindingTriage.status })
+        .select({ status: scanFindingTriage.status, acceptedUntil: scanFindingTriage.acceptedUntil })
         .from(scanFindingTriage)
         .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId), eq(scanFindingTriage.fingerprint, target)));
       if (kept?.status === "duplicate") return "That Finding is itself a duplicate; point to the Finding it keeps";
+      const expired = kept?.status === "accepted_risk" && (!kept.acceptedUntil || kept.acceptedUntil.getTime() <= now.getTime());
+      if (kept && !expired && (kept.status === "fixed" || kept.status === "false_positive" || kept.status === "accepted_risk")) return RESOLVED_TARGET_MESSAGE[kept.status];
       const pointing = await db
         .select({ id: scanFindingTriage.id })
         .from(scanFindingTriage)
@@ -168,7 +177,7 @@ export const setTriageEffect = (
     const duplicateOf = body.status === "duplicate" ? (body.duplicateOf ?? null) : null;
     if (body.status === "duplicate" && !duplicateOf) return yield* new Invalid({ message: "A duplicate needs the Finding it duplicates" });
     if (duplicateOf) {
-      const refusal = yield* duplicateRefusal(db, tenantId, repoId, body.fingerprint, duplicateOf);
+      const refusal = yield* duplicateRefusal(db, tenantId, repoId, body.fingerprint, duplicateOf, now);
       if (refusal) return yield* new Invalid({ message: refusal });
     }
     if (body.signalId) {

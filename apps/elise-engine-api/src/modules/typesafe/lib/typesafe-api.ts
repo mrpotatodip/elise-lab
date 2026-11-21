@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { NOUL_QUESTION_ID, TYPESAFE_API_URL, TYPESAFE_MODEL } from "#/modules/typesafe/constants";
+import { NOUL_QUESTION_ID, TYPESAFE_API_URL, TYPESAFE_MODEL, TYPESAFE_TIMEOUT_MS } from "#/modules/typesafe/constants";
 import type { TypeSafeGateway } from "#/modules/typesafe/types";
 
 const NoulResponseSchema = z.object({
@@ -11,6 +11,7 @@ export const typesafeGateway = (apiKey: string, fetcher: typeof fetch = fetch): 
   noul: async ({ state, question }) => {
     const response = await fetcher(TYPESAFE_API_URL, {
       method: "POST",
+      signal: AbortSignal.timeout(TYPESAFE_TIMEOUT_MS),
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({ model: TYPESAFE_MODEL, state, questions: { [NOUL_QUESTION_ID]: { type: "noul", instructions: question } } }),
     });

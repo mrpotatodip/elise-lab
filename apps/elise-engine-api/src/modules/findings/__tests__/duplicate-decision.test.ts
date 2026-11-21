@@ -75,4 +75,13 @@ describe("a duplicate decision", () => {
     expect(await refusal(body("duplicate", "a", "c"))).toMatchObject({ tag: "Invalid", message: expect.stringContaining("itself a duplicate") });
     expect(await refusal(body("duplicate", "d", "b"))).toMatchObject({ tag: "Invalid", message: expect.stringContaining("point to it") });
   });
+
+  it.each([
+    ["fixed", "marked fixed"],
+    ["false_positive", "false positive"],
+  ] as const)("refuses a target that is %s", async (status, message) => {
+    await Effect.runPromise(set(body(status, "b")));
+
+    expect(await refusal(body("duplicate", "a", "b"))).toMatchObject({ tag: "Invalid", message: expect.stringContaining(message) });
+  });
 });

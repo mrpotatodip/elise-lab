@@ -110,13 +110,22 @@ export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput
   const dismissed: Verdict["dismissed"] = [];
   const counts = emptyCounts();
 
-  for (const finding of unionOf(findings, newestFirst)) {
+  const union = unionOf(findings, newestFirst);
+  const present = new Set(union.map((finding) => finding.fingerprint));
+  const keptOpen = (fingerprint: string): boolean => {
+    const kept = decisions.get(fingerprint);
+    if (!present.has(fingerprint)) return false;
+    if (kept?.status === "false_positive" || kept?.status === "duplicate") return false;
+    return !(kept?.status === "accepted_risk" && kept.acceptedUntil && kept.acceptedUntil.getTime() > now.getTime());
+  };
+
+  for (const finding of union) {
     const decision = decisions.get(finding.fingerprint);
     if (decision?.status === "false_positive") {
       dismissed.push(detail(finding));
       continue;
     }
-    if (decision?.status === "duplicate") {
+    if (decision?.status === "duplicate" && decision.duplicateOf && keptOpen(decision.duplicateOf)) {
       dismissed.push({ ...detail(finding), duplicateOf: decision.duplicateOf });
       continue;
     }

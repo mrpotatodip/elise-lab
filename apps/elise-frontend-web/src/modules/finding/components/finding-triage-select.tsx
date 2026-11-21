@@ -78,9 +78,13 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
         disabled={save.isPending}
         onValueChange={(next) => {
           const picked = FINDING_TRIAGE_OPTIONS.find((option) => option.value === next);
-          if (!picked || picked.value === (finding.triage?.status ?? "open")) return;
+          if (!picked) return;
+          if (picked.value === "duplicate") {
+            setMarking(true);
+            return;
+          }
+          if (picked.value === (finding.triage?.status ?? "open")) return;
           if (picked.value === "accepted_risk") setAccepting(true);
-          else if (picked.value === "duplicate") setMarking(true);
           else save.mutate({ status: picked.value, note: picked.value === "open" ? null : undefined });
         }}
       >
@@ -116,7 +120,7 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
       <FindingDuplicateDialog
         open={marking}
         onOpenChange={setMarking}
-        suggested={possibleDuplicate?.fingerprint ?? null}
+        suggested={finding.triage?.duplicateOf ?? possibleDuplicate?.fingerprint ?? null}
         findingTitle={finding.title}
         candidates={candidates.filter((candidate) => candidate.fingerprint !== finding.fingerprint)}
         pending={save.isPending}

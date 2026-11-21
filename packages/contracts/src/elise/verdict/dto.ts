@@ -35,8 +35,11 @@ export const VerdictFindingSchema = z.object({
   needs: z.string().nullable().optional(),
 });
 
+// -----
+// duplicateOf is set when the problem was dismissed as a
+// duplicate: the fingerprint of the Finding kept.
+// -----
 export const VerdictDismissedSchema = VerdictFindingSchema.extend({
-  // Set when the problem was dismissed as a duplicate: the fingerprint of the Finding kept.
   duplicateOf: z.string().nullable().optional(),
 });
 

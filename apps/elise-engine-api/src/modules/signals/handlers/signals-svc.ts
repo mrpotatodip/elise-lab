@@ -34,14 +34,14 @@ export const askWeakReasonSvc = (gateway: TypeSafeGateway | null, input: ReasonC
   if (!gateway || !input.finding) return Effect.succeed(null);
   const { title, description, severity, evidence } = input.finding;
   return Effect.tryPromise({ try: () => gateway.noul({ state: { finding: { title, description, severity, evidence }, note }, question: WEAK_REASON_QUESTION }), catch: toExternalError }).pipe(
-    Effect.catchTag("ExternalError", () => Effect.succeed(null)),
+    Effect.catchTag("ExternalError", (cause) => Effect.sync(() => console.error("signals: the weak-reason check got no answer", cause)).pipe(Effect.as(null))),
   );
 };
 
 export const recordWeakReasonSvc = (db: AppDbType, accountId: string, repoId: string, fingerprint: string, answer: NoulAnswer): Effect.Effect<Signal | null, DbError> =>
   answer.probability <= SIGNAL_NO_THRESHOLD ? insertWeakReasonSignalEffect(db, accountId, repoId, fingerprint, answer) : Effect.succeed(null);
 
-export const dismissSignalSvc =(db: AppDbType, accountId: string, signalId: string): Effect.Effect<{ dismissed: true }, NotFound | DbError> =>
+export const dismissSignalSvc = (db: AppDbType, accountId: string, signalId: string): Effect.Effect<{ dismissed: true }, NotFound | DbError> =>
   Effect.gen(function* () {
     const found = yield* dismissSignalEffect(db, accountId, signalId);
     if (!found) return yield* new NotFound({ message: "Signal not found" });
