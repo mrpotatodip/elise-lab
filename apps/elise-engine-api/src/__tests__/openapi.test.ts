@@ -71,6 +71,7 @@ describe("GET /openapi.json", () => {
       "PATCH /groups/{groupId}",
       "PATCH /usage/budget",
       "POST /findings/comments",
+      "POST /findings/signals/weak-reason",
       "POST /findings/signals/{signalId}/dismiss",
       "POST /groups",
       "POST /repos",

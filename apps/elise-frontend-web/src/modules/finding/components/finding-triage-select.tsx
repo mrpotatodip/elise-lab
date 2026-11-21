@@ -4,11 +4,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { hasAccessPower } from "@repo/contracts/elise";
-import { setFindingTriage } from "../api";
+import { checkAcceptedRisk, setFindingTriage } from "../api";
 import { FINDING_TRIAGE_OPTIONS } from "../constants";
 import type { Finding, FindingTriage, FindingTriageStatus } from "../schemas";
 import { FindingDuplicateDialog, type DuplicateCandidate } from "./finding-duplicate-dialog";
 import { FindingRiskDialog, type RiskInput } from "./finding-risk-dialog";
+import { FindingWeakReasonDialog } from "./finding-weak-reason-dialog";
 
 type FindingTriageSelectProps = {
   finding: Pick<Finding, "repo" | "fingerprint" | "triage" | "title">;
@@ -20,7 +21,9 @@ type FindingTriageSelectProps = {
 
 export type PossibleDuplicate = { fingerprint: string; title: string; onDismiss: () => void };
 
-type Decision = { status: FindingTriageStatus; acceptDays?: number; note?: string | null; duplicateOf?: string };
+type Decision = { status: FindingTriageStatus; acceptDays?: number; note?: string | null; duplicateOf?: string; signalId?: string };
+
+type RiskWarning = { input: RiskInput; signalId: string };
 
 const SAVED_COPY = {
   open: "Reopened. It counts as open again.",
@@ -37,17 +40,34 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
   const [accepting, setAccepting] = useState(false);
   const [marking, setMarking] = useState(false);
 
+  const [warning, setWarning] = useState<RiskWarning | null>(null);
+
   const save = useMutation({
-    mutationFn: ({ status, acceptDays, note, duplicateOf }: Decision) =>
-      setFindingTriage({ data: { repo: finding.repo, fingerprint: finding.fingerprint, status, note: note === undefined ? (finding.triage?.note ?? null) : note, acceptDays, duplicateOf } }),
+    mutationFn: ({ status, acceptDays, note, duplicateOf, signalId }: Decision) =>
+      setFindingTriage({ data: { repo: finding.repo, fingerprint: finding.fingerprint, status, note: note === undefined ? (finding.triage?.note ?? null) : note, acceptDays, duplicateOf, signalId } }),
     onSuccess: (saved, decision) => {
       setAccepting(false);
+      setWarning(null);
       setMarking(false);
       onSaved?.(finding.fingerprint, saved);
       toast.success(SAVED_COPY[decision.status]);
       void Promise.all(also.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
     },
     onError: (error) => toast.error(error.message === "Forbidden" ? "Only account admins can accept a risk." : `We couldn't save that decision. ${error.message}`),
+  });
+
+  const check = useMutation({
+    mutationFn: async (input: RiskInput) => {
+      try {
+        return (await checkAcceptedRisk({ data: { repo: finding.repo, fingerprint: finding.fingerprint, note: input.note } })).signal;
+      } catch {
+        return null;
+      }
+    },
+    onSuccess: (signal, input) => {
+      if (signal) setWarning({ input, signalId: signal.id });
+      else save.mutate({ status: "accepted_risk", note: input.note, acceptDays: input.days });
+    },
   });
 
   return (
@@ -107,8 +127,14 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
         onOpenChange={setAccepting}
         findingTitle={finding.title}
         initialNote={finding.triage?.note ?? ""}
+        pending={save.isPending || check.isPending}
+        onConfirm={(input: RiskInput) => check.mutate(input)}
+      />
+      <FindingWeakReasonDialog
+        open={warning !== null}
+        onOpenChange={(open) => !open && setWarning(null)}
         pending={save.isPending}
-        onConfirm={({ note, days }: RiskInput) => save.mutate({ status: "accepted_risk", note, acceptDays: days })}
+        onSaveAnyway={() => warning && save.mutate({ status: "accepted_risk", note: warning.input.note, acceptDays: warning.input.days, signalId: warning.signalId })}
       />
     </>
   );
