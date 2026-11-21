@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CREDIT_ENTRY_LABEL, PLAN_STATUS_VIEW, creditAmountLabel, planKeyLabel, planPeriodSentence, planSeatsLabel, planSourceLabel, planSwitchOffers } from "#/modules/plan/utils/plan-format";
+import { CREDIT_ENTRY_LABEL, PLAN_STATUS_VIEW, creditAmountLabel, planKeyLabel, planPeriodSentence, planCardViews, planSeatsLabel, planSourceLabel, planSwitchOffers } from "#/modules/plan/utils/plan-format";
 
 const onPlan = (key: string) => ({ key, label: key, monthlyPriceUsd: 0, includedCreditUsd: 0, carryCapUsd: null, keySource: "account" as const, scanAllowance: null, maxMembers: 5 });
+
+const seats = (members: number, pendingInvites: number) => ({ members, pendingInvites });
 
 describe("planSwitchOffers", () => {
   const offers = [
@@ -22,13 +24,44 @@ describe("planSwitchOffers", () => {
   });
 });
 
+describe("planCardViews", () => {
+  const offers = [
+    { key: "starter", label: "Starter", monthlyPriceUsd: 15, includedCreditUsd: 0, maxMembers: 2 },
+    { key: "runner", label: "Runner", monthlyPriceUsd: 35, includedCreditUsd: 0, maxMembers: 5 },
+  ];
+  const none = { plan: null, source: null, status: null } as const;
+
+  it.each([
+    ["no plan, 1 person: both subscribe", { ...none, seats: seats(1, 0) }, [["subscribe", null], ["subscribe", null]]],
+    [
+      "no plan, 3 people: Starter is blocked",
+      { ...none, seats: seats(3, 0) },
+      [["subscribe", "Your account has 3 people and pending invites. Starter holds 2. Remove 1 to subscribe."], ["subscribe", null]],
+    ],
+    ["Runner, active, 2 people: can switch to Starter", { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(1, 1) }, [["switch", null], ["none", null]]],
+    [
+      "Runner, active, 4 people with invites: Starter switch blocked",
+      { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(3, 1) },
+      [["switch", "Your account has 4 people and pending invites. Starter holds 2. Remove 2 to switch."], ["none", null]],
+    ],
+    ["Starter, active: can switch to Runner", { plan: onPlan("starter"), source: "stripe", status: "active", seats: seats(2, 0) }, [["none", null], ["switch", null]]],
+    ["past due: no card has an action", { plan: onPlan("runner"), source: "stripe", status: "past_due", seats: seats(1, 0) }, [["none", null], ["none", null]]],
+  ] as const)("%s", (_name, data, expected) => {
+    expect(planCardViews(data, offers).map((view) => [view.action, view.blocked])).toEqual(expected);
+  });
+
+  it("tags the current plan's card", () => {
+    expect(planCardViews({ plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(1, 0) }, offers).map((view) => view.current)).toEqual([false, true]);
+  });
+});
+
 describe("planSeatsLabel", () => {
   it.each([
     ["no waiting invites", { members: 3, pendingInvites: 0 }, "3 of 5 people"],
     ["one waiting invite", { members: 3, pendingInvites: 1 }, "4 of 5 people, including 1 waiting invite"],
     ["two waiting invites", { members: 2, pendingInvites: 2 }, "4 of 5 people, including 2 waiting invites"],
-  ])("counts %s as the invite limit does", (_name, seats, expected) => {
-    expect(planSeatsLabel(seats, 5)).toBe(expected);
+  ])("counts %s as the invite limit does", (_name, counts, expected) => {
+    expect(planSeatsLabel(counts, 5)).toBe(expected);
   });
 });
 

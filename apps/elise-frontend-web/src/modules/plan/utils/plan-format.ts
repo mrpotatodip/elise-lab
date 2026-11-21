@@ -26,6 +26,22 @@ export const planBillingAction = (data: Pick<PlanDetails, "source" | "status">):
 export const planSwitchOffers = (data: Pick<PlanDetails, "plan" | "source" | "status">, offers: ReadonlyArray<PlanOffer>) =>
   data.source === "stripe" && data.status === "active" && data.plan !== null ? offers.filter((offer) => offer.key !== data.plan?.key) : [];
 
+export type PlanCardView = { offer: PlanOffer; current: boolean; action: "switch" | "subscribe" | "none"; blocked: string | null };
+
+export const planCardViews = (data: Pick<PlanDetails, "plan" | "source" | "status" | "seats">, offers: ReadonlyArray<PlanOffer>): PlanCardView[] => {
+  const people = data.seats.members + data.seats.pendingInvites;
+  const switchKeys = new Set(planSwitchOffers(data, offers).map((offer) => offer.key));
+  const subscribes = planBillingAction(data) === "subscribe";
+
+  return offers.map((offer) => {
+    const action = switchKeys.has(offer.key) ? "switch" : subscribes ? "subscribe" : "none";
+    const over = people - offer.maxMembers;
+    const blocked =
+      action !== "none" && over > 0 ? `Your account has ${people} people and pending invites. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.` : null;
+    return { offer, current: data.plan?.key === offer.key, action, blocked };
+  });
+};
+
 export const planSwitchPending = (switchingTo: string | null, data: Pick<PlanDetails, "plan">) => switchingTo !== null && data.plan?.key !== switchingTo;
 
 export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
