@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
-import { Link, useRouteContext } from "@tanstack/react-router";
-import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { hasAccessPower } from "@repo/contracts/elise";
+import { Link } from "@tanstack/react-router";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
 import { Button, buttonVariants } from "#/components/ui/button";
@@ -13,18 +11,13 @@ import { runnerShownState, runnersQuery, runnerWhen } from "#/modules/runner";
 import { ShellPageHeader } from "#/modules/shell";
 import { teamQuery, teamRoleLabel } from "#/modules/team";
 import { usageUsd } from "#/modules/usage";
-import { openBillingPortal, startPlanCheckout } from "../api";
-import { planOffersQuery, planQuery } from "../hooks";
+import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS } from "../constants";
+import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
+import type { PlanBillingActionKind, PlanCheckoutReturn } from "../types";
 import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planDateLabel, planSourceLabel } from "../utils";
 
-export type PlanCheckoutReturn = "success" | "cancelled";
-
-function BillingButton({ action, variant = "default", size = "sm" }: { action: "subscribe" | "manage"; variant?: "default" | "outline"; size?: "sm" | "default" }) {
-  const go = useMutation({
-    mutationFn: () => (action === "subscribe" ? startPlanCheckout() : openBillingPortal()),
-    onSuccess: ({ url }) => window.location.assign(url),
-    onError: (error) => toast.error(`We couldn't open the payment page. ${error.message}`),
-  });
+function BillingButton({ action, variant = "default", size = "sm" }: { action: PlanBillingActionKind; variant?: "default" | "outline"; size?: "sm" | "default" }) {
+  const go = usePlanActions(action);
 
   return (
     <Button variant={variant} size={size} className="justify-self-start" disabled={go.isPending || go.isSuccess} onClick={() => go.mutate()}>
@@ -33,12 +26,7 @@ function BillingButton({ action, variant = "default", size = "sm" }: { action: "
   );
 }
 
-function useCanManagePlan() {
-  const { user } = useRouteContext({ from: "/_app" });
-  return hasAccessPower(user?.powers ?? [], "company:plan:manage");
-}
-
-function CheckoutNote({ checkout, confirming }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean }) {
+function CheckoutNote({ checkout, confirming, gaveUp }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
   if (checkout === "cancelled") {
     return (
       <Alert variant="info">
@@ -49,7 +37,7 @@ function CheckoutNote({ checkout, confirming }: { checkout: PlanCheckoutReturn |
   if (confirming) {
     return (
       <Alert variant="info">
-        <AlertDescription>Confirming payment. This page updates on its own in a moment.</AlertDescription>
+        <AlertDescription>{gaveUp ? "Still waiting: refresh in a minute." : "Confirming payment. This page updates on its own in a moment."}</AlertDescription>
       </Alert>
     );
   }
@@ -62,7 +50,7 @@ const ALERT_VARIANT = { success: "success", warning: "warning", destructive: "de
 
 const ACTION = buttonVariants({ variant: "outline", size: "sm" });
 
-function PlanOfferCard({ checkout, confirming }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean }) {
+function PlanOfferCard({ checkout, confirming, gaveUp }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
   const { data: offers } = useSuspenseQuery(planOffersQuery());
   const canManage = useCanManagePlan();
   const offer = offers[0];
@@ -70,7 +58,7 @@ function PlanOfferCard({ checkout, confirming }: { checkout: PlanCheckoutReturn 
   return (
     <>
       <ShellPageHeader title="Plan" description="What this account pays for." />
-      <CheckoutNote checkout={checkout} confirming={confirming} />
+      <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
       <Card className="max-w-3xl">
         <CardHeader>
           <CardTitle>No plan yet</CardTitle>
@@ -109,13 +97,11 @@ function Column({ label, aside, footer, children }: ColumnProps) {
   );
 }
 
-const CONFIRM_POLL_MS = 3000;
-const CONFIRM_POLL_MAX = 20;
-
 export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
+  const queryClient = useQueryClient();
   const { data } = useSuspenseQuery({
     ...planQuery(),
-    refetchInterval: (query) => (query.state.data !== undefined && planConfirmingPayment(checkout, query.state.data) && query.state.dataUpdateCount < CONFIRM_POLL_MAX ? CONFIRM_POLL_MS : false),
+    refetchInterval: (query) => (query.state.data !== undefined && planConfirmingPayment(checkout, query.state.data) && query.state.dataUpdateCount < PLAN_CONFIRM_POLL_MAX ? PLAN_CONFIRM_POLL_MS : false),
   });
   const { data: runners } = useSuspenseQuery(runnersQuery());
   const { data: team } = useSuspenseQuery(teamQuery());
@@ -123,9 +109,10 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const now = useNow();
   const { plan } = data;
   const confirming = planConfirmingPayment(checkout, data);
+  const gaveUp = (queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0) >= PLAN_CONFIRM_POLL_MAX;
 
   if (plan === null || data.status === null || data.source === null) {
-    return <PlanOfferCard checkout={checkout} confirming={confirming} />;
+    return <PlanOfferCard checkout={checkout} confirming={confirming} gaveUp={gaveUp} />;
   }
 
   const status = PLAN_STATUS_VIEW[data.status];
@@ -142,7 +129,7 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
     <>
       <ShellPageHeader title="Plan" description="What this account pays for." badges={<Badge variant={status.variant}>{status.label}</Badge>} />
 
-      <CheckoutNote checkout={checkout} confirming={confirming} />
+      <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
 
       {status.note !== null && (
         <Alert variant={ALERT_VARIANT[status.variant]}>

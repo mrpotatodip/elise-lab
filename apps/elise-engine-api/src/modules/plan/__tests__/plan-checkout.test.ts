@@ -80,6 +80,12 @@ describe("POST /usage/plan/checkout", () => {
     expect([response.status, (await rowOf()).source]).toEqual([200, "grant"]);
   });
 
+  it("creates one Stripe customer however many times the Account clicks Subscribe", async () => {
+    await answer("/usage/plan/checkout");
+    await answer("/usage/plan/checkout");
+    expect([stripe.customers.length, stripe.checkouts[1].customerId]).toEqual([1, stripe.customers[0].id]);
+  });
+
   it("reuses the Stripe customer of an Account that cancelled", async () => {
     await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runnerPlanId, status: "canceled", source: "stripe", stripeCustomerId: "cus_old", stripeSubscriptionId: "sub_old" });
     await answer("/usage/plan/checkout");

@@ -1,4 +1,5 @@
 import type { SubscriptionStatusValue } from "@repo/contracts/elise";
+import { STRIPE_WEBHOOK_SIGNATURE_TOLERANCE_SECONDS } from "#/modules/stripe/constants";
 
 export const subscriptionStatusOf = (stripeStatus: string): SubscriptionStatusValue => {
   switch (stripeStatus) {
@@ -17,8 +18,6 @@ export const subscriptionStatusOf = (stripeStatus: string): SubscriptionStatusVa
   }
 };
 
-const SIGNATURE_TOLERANCE_SECONDS = 300;
-
 const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 const sameText = (a: string, b: string): boolean => {
@@ -34,7 +33,7 @@ export const stripeSignatureValid = async (rawBody: string, header: string | und
   const timestamp = parts.find(({ key }) => key === "t")?.value;
   const signatures = parts.filter(({ key, value }) => key === "v1" && value).map(({ value }) => value);
   if (!timestamp || signatures.length === 0 || !/^\d+$/.test(timestamp)) return false;
-  if (Math.abs(nowSeconds - Number(timestamp)) > SIGNATURE_TOLERANCE_SECONDS) return false;
+  if (Math.abs(nowSeconds - Number(timestamp)) > STRIPE_WEBHOOK_SIGNATURE_TOLERANCE_SECONDS) return false;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const expected = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${timestamp}.${rawBody}`)));
   return signatures.some((signature) => sameText(signature, expected));

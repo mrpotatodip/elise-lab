@@ -12,6 +12,10 @@ export const fakeStripe = () => {
   const portals: { customerId: string; returnUrl: string }[] = [];
 
   const gateway: StripeGateway = {
+    findCustomer: async ({ accountId }) => {
+      const found = customers.find((customer) => customer.accountId === accountId);
+      return found ? { id: found.id } : null;
+    },
     createCustomer: async (input) => {
       const customer = { id: `cus_fake_${customers.length + 1}`, ...input };
       customers.push(customer);

@@ -21,6 +21,7 @@ export type CheckoutInput = { customerId: string; accountId: string; priceId: st
 // with the Worker's secret key; the tests pass an in-memory one.
 // -----
 export type StripeGateway = {
+  findCustomer: (input: { accountId: string }) => Promise<{ id: string } | null>;
   createCustomer: (input: { name: string; email: string | null; accountId: string }) => Promise<{ id: string }>;
   createCheckoutSession: (input: CheckoutInput) => Promise<{ url: string }>;
   createPortalSession: (input: { customerId: string; returnUrl: string }) => Promise<{ url: string }>;

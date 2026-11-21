@@ -10,7 +10,7 @@ type StatusView = { label: string; variant: "success" | "warning" | "destructive
 // -----
 export const PLAN_STATUS_VIEW = {
   active: { label: "Active", variant: "success", note: null },
-  past_due: { label: "Payment failed", variant: "warning", note: "Payment failed. Scans keep running until the grace period ends." },
+  past_due: { label: "Payment failed", variant: "warning", note: "Payment failed. Scans keep running for 7 days after the first failure, then pause." },
   unpaid: { label: "Unpaid", variant: "destructive", note: "Scans are paused until the plan is active again." },
   canceled: { label: "Canceled", variant: "destructive", note: "Scans are paused until the plan is active again." },
   incomplete: { label: "Not active yet", variant: "neutral", note: "The plan is not active yet." },

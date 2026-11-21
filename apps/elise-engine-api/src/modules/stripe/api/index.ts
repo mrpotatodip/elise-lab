@@ -1,1 +1,1 @@
-export { default as stripeWebhookAPI } from "./stripe-webhook";
+export { default as receiveStripeWebhookAPI } from "./receive-stripe-webhook";

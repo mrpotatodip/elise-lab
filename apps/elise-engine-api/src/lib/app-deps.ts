@@ -9,6 +9,8 @@ import { runnerIdentitySvc } from "#/modules/runners/handlers";
 import { findConnectedRunnerEffect } from "#/modules/runners/queries";
 import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
 import { tenantScanRepo } from "#/modules/scan-ledger";
+import { InternalServiceError } from "#/lib/errors";
+import { STRIPE_NOT_CONFIGURED_MESSAGE } from "#/modules/stripe/constants";
 import { stripeGateway } from "#/modules/stripe/lib";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 import type { AppEnv, AppDeps } from "#/types/variables";
@@ -50,5 +52,8 @@ export const realAppDeps: AppDeps = {
   },
   withTenant: (c, accountId, run) => withTenant(c.env.HYPERDRIVE_TENANT.connectionString, (promise) => c.executionCtx.waitUntil(promise), accountId, run),
   withOwner: (c, run) => withPool(c.env.DATABASE_URL, (promise) => c.executionCtx.waitUntil(promise), run),
-  stripe: (env) => stripeGateway(env.STRIPE_SECRET_KEY ?? ""),
+  stripe: (env) => {
+    if (!env.STRIPE_SECRET_KEY) throw new InternalServiceError(STRIPE_NOT_CONFIGURED_MESSAGE);
+    return stripeGateway(env.STRIPE_SECRET_KEY);
+  },
 };

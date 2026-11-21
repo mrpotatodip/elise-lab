@@ -163,10 +163,11 @@ const PLATFORM_POWERS = ACCESS_POWERS.filter((power) => power.startsWith("platfo
 const TENANT_READS = TENANT_POWERS.filter((power) => powerAction(power) === "read");
 
 // -----
-// The owner keeps what changes the people already in the account.
-// A Workspace admin invites and revokes, runs groups, connects
-// GitHub and accepts risk; a Workspace member does none of it
-// and sees no part of Team.
+// The owner keeps what changes the people already in the account
+// and what the account pays: the plan and its billing portal.
+// A Workspace admin invites and revokes, runs groups and accepts
+// risk; a Workspace member does none of it and sees no part of
+// Team.
 // -----
 const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete", "company:plan:manage"] as const;
 const WORKSPACE_ADMIN_POWERS = TENANT_POWERS.filter((power) => !OWNER_ONLY.some((owner) => owner === power));

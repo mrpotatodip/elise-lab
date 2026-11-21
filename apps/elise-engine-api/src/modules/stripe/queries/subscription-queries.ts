@@ -1,9 +1,10 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, notInArray, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { SubscriptionStatusValue } from "@repo/contracts/elise";
 import { platformMasterPlans, tenants, tenantSubscriptions } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
+import { STRIPE_SUBSCRIPTION_LIVE_STATUSES } from "#/modules/stripe/constants";
 
 export const tenantExistsEffect = (db: AppDbType, tenantId: string): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
@@ -42,15 +43,17 @@ export type StripeSubscriptionRow = {
   cancelAtPeriodEnd: boolean;
 };
 
-export const upsertStripeSubscriptionEffect = (db: AppDbType, row: StripeSubscriptionRow, now: Date): Effect.Effect<void, DbError> =>
+export const upsertStripeSubscriptionEffect = (db: AppDbType, row: StripeSubscriptionRow, now: Date): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const pastDue = row.status === "past_due";
-      await db
+      const stored = tenantSubscriptions.stripeSubscriptionId;
+      const written = await db
         .insert(tenantSubscriptions)
         .values({ ...row, source: "stripe", pastDueSince: pastDue ? now : null })
         .onConflictDoUpdate({
           target: tenantSubscriptions.tenantId,
+          setWhere: or(isNull(stored), eq(stored, row.stripeSubscriptionId), row.status === "canceled" ? undefined : notInArray(tenantSubscriptions.status, [...STRIPE_SUBSCRIPTION_LIVE_STATUSES])),
           set: {
             planId: row.planId,
             status: row.status,
@@ -62,7 +65,9 @@ export const upsertStripeSubscriptionEffect = (db: AppDbType, row: StripeSubscri
             pastDueSince: pastDue ? sql`coalesce(${tenantSubscriptions.pastDueSince}, ${now.toISOString()}::timestamptz)` : null,
             updatedAt: now,
           },
-        });
+        })
+        .returning({ tenantId: tenantSubscriptions.tenantId });
+      return written.length > 0;
     },
     catch: toDbError,
   });

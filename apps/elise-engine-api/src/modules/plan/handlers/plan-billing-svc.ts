@@ -22,9 +22,8 @@ export const startPlanCheckoutSvc = (
     }
     if (!context.priceId) return yield* Effect.fail(new Invalid({ message: "The Runner plan has no Stripe price yet" }));
     const priceId = context.priceId;
-    const customerId =
-      subscription?.stripeCustomerId ??
-      (yield* Effect.tryPromise({ try: () => stripe.createCustomer({ name: context.accountName, email: context.adminEmail, accountId }), catch: toExternalError })).id;
+    const known = subscription?.stripeCustomerId ?? (yield* Effect.tryPromise({ try: () => stripe.findCustomer({ accountId }), catch: toExternalError }))?.id;
+    const customerId = known ?? (yield* Effect.tryPromise({ try: () => stripe.createCustomer({ name: context.accountName, email: context.adminEmail, accountId }), catch: toExternalError })).id;
     return yield* Effect.tryPromise({
       try: () =>
         stripe.createCheckoutSession({ customerId, accountId, priceId, successUrl: planPageUrl(dashboardUrl, "?checkout=success"), cancelUrl: planPageUrl(dashboardUrl, "?checkout=cancelled") }),

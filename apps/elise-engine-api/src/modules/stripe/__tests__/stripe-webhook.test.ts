@@ -116,6 +116,25 @@ describe("POST /stripe/webhook: Stripe's status becomes the Account's Subscripti
     expect([row.status, row.stripeSubscriptionId]).toEqual(["active", "sub_2"]);
   });
 
+  it("keeps a live subscription when an event arrives for another Stripe subscription, whatever its status", async () => {
+    const [runner] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "runner"));
+    await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runner.id, status: "active", source: "stripe", stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_live" });
+    stripe.subscriptions.set("sub_old", { id: "sub_old", customerId: "cus_1", status: "canceled", priceId: PRICE, currentPeriodEnd: null, cancelAtPeriodEnd: false, accountId });
+    stripe.subscriptions.set("sub_new", { id: "sub_new", customerId: "cus_1", status: "active", priceId: PRICE, currentPeriodEnd: null, cancelAtPeriodEnd: false, accountId });
+    await post(subscriptionEvent("customer.subscription.deleted", "sub_old"));
+    await post(subscriptionEvent("customer.subscription.created", "sub_new"));
+    const row = await rowOf();
+    expect([row.status, row.stripeSubscriptionId]).toEqual(["active", "sub_live"]);
+  });
+
+  it("answers 400 for a signed body that is not JSON", async () => {
+    const { env } = fakeBindings({ STRIPE_WEBHOOK_SECRET: SECRET });
+    const body = "{not json";
+    const headers = new Headers({ "stripe-signature": await signed(body) });
+    const response = await app.fetch(new Request("http://localhost/stripe/webhook", { method: "POST", headers, body }), env, testExecutionContext);
+    expect(response.status).toBe(400);
+  });
+
   it("answers 200 and writes nothing for an event it does not handle", async () => {
     const response = await post({ id: "evt_3", type: "charge.succeeded", data: { object: { id: "ch_1" } } });
     expect([response.status, await rowOf()]).toEqual([200, undefined]);

@@ -49,7 +49,9 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
   // Every /scans route needs the service token or a
   // signed-in session. /auth, /sign-up and /me do
   // their own checks, and so do /team and /groups. The OpenAPI routes below are
-  // not here: they answer only in development.
+  // not here: they answer only in development. /stripe/webhook is
+  // public on purpose: Stripe sends no session, and the route
+  // checks the stripe-signature header itself.
   // -----
   app.use("/scans/*", requireScanAccess);
   app.use("/usage/*", requireScanAccess);

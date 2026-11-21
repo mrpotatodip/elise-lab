@@ -1,20 +1,13 @@
 import { z } from "zod";
+import { STRIPE_API_BASE_URL, STRIPE_API_VERSION } from "#/modules/stripe/constants";
+import {
+  StripeCustomerSearchResponseSchema,
+  StripeIdResponseSchema,
+  StripeSubscriptionResponseSchema,
+  StripeUrlResponseSchema,
+} from "#/modules/stripe/schemas";
 import type { StripeGateway } from "#/modules/stripe/types";
 
-const STRIPE_API = "https://api.stripe.com/v1";
-const STRIPE_VERSION = "2025-04-30.basil";
-
-const IdSchema = z.object({ id: z.string() });
-const UrlSchema = z.object({ url: z.string() });
-const SubscriptionSchema = z.object({
-  id: z.string(),
-  customer: z.string(),
-  status: z.string(),
-  cancel_at_period_end: z.boolean(),
-  metadata: z.record(z.string(), z.string()).default({}),
-  current_period_end: z.number().optional(),
-  items: z.object({ data: z.array(z.object({ price: z.object({ id: z.string() }), current_period_end: z.number().optional() })) }),
-});
 
 const parse = async <S extends z.ZodType>(response: Response, schema: S, what: string): Promise<z.infer<S>> => {
   if (!response.ok) throw new Error(`Stripe ${what} answered ${response.status}`);
@@ -22,22 +15,29 @@ const parse = async <S extends z.ZodType>(response: Response, schema: S, what: s
 };
 
 export const stripeGateway = (secretKey: string): StripeGateway => {
-  const headers = { authorization: `Bearer ${secretKey}`, "stripe-version": STRIPE_VERSION };
-  const get = async <S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> => parse(await fetch(`${STRIPE_API}${path}`, { headers }), schema, `GET ${path}`);
-  const call = async <S extends z.ZodType>(method: "POST", path: string, schema: S, form: URLSearchParams): Promise<z.infer<S>> =>
-    parse(await fetch(`${STRIPE_API}${path}`, { method, headers: { ...headers, "content-type": "application/x-www-form-urlencoded" }, body: form.toString() }), schema, `${method} ${path}`);
+  const headers = { authorization: `Bearer ${secretKey}`, "stripe-version": STRIPE_API_VERSION };
+  const get = async <S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> => parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { headers }), schema, `GET ${path}`);
+  const post = async <S extends z.ZodType>(path: string, schema: S, form: URLSearchParams, idempotencyKey?: string): Promise<z.infer<S>> => {
+    const postHeaders = new Headers(headers);
+    postHeaders.set("content-type", "application/x-www-form-urlencoded");
+    if (idempotencyKey) postHeaders.set("idempotency-key", idempotencyKey);
+    return parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { method: "POST", headers: postHeaders, body: form.toString() }), schema, `POST ${path}`);
+  };
 
   return {
+    findCustomer: async ({ accountId }) => {
+      const found = await get(`/customers/search?query=${encodeURIComponent(`metadata['accountId']:'${accountId}'`)}&limit=1`, StripeCustomerSearchResponseSchema);
+      return found.data[0] ?? null;
+    },
     createCustomer: ({ name, email, accountId }) => {
       const form = new URLSearchParams({ name, "metadata[accountId]": accountId });
       if (email) form.set("email", email);
-      return call("POST", "/customers", IdSchema, form);
+      return post("/customers", StripeIdResponseSchema, form, `eliselab-customer-${accountId}`);
     },
     createCheckoutSession: ({ customerId, accountId, priceId, successUrl, cancelUrl }) =>
-      call(
-        "POST",
+      post(
         "/checkout/sessions",
-        UrlSchema,
+        StripeUrlResponseSchema,
         new URLSearchParams({
         mode: "subscription",
         customer: customerId,
@@ -54,9 +54,9 @@ export const stripeGateway = (secretKey: string): StripeGateway => {
         cancel_url: cancelUrl,
         }),
       ),
-    createPortalSession: ({ customerId, returnUrl }) => call("POST", "/billing_portal/sessions", UrlSchema, new URLSearchParams({ customer: customerId, return_url: returnUrl })),
+    createPortalSession: ({ customerId, returnUrl }) => post("/billing_portal/sessions", StripeUrlResponseSchema, new URLSearchParams({ customer: customerId, return_url: returnUrl })),
     retrieveSubscription: async (subscriptionId) => {
-      const found = await get(`/subscriptions/${encodeURIComponent(subscriptionId)}`, SubscriptionSchema);
+      const found = await get(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeSubscriptionResponseSchema);
       const item = found.items.data[0];
       const periodEnd = item?.current_period_end ?? found.current_period_end;
       return {

@@ -14,7 +14,7 @@ describe("planSeatsLabel", () => {
 describe("PLAN_STATUS_VIEW", () => {
   it.each([
     ["active", null],
-    ["past_due", "Payment failed. Scans keep running until the grace period ends."],
+    ["past_due", "Payment failed. Scans keep running for 7 days after the first failure, then pause."],
     ["unpaid", "Scans are paused until the plan is active again."],
     ["canceled", "Scans are paused until the plan is active again."],
     ["incomplete", "The plan is not active yet."],
