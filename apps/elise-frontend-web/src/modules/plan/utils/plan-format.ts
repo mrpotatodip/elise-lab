@@ -10,13 +10,21 @@ type StatusView = { label: string; variant: "success" | "warning" | "destructive
 // -----
 export const PLAN_STATUS_VIEW = {
   active: { label: "Active", variant: "success", note: null },
-  past_due: { label: "Payment failed", variant: "warning", note: "Payment failed. Scans keep running until the grace period ends." },
+  past_due: { label: "Payment failed", variant: "warning", note: "Payment failed. Scans keep running for 7 days after the first failure, then pause." },
   unpaid: { label: "Unpaid", variant: "destructive", note: "Scans are paused until the plan is active again." },
   canceled: { label: "Canceled", variant: "destructive", note: "Scans are paused until the plan is active again." },
   incomplete: { label: "Not active yet", variant: "neutral", note: "The plan is not active yet." },
 } as const satisfies Record<NonNullable<PlanDetails["status"]>, StatusView>;
 
 export const planSourceLabel = (source: NonNullable<PlanDetails["source"]>) => (source === "grant" ? "Granted by Elise, no invoice" : "Card, through Stripe");
+
+const PORTAL_STATUSES: ReadonlyArray<PlanDetails["status"]> = ["active", "past_due", "unpaid"];
+
+export const planBillingAction = (data: Pick<PlanDetails, "source" | "status">): "subscribe" | "manage" =>
+  data.source === "stripe" && PORTAL_STATUSES.includes(data.status) ? "manage" : "subscribe";
+
+export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
+  checkout === "success" && !(data.source === "stripe" && data.status === "active");
 
 export const planKeyLabel = (keySource: NonNullable<PlanDetails["plan"]>["keySource"]) =>
   keySource === "account" ? "Your own Claude, through a Runner" : "Our key, paid with credit";
@@ -36,6 +44,12 @@ const RENEWS = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", y
 export const planDateLabel = (iso: string) => {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : RENEWS.format(date);
+};
+
+export const planPeriodSentence = (data: Pick<PlanDetails, "status" | "cancelAtPeriodEnd" | "currentPeriodEnd">) => {
+  if (data.currentPeriodEnd === null || data.status === "canceled") return "";
+  const date = planDateLabel(data.currentPeriodEnd);
+  return data.cancelAtPeriodEnd === true ? `. Ends on ${date}` : `. Renews ${date}`;
 };
 
 export const CREDIT_ENTRY_LABEL = {

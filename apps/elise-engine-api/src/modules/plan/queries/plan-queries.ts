@@ -1,10 +1,12 @@
 import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import type { PlanDetails, PlanOffer } from "@repo/contracts/elise";
-import { partyRoles, platformMasterPlans, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
+import type { PlanDetails, PlanOffer, SubscriptionSourceValue, SubscriptionStatusValue } from "@repo/contracts/elise";
+import { authUser, partyRoles, platformMasterPlans, tenants, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
+
+const RUNNER_PLAN_KEY = "runner";
 
 // -----
 // The plans an Account may pick: the rows of the catalogue not
@@ -26,6 +28,28 @@ export const offeredPlansEffect = (db: AppDbType): Effect.Effect<PlanOffer[], Db
         .where(eq(platformMasterPlans.enabled, true))
         .orderBy(asc(platformMasterPlans.monthlyPriceUsd));
       return rows.map((row) => ({ key: row.key, label: row.label, monthlyPriceUsd: Number(row.price), includedCreditUsd: Number(row.credit), maxMembers: row.maxMembers }));
+    },
+    catch: toDbError,
+  });
+
+export type BillingContext = {
+  accountName: string;
+  adminEmail: string | null;
+  priceId: string | null;
+  subscription: { source: SubscriptionSourceValue; status: SubscriptionStatusValue; stripeCustomerId: string | null } | null;
+};
+
+export const billingContextEffect = (db: AppDbType, tenantId: string, userId: string): Effect.Effect<BillingContext, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [account] = await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId));
+      const [admin] = await db.select({ email: authUser.email }).from(authUser).where(eq(authUser.id, userId));
+      const [runner] = await db.select({ priceId: platformMasterPlans.stripePriceId }).from(platformMasterPlans).where(eq(platformMasterPlans.key, RUNNER_PLAN_KEY));
+      const [subscription] = await db
+        .select({ source: tenantSubscriptions.source, status: tenantSubscriptions.status, stripeCustomerId: tenantSubscriptions.stripeCustomerId })
+        .from(tenantSubscriptions)
+        .where(eq(tenantSubscriptions.tenantId, tenantId));
+      return { accountName: account?.name ?? "", adminEmail: admin?.email ?? null, priceId: runner?.priceId ?? null, subscription: subscription ?? null };
     },
     catch: toDbError,
   });
@@ -54,6 +78,7 @@ export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): E
             status: tenantSubscriptions.status,
             source: tenantSubscriptions.source,
             periodEnd: tenantSubscriptions.currentPeriodEnd,
+            cancelAtPeriodEnd: tenantSubscriptions.cancelAtPeriodEnd,
           })
           .from(tenantSubscriptions)
           .innerJoin(platformMasterPlans, eq(platformMasterPlans.id, tenantSubscriptions.planId))
@@ -95,6 +120,7 @@ export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): E
       status: row?.status ?? null,
       source: row?.source ?? null,
       currentPeriodEnd: row?.periodEnd?.toISOString() ?? null,
+      cancelAtPeriodEnd: row?.cancelAtPeriodEnd ?? false,
       scans,
       seats,
     };
