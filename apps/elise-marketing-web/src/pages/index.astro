@@ -84,20 +84,32 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
       <section id="pricing" aria-labelledby="pricing-heading">
         <h2 id="pricing-heading">Pricing</h2>
         <p class="section-note">{PRICING.note}</p>
+        <div class="billing">
+          <input class="sr-only" type="radio" name="billing" id="billing-month" value="month" checked />
+          <input class="sr-only" type="radio" name="billing" id="billing-year" value="year" />
+          <div class="billing-toggle" role="group" aria-label="Billing interval">
+            <label for="billing-month">{PRICING.intervals.month}</label>
+            <label for="billing-year">{PRICING.intervals.year} <span class="billing-badge">{PRICING.yearlyBadge}</span></label>
+          </div>
         <div class="plans">
           {
             PRICING.plans.map((plan) => (
               <article class="plan">
                 <h3>{plan.name}</h3>
-                <p class="plan-price">
+                <p class="plan-price when-month">
                   {plan.price}
                   <span>per month</span>
+                </p>
+                <p class="plan-price when-year">
+                  {plan.yearlyPrice}
+                  <span>per year, {plan.yearlyPerMonth} a month</span>
                 </p>
                 <p class="plan-summary">{plan.summary}</p>
                 <ul>{plan.points.map((point) => <li>{point}</li>)}</ul>
               </article>
             ))
           }
+        </div>
         </div>
         <div class="plans-action">
           <a class="button outline" href={SITE.signUpUrl}>{PRICING.action}</a>

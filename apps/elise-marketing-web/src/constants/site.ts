@@ -72,12 +72,16 @@ export const STEPS = [
 // subscription path is not live yet. Update this when the plans table changes.
 export const PRICING = {
   note: "Two plans, one flat price each. Paid sign-up opens soon. Until then, create an account and set up a Runner. There is no card checkout yet and no free trial.",
+  intervals: { month: "Monthly", year: "Yearly" },
+  yearlyBadge: "2 months free",
   action: "Create an account",
   actionHint: "Create an account opens the sign-up page in Elise.",
   plans: [
     {
       name: "Starter",
       price: "$15",
+      yearlyPrice: "$150",
+      yearlyPerMonth: "$12.50",
       summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place. For one or two people.",
       points: [
         "Flat price. EliseLAB adds no charge per scan.",
@@ -89,6 +93,8 @@ export const PRICING = {
     {
       name: "Runner",
       price: "$35",
+      yearlyPrice: "$350",
+      yearlyPerMonth: "$29.17",
       summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place.",
       points: [
         "Flat price. EliseLAB adds no charge per scan.",
