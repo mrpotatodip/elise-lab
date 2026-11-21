@@ -1,7 +1,7 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { Effect } from "effect";
-import type { Signal, SignalsSettings } from "@repo/contracts/elise";
-import { scanRepos, scanSignals, tenants } from "@repo/db-elise/schema";
+import { WEAK_REASON_SIGNAL_KIND, type CheckAcceptedRiskBody, type Signal, type SignalsSettings } from "@repo/contracts/elise";
+import { scanFindings, scanRepos, scanSignals, scans, tenants } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
@@ -62,7 +62,56 @@ export const listSignalsEffect = (db: AppDbType, tenantId: string, repo: string)
     catch: toDbError,
   });
 
-export const dismissSignalEffect = (db: AppDbType, tenantId: string, signalId: string): Effect.Effect<boolean, DbError> =>
+export type ReasonCheckInput = {
+  enabled: boolean;
+  finding: { repoId: string; title: string; description: string | null; severity: string | null; evidence: string | null } | null;
+};
+
+export const findReasonCheckInputEffect = (db: AppDbType, tenantId: string, body: CheckAcceptedRiskBody): Effect.Effect<ReasonCheckInput, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [account] = await db.select({ enabled: tenants.signalsEnabled }).from(tenants).where(eq(tenants.id, tenantId));
+      if (account?.enabled === false) return { enabled: false, finding: null };
+      const [row] = await db
+        .select({ repoId: scans.repoId, title: scanFindings.title, description: scanFindings.impact, severity: scanFindings.severity, evidence: scanFindings.evidence })
+        .from(scanFindings)
+        .innerJoin(scans, eq(scans.id, scanFindings.scanId))
+        .innerJoin(scanRepos, eq(scanRepos.id, scans.repoId))
+        .where(and(eq(scanFindings.tenantId, tenantId), sameRepoIdentity(tenantId, repoIdentityOf(body.repo)), eq(scanFindings.fingerprint, body.fingerprint)))
+        .orderBy(desc(scanFindings.createdAt))
+        .limit(1);
+      return { enabled: true, finding: row ?? null };
+    },
+    catch: toDbError,
+  });
+
+export const insertWeakReasonSignalEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+  fingerprint: string,
+  answer: { probability: number; modelVersion: string },
+): Effect.Effect<Signal, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [row] = await db
+        .insert(scanSignals)
+        .values({ tenantId, repoId, fingerprint, relatedFingerprint: null, kind: WEAK_REASON_SIGNAL_KIND, probability: answer.probability, modelVersion: answer.modelVersion, dismissedAt: new Date() })
+        .returning();
+      return {
+        id: row.id,
+        kind: row.kind,
+        fingerprint: row.fingerprint,
+        relatedFingerprint: row.relatedFingerprint,
+        probability: row.probability,
+        modelVersion: row.modelVersion,
+        createdAt: row.createdAt.toISOString(),
+      };
+    },
+    catch: toDbError,
+  });
+
+export const dismissSignalEffect =(db: AppDbType, tenantId: string, signalId: string): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const updated = await db

@@ -1,5 +1,5 @@
 import { describeRoute } from "hono-openapi";
-import { SignalSchema, SignalsSettingsSchema } from "@repo/contracts/elise";
+import { AcceptedRiskCheckSchema, SignalSchema, SignalsSettingsSchema } from "@repo/contracts/elise";
 import { z } from "zod";
 import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
 
@@ -49,7 +49,27 @@ export const listSignalsDoc = describeRoute({
   responses: { 200: jsonResponse("The Signals.", envelope(z.array(SignalSchema))), ...errorResponses(400, 401, 403) },
 });
 
-export const dismissSignalDoc = describeRoute({
+export const checkAcceptedRiskDoc = describeRoute({
+  tags: ["findings"],
+  summary: "Check the reason of a draft accepted risk",
+  security: SERVICE_SECURITY,
+  description: routeText({
+    context:
+      "Before an accepted risk is saved, one yes/no question goes to TypeSafe: does the note give a reason the risk is acceptable for this Finding. It sends the Finding's title, description, severity and evidence text and the note, never source code. It never blocks: a weak reason only returns a Signal to show a warning, and the decision may be saved over it (send its ID as `signalId` on the triage request).",
+    steps: [
+      "The Worker checks the session and that the login's Role holds `company:findings:accepted_risk:update`.",
+      "The Worker answers 404 if the account has no such Finding. With Signals off, or no TypeSafe key, no question is asked and `signal` is null.",
+      "The Worker asks TypeSafe. A weak reason (probability at or below the engine threshold) is stored and returned as `signal`; a good reason, a doubtful answer or a TypeSafe failure returns null.",
+    ],
+    example: [
+      "Check a note:",
+      bash(`curl -X POST ${EXAMPLE_BASE_URL}/findings/signals/weak-reason \\`, SESSION, `${ACCOUNT} \\`, '  -H "Content-Type: application/json" \\', `  -d '{"repo":"https://github.com/octocat/Hello-World","fingerprint":"<64 hex>","note":"Behind the VPN"}'`),
+    ],
+  }),
+  responses: { 200: jsonResponse("The Signal or none.", envelope(AcceptedRiskCheckSchema)), ...errorResponses(400, 401, 403, 404) },
+});
+
+export const dismissSignalDoc =describeRoute({
   tags: ["findings"],
   summary: "Dismiss a Signal",
   security: SERVICE_SECURITY,
