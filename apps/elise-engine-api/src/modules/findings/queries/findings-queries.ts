@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
 import type { Finding, FindingsQuery, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
-import { partyPersons, scanFindings, scanFindingTriage, scanRepos, scans, type TFindingTriage } from "@repo/db-elise/schema";
+import { partyPersons, scanFindings, scanFindingTriage, scanRepoFindings, scanRepos, scans, type TFindingTriage } from "@repo/db-elise/schema";
 import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
@@ -30,6 +30,7 @@ export const triageView = (triage: TFindingTriage, decidedBy: DecidedBy | undefi
   status: triage.status,
   note: triage.note,
   acceptedUntil: triage.acceptedUntil?.toISOString() ?? null,
+  duplicateOf: triage.duplicateOf,
   updatedAt: triage.updatedAt.toISOString(),
   decidedBy: decidedByName(decidedBy),
 });
@@ -118,6 +119,32 @@ export const findingRepoIdEffect = (db: Pick<AppDbType, "select">, tenantId: str
 
 const DAY_MS = 86_400_000;
 
+const duplicateRefusal = (db: TenantDbType, tenantId: string, repoId: string, fingerprint: string, target: string): Effect.Effect<string | null, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      if (target === fingerprint) return "A Finding cannot be a duplicate of itself";
+      const shared = await db
+        .select({ branchId: scanRepoFindings.branchId })
+        .from(scanRepoFindings)
+        .where(and(eq(scanRepoFindings.tenantId, tenantId), eq(scanRepoFindings.repoId, repoId), inArray(scanRepoFindings.fingerprint, [fingerprint, target])))
+        .groupBy(scanRepoFindings.branchId)
+        .having(sql`count(distinct ${scanRepoFindings.fingerprint}) = 2`);
+      if (shared.length === 0) return "A duplicate must point to a Finding of the same Branch";
+      const [kept] = await db
+        .select({ status: scanFindingTriage.status })
+        .from(scanFindingTriage)
+        .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId), eq(scanFindingTriage.fingerprint, target)));
+      if (kept?.status === "duplicate") return "That Finding is itself a duplicate; point to the Finding it keeps";
+      const pointing = await db
+        .select({ id: scanFindingTriage.id })
+        .from(scanFindingTriage)
+        .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId), eq(scanFindingTriage.status, "duplicate"), eq(scanFindingTriage.duplicateOf, fingerprint)))
+        .limit(1);
+      return pointing.length > 0 ? "Other Findings are duplicates that point to it; undo them first" : null;
+    },
+    catch: toDbError,
+  });
+
 // -----
 // Every triage decision, with its audit row, in the transaction
 // db already is (withTenant), so a decision is never saved without
@@ -138,6 +165,12 @@ export const setTriageEffect = (
     const accepting = body.status === "accepted_risk";
     const note = body.note?.trim() ? body.note : null;
     if (accepting && (body.acceptDays === undefined || !note)) return yield* new Invalid({ message: "An accepted risk needs a reason and a number of days" });
+    const duplicateOf = body.status === "duplicate" ? (body.duplicateOf ?? null) : null;
+    if (body.status === "duplicate" && !duplicateOf) return yield* new Invalid({ message: "A duplicate needs the Finding it duplicates" });
+    if (duplicateOf) {
+      const refusal = yield* duplicateRefusal(db, tenantId, repoId, body.fingerprint, duplicateOf);
+      if (refusal) return yield* new Invalid({ message: refusal });
+    }
     const actorPartyId = userId ? yield* Effect.tryPromise({ try: () => actorPartyOf(db, userId), catch: toDbError }) : null;
     if (accepting && !actorPartyId) return yield* new Forbidden({ message: "Forbidden" });
     const acceptedUntil = accepting && body.acceptDays !== undefined ? new Date(now.getTime() + body.acceptDays * DAY_MS) : null;
@@ -147,10 +180,10 @@ export const setTriageEffect = (
         const [previous] = await db.select().from(scanFindingTriage).where(key);
         const [row] = await db
           .insert(scanFindingTriage)
-          .values({ tenantId, repoId, fingerprint: body.fingerprint, status: body.status, note, acceptedUntil, setByPartyId: actorPartyId })
+          .values({ tenantId, repoId, fingerprint: body.fingerprint, status: body.status, note, acceptedUntil, duplicateOf, setByPartyId: actorPartyId })
           .onConflictDoUpdate({
             target: [scanFindingTriage.tenantId, scanFindingTriage.repoId, scanFindingTriage.fingerprint],
-            set: { status: body.status, note, acceptedUntil, setByPartyId: actorPartyId, updatedAt: now },
+            set: { status: body.status, note, acceptedUntil, duplicateOf, setByPartyId: actorPartyId, updatedAt: now },
           })
           .returning();
         await insertAuditEntry(db, {
@@ -158,8 +191,8 @@ export const setTriageEffect = (
           action: accepting ? "finding.risk.accepted" : "finding.triage.set",
           subjectId: row.id,
           tenantId,
-          before: previous ? { status: previous.status, note: previous.note, acceptedUntil: previous.acceptedUntil?.toISOString() ?? null } : undefined,
-          after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null },
+          before: previous ? { status: previous.status, note: previous.note, acceptedUntil: previous.acceptedUntil?.toISOString() ?? null, duplicateOf: previous.duplicateOf } : undefined,
+          after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null, duplicateOf },
         });
         const [person] = actorPartyId ? await db.select().from(partyPersons).where(eq(partyPersons.partyId, actorPartyId)) : [];
         return triageView(row, person);

@@ -15,12 +15,12 @@ export const branchStateOf = ({ history }: { history: { state: RepoFindingStateV
 // -----
 export type OpenCountRow = Pick<RepoFinding, "state" | "unchecked" | "severity"> & { triage: { status: FindingTriageStatusValue } | null };
 
-const RESOLVED_BY_PERSON: ReadonlySet<FindingTriageStatusValue> = new Set(["fixed", "false_positive", "accepted_risk"]);
+const RESOLVED_BY_PERSON: ReadonlySet<FindingTriageStatusValue> = new Set(["fixed", "false_positive", "accepted_risk", "duplicate"]);
 
 // -----
 // Still a problem to work on: the history has not closed
 // it, and no person has decided it is fixed, a false
-// positive or an accepted risk.
+// positive, an accepted risk or a duplicate.
 // -----
 export const isUnresolved = (finding: OpenCountRow): boolean =>
   (finding.state === "open" || finding.state === "regressed") && !(finding.triage && RESOLVED_BY_PERSON.has(finding.triage.status));

@@ -161,7 +161,7 @@ One security problem in `findings.json`, with a status of `confirmed` or `needs_
 _Avoid_: Bug, issue, vulnerability (until a person checks it)
 
 **decision**:
-A triage change to a Finding: its status (`open`, `fixed`, `false_positive` or `accepted_risk`) and its note (`scan_finding_triage`). It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
+A triage change to a Finding: its status (`open`, `fixed`, `false_positive`, `accepted_risk` or `duplicate`) and its note (`scan_finding_triage`). A `duplicate` points to another Finding of the same Branch that is not itself a duplicate, and that Finding carries the problem. It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
 _Avoid_: Verdict (that answers a whole commit), status (a Finding has two)
 
 **Comment**:

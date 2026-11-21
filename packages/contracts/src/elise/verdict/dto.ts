@@ -35,6 +35,11 @@ export const VerdictFindingSchema = z.object({
   needs: z.string().nullable().optional(),
 });
 
+export const VerdictDismissedSchema = VerdictFindingSchema.extend({
+  // Set when the problem was dismissed as a duplicate: the fingerprint of the Finding kept.
+  duplicateOf: z.string().nullable().optional(),
+});
+
 export const VerdictAcceptedSchema = VerdictFindingSchema.extend({
   note: z.string(),
   acceptedUntil: z.string(),
@@ -57,7 +62,7 @@ export const VerdictSchema = z.object({
   counts: SeverityCountsSchema.extend({ needsValidation: z.number().int().min(0) }),
   open: z.array(VerdictOpenSchema),
   accepted: z.array(VerdictAcceptedSchema),
-  dismissed: z.array(VerdictFindingSchema),
+  dismissed: z.array(VerdictDismissedSchema),
 });
 
 export type VerdictValue = (typeof VERDICT_VALUES)[number];

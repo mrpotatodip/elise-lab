@@ -33,16 +33,20 @@ const RECENT_SCAN_COUNT = 3;
 
 const unratedOf = (summary: { total: number; severity: Record<string, number> }) => summary.total - Object.values(summary.severity).reduce((sum, count) => sum + count, 0);
 
-const FILTER_VALUES = ["action", "decided", "scan", "all"] as const satisfies readonly FindingFilter[];
+const FILTER_VALUES = ["action", "decided", "duplicate", "scan", "all"] as const satisfies readonly FindingFilter[];
 
 const FILTER_COPY = {
   action: { label: "Needs action", note: "Unresolved problems on this branch." },
   decided: { label: "Decided by a person", note: "Marked fixed, dismissed or accepted by someone on your team." },
+  duplicate: { label: "Duplicates", note: "Marked as a duplicate of another finding, which carries the problem." },
   scan: { label: "Fixed by a scan", note: "An earlier scan checked the code and the problem was gone." },
   all: { label: "Every finding", note: "Every problem any scan of this branch found." },
 } as const satisfies Record<FindingFilter, { label: string; note: string }>;
 
-const asFilter = (value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
+const inFilter = (f: RepoFinding, value: FindingFilter) =>
+  value === "all" || (value === "duplicate" ? f.triage?.status === "duplicate" : findingGroup(f.state, f.triage) === value);
+
+const asFilter =(value: string | null): FindingFilter => FILTER_VALUES.find((filter) => filter === value) ?? "action";
 
 type ScanStarts = ReadonlyMap<string, ScanStatus["createdAt"]>;
 
@@ -104,6 +108,7 @@ type FindingRow = {
   fixedOn: string | null;
   starts: ScanStarts;
   blocks: boolean;
+  candidates: ComponentProps<typeof FindingTriageSelect>["candidates"];
   onSaved: ComponentProps<typeof FindingTriageSelect>["onSaved"];
 };
 
@@ -177,10 +182,10 @@ const decisionColumn = findingColumn.display({
   header: "Your decision",
   meta: { cell: "relative z-10" },
   cell: ({ row }) => {
-    const { finding, repoId, fixedOn, onSaved } = row.original;
+    const { finding, repoId, fixedOn, candidates, onSaved } = row.original;
     return (
       <span className="grid justify-items-start gap-1.5">
-        {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId), findingCommentKeys.thread(finding.repo, finding.fingerprint)]} onSaved={onSaved} />}
+        {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId), findingCommentKeys.thread(finding.repo, finding.fingerprint)]} candidates={candidates} onSaved={onSaved} />}
         <FindingDecisionNote state={finding.state} triage={finding.triage} fixedOn={fixedOn} />
         <FindingDiscussionButton
           repo={finding.repo}
@@ -296,16 +301,17 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
     queryClient.setQueryData(findingsOptions.queryKey, (old) => old && { ...old, pages: old.pages.map((page) => ({ ...page, findings: page.findings.map((f) => (f.fingerprint === fingerprint ? { ...f, triage } : f)) })) });
   const all = data.pages.flatMap((page) => page.findings);
   const more = hasNextPage ? "+" : "";
-  const countOf = (value: FindingFilter) => (value === "all" ? all.length : all.filter((f) => findingGroup(f.state, f.triage) === value).length);
+  const countOf = (value: FindingFilter) => all.filter((f) => inFilter(f, value)).length;
+  const candidates = all.filter((f) => findingGroup(f.state, f.triage) === "action").map((f) => ({ fingerprint: f.fingerprint, title: f.title }));
   const filterItems = FILTER_VALUES.map((value) => ({ value, label: `${FILTER_COPY[value].label} (${countOf(value)}${more})` }));
-  const inGroup = filter === "all" ? all : all.filter((f) => findingGroup(f.state, f.triage) === filter);
+  const inGroup = all.filter((f) => inFilter(f, filter));
   const query = search.trim().toLowerCase();
   const matching = query === "" ? inGroup : inGroup.filter((f) => [f.title, f.file ?? "", f.class].some((text) => text.toLowerCase().includes(query)));
   const findings = blockers.size === 0 ? matching : matching.toSorted((a, b) => Number(blockers.has(b.fingerprint)) - Number(blockers.has(a.fingerprint)));
   const selectedFinding = selected === undefined ? undefined : findings[selected];
   const emptyCopy = repoEmptyCopy(filter, hasNextPage);
   const starts: ScanStarts = new Map(history.map((scan) => [scan.scanId, scan.createdAt]));
-  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, starts), starts, blocks: blockers.has(finding.fingerprint), onSaved: decided }));
+  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, starts), starts, blocks: blockers.has(finding.fingerprint), candidates, onSaved: decided }));
   const table = useTable({ features: dataTableFeatures, columns: findingColumns, data: rows, getRowId: (row) => row.finding.id });
 
   return (
@@ -398,6 +404,7 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
               <FindingTriageSelect
                 finding={selectedFinding}
                 also={[repoKeys.detail(repoId), findingCommentKeys.thread(selectedFinding.repo, selectedFinding.fingerprint)]}
+                candidates={candidates}
                 onSaved={decided}
               />
             </div>
