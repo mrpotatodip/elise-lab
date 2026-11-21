@@ -44,6 +44,7 @@ const queueInviteEmail = (tenant: TenantEffect<AppTxDbType>, accountId: string, 
       try: () =>
         mailer.enqueue({
           kind: "team-invite",
+          inviteId: invite.id,
           to: invite.email,
           accountName,
           inviterName,
