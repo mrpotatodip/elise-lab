@@ -16,6 +16,18 @@ const offeredPlanEffect = (db: AppDbType, planKey: string): Effect.Effect<PlanBy
     return { ...plan, priceId: plan.priceId };
   });
 
+const seatCapEffect = (db: AppDbType, accountId: string, target: PlanByKey, now: Date): Effect.Effect<void, DbError | Conflict> =>
+  Effect.gen(function* () {
+    const { members, pendingInvites } = yield* seatsEffect(db, accountId, now);
+    if (members + pendingInvites > target.maxMembers) {
+      return yield* Effect.fail(
+        new Conflict({
+          message: `This account has ${members} ${members === 1 ? "person" : "people"} and ${pendingInvites} pending ${pendingInvites === 1 ? "invite" : "invites"}, and ${target.label} holds ${target.maxMembers}. Remove members or revoke invites first.`,
+        }),
+      );
+    }
+  });
+
 export const startPlanCheckoutSvc = (
   db: AppDbType,
   stripe: StripeGateway,
@@ -23,6 +35,7 @@ export const startPlanCheckoutSvc = (
   accountId: string,
   userId: string,
   planKey: string,
+  now: Date,
 ): Effect.Effect<PlanSessionUrl, DbError | Conflict | Invalid | ExternalError> =>
   Effect.gen(function* () {
     const context = yield* billingContextEffect(db, accountId, userId);
@@ -30,7 +43,9 @@ export const startPlanCheckoutSvc = (
     if (subscription?.source === "stripe" && (subscription.status === "active" || subscription.status === "past_due")) {
       return yield* Effect.fail(new Conflict({ message: "This account already has a subscription. Manage it in the billing portal." }));
     }
-    const { priceId } = yield* offeredPlanEffect(db, planKey);
+    const target = yield* offeredPlanEffect(db, planKey);
+    yield* seatCapEffect(db, accountId, target, now);
+    const { priceId } = target;
     const known = subscription?.stripeCustomerId ?? (yield* Effect.tryPromise({ try: () => stripe.findCustomer({ accountId }), catch: toExternalError }))?.id;
     const customerId = known ?? (yield* Effect.tryPromise({ try: () => stripe.createCustomer({ name: context.accountName, email: context.adminEmail, accountId }), catch: toExternalError })).id;
     return yield* Effect.tryPromise({
@@ -55,14 +70,7 @@ export const changePlanSvc = (
     }
     const target = yield* offeredPlanEffect(db, planKey);
     if (target.id === subscription.planId) return yield* Effect.fail(new Conflict({ message: `This account is already on the ${target.label} plan.` }));
-    const { members, pendingInvites } = yield* seatsEffect(db, accountId, now);
-    if (members + pendingInvites > target.maxMembers) {
-      return yield* Effect.fail(
-        new Conflict({
-          message: `This account has ${members} ${members === 1 ? "person" : "people"} and ${pendingInvites} pending ${pendingInvites === 1 ? "invite" : "invites"}, and ${target.label} holds ${target.maxMembers}. Remove members or revoke invites first.`,
-        }),
-      );
-    }
+    yield* seatCapEffect(db, accountId, target, now);
     const subscriptionId = subscription.stripeSubscriptionId;
     yield* Effect.tryPromise({ try: () => stripe.changeSubscriptionPrice({ subscriptionId, priceId: target.priceId }), catch: toExternalError });
     return { planKey: target.key };

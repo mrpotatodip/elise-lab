@@ -10,7 +10,7 @@ const redirect = {
 };
 
 export const usePlanActions = () => ({
-  checkout: useMutation({ mutationFn: (planKey: string) => startPlanCheckout({ data: { planKey } }), ...redirect }),
+  checkout: useMutation({ mutationFn: (planKey: string) => startPlanCheckout({ data: { planKey } }), onSuccess: redirect.onSuccess }),
   portal: useMutation({ mutationFn: () => openBillingPortal(), ...redirect }),
   change: useMutation({ mutationFn: (planKey: string) => changePlan({ data: { planKey } }) }),
 });

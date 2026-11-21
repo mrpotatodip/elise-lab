@@ -13,6 +13,7 @@ export const createPlanCheckoutDoc = describeRoute({
       "The Worker checks the signed-in login and that its role in the account holds the Power `company:plan:manage`.",
       "The Worker answers 409 while the account has an active or past-due Stripe Subscription.",
       "The Worker answers 400 when the plan is unknown, not offered or has no Stripe price.",
+      "The Worker answers 409, naming the counts, when the people plus pending invites exceed the plan's member limit.",
       "The Worker reuses the account's Stripe customer or makes one, then opens a Checkout session for the plan's Stripe price, with the account ID attached.",
       "The Worker returns the session URL.",
     ],

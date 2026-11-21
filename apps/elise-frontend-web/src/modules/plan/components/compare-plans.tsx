@@ -81,15 +81,22 @@ function SubscribeButton({ offer, primary, blocked }: { offer: PlanOffer; primar
   const { checkout } = usePlanActions();
 
   return (
-    <Button
-      variant={primary ? "default" : "outline"}
-      size="sm"
-      className={BUTTON_CLASS}
-      disabled={blocked || checkout.isPending || checkout.isSuccess}
-      onClick={() => checkout.mutate(offer.key)}
-    >
-      Subscribe to {offer.label}
-    </Button>
+    <div className="grid justify-items-start gap-2">
+      <Button
+        variant={primary ? "default" : "outline"}
+        size="sm"
+        className={BUTTON_CLASS}
+        disabled={blocked || checkout.isPending || checkout.isSuccess}
+        onClick={() => checkout.mutate(offer.key)}
+      >
+        Subscribe to {offer.label}
+      </Button>
+      {checkout.isError && (
+        <Alert variant="destructive">
+          <AlertDescription>{checkout.error.message}</AlertDescription>
+        </Alert>
+      )}
+    </div>
   );
 }
 
@@ -112,7 +119,9 @@ export function ComparePlans({ views, from, canManage, switching, onSwitched }: 
           <Card key={offer.key} className="grid grid-rows-[auto_1fr]">
             <CardHeader className="flex-row items-center justify-between gap-4">
               <CardTitle>{offer.label}</CardTitle>
-              {current && <Badge variant="neutral">Current plan</Badge>}
+              <Badge variant="neutral" className={current ? undefined : "invisible"} aria-hidden={!current}>
+                Current plan
+              </Badge>
             </CardHeader>
             <CardContent className="grid content-between gap-6">
               <div className="grid content-start gap-4">

@@ -1,4 +1,5 @@
-import { authUser, platformMasterPlans, tenantSubscriptions } from "@repo/db-elise/schema";
+import { ensureTenantRoles, findTenantRole } from "@repo/db-elise";
+import { authUser, partyRoles, platformMasterPlans, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -15,6 +16,8 @@ const UrlBodySchema = z.object({ data: z.object({ url: z.string() }).nullable() 
 let test: TestDb;
 let accountId: string;
 let runnerPlanId: string;
+let roleId: string;
+let partyIds: string[] = [];
 let powers: AccessPower[] = ["company:plan:manage"];
 const stripe = fakeStripe();
 const app = tenantRouteApp(() => test, {
@@ -30,10 +33,30 @@ const answer = async (path: string) => {
   return { status: response.status, body: UrlBodySchema.parse(await response.json()) };
 };
 
+const setPeople = async (count: number) => {
+  await test.raw.insert(partyRoles).values(partyIds.slice(0, count).map((partyId) => ({ partyId, tenantId: accountId, roleId, roleScope: "tenant" as const })));
+};
+const addInvite = async () => {
+  await test.raw.insert(tenantTeamInvites).values({
+    tenantId: accountId,
+    email: "invited@example.com",
+    roleId,
+    tokenHash: "hash-0",
+    invitedBy: partyIds[0],
+    expiresAt: new Date(Date.now() + 86_400_000),
+  });
+};
+
 beforeAll(async () => {
   test = await openTestDb();
   const acme = await seedTenant(test, "acme");
   accountId = acme.tenantId;
+  partyIds = [acme.partyId];
+  for (const slug of ["second", "third"]) partyIds.push((await seedTenant(test, slug)).partyId);
+  await ensureTenantRoles(test.raw, accountId);
+  const role = await findTenantRole(test.raw, accountId, "workspace_member");
+  if (!role) throw new Error("workspace_member role missing");
+  roleId = role.id;
   await test.raw.insert(authUser).values({ id: USER, name: "Admin", email: "admin@example.com", emailVerified: true, partyId: acme.partyId });
   await test.raw.update(platformMasterPlans).set({ stripePriceId: PRICE }).where(eq(platformMasterPlans.key, "runner"));
   [{ id: runnerPlanId }] = await test.raw.select({ id: platformMasterPlans.id }).from(platformMasterPlans).where(eq(platformMasterPlans.key, "runner"));
@@ -49,6 +72,8 @@ beforeEach(async () => {
   stripe.checkouts.length = 0;
   stripe.portals.length = 0;
   await test.raw.delete(tenantSubscriptions);
+  await test.raw.delete(tenantTeamInvites);
+  await test.raw.delete(partyRoles).where(eq(partyRoles.tenantId, accountId));
 });
 
 describe("POST /usage/plan/checkout", () => {
@@ -76,6 +101,18 @@ describe("POST /usage/plan/checkout", () => {
     await test.raw.update(platformMasterPlans).set({ stripePriceId: price, enabled }).where(eq(platformMasterPlans.key, "starter"));
     const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey }, env: { DASHBOARD_URL: DASHBOARD } });
     expect([response.status, stripe.checkouts.length]).toEqual([400, 0]);
+  });
+
+  it.each([
+    { name: "people at the cap", members: 2, invite: false, status: 200 },
+    { name: "people over the cap", members: 3, invite: false, status: 409 },
+    { name: "people plus a pending invite over the cap", members: 2, invite: true, status: 409 },
+  ])("for Starter with $name answers $status and opens a session only when allowed", async ({ members, invite, status }) => {
+    await test.raw.update(platformMasterPlans).set({ stripePriceId: "price_starter_test", enabled: true }).where(eq(platformMasterPlans.key, "starter"));
+    await setPeople(members);
+    if (invite) await addInvite();
+    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "starter" }, env: { DASHBOARD_URL: DASHBOARD } });
+    expect([response.status, stripe.checkouts.length, stripe.customers.length]).toEqual([status, status === 200 ? 1 : 0, status === 200 ? 1 : 0]);
   });
 
   it("refuses a login whose Role lacks company:plan:manage and asks Stripe for nothing", async () => {
