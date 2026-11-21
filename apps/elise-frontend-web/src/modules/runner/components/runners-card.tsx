@@ -91,8 +91,8 @@ export function RunnersCard() {
             </EmptyHeader>
             <EmptyContent className="max-w-md">
               <CopyCommand command={RUNNER_LOGIN_COMMAND} />
-              <p className="text-xs text-muted-foreground">
-                Setup steps are in{" "}
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                The setup tasks are in{" "}
                 <Link to="/overview" className={INLINE_LINK_CLASS}>
                   Getting started
                 </Link>

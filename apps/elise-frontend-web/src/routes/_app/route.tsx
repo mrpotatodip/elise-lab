@@ -12,7 +12,14 @@ export const Route = createFileRoute("/_app")({
     if (!context.user) throw redirect({ to: "/signin" });
     if (isWatcher(context.user.powers) && !location.pathname.startsWith("/summary")) throw redirect({ to: "/summary" });
   },
-  loader: ({ context }) => (isWatcher(context.user?.powers ?? []) ? null : context.queryClient.query({ ...scansQuery(), staleTime: "static" })),
+  loader: ({ context }) => {
+    const powers = context.user?.powers ?? [];
+    if (isWatcher(powers)) return null;
+    return Promise.all([
+      context.queryClient.query({ ...scansQuery(), staleTime: "static" }),
+      hasAccessPower(powers, "company:runners:create") ? context.queryClient.query({ ...runnersQuery(), staleTime: "static" }) : null,
+    ]);
+  },
   component: AppLayout,
 });
 

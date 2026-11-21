@@ -168,7 +168,7 @@ export function ScanList() {
             </EmptyHeader>
             <EmptyContent>
               <ScanNewDialog label="Start your first audit" size="default" />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 New here? Follow{" "}
                 <Link to="/overview" className={INLINE_LINK_CLASS}>
                   Getting started

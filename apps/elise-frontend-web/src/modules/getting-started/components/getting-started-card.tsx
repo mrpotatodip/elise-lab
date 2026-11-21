@@ -26,7 +26,7 @@ function Task({ done, title, children }: TaskProps) {
       <span aria-hidden="true" className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full", done ? "bg-status-success-soft text-status-success" : "text-muted-foreground")}>
         <Icon className="size-3.5" />
       </span>
-      <div className="grid min-w-0 flex-1 gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
         <h3 className={cn("text-sm font-semibold leading-snug", done && "text-muted-foreground")}>
           {title}
           <span className="sr-only">{done ? " (done)" : " (open)"}</span>
@@ -70,14 +70,14 @@ export function GettingStartedCard() {
         </div>
       </CardHeader>
       <CardContent>
-        <ol className="grid divide-y">
+        <ol className="flex flex-col divide-y">
           <Task done={done("install")} title="Install the Runner">
             <CopyCommand command={GETTING_STARTED_INSTALL_COMMAND} />
-            <p className="text-xs text-muted-foreground">Claude Code must be installed and signed in on that computer.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Claude Code must be installed and signed in on that computer.</p>
           </Task>
           <Task done={done("login")} title="Log the Runner in">
             <CopyCommand command={RUNNER_LOGIN_COMMAND} />
-            <p className="text-xs text-muted-foreground">It opens this site so you can approve the computer on the device page.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">It opens this site so you can approve the computer on the device page.</p>
           </Task>
           <Task done={done("git-access")} title="Check git access (private repositories only)">
             <CopyCommand command={GETTING_STARTED_DOCTOR_COMMAND} />
@@ -90,7 +90,7 @@ export function GettingStartedCard() {
             )}
           </Task>
           <Task done={done("first-scan")} title="Start a first Scan">
-            <p className="text-xs text-muted-foreground">
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
               Keep <code className="font-mono">elise-runner run</code> open on the computer so it picks the Scan up.
             </p>
             <div>
@@ -98,7 +98,7 @@ export function GettingStartedCard() {
             </div>
           </Task>
           <Task done={done("report")} title="Read the Report">
-            <p className="text-xs text-muted-foreground">
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
               When the Scan finishes, open it from{" "}
               <Link to="/scans" className={INLINE_LINK_CLASS}>
                 Scans
