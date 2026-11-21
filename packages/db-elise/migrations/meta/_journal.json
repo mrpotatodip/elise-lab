@@ -680,6 +680,13 @@
       "when": 1795203740794,
       "tag": "0096_retire_github_app",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1795226349413,
+      "tag": "0097_stripe_plan_manage_power",
+      "breakpoints": true
     }
   ]
 }

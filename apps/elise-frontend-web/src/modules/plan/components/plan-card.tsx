@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
-import { buttonVariants } from "#/components/ui/button";
+import { Button, buttonVariants } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Progress } from "#/components/ui/progress";
 import { useNow } from "#/lib/use-now";
@@ -11,8 +11,38 @@ import { runnerShownState, runnersQuery, runnerWhen } from "#/modules/runner";
 import { ShellPageHeader } from "#/modules/shell";
 import { teamQuery, teamRoleLabel } from "#/modules/team";
 import { usageUsd } from "#/modules/usage";
-import { planOffersQuery, planQuery } from "../hooks";
-import { PLAN_STATUS_VIEW, planDateLabel, planSourceLabel } from "../utils";
+import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS } from "../constants";
+import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
+import type { PlanBillingActionKind, PlanCheckoutReturn } from "../types";
+import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel } from "../utils";
+
+function BillingButton({ action, variant = "default", size = "sm" }: { action: PlanBillingActionKind; variant?: "default" | "outline"; size?: "sm" | "default" }) {
+  const go = usePlanActions(action);
+
+  return (
+    <Button variant={variant} size={size} className="justify-self-start" disabled={go.isPending || go.isSuccess} onClick={() => go.mutate()}>
+      {action === "subscribe" ? "Subscribe" : "Manage billing"}
+    </Button>
+  );
+}
+
+function CheckoutNote({ checkout, confirming, gaveUp }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
+  if (checkout === "cancelled") {
+    return (
+      <Alert variant="info">
+        <AlertDescription>Checkout was cancelled. Nothing was charged.</AlertDescription>
+      </Alert>
+    );
+  }
+  if (confirming) {
+    return (
+      <Alert variant="info">
+        <AlertDescription>{gaveUp ? "Still waiting: refresh in a minute." : "Confirming payment. This page updates on its own in a moment."}</AlertDescription>
+      </Alert>
+    );
+  }
+  return null;
+}
 
 const PER_MONTH = <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>;
 
@@ -20,13 +50,15 @@ const ALERT_VARIANT = { success: "success", warning: "warning", destructive: "de
 
 const ACTION = buttonVariants({ variant: "outline", size: "sm" });
 
-function PlanOfferCard() {
+function PlanOfferCard({ checkout, confirming, gaveUp }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
   const { data: offers } = useSuspenseQuery(planOffersQuery());
+  const canManage = useCanManagePlan();
   const offer = offers[0];
 
   return (
     <>
       <ShellPageHeader title="Plan" description="What this account pays for." />
+      <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
       <Card className="max-w-3xl">
         <CardHeader>
           <CardTitle>No plan yet</CardTitle>
@@ -40,8 +72,9 @@ function PlanOfferCard() {
               {PER_MONTH}
             </p>
             <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-              Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place. To subscribe, contact us.
+              Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place.
             </p>
+            {canManage ? <BillingButton action="subscribe" /> : <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to subscribe.</p>}
           </CardContent>
         )}
       </Card>
@@ -64,18 +97,26 @@ function Column({ label, aside, footer, children }: ColumnProps) {
   );
 }
 
-export function PlanCard() {
-  const { data } = useSuspenseQuery(planQuery());
+export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
+  const queryClient = useQueryClient();
+  const { data } = useSuspenseQuery({
+    ...planQuery(),
+    refetchInterval: (query) => (query.state.data !== undefined && planConfirmingPayment(checkout, query.state.data) && query.state.dataUpdateCount < PLAN_CONFIRM_POLL_MAX ? PLAN_CONFIRM_POLL_MS : false),
+  });
   const { data: runners } = useSuspenseQuery(runnersQuery());
   const { data: team } = useSuspenseQuery(teamQuery());
+  const canManage = useCanManagePlan();
   const now = useNow();
   const { plan } = data;
+  const confirming = planConfirmingPayment(checkout, data);
+  const gaveUp = (queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0) >= PLAN_CONFIRM_POLL_MAX;
 
   if (plan === null || data.status === null || data.source === null) {
-    return <PlanOfferCard />;
+    return <PlanOfferCard checkout={checkout} confirming={confirming} gaveUp={gaveUp} />;
   }
 
   const status = PLAN_STATUS_VIEW[data.status];
+  const billing = planBillingAction(data);
   const granted = data.source === "grant";
   const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
@@ -87,14 +128,28 @@ export function PlanCard() {
     <>
       <ShellPageHeader title="Plan" description="What this account pays for." badges={<Badge variant={status.variant}>{status.label}</Badge>} />
 
+      <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
+
       {status.note !== null && (
         <Alert variant={ALERT_VARIANT[status.variant]}>
-          <AlertDescription>{status.note}</AlertDescription>
+          <AlertDescription className="grid justify-items-start gap-3">
+            {status.note}
+            {data.status === "past_due" && canManage && <BillingButton action="manage" variant="outline" />}
+          </AlertDescription>
         </Alert>
       )}
 
       <Card className="grid overflow-hidden lg:grid-cols-3 lg:divide-x">
-        <Column label={`${plan.label} plan`} footer={<p className="max-w-copy text-sm leading-relaxed text-muted-foreground">To change your plan, contact us.</p>}>
+        <Column
+          label={`${plan.label} plan`}
+          footer={
+            canManage ? (
+              <BillingButton action={billing} variant={billing === "subscribe" ? "default" : "outline"} />
+            ) : (
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to change the plan.</p>
+            )
+          }
+        >
           {granted ? (
             <>
               <p className="text-[40px] font-semibold leading-none tracking-tight">No charge</p>
@@ -111,7 +166,7 @@ export function PlanCard() {
               </p>
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
                 {planSourceLabel(data.source)}
-                {data.currentPeriodEnd !== null ? `. Renews ${planDateLabel(data.currentPeriodEnd)}` : ""}. Elise charges nothing per scan.
+                {planPeriodSentence(data)}. Elise charges nothing per scan.
               </p>
             </>
           )}

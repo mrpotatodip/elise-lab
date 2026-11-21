@@ -59,6 +59,6 @@ describe("planDetailsEffect", () => {
     const role = await findTenantRole(test.raw, tenantId, "workspace_member");
     await test.raw.insert(partyRoles).values({ partyId, tenantId, roleId: role!.id, roleScope: "tenant" });
 
-    expect(await details(tenantId)).toEqual({ plan: null, status: null, source: null, currentPeriodEnd: null, scans: 0, seats: { members: 1, pendingInvites: 0 } });
+    expect(await details(tenantId)).toEqual({ plan: null, status: null, source: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, scans: 0, seats: { members: 1, pendingInvites: 0 } });
   });
 });

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import {
   SUBSCRIPTION_SOURCE_VALUES,
   SUBSCRIPTION_STATUS_VALUES,
@@ -34,6 +34,7 @@ export const tenantSubscriptions = pgTable(
     stripeSubscriptionId: text("stripe_subscription_id"),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     pastDueSince: timestamp("past_due_since", { withTimezone: true }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
