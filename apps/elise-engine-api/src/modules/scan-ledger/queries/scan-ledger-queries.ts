@@ -5,7 +5,6 @@ import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCredit
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
-import { clearEndedScanFindingsEffect } from "#/modules/live-findings/queries";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
@@ -234,8 +233,8 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   mark: (accountId, scanId, patch) => {
     const ended = patch.status === "succeeded" || patch.status === "failed";
     return Effect.tryPromise({
-      try: () =>
-        db
+      try: () => {
+        const update = db
           .update(scans)
           .set({
             ...(patch.status !== undefined && { status: patch.status }),
@@ -255,11 +254,19 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
             }),
             updatedAt: new Date(),
           })
-          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), ne(scans.status, "stopped"), patch.status === "failed" ? undefined : ne(scans.status, "failed"))),
+          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), ne(scans.status, "stopped"), patch.status === "failed" ? undefined : ne(scans.status, "failed")));
+        if (patch.status !== "failed") return update;
+        const changed = db.$with("changed").as(update.returning({ id: scans.id }));
+        const cleared = db.$with("cleared").as(
+          db
+            .delete(scanFindings)
+            .where(inArray(scanFindings.scanId, db.select({ id: changed.id }).from(changed)))
+            .returning({ id: scanFindings.id }),
+        );
+        return db.with(changed, cleared).select({ id: changed.id }).from(changed);
+      },
       catch: toDbError,
-    }).pipe(
-      Effect.flatMap(() => (patch.status === "failed" ? clearEndedScanFindingsEffect(db, accountId, scanId) : Effect.void)),
-    );
+    }).pipe(Effect.asVoid);
   },
 
   addFiles: (accountId, scanId, files) =>
@@ -292,12 +299,22 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
 export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string, now: Date): Effect.Effect<void, NotFound | Conflict | DbError> =>
   Effect.gen(function* () {
     const stopped = yield* Effect.tryPromise({
-      try: () =>
-        db
-          .update(scans)
-          .set({ status: "stopped", step: null, finishedAt: now, updatedAt: now })
-          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), inArray(scans.status, ["queued", "running"])))
-          .returning({ id: scans.id }),
+      try: () => {
+        const ended = db.$with("ended").as(
+          db
+            .update(scans)
+            .set({ status: "stopped", step: null, finishedAt: now, updatedAt: now })
+            .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), inArray(scans.status, ["queued", "running"])))
+            .returning({ id: scans.id }),
+        );
+        const cleared = db.$with("cleared").as(
+          db
+            .delete(scanFindings)
+            .where(inArray(scanFindings.scanId, db.select({ id: ended.id }).from(ended)))
+            .returning({ id: scanFindings.id }),
+        );
+        return db.with(ended, cleared).select({ id: ended.id }).from(ended);
+      },
       catch: toDbError,
     });
     if (stopped.length === 0) {
@@ -305,7 +322,6 @@ export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string,
       if (!found) return yield* new NotFound({ message: "Scan not found" });
       return yield* new Conflict({ message: SCAN_ALREADY_ENDED });
     }
-    yield* Effect.tryPromise({ try: () => db.delete(scanFindings).where(and(eq(scanFindings.tenantId, accountId), eq(scanFindings.scanId, scanId))), catch: toDbError });
     yield* Effect.tryPromise({
       try: () =>
         db

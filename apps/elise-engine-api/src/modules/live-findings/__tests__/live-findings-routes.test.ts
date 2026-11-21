@@ -6,7 +6,10 @@ import { LIVE_FINDINGS_PER_SCAN_MAX, LiveFindingsSavedSchema, RepoFindingListSch
 import { fakeBindings, testExecutionContext } from "#/__tests__/fake-bindings";
 import { asTenant, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
+import { sha256Hex } from "@repo/db-elise";
+import { findingRepoIdEffect } from "#/modules/findings/queries";
 import { stopScanEffect, tenantScanRepo } from "#/modules/scan-ledger";
+import { summaryOf } from "#/modules/scan-ledger/utils";
 import { commitEvidenceEffect } from "#/modules/verdict/queries";
 import { buildScanRecordSvc, writeScanRecordEffect } from "#/modules/scan-records";
 import type { ScanParams } from "#/schemas";
@@ -110,6 +113,15 @@ describe("POST /runners/jobs/:scanId/findings", () => {
     expect(await rowsOf(scanId)).toHaveLength(0);
   });
 
+  it("keeps the valid records of a batch and counts a malformed one as dropped", async () => {
+    const { scanId } = await runnerScan();
+    const bad = { verdict: "confirmed", fingerprint: "BAD", title: "no severity" };
+    const res = SavedEnvelope.parse(await (await post(scanId, { findings: [confirmed("A"), bad, needsValidation("B")] })).json());
+
+    expect(res.data).toEqual({ accepted: 2, dropped: 1 });
+    expect((await rowsOf(scanId)).map((row) => row.findingId)).toEqual(["A", "B"]);
+  });
+
   it("drops a new fingerprint past the per-Scan cap but still updates one it holds", async () => {
     const { scanId } = await runnerScan();
     const seeded = Array.from({ length: LIVE_FINDINGS_PER_SCAN_MAX }, (_, n) => ({
@@ -126,6 +138,29 @@ describe("POST /runners/jobs/:scanId/findings", () => {
 
     expect(res.data).toEqual({ accepted: 1, dropped: 1 });
     expect((await rowsOf(scanId)).some((row) => row.findingId === "fresh")).toBe(false);
+  });
+});
+
+describe("a running Scan's live rows", () => {
+  it("count in the Scan's summary", async () => {
+    const { scanId } = await runnerScan();
+    await post(scanId, { findings: [confirmed("A"), needsValidation("B")] });
+    const [row] = await test.raw.select().from(scans).where(eq(scans.id, scanId));
+    const counts = (await rowsOf(scanId)).map(({ status, severity, origin }) => ({ status, severity, origin, total: 1 }));
+
+    expect(summaryOf(row, counts)).toMatchObject({ total: 2, needsValidation: 1, severity: { high: 1 } });
+  });
+
+  it("cannot be triaged or commented on", async () => {
+    const { scanId } = await runnerScan();
+    await post(scanId, { findings: [confirmed("LIVE-ONLY-3")] });
+    const [{ repo }] = await test.raw.select({ repo: scans.repo }).from(scans).where(eq(scans.id, scanId));
+    const fingerprint = await sha256Hex("LIVE-ONLY-3");
+    const triage = await callAs(app, tenantId, "/findings/triage", { method: "PUT", body: { repo, fingerprint, status: "false_positive" } });
+    const owner = await Effect.runPromise(findingRepoIdEffect(test.http, tenantId, repo, fingerprint));
+
+    expect(triage.status).toBe(404);
+    expect(owner).toBeNull();
   });
 });
 

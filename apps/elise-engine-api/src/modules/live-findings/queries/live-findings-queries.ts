@@ -67,22 +67,3 @@ export const upsertLiveFindingsEffect = (db: AppDbType, rows: readonly NewFindin
             }),
         catch: toDbError,
       }).pipe(Effect.asVoid);
-
-export const clearEndedScanFindingsEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<void, DbError> =>
-  Effect.tryPromise({
-    try: () =>
-      db.delete(scanFindings).where(
-        and(
-          eq(scanFindings.tenantId, tenantId),
-          eq(scanFindings.scanId, scanId),
-          inArray(
-            scanFindings.scanId,
-            db
-              .select({ id: scans.id })
-              .from(scans)
-              .where(and(eq(scans.tenantId, tenantId), inArray(scans.status, ["failed", "stopped"]))),
-          ),
-        ),
-      ),
-    catch: toDbError,
-  }).pipe(Effect.asVoid);

@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { LIVE_FINDINGS_PER_SCAN_MAX, type LiveFindingRecord, type LiveFindingsSaved, type RunnerIdentity, type SaveLiveFindingsBody } from "@repo/contracts/elise";
+import { LIVE_FINDINGS_PER_SCAN_MAX, LiveFindingRecordSchema, type LiveFindingRecord, type LiveFindingsSaved, type RunnerIdentity, type SaveLiveFindingsBody } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
 import { Conflict, NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import { LIVE_FINDINGS_JOB_NOT_FOUND, LIVE_FINDINGS_NOT_RUNNING } from "#/modules/live-findings/constants";
@@ -20,7 +20,11 @@ export const saveLiveFindingsSvc = (
     if (status === null) return yield* new NotFound({ message: LIVE_FINDINGS_JOB_NOT_FOUND });
     if (status !== "running") return yield* new Conflict({ message: LIVE_FINDINGS_NOT_RUNNING });
 
-    const records = [...new Map<string, LiveFindingRecord>(body.findings.map((record) => [record.fingerprint, record])).values()];
+    const parsed = body.findings.flatMap((record) => {
+      const result = LiveFindingRecordSchema.safeParse(record);
+      return result.success ? [result.data] : [];
+    });
+    const records = [...new Map<string, LiveFindingRecord>(parsed.map((record) => [record.fingerprint, record])).values()];
     const rows = yield* Effect.tryPromise({
       try: () => Promise.all(records.map((record) => fullFindingRowOf(record, { accountId: runner.accountId, scanId }))),
       catch: toExternalError,

@@ -129,7 +129,7 @@ export function ScanFindingsTable({ scanId, repoId, repoLabel, commit, live = fa
 
   return (
     <>
-      {actionable.length > 0 && (
+      {actionable.length > 0 && !live && (
         <div className="flex justify-end border-b px-5 py-3">
           <ScanFindingCopy text={scanFindingsPrompt(sorted, { repo: repoLabel, commit })} label={`Copy ${actionable.length === 1 ? "finding" : `all ${actionable.length} findings`} for coding agent`} />
         </div>

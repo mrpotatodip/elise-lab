@@ -36,10 +36,11 @@ export const LiveFindingRecordSchema = z.discriminatedUnion("verdict", [Confirme
 // -----
 // A batch from a Runner of the records that are new or changed since
 // its last batch. A later record with the same fingerprint replaces
-// the earlier one, in this batch and across batches.
+// the earlier one, in this batch and across batches. A record
+// that does not parse is dropped on its own; the rest are kept.
 // -----
 export const SaveLiveFindingsBodySchema = z.object({
-  findings: z.array(LiveFindingRecordSchema).max(LIVE_FINDINGS_BATCH_MAX),
+  findings: z.array(z.unknown()).max(LIVE_FINDINGS_BATCH_MAX),
 });
 
 // -----
