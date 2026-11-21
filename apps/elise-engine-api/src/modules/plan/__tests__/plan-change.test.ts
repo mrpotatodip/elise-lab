@@ -143,6 +143,13 @@ describe("POST /usage/plan/change", () => {
     expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_YEARLY }]]);
   });
 
+  it("lets an Account over the member cap go from monthly to yearly on its own plan", async () => {
+    await subscribe(starterPlanId);
+    await setPeople(3);
+    const { status } = await planChange("starter", "year");
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: STARTER_YEARLY }]]);
+  });
+
   it("refuses yearly to monthly on the same plan, telling the admin to cancel at period end", async () => {
     await subscribe(runnerPlanId, "year");
     const { status, text } = await planChange("runner", "month");

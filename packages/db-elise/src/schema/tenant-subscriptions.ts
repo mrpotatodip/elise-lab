@@ -3,8 +3,8 @@ import { boolean, check, pgTable, text, timestamp, uniqueIndex, uuid } from "dri
 import {
   BILLING_INTERVAL_VALUES,
   SUBSCRIPTION_SOURCE_VALUES,
-  type BillingIntervalValue,
   SUBSCRIPTION_STATUS_VALUES,
+  type BillingIntervalValue,
   type SubscriptionSourceValue,
   type SubscriptionStatusValue,
 } from "@repo/contracts/elise";
@@ -19,8 +19,9 @@ const inList = (values: readonly string[]) => sql.raw(values.map((value) => `'${
 // webhooks. A row with source "grant" is the operator's gift of a
 // plan that Stripe does not know: it has no Stripe IDs and is never
 // charged. billing_interval is "month" or "year", set from the
-// Stripe price by the webhook; a grant has none. past_due_since is when Stripe first said past_due, to
-// count the grace period; it is null in any other status.
+// Stripe price by the webhook; a grant has none. past_due_since is
+// when Stripe first said past_due, to count the grace period; it is
+// null in any other status.
 // -----
 export const tenantSubscriptions = pgTable(
   "tenant_subscriptions",

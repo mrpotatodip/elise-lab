@@ -39,71 +39,19 @@ function TermsRow({ heading, terms, interval }: { heading: string; terms: Terms;
   );
 }
 
-function IntervalDialog({ offer, busy, onSwitched }: { offer: PlanOffer; busy: boolean; onSwitched: (target: PlanSwitchTarget) => void }) {
-  const [open, setOpen] = useState(false);
-  const { change } = usePlanActions();
+type ChangeCopy = { trigger: string; title: string; description: string; keep: string; note?: string };
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) change.reset();
-      }}
-    >
-      <DialogTrigger render={<Button size="sm" className={BUTTON_CLASS} disabled={busy} />}>Switch to yearly</DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Switch {offer.label} to yearly?</DialogTitle>
-          <DialogDescription>Takes effect now. The unused part of your current month is credited toward the yearly price.</DialogDescription>
-        </DialogHeader>
-        <DialogBody className="grid gap-3">
-          <TermsRow heading="Now" terms={offer} interval="month" />
-          <TermsRow heading="After the switch" terms={offer} interval="year" />
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{PLAN_REFUND_LINE}</p>
-          {change.isError && (
-            <Alert variant="destructive">
-              <AlertDescription>{change.error.message}</AlertDescription>
-            </Alert>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>Keep monthly</DialogClose>
-          <Button
-            disabled={change.isPending}
-            onClick={() =>
-              change.mutate(
-                { planKey: offer.key, interval: "year" },
-                {
-                  onSuccess: () => {
-                    setOpen(false);
-                    onSwitched({ planKey: offer.key, interval: "year" });
-                  },
-                },
-              )
-            }
-          >
-            {change.isPending ? "Switching" : "Switch to yearly"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function SwitchDialog({
-  offer,
-  from,
-  interval,
-  busy,
-  onSwitched,
-}: {
-  offer: PlanOffer;
-  from: Terms;
-  interval: PlanInterval;
+type ChangeDialogProps = {
+  target: PlanSwitchTarget;
+  now: { terms: Terms; interval: PlanInterval };
+  after: { terms: Terms; interval: PlanInterval };
+  copy: ChangeCopy;
+  primary: boolean;
   busy: boolean;
   onSwitched: (target: PlanSwitchTarget) => void;
-}) {
+};
+
+function ChangeDialog({ target, now, after, copy, primary, busy, onSwitched }: ChangeDialogProps) {
   const [open, setOpen] = useState(false);
   const { change } = usePlanActions();
 
@@ -115,15 +63,16 @@ function SwitchDialog({
         if (!next) change.reset();
       }}
     >
-      <DialogTrigger render={<Button variant="outline" size="sm" className={BUTTON_CLASS} disabled={busy} />}>Switch to {offer.label}</DialogTrigger>
+      <DialogTrigger render={<Button variant={primary ? "default" : "outline"} size="sm" className={BUTTON_CLASS} disabled={busy} />}>{copy.trigger}</DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Switch to {offer.label}?</DialogTitle>
-          <DialogDescription>Takes effect now. The price difference is prorated on your next invoice.</DialogDescription>
+          <DialogTitle>{copy.title}</DialogTitle>
+          <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
         <DialogBody className="grid gap-3">
-          <TermsRow heading="Now" terms={from} interval={interval} />
-          <TermsRow heading="After the switch" terms={offer} interval={interval} />
+          <TermsRow heading="Now" terms={now.terms} interval={now.interval} />
+          <TermsRow heading="After the switch" terms={after.terms} interval={after.interval} />
+          {copy.note !== undefined && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{copy.note}</p>}
           {change.isError && (
             <Alert variant="destructive">
               <AlertDescription>{change.error.message}</AlertDescription>
@@ -131,22 +80,19 @@ function SwitchDialog({
           )}
         </DialogBody>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>Keep {from.label}</DialogClose>
+          <DialogClose render={<Button variant="outline" />}>{copy.keep}</DialogClose>
           <Button
             disabled={change.isPending}
             onClick={() =>
-              change.mutate(
-                { planKey: offer.key },
-                {
-                  onSuccess: () => {
-                    setOpen(false);
-                    onSwitched({ planKey: offer.key, interval: null });
-                  },
+              change.mutate(target, {
+                onSuccess: () => {
+                  setOpen(false);
+                  onSwitched(target);
                 },
-              )
+              })
             }
           >
-            {change.isPending ? "Switching" : `Switch to ${offer.label}`}
+            {change.isPending ? "Switching" : copy.trigger}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -178,8 +124,8 @@ function SubscribeButton({ offer, interval, primary, blocked }: { offer: PlanOff
 }
 
 function PriceBlock({ offer, interval }: { offer: PlanOffer; interval: PlanInterval }) {
-  const yearly = planPriceView(offer, interval);
-  const view = yearly ?? planPriceView(offer, "month");
+  const shownView = planPriceView(offer, interval);
+  const view = shownView ?? planPriceView(offer, "month");
   if (view === null) return null;
 
   return (
@@ -189,7 +135,7 @@ function PriceBlock({ offer, interval }: { offer: PlanOffer; interval: PlanInter
         <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per {view.unit}</span>
       </p>
       {view.perMonth !== null && <p className="text-sm tabular-nums text-muted-foreground">{view.perMonth}</p>}
-      {yearly === null && <p className="text-sm text-muted-foreground">Monthly only.</p>}
+      {shownView === null && <p className="text-sm text-muted-foreground">Monthly only.</p>}
     </div>
   );
 }
@@ -252,13 +198,41 @@ export function ComparePlans({ data, offers, from, canManage, switching, onSwitc
                   ))}
                 </ul>
               </div>
+              {action === "none" && canManage && blocked !== null && <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{blocked}</p>}
               {action !== "none" &&
                 (canManage ? (
                   <div className="grid justify-items-start gap-2">
                     {action === "switchInterval" ? (
-                      <IntervalDialog offer={offer} busy={switching} onSwitched={onSwitched} />
+                      <ChangeDialog
+                        target={{ planKey: offer.key, interval: "year" }}
+                        now={{ terms: offer, interval: "month" }}
+                        after={{ terms: offer, interval: "year" }}
+                        copy={{
+                          trigger: "Switch to yearly",
+                          title: `Switch ${offer.label} to yearly?`,
+                          description: "Takes effect now. The unused part of your current month is credited toward the yearly price.",
+                          keep: "Keep monthly",
+                          note: PLAN_REFUND_LINE,
+                        }}
+                        primary
+                        busy={switching}
+                        onSwitched={onSwitched}
+                      />
                     ) : action === "switch" && from !== null ? (
-                      <SwitchDialog offer={offer} from={from} interval={shown} busy={switching || blocked !== null} onSwitched={onSwitched} />
+                      <ChangeDialog
+                        target={{ planKey: offer.key }}
+                        now={{ terms: from, interval: shown }}
+                        after={{ terms: offer, interval: shown }}
+                        copy={{
+                          trigger: `Switch to ${offer.label}`,
+                          title: `Switch to ${offer.label}?`,
+                          description: "Takes effect now. The price difference is prorated on your next invoice.",
+                          keep: `Keep ${from.label}`,
+                        }}
+                        primary={false}
+                        busy={switching || blocked !== null}
+                        onSwitched={onSwitched}
+                      />
                     ) : (
                       <SubscribeButton offer={offer} interval={shown} primary={offer.key === firstSubscribable} blocked={blocked !== null} />
                     )}

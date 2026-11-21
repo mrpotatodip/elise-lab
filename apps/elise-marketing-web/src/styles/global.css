@@ -360,6 +360,10 @@ h2 {
   font-weight: 600;
 }
 
+.billing:has(#billing-month:checked) .billing-badge {
+  display: none;
+}
+
 .billing:has(#billing-month:checked) label[for="billing-month"],
 .billing:has(#billing-year:checked) label[for="billing-year"] {
   background: var(--foreground);

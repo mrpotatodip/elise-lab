@@ -67,15 +67,19 @@ export const planCardViews = (
     })();
     const over = people - offer.maxMembers;
     const blocked =
-      (action === "switch" || action === "subscribe") && over > 0 ? `Your account has ${counts}. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.` : null;
+      (action === "switch" || action === "subscribe") && over > 0
+        ? `Your account has ${counts}. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.`
+        : action === "none" && switchKeys.has(offer.key) && priced && shown !== subInterval
+          ? "Switch to yearly first, then change plan."
+          : null;
     return { offer, current: held && data.plan?.key === offer.key, action, blocked };
   });
 };
 
-export type PlanSwitchTarget = { planKey: string; interval: PlanInterval | null };
+export type PlanSwitchTarget = { planKey: string; interval?: PlanInterval };
 
 export const planSwitchPending = (target: PlanSwitchTarget | null, data: Pick<PlanDetails, "plan" | "interval">) =>
-  target !== null && (data.plan?.key !== target.planKey || (target.interval !== null && (data.interval ?? "month") !== target.interval));
+  target !== null && (data.plan?.key !== target.planKey || (target.interval !== undefined && (data.interval ?? "month") !== target.interval));
 
 export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
   checkout === "success" && !(data.source === "stripe" && data.status === "active");

@@ -12,10 +12,8 @@ const offeredPlanEffect = (db: AppDbType, planKey: string, interval: BillingInte
   Effect.gen(function* () {
     const plan = yield* planByKeyEffect(db, planKey);
     if (!plan || !plan.enabled) return yield* Effect.fail(new Invalid({ message: `The plan "${planKey}" is not offered` }));
-    const priceId = interval === "year" ? plan.yearlyPriceId : plan.priceId;
-    if (!priceId) {
-      return yield* Effect.fail(new Invalid({ message: interval === "year" ? `The ${plan.label} plan has no yearly price` : `The ${plan.label} plan has no Stripe price yet` }));
-    }
+    const [priceId, missing] = interval === "year" ? [plan.yearlyPriceId, `The ${plan.label} plan has no yearly price`] : [plan.priceId, `The ${plan.label} plan has no Stripe price yet`];
+    if (!priceId) return yield* Effect.fail(new Invalid({ message: missing }));
     return { ...plan, priceId };
   });
 
@@ -86,7 +84,7 @@ export const changePlanSvc = (
     if (requested !== current && !samePlan) {
       return yield* Effect.fail(new Conflict({ message: "Change the plan or the billing interval, not both at once." }));
     }
-    yield* seatCapEffect(db, accountId, target, now);
+    if (!samePlan) yield* seatCapEffect(db, accountId, target, now);
     const subscriptionId = subscription.stripeSubscriptionId;
     yield* Effect.tryPromise({ try: () => stripe.changeSubscriptionPrice({ subscriptionId, priceId: target.priceId }), catch: toExternalError });
     return { planKey: target.key };

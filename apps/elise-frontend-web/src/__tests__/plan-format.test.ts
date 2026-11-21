@@ -109,8 +109,8 @@ describe("yearly billing in planCardViews", () => {
 
 describe("planSwitchPending", () => {
   it.each([
-    ["a plan change waits until the plan is the new one", { planKey: "starter", interval: null }, { plan: onPlan("runner"), interval: "month" as const }, true],
-    ["a plan change is done once the plan matches", { planKey: "starter", interval: null }, { plan: onPlan("starter"), interval: "month" as const }, false],
+    ["a plan change waits until the plan is the new one", { planKey: "starter" }, { plan: onPlan("runner"), interval: "month" as const }, true],
+    ["a plan change is done once the plan matches", { planKey: "starter" }, { plan: onPlan("starter"), interval: "month" as const }, false],
     ["a switch to yearly waits while the Subscription is monthly", { planKey: "starter", interval: "year" as const }, { plan: onPlan("starter"), interval: "month" as const }, true],
     ["a switch to yearly is done once the Subscription is yearly", { planKey: "starter", interval: "year" as const }, { plan: onPlan("starter"), interval: "year" as const }, false],
     ["nothing is pending when no switch was made", null, { plan: onPlan("starter"), interval: "month" as const }, false],
