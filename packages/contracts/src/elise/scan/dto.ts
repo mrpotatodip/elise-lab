@@ -232,6 +232,7 @@ export const FindingTriageSchema = z.object({
   status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
   note: z.string().nullable(),
   acceptedUntil: z.string().nullable(),
+  duplicateOf: z.string().nullable().default(null),
   updatedAt: z.string(),
   decidedBy: z.string().nullable().default(null),
 });
@@ -274,7 +275,9 @@ export const FindingsQuerySchema = z.object({
 
 // -----
 // An accepted risk needs a reason and a number of days (at most
-// ACCEPTED_RISK_MAX_DAYS); no other status takes days.
+// ACCEPTED_RISK_MAX_DAYS); no other status takes days. A
+// duplicate names the fingerprint of the Finding kept (ADR
+// 0012); no other status takes one.
 // -----
 export const FindingTriageBodySchema = z
   .object({
@@ -283,8 +286,17 @@ export const FindingTriageBodySchema = z
     status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
     note: z.string().max(2000).nullish(),
     acceptDays: z.number().int().min(1).max(ACCEPTED_RISK_MAX_DAYS).optional(),
+    duplicateOf: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
   })
   .superRefine((body, ctx) => {
+    if (body.status === "duplicate" && body.duplicateOf === undefined) {
+      ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "A duplicate needs the Finding it duplicates" });
+    } else if (body.status !== "duplicate" && body.duplicateOf !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "Only a duplicate takes a Finding it duplicates" });
+    }
     if (body.status === "accepted_risk") {
       if (!body.note?.trim()) ctx.addIssue({ code: "custom", path: ["note"], message: "An accepted risk needs a reason" });
       if (body.acceptDays === undefined) ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "An accepted risk needs a number of days" });

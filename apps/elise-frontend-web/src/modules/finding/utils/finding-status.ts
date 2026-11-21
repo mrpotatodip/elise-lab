@@ -1,9 +1,9 @@
 import type { FindingState, FindingTriage } from "../schemas";
 
-export type FindingStatusKey = "open" | "came_back" | "fixed_by_scan" | "marked_fixed" | "false_positive" | "accepted_risk";
+export type FindingStatusKey = "open" | "came_back" | "fixed_by_scan" | "marked_fixed" | "false_positive" | "accepted_risk" | "duplicate";
 export type FindingGroup = "action" | "decided" | "scan";
 
-const RESOLVED_BY_PERSON: ReadonlySet<string> = new Set(["fixed", "false_positive", "accepted_risk"]);
+const RESOLVED_BY_PERSON: ReadonlySet<string> = new Set(["fixed", "false_positive", "accepted_risk", "duplicate"]);
 
 export const isResolvedByPerson = (triage: FindingTriage | null) => triage !== null && RESOLVED_BY_PERSON.has(triage.status);
 
@@ -17,6 +17,7 @@ export function findingStatusKey(state: FindingState, triage: FindingTriage | nu
   if (triage?.status === "fixed") return "marked_fixed";
   if (triage?.status === "false_positive") return "false_positive";
   if (triage?.status === "accepted_risk") return "accepted_risk";
+  if (triage?.status === "duplicate") return "duplicate";
   return state === "regressed" ? "came_back" : "open";
 }
 
@@ -36,4 +37,5 @@ export const FINDING_STATUS_BADGE = {
   marked_fixed: { label: "Marked fixed", variant: "success" },
   false_positive: { label: "False positive", variant: "neutral" },
   accepted_risk: { label: "Risk accepted", variant: "warning" },
+  duplicate: { label: "Duplicate", variant: "neutral" },
 } as const satisfies Record<FindingStatusKey, { label: string; variant: "outline" | "destructive" | "success" | "neutral" | "warning" }>;

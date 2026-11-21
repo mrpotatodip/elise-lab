@@ -33,6 +33,7 @@ const triage = (letter: string, overrides: Partial<JudgedTriage>): JudgedTriage 
   status: "open",
   note: null,
   acceptedUntil: null,
+  duplicateOf: null,
   ...overrides,
 });
 
@@ -145,6 +146,29 @@ describe("judgeCommit: decisions by a person", () => {
     const verdict = judge({ findings: [finding("s2", "a", "critical")], triage: [triage("a", { status: "false_positive" })] });
 
     expect(verdict).toMatchObject({ verdict: "pass", open: [], dismissed: [expect.objectContaining({ title: "problem a" })] });
+  });
+
+  it("counts a problem once: a duplicate is dismissed with its link and the kept one blocks", () => {
+    const verdict = judge({
+      findings: [finding("s2", "a", "high"), finding("s2", "b", "high")],
+      triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) })],
+    });
+
+    expect(verdict).toMatchObject({
+      verdict: "fail",
+      counts: { high: 1 },
+      open: [expect.objectContaining({ title: "problem b" })],
+      dismissed: [expect.objectContaining({ title: "problem a", duplicateOf: "b".repeat(64) })],
+    });
+  });
+
+  it("follows the kept Finding's decision: a duplicate of a false positive passes", () => {
+    const verdict = judge({
+      findings: [finding("s2", "a", "high"), finding("s2", "b", "high")],
+      triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) }), triage("b", { status: "false_positive" })],
+    });
+
+    expect(verdict).toMatchObject({ verdict: "pass", open: [], dismissed: [expect.objectContaining({ title: "problem a" }), expect.objectContaining({ title: "problem b" })] });
   });
 
   it("lets an accepted risk pass until its end date, and lists it with the reason", () => {

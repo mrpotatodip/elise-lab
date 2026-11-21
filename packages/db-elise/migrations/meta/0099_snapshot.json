@@ -1,5 +1,5 @@
 {
-  "id": "73c149f3-9352-4a6f-bc1b-a2f997d3fe28",
+  "id": "1b50d262-8274-41cf-affb-37c28bca2a5b",
   "prevId": "84ea6cf6-5eca-4349-a70a-04fcbc9b3745",
   "version": "7",
   "dialect": "postgresql",
@@ -2148,13 +2148,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "signals_enabled": {
-          "name": "signals_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -4209,6 +4202,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "duplicate_of": {
+          "name": "duplicate_of",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "set_by_party_id": {
           "name": "set_by_party_id",
           "type": "uuid",
@@ -4308,11 +4307,15 @@
       "checkConstraints": {
         "scan_finding_triage_status": {
           "name": "scan_finding_triage_status",
-          "value": "\"scan_finding_triage\".\"status\" in ('open', 'fixed', 'false_positive', 'accepted_risk')"
+          "value": "\"scan_finding_triage\".\"status\" in ('open', 'fixed', 'false_positive', 'accepted_risk', 'duplicate')"
         },
         "scan_finding_triage_accepted": {
           "name": "scan_finding_triage_accepted",
           "value": "(\"scan_finding_triage\".\"status\" = 'accepted_risk') = (\"scan_finding_triage\".\"accepted_until\" is not null) and (\"scan_finding_triage\".\"status\" <> 'accepted_risk' or \"scan_finding_triage\".\"note\" is not null)"
+        },
+        "scan_finding_triage_duplicate": {
+          "name": "scan_finding_triage_duplicate",
+          "value": "(\"scan_finding_triage\".\"status\" = 'duplicate') = (\"scan_finding_triage\".\"duplicate_of\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -5472,145 +5475,6 @@
           "value": "\"scan_finding_comments\".\"deleted_at\" is not null or char_length(\"scan_finding_comments\".\"body\") between 1 and 4000"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.scan_signals": {
-      "name": "scan_signals",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repo_id": {
-          "name": "repo_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fingerprint": {
-          "name": "fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "related_fingerprint": {
-          "name": "related_fingerprint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "probability": {
-          "name": "probability",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "model_version": {
-          "name": "model_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "dismissed_at": {
-          "name": "dismissed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_scan_signals_repo": {
-          "name": "idx_scan_signals_repo",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "fingerprint",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "scan_signals_tenant_id_tenants_id_fk": {
-          "name": "scan_signals_tenant_id_tenants_id_fk",
-          "tableFrom": "scan_signals",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "scan_signals_repo_tenant_fk": {
-          "name": "scan_signals_repo_tenant_fk",
-          "tableFrom": "scan_signals",
-          "tableTo": "scan_repos",
-          "columnsFrom": [
-            "repo_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.scan_trace_entries": {
