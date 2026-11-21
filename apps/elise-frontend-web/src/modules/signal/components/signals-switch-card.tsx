@@ -24,7 +24,7 @@ export function SignalsSwitchCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Hints from Jev</CardTitle>
+        <CardTitle>Show Signals</CardTitle>
         <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
           Signals are hints from TypeSafe&apos;s Jev model, such as a possible duplicate or a weak reason for an accepted risk. A Signal never changes a Finding, a decision or the Verdict: you act on it or ignore it.
         </p>
