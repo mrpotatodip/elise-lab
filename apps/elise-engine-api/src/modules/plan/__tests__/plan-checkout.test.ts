@@ -62,6 +62,22 @@ describe("POST /usage/plan/checkout", () => {
     expect(stripe.customers).toMatchObject([{ name: "acme", email: "admin@example.com", accountId }]);
   });
 
+  it("starts a checkout on the Starter price for planKey starter", async () => {
+    await test.raw.update(platformMasterPlans).set({ stripePriceId: "price_starter_test", enabled: true }).where(eq(platformMasterPlans.key, "starter"));
+    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "starter" }, env: { DASHBOARD_URL: DASHBOARD } });
+    expect([response.status, stripe.checkouts.map((checkout) => checkout.priceId)]).toEqual([200, ["price_starter_test"]]);
+  });
+
+  it.each([
+    { name: "an unknown plan", planKey: "nope", enabled: true, price: "price_x" },
+    { name: "a disabled plan", planKey: "starter", enabled: false, price: "price_starter_test" },
+    { name: "a plan with no price", planKey: "starter", enabled: true, price: null },
+  ])("refuses $name and asks Stripe for nothing", async ({ planKey, enabled, price }) => {
+    await test.raw.update(platformMasterPlans).set({ stripePriceId: price, enabled }).where(eq(platformMasterPlans.key, "starter"));
+    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey }, env: { DASHBOARD_URL: DASHBOARD } });
+    expect([response.status, stripe.checkouts.length]).toEqual([400, 0]);
+  });
+
   it("refuses a login whose Role lacks company:plan:manage and asks Stripe for nothing", async () => {
     powers = ["company:plan:read"];
     const { status } = await answer("/usage/plan/checkout");

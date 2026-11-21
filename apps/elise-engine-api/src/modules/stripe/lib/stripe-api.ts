@@ -55,6 +55,13 @@ export const stripeGateway = (secretKey: string): StripeGateway => {
         }),
       ),
     createPortalSession: ({ customerId, returnUrl }) => post("/billing_portal/sessions", StripeUrlResponseSchema, new URLSearchParams({ customer: customerId, return_url: returnUrl })),
+    changeSubscriptionPrice: async ({ subscriptionId, priceId }) => {
+      const path = `/subscriptions/${encodeURIComponent(subscriptionId)}`;
+      const found = await get(path, StripeSubscriptionResponseSchema);
+      const item = found.items.data[0];
+      if (!item) throw new Error(`Stripe subscription ${subscriptionId} has no item`);
+      await post(path, StripeIdResponseSchema, new URLSearchParams({ "items[0][id]": item.id, "items[0][price]": priceId, proration_behavior: "create_prorations" }));
+    },
     retrieveSubscription: async (subscriptionId) => {
       const found = await get(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeSubscriptionResponseSchema);
       const item = found.items.data[0];

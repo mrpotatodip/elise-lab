@@ -6,8 +6,6 @@ import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 
-const RUNNER_PLAN_KEY = "runner";
-
 // -----
 // The plans an Account may pick: the rows of the catalogue not
 // marked not offered (enabled false), cheapest first. Rows stay
@@ -35,21 +33,68 @@ export const offeredPlansEffect = (db: AppDbType): Effect.Effect<PlanOffer[], Db
 export type BillingContext = {
   accountName: string;
   adminEmail: string | null;
-  priceId: string | null;
-  subscription: { source: SubscriptionSourceValue; status: SubscriptionStatusValue; stripeCustomerId: string | null } | null;
+  subscription: {
+    source: SubscriptionSourceValue;
+    status: SubscriptionStatusValue;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+    planId: string;
+  } | null;
 };
+
+export type PlanByKey = { id: string; key: string; label: string; priceId: string | null; enabled: boolean; maxMembers: number };
+
+export const planByKeyEffect = (db: AppDbType, key: string): Effect.Effect<PlanByKey | null, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [found] = await db
+        .select({
+          id: platformMasterPlans.id,
+          key: platformMasterPlans.key,
+          label: platformMasterPlans.label,
+          priceId: platformMasterPlans.stripePriceId,
+          enabled: platformMasterPlans.enabled,
+          maxMembers: platformMasterPlans.maxMembers,
+        })
+        .from(platformMasterPlans)
+        .where(eq(platformMasterPlans.key, key));
+      return found ?? null;
+    },
+    catch: toDbError,
+  });
+
+export const seatsEffect = (db: AppDbType, tenantId: string, now: Date): Effect.Effect<{ members: number; pendingInvites: number }, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [{ members }] = await db
+        .select({ members: sql<number>`count(distinct ${partyRoles.partyId})::int` })
+        .from(partyRoles)
+        .where(eq(partyRoles.tenantId, tenantId));
+      const [{ pendingInvites }] = await db
+        .select({ pendingInvites: sql<number>`count(*)::int` })
+        .from(tenantTeamInvites)
+        .where(and(eq(tenantTeamInvites.tenantId, tenantId), isNull(tenantTeamInvites.revokedAt), isNull(tenantTeamInvites.acceptedAt), gt(tenantTeamInvites.expiresAt, now)));
+      return { members, pendingInvites };
+    },
+    catch: toDbError,
+  });
 
 export const billingContextEffect = (db: AppDbType, tenantId: string, userId: string): Effect.Effect<BillingContext, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [account] = await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId));
       const [admin] = await db.select({ email: authUser.email }).from(authUser).where(eq(authUser.id, userId));
-      const [runner] = await db.select({ priceId: platformMasterPlans.stripePriceId }).from(platformMasterPlans).where(eq(platformMasterPlans.key, RUNNER_PLAN_KEY));
       const [subscription] = await db
-        .select({ source: tenantSubscriptions.source, status: tenantSubscriptions.status, stripeCustomerId: tenantSubscriptions.stripeCustomerId })
+        .select({
+          source: tenantSubscriptions.source,
+          status: tenantSubscriptions.status,
+          stripeCustomerId: tenantSubscriptions.stripeCustomerId,
+          stripeSubscriptionId: tenantSubscriptions.stripeSubscriptionId,
+          planId: tenantSubscriptions.planId,
+        })
         .from(tenantSubscriptions)
         .where(eq(tenantSubscriptions.tenantId, tenantId));
-      return { accountName: account?.name ?? "", adminEmail: admin?.email ?? null, priceId: runner?.priceId ?? null, subscription: subscription ?? null };
+      return { accountName: account?.name ?? "", adminEmail: admin?.email ?? null, subscription: subscription ?? null };
     },
     catch: toDbError,
   });
@@ -87,22 +132,7 @@ export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): E
       },
       catch: toDbError,
     });
-    const seats = yield* Effect.tryPromise({
-      try: async () => {
-        const [{ members }] = await db
-          .select({ members: sql<number>`count(distinct ${partyRoles.partyId})::int` })
-          .from(partyRoles)
-          .where(eq(partyRoles.tenantId, tenantId));
-        const [{ pendingInvites }] = await db
-          .select({ pendingInvites: sql<number>`count(*)::int` })
-          .from(tenantTeamInvites)
-          .where(
-            and(eq(tenantTeamInvites.tenantId, tenantId), isNull(tenantTeamInvites.revokedAt), isNull(tenantTeamInvites.acceptedAt), gt(tenantTeamInvites.expiresAt, now)),
-          );
-        return { members, pendingInvites };
-      },
-      catch: toDbError,
-    });
+    const seats = yield* seatsEffect(db, tenantId, now);
     const { scans } = yield* monthSpendEffect(db, tenantId, monthStartOf(now));
     return {
       plan: row

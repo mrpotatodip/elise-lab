@@ -25,5 +25,6 @@ export type StripeGateway = {
   createCustomer: (input: { name: string; email: string | null; accountId: string }) => Promise<{ id: string }>;
   createCheckoutSession: (input: CheckoutInput) => Promise<{ url: string }>;
   createPortalSession: (input: { customerId: string; returnUrl: string }) => Promise<{ url: string }>;
+  changeSubscriptionPrice: (input: { subscriptionId: string; priceId: string }) => Promise<void>;
   retrieveSubscription: (subscriptionId: string) => Promise<StripeSubscription>;
 };

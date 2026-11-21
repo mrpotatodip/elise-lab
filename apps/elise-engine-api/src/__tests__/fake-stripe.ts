@@ -10,6 +10,7 @@ export const fakeStripe = () => {
   const customers: { id: string; name: string; email: string | null; accountId: string }[] = [];
   const checkouts: { customerId: string; accountId: string; priceId: string; successUrl: string; cancelUrl: string }[] = [];
   const portals: { customerId: string; returnUrl: string }[] = [];
+  const changes: { subscriptionId: string; priceId: string }[] = [];
 
   const gateway: StripeGateway = {
     findCustomer: async ({ accountId }) => {
@@ -29,6 +30,9 @@ export const fakeStripe = () => {
       portals.push(input);
       return { url: `https://billing.stripe.test/${input.customerId}` };
     },
+    changeSubscriptionPrice: async (input) => {
+      changes.push(input);
+    },
     retrieveSubscription: async (subscriptionId) => {
       const found = subscriptions.get(subscriptionId);
       if (!found) throw new Error(`no fake subscription ${subscriptionId}`);
@@ -36,5 +40,5 @@ export const fakeStripe = () => {
     },
   };
 
-  return { gateway, subscriptions, customers, checkouts, portals };
+  return { gateway, subscriptions, customers, checkouts, portals, changes };
 };
