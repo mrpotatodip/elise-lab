@@ -12,11 +12,13 @@ const SEND_EVERY: Duration = Duration::from_millis(2500);
 const UPLOAD_TIMEOUT: Duration = Duration::from_secs(5);
 const FINISH_TIMEOUT: Duration = Duration::from_secs(3);
 const BATCH_MAX: usize = 200;
+const UNSENT_MAX: usize = 1000;
 
 #[derive(Default)]
 struct Tail {
     offset: u64,
     pending: Vec<u8>,
+    unsent: Vec<serde_json::Value>,
     refused: bool,
 }
 
@@ -41,8 +43,18 @@ impl LiveSink {
     }
 
     async fn push(&self, file: &Path, last: bool) {
-        let records = self.with_tail(|tail| if tail.refused { Vec::new() } else { read_new(file, tail, last) });
-        for batch in records.chunks(BATCH_MAX) {
+        let mut waiting = self.with_tail(|tail| {
+            if tail.refused {
+                return Vec::new();
+            }
+            let fresh = read_new(file, tail, last);
+            tail.unsent.extend(fresh);
+            let over = tail.unsent.len().saturating_sub(UNSENT_MAX);
+            tail.unsent.drain(..over);
+            std::mem::take(&mut tail.unsent)
+        });
+        while !waiting.is_empty() {
+            let batch: Vec<_> = waiting.drain(..waiting.len().min(BATCH_MAX)).collect();
             let answer = client()
                 .post(format!("{}/runners/jobs/{}/findings", engine_url(), self.scan_id))
                 .bearer_auth(&self.token)
@@ -50,9 +62,17 @@ impl LiveSink {
                 .json(&serde_json::json!({ "findings": batch }))
                 .send()
                 .await;
-            if answer.is_ok_and(|response| response.status() == StatusCode::CONFLICT) {
-                self.with_tail(|tail| tail.refused = true);
-                return;
+            match answer.map(|response| response.status()) {
+                Ok(StatusCode::CONFLICT) => {
+                    self.with_tail(|tail| tail.refused = true);
+                    return;
+                }
+                Ok(status) if status.is_success() || status == StatusCode::BAD_REQUEST => {}
+                _ => {
+                    waiting.splice(0..0, batch);
+                    self.with_tail(|tail| tail.unsent = waiting);
+                    return;
+                }
             }
         }
     }

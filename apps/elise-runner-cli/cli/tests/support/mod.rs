@@ -26,6 +26,7 @@ struct State {
     remove_after_result: bool,
     findings: Vec<(String, String)>,
     findings_answer: Option<u16>,
+    findings_failures: usize,
     findings_before_result: Vec<usize>,
     cancelled: BTreeSet<String>,
     job_checks: Vec<String>,
@@ -123,6 +124,10 @@ impl Engine {
 
     pub fn batches_before_results(&self) -> Vec<usize> {
         self.state.lock().unwrap().findings_before_result.clone()
+    }
+
+    pub fn fail_findings_first(&self, times: usize) {
+        self.state.lock().unwrap().findings_failures = times;
     }
 
     pub fn answer_findings_with(&self, status: u16) {
@@ -421,6 +426,10 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             None => (200, r#"{"data":null,"error":null}"#.to_string()),
         },
         ("POST", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/findings") => {
+            if state.findings_failures > 0 {
+                state.findings_failures -= 1;
+                return (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string());
+            }
             let scan_id = path.trim_start_matches("/runners/jobs/").trim_end_matches("/findings").to_string();
             state.findings.push((scan_id, request.body.clone()));
             match state.findings_answer {
