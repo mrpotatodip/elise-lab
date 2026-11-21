@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CREDIT_ENTRY_LABEL, PLAN_STATUS_VIEW, creditAmountLabel, planKeyLabel, planSeatsLabel, planSourceLabel } from "#/modules/plan/utils/plan-format";
+import { CREDIT_ENTRY_LABEL, PLAN_STATUS_VIEW, creditAmountLabel, planKeyLabel, planPeriodSentence, planSeatsLabel, planSourceLabel } from "#/modules/plan/utils/plan-format";
 
 describe("planSeatsLabel", () => {
   it.each([
@@ -20,6 +20,17 @@ describe("PLAN_STATUS_VIEW", () => {
     ["incomplete", "The plan is not active yet."],
   ] as const)("says what %s means for scans", (status, note) => {
     expect(PLAN_STATUS_VIEW[status].note).toBe(note);
+  });
+});
+
+describe("planPeriodSentence", () => {
+  it.each([
+    ["an active plan", "active", false, "2026-12-21T00:00:00Z", ". Renews Dec 21, 2026"],
+    ["a plan set to cancel", "active", true, "2026-12-21T00:00:00Z", ". Ends on Dec 21, 2026"],
+    ["a canceled plan", "canceled", false, "2026-12-21T00:00:00Z", ""],
+    ["no period end", "active", false, null, ""],
+  ] as const)("reads %s", (_name, status, cancelAtPeriodEnd, currentPeriodEnd, expected) => {
+    expect(planPeriodSentence({ status, cancelAtPeriodEnd, currentPeriodEnd })).toBe(expected);
   });
 });
 

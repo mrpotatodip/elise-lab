@@ -46,6 +46,12 @@ export const planDateLabel = (iso: string) => {
   return Number.isNaN(date.getTime()) ? iso : RENEWS.format(date);
 };
 
+export const planPeriodSentence = (data: Pick<PlanDetails, "status" | "cancelAtPeriodEnd" | "currentPeriodEnd">) => {
+  if (data.currentPeriodEnd === null || data.status === "canceled") return "";
+  const date = planDateLabel(data.currentPeriodEnd);
+  return data.cancelAtPeriodEnd === true ? `. Ends on ${date}` : `. Renews ${date}`;
+};
+
 export const CREDIT_ENTRY_LABEL = {
   grant: "Monthly credit",
   topup: "Top-up",

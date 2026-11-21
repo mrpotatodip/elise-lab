@@ -14,7 +14,7 @@ import { usageUsd } from "#/modules/usage";
 import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS } from "../constants";
 import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
 import type { PlanBillingActionKind, PlanCheckoutReturn } from "../types";
-import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planDateLabel, planSourceLabel } from "../utils";
+import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel } from "../utils";
 
 function BillingButton({ action, variant = "default", size = "sm" }: { action: PlanBillingActionKind; variant?: "default" | "outline"; size?: "sm" | "default" }) {
   const go = usePlanActions(action);
@@ -117,7 +117,6 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
 
   const status = PLAN_STATUS_VIEW[data.status];
   const billing = planBillingAction(data);
-  const endsOn = data.cancelAtPeriodEnd === true && data.currentPeriodEnd !== null ? planDateLabel(data.currentPeriodEnd) : null;
   const granted = data.source === "grant";
   const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
@@ -167,7 +166,7 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
               </p>
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
                 {planSourceLabel(data.source)}
-                {endsOn !== null ? `. Ends on ${endsOn}` : data.currentPeriodEnd !== null ? `. Renews ${planDateLabel(data.currentPeriodEnd)}` : ""}. Elise charges nothing per scan.
+                {planPeriodSentence(data)}. Elise charges nothing per scan.
               </p>
             </>
           )}

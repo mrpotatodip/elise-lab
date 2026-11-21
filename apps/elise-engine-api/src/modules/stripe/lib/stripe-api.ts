@@ -47,7 +47,6 @@ export const stripeGateway = (secretKey: string): StripeGateway => {
         "payment_method_types[0]": "card",
         allow_promotion_codes: "false",
         "tax_id_collection[enabled]": "true",
-        "customer_update[name]": "auto",
         "customer_update[address]": "auto",
         "subscription_data[metadata][accountId]": accountId,
         success_url: successUrl,
