@@ -1,0 +1,31 @@
+---
+import Legal from "../layouts/Legal.astro";
+import { SUB_PROCESSORS } from "../constants/legal";
+---
+
+<Legal title="Privacy" description="Which companies receive your data when you use EliseLAB, and what each one receives.">
+  <h1>Privacy</h1>
+  <p class="notice" role="note">Draft. The legal wording on this page is still to be written and approved. The sub-processor list below is factual.</p>
+
+  <h2>Sub-processors</h2>
+  <p>EliseLAB sends some of your data to the companies below. Each one receives only what its row says.</p>
+
+  <ul class="processors">
+    {
+      SUB_PROCESSORS.map((processor) => (
+        <li>
+          <h3>{processor.name}</h3>
+          <p>{processor.purpose}</p>
+          <p><strong>Receives.</strong> {processor.receives}</p>
+          <p><strong>Never receives.</strong> {processor.neverReceives}</p>
+        </li>
+      ))
+    }
+  </ul>
+
+  <h2>Signals</h2>
+  <p>Signals are on for every account. An account admin can turn them off in Account settings. Turning them off stops new requests to TypeSafe.</p>
+
+  <h2>The rest of this page</h2>
+  <p class="pending">Wording pending approval: what EliseLAB collects, how long it keeps it, your rights and how to reach us.</p>
+</Legal>
