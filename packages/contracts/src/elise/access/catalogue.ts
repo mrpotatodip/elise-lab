@@ -22,7 +22,7 @@ export const ACCESS_CATALOGUE = [
     children: [
       { key: "dashboard", label: "Dashboard", actions: ["read"] },
       { key: "summary", label: "Summary", actions: ["read"] },
-      { key: "plan", label: "Plan", actions: ["read"] },
+      { key: "plan", label: "Plan", actions: ["read", "manage"] },
       {
         key: "team",
         label: "Team",
@@ -168,7 +168,7 @@ const TENANT_READS = TENANT_POWERS.filter((power) => powerAction(power) === "rea
 // GitHub and accepts risk; a Workspace member does none of it
 // and sees no part of Team.
 // -----
-const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete"] as const;
+const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete", "company:plan:manage"] as const;
 const WORKSPACE_ADMIN_POWERS = TENANT_POWERS.filter((power) => !OWNER_ONLY.some((owner) => owner === power));
 const WORKSPACE_MEMBER_READS = TENANT_READS.filter((power) => !power.startsWith("company:team:"));
 

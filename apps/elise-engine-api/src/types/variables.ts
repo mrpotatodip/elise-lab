@@ -1,7 +1,8 @@
 import type { Context } from "hono";
 import type { Effect } from "effect";
 import type { AccessPower, RunnerIdentity, ScanUsage } from "@repo/contracts/elise";
-import type { TenantDbType } from "#/lib/db-connection";
+import type { PoolDbType, TenantDbType } from "#/lib/db-connection";
+import type { StripeGateway } from "#/modules/stripe/types";
 import type { DbError, Invalid } from "#/lib/effect-query";
 import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
@@ -24,6 +25,8 @@ export type Bindings = {
   BILLING_ENFORCED: string;
   ANTHROPIC_API_KEY: string;
   KEY_ENCRYPTION_SECRET?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
   SCAN_API_TOKEN: string;
   DATABASE_URL: string;
   HYPERDRIVE_TENANT: Hyperdrive;
@@ -66,6 +69,8 @@ export type AppDeps = {
   enqueueInviteEmail: (env: Bindings, mail: InviteEmail) => Promise<void>;
   enqueuePasswordResetEmail: (env: Bindings, mail: PasswordResetEmail) => Promise<void>;
   withTenant: <T>(c: Context<AppEnv>, accountId: string, run: (db: TenantDbType) => Promise<T>) => Promise<T>;
+  withOwner: <T>(c: Context<AppEnv>, run: (db: PoolDbType) => Promise<T>) => Promise<T>;
+  stripe: (env: Bindings) => StripeGateway;
 };
 
 export type Variables = { userId?: string; deps: AppDeps };

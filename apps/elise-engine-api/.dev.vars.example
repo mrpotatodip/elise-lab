@@ -3,5 +3,8 @@ SCAN_API_TOKEN=
 ANTHROPIC_API_KEY=
 # Optional: lets an account save its own Anthropic key. Any long random string.
 KEY_ENCRYPTION_SECRET=
+# Stripe, test mode first: the secret key and the webhook endpoint's signing secret.
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
 DATABASE_URL=
 AUTH_SECRET=

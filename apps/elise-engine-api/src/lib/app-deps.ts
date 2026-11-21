@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import { ScanUsageSchema } from "@repo/contracts/elise";
 import { createAuth } from "#/lib/auth";
-import { dbConnect, withTenant } from "#/lib/db-connection";
+import { dbConnect, withPool, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { linkScanArchiveEffect } from "#/modules/archives/queries";
 import { holdCreditEffect, settleCreditEffect } from "#/modules/credit";
@@ -9,6 +9,7 @@ import { runnerIdentitySvc } from "#/modules/runners/handlers";
 import { findConnectedRunnerEffect } from "#/modules/runners/queries";
 import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
 import { tenantScanRepo } from "#/modules/scan-ledger";
+import { stripeGateway } from "#/modules/stripe/lib";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 import type { AppEnv, AppDeps } from "#/types/variables";
 
@@ -48,4 +49,6 @@ export const realAppDeps: AppDeps = {
     await env.INVITE_EMAIL_QUEUE.send(mail, { contentType: "json" });
   },
   withTenant: (c, accountId, run) => withTenant(c.env.HYPERDRIVE_TENANT.connectionString, (promise) => c.executionCtx.waitUntil(promise), accountId, run),
+  withOwner: (c, run) => withPool(c.env.DATABASE_URL, (promise) => c.executionCtx.waitUntil(promise), run),
+  stripe: (env) => stripeGateway(env.STRIPE_SECRET_KEY ?? ""),
 };

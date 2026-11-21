@@ -17,7 +17,7 @@ const operations = (spec: Spec) =>
 // Opened by someone with no login yet: the invitee, and a
 // Runner that pairs with a code.
 // -----
-const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll", "POST /runners/login/start", "POST /runners/login/check"]);
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll", "POST /runners/login/start", "POST /runners/login/check", "POST /stripe/webhook"]);
 
 describe("GET /openapi.json", () => {
   it("lists every route of the API", async () => {
@@ -85,8 +85,11 @@ describe("GET /openapi.json", () => {
       "POST /scans",
       "POST /scans/{scanId}/stop",
       "POST /sign-up",
+      "POST /stripe/webhook",
       "POST /team/invites",
       "POST /team/invites/{token}/accept",
+      "POST /usage/plan/checkout",
+      "POST /usage/plan/portal",
       "PUT /findings/triage",
       "PUT /groups/{groupId}/members/{partyId}",
       "PUT /usage/anthropic-key",
@@ -99,7 +102,7 @@ describe("GET /openapi.json", () => {
     for (const { route, operation } of operations(spec)) {
       expect({ route, summary: Boolean(operation.summary) }).toEqual({ route, summary: true });
       expect({ route, description: operation.description?.includes("**Context.**") }).toEqual({ route, description: true });
-      const tag = ["groups", "team", "repos", "scans", "files", "findings", "usage", "runners", "me", "sign-up"].find((name) => route.includes(`/${name}`));
+      const tag = ["groups", "team", "repos", "scans", "files", "findings", "usage", "runners", "me", "sign-up", "stripe"].find((name) => route.includes(`/${name}`));
       expect({ route, tags: operation.tags }).toEqual({ route, tags: [tag] });
       const security = tag === "sign-up" || PUBLIC_ROUTES.has(route) ? undefined : [{ bearerAuth: [] }];
       expect({ route, security: operation.security }).toEqual({ route, security });

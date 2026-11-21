@@ -47,6 +47,7 @@ export const OTHER_RUNNER_NAME = "runner-of-the-other";
 // -----
 export const NOT_TENANT_ROUTES: readonly string[] = [
   "GET /usage/plan/offers",
+  "POST /stripe/webhook",
   "GET /auth/*",
   "POST /auth/*",
   "POST /sign-up",
@@ -133,6 +134,8 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /usage/credit": { kind: "run", path: "/usage/credit", expect: "own", own: { planKey: null, balanceUsd: 0, scans: 0 } },
   "GET /usage/credit/entries": { kind: "run", path: "/usage/credit/entries", expect: "empty" },
   "GET /usage/plan": { kind: "run", path: "/usage/plan", expect: "own", own: { plan: null, status: null, scans: 0 } },
+  "POST /usage/plan/checkout": serviceTest("modules/plan/__tests__/plan-checkout.test.ts"),
+  "POST /usage/plan/portal": serviceTest("modules/plan/__tests__/plan-checkout.test.ts"),
   // -----
   // After the two change lists: the change writes the caller's own
   // audit row, which those lists would then show.

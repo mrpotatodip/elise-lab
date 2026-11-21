@@ -64,11 +64,23 @@ export const PlanDetailsSchema = z.object({
   status: z.enum(SUBSCRIPTION_STATUS_VALUES).nullable(),
   source: z.enum(SUBSCRIPTION_SOURCE_VALUES).nullable(),
   currentPeriodEnd: z.string().nullable(),
+  cancelAtPeriodEnd: z.boolean().optional(),
   scans: z.number().int().min(0),
   seats: z.object({ members: z.number().int().min(0), pendingInvites: z.number().int().min(0) }),
 });
 
 export type PlanDetails = z.infer<typeof PlanDetailsSchema>;
+
+// -----
+// POST /usage/plan/checkout and POST /usage/plan/portal: the Stripe
+// page to send the browser to. Checkout starts the Runner plan's
+// Subscription; the Billing portal manages the card, the invoices
+// and the cancel. Both need the Power company:plan:manage. The Plan
+// only changes when Stripe's webhook says so, never on the return.
+// -----
+export const PlanSessionUrlSchema = z.object({ url: z.url() });
+
+export type PlanSessionUrl = z.infer<typeof PlanSessionUrlSchema>;
 
 // -----
 // GET /usage/plan/offers: the plans an Account may pick, cheapest
