@@ -709,6 +709,21 @@ fn a_route_that_never_answers_does_not_fail_the_scan() {
 }
 
 #[test]
+fn live_findings_an_engine_could_not_take_are_sent_again_in_order() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    runner.stub_tools(&["claude", "node"]);
+    engine.fail_findings_first(2);
+    engine.queue_job(job("scan_23", ["phase=recon", "phase=hunt", "phase=check live=spread", "phase=report"]));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    assert_eq!(fingerprints(&engine.finding_batches()), ["fp-1", "fp-2", "fp-3"]);
+    assert_eq!(engine.results()[0].1["state"], "succeeded");
+}
+
+#[test]
 fn an_engine_that_answers_conflict_ends_the_push_and_fails_nothing() {
     let engine = Engine::start();
     let mut runner = paired(&engine);
