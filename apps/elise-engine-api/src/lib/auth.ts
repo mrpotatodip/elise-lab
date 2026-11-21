@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins";
+import { sha256Hex } from "@repo/db-elise";
 import { authAccount, authSession, authUser, authVerification } from "@repo/db-elise/schema";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
 import type { PasswordResetEmail } from "#/modules/email";
@@ -38,6 +39,7 @@ export type AuthConfig = {
   dashboardUrl: string;
   sendPasswordReset: (mail: PasswordResetEmail) => Promise<void>;
   waitUntil?: (promise: Promise<unknown>) => void;
+  resetAddressLimiter?: RateLimit;
 };
 
 const RESET_TOKEN_SECONDS = 3600;
@@ -64,13 +66,19 @@ export const buildAuth = (config: AuthConfig) =>
       requireEmailVerification: false,
       resetPasswordTokenExpiresIn: RESET_TOKEN_SECONDS,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: ({ user, token }) =>
-        config.sendPasswordReset({
+      sendResetPassword: async ({ user, token }) => {
+        if (config.resetAddressLimiter) {
+          const key = await sha256Hex(user.email.toLowerCase());
+          const { success } = await config.resetAddressLimiter.limit({ key });
+          if (!success) return;
+        }
+        await config.sendPasswordReset({
           kind: "password-reset",
           to: user.email,
           link: `${config.dashboardUrl}/reset-password?token=${encodeURIComponent(token)}`,
           expiresAt: new Date(Date.now() + RESET_TOKEN_SECONDS * 1000).toISOString(),
-        }),
+        });
+      },
     },
     disabledPaths: AUTH_DISABLED_PATHS,
     secret: config.secret,
@@ -104,6 +112,7 @@ export const createAuth = (c: Context<AppEnv>) => {
     dashboardUrl: c.env.DASHBOARD_URL,
     sendPasswordReset: (mail) => c.get("deps").enqueueEmail(c.env, mail),
     waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+    resetAddressLimiter: c.env.PASSWORD_RESET_ADDRESS_LIMITER,
   });
   return { auth, close: () => c.executionCtx.waitUntil(close()) };
 };
