@@ -29,7 +29,10 @@ export const planSwitchOffers = (data: Pick<PlanDetails, "plan" | "source" | "st
 export type PlanCardView = { offer: PlanOffer; current: boolean; action: "switch" | "subscribe" | "none"; blocked: string | null };
 
 export const planCardViews = (data: Pick<PlanDetails, "plan" | "source" | "status" | "seats">, offers: ReadonlyArray<PlanOffer>): PlanCardView[] => {
-  const people = data.seats.members + data.seats.pendingInvites;
+  const { members, pendingInvites } = data.seats;
+  const people = members + pendingInvites;
+  const held = data.status === null || data.status === "active" || data.status === "past_due";
+  const counts = `${members} ${members === 1 ? "person" : "people"}${pendingInvites > 0 ? ` and ${pendingInvites} pending invite${pendingInvites === 1 ? "" : "s"}` : ""}`;
   const switchKeys = new Set(planSwitchOffers(data, offers).map((offer) => offer.key));
   const subscribes = planBillingAction(data) === "subscribe";
 
@@ -37,8 +40,8 @@ export const planCardViews = (data: Pick<PlanDetails, "plan" | "source" | "statu
     const action = switchKeys.has(offer.key) ? "switch" : subscribes ? "subscribe" : "none";
     const over = people - offer.maxMembers;
     const blocked =
-      action !== "none" && over > 0 ? `Your account has ${people} people and pending invites. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.` : null;
-    return { offer, current: data.plan?.key === offer.key, action, blocked };
+      action !== "none" && over > 0 ? `Your account has ${counts}. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.` : null;
+    return { offer, current: held && data.plan?.key === offer.key, action, blocked };
   });
 };
 

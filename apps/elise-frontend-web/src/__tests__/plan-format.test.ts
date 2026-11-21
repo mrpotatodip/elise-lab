@@ -32,26 +32,28 @@ describe("planCardViews", () => {
   const none = { plan: null, source: null, status: null } as const;
 
   it.each([
-    ["no plan, 1 person: both subscribe", { ...none, seats: seats(1, 0) }, [["subscribe", null], ["subscribe", null]]],
+    ["no plan, 1 person: both subscribe", { ...none, seats: seats(1, 0) }, [["subscribe", null, false], ["subscribe", null, false]]],
     [
       "no plan, 3 people: Starter is blocked",
       { ...none, seats: seats(3, 0) },
-      [["subscribe", "Your account has 3 people and pending invites. Starter holds 2. Remove 1 to subscribe."], ["subscribe", null]],
+      [["subscribe", "Your account has 3 people. Starter holds 2. Remove 1 to subscribe.", false], ["subscribe", null, false]],
     ],
-    ["Runner, active, 2 people: can switch to Starter", { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(1, 1) }, [["switch", null], ["none", null]]],
+    ["Runner, active, 2 people: can switch to Starter", { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(1, 1) }, [["switch", null, false], ["none", null, true]]],
     [
-      "Runner, active, 4 people with invites: Starter switch blocked",
+      "Runner, active, 3 people and 1 invite: Starter switch blocked",
       { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(3, 1) },
-      [["switch", "Your account has 4 people and pending invites. Starter holds 2. Remove 2 to switch."], ["none", null]],
+      [["switch", "Your account has 3 people and 1 pending invite. Starter holds 2. Remove 2 to switch.", false], ["none", null, true]],
     ],
-    ["Starter, active: can switch to Runner", { plan: onPlan("starter"), source: "stripe", status: "active", seats: seats(2, 0) }, [["none", null], ["switch", null]]],
-    ["past due: no card has an action", { plan: onPlan("runner"), source: "stripe", status: "past_due", seats: seats(1, 0) }, [["none", null], ["none", null]]],
+    [
+      "Runner, active, 2 people and 2 invites: invites are plural",
+      { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(2, 2) },
+      [["switch", "Your account has 2 people and 2 pending invites. Starter holds 2. Remove 2 to switch.", false], ["none", null, true]],
+    ],
+    ["Starter, active: can switch to Runner", { plan: onPlan("starter"), source: "stripe", status: "active", seats: seats(2, 0) }, [["none", null, true], ["switch", null, false]]],
+    ["past due: no card has an action, the plan stays current", { plan: onPlan("runner"), source: "stripe", status: "past_due", seats: seats(1, 0) }, [["none", null, false], ["none", null, true]]],
+    ["canceled: subscribe again, no plan is current", { plan: onPlan("runner"), source: "stripe", status: "canceled", seats: seats(1, 0) }, [["subscribe", null, false], ["subscribe", null, false]]],
   ] as const)("%s", (_name, data, expected) => {
-    expect(planCardViews(data, offers).map((view) => [view.action, view.blocked])).toEqual(expected);
-  });
-
-  it("tags the current plan's card", () => {
-    expect(planCardViews({ plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(1, 0) }, offers).map((view) => view.current)).toEqual([false, true]);
+    expect(planCardViews(data, offers).map((view) => [view.action, view.blocked, view.current])).toEqual(expected);
   });
 });
 
