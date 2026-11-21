@@ -11,12 +11,14 @@ type FindingDuplicateDialogProps = {
   onOpenChange: (open: boolean) => void;
   findingTitle: string;
   candidates: readonly DuplicateCandidate[];
+  suggested?: string | null;
   pending: boolean;
   onConfirm: (duplicateOf: string) => void;
 };
 
-export function FindingDuplicateDialog({ open, onOpenChange, findingTitle, candidates, pending, onConfirm }: FindingDuplicateDialogProps) {
-  const [kept, setKept] = useState<string | null>(null);
+export function FindingDuplicateDialog({ open, onOpenChange, findingTitle, candidates, suggested = null, pending, onConfirm }: FindingDuplicateDialogProps) {
+  const [picked, setKept] = useState<string | null>(null);
+  const kept = picked ?? suggested;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

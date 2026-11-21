@@ -28,6 +28,7 @@ export const scanRowToStatus = (
   branchId: row.branchId,
   untrackedReason: row.untrackedReason,
   profileMet: row.profileMet,
+  signalPairsSkipped: row.signalPairsSkipped,
   skill: row.skill,
   model: row.model,
   effort: row.effort,

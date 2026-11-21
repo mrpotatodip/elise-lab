@@ -25,6 +25,7 @@ export const ScanStatusSchema = documentFields(ContractScanStatusSchema, {
     description:
       "The profile a succeeded Runner Scan met, from the files its agent wrote (the agent's own account of what it did): quick, standard or deep, or none when it met no profile. Equal to profile when the Scan did the work asked for, smaller when it did less. Null when the Scan was not checked: a cloud Scan, a Partial Scan, a Scan that did not succeed, or a Scan stored before this field.",
   },
+  signalPairsSkipped: { description: "How many candidate pairs the possible-duplicate Signal step left unasked because of its per-Scan cap. Null when the step did not run." },
   status: { example: "succeeded" },
   createdAt: { example: "2026-11-07T02:45:14.278Z" },
   files: { example: ["REPORT.md", "findings.json"] },

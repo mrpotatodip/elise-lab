@@ -111,6 +111,7 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   branchId: z.uuid().nullish(),
   untrackedReason: z.string().nullish(),
   profileMet: z.enum(PROFILE_MET_VALUES).nullish(),
+  signalPairsSkipped: z.number().int().min(0).nullish(),
   status: ScanStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),

@@ -1,6 +1,7 @@
 import { Suspense, useState, type ComponentProps } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseInfiniteQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useTable } from "@tanstack/react-table";
 import { ChevronRight, ExternalLink, GitBranch, Search, ShieldCheck, Undo2 } from "lucide-react";
 import { Alert, AlertDescription } from "#/components/ui/alert";
@@ -17,6 +18,7 @@ import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { repoSiteName } from "#/lib/repo-site-name";
 import { cn } from "#/lib/utils";
 import { GithubPrivateBadge } from "#/modules/github";
+import { dismissSignal, signalKeys, signalsQuery } from "#/modules/signal";
 import { ShellPageHeader } from "#/modules/shell";
 import { FindingDiscussionButton, findingCommentKeys } from "#/modules/finding-comment";
 import { FindingDecisionNote, FindingStatusBadge, FindingStatusBanner, FindingTriageSelect, findingGroup, findingStatusKey } from "#/modules/finding";
@@ -110,6 +112,7 @@ type FindingRow = {
   blocks: boolean;
   candidates: ComponentProps<typeof FindingTriageSelect>["candidates"];
   onSaved: ComponentProps<typeof FindingTriageSelect>["onSaved"];
+  hintOf: (fingerprint: string) => ComponentProps<typeof FindingTriageSelect>["possibleDuplicate"];
 };
 
 const findingColumn = dataTableColumns<FindingRow>();
@@ -182,10 +185,12 @@ const decisionColumn = findingColumn.display({
   header: "Your decision",
   meta: { cell: "relative z-10" },
   cell: ({ row }) => {
-    const { finding, repoId, fixedOn, candidates, onSaved } = row.original;
+    const { finding, repoId, fixedOn, candidates, onSaved, hintOf } = row.original;
     return (
       <span className="grid justify-items-start gap-1.5">
-        {finding.state !== "fixed_by_code" && <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId), findingCommentKeys.thread(finding.repo, finding.fingerprint)]} candidates={candidates} onSaved={onSaved} />}
+        {finding.state !== "fixed_by_code" && (
+          <FindingTriageSelect finding={finding} also={[repoKeys.detail(repoId), findingCommentKeys.thread(finding.repo, finding.fingerprint)]} candidates={candidates} onSaved={onSaved} possibleDuplicate={hintOf(finding.fingerprint)} />
+        )}
         <FindingDecisionNote state={finding.state} triage={finding.triage} fixedOn={fixedOn} />
         <FindingDiscussionButton
           repo={finding.repo}
@@ -303,6 +308,20 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
   const more = hasNextPage ? "+" : "";
   const countOf = (value: FindingFilter) => all.filter((f) => inFilter(f, value)).length;
   const candidates = all.filter((f) => findingGroup(f.state, f.triage) === "action").map((f) => ({ fingerprint: f.fingerprint, title: f.title }));
+  const signals = useQuery({ ...signalsQuery(all[0]?.repo ?? ""), enabled: all.length > 0 });
+  const dismiss = useMutation({
+    mutationFn: (signalId: string) => dismissSignal({ data: { signalId } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: signalKeys.all }),
+    onError: (error) => toast.error(`We couldn't dismiss that hint. ${error.message}`),
+  });
+  const hintOf = (fingerprint: string) => {
+    const finding = all.find((f) => f.fingerprint === fingerprint);
+    if (!finding || findingGroup(finding.state, finding.triage) !== "action" || finding.triage) return undefined;
+    const signal = signals.data?.find((s) => s.kind === "possible_duplicate" && s.fingerprint === fingerprint && s.relatedFingerprint !== null && candidates.some((c) => c.fingerprint === s.relatedFingerprint));
+    const other = candidates.find((c) => c.fingerprint === signal?.relatedFingerprint);
+    return signal && other ? { fingerprint: other.fingerprint, title: other.title, onDismiss: () => dismiss.mutate(signal.id) } : undefined;
+  };
+  const skippedPairs = history.find((scan) => scan.branch === branch && scan.status === "succeeded")?.signalPairsSkipped ?? 0;
   const filterItems = FILTER_VALUES.map((value) => ({ value, label: `${FILTER_COPY[value].label} (${countOf(value)}${more})` }));
   const inGroup = all.filter((f) => inFilter(f, filter));
   const query = search.trim().toLowerCase();
@@ -311,7 +330,7 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
   const selectedFinding = selected === undefined ? undefined : findings[selected];
   const emptyCopy = repoEmptyCopy(filter, hasNextPage);
   const starts: ScanStarts = new Map(history.map((scan) => [scan.scanId, scan.createdAt]));
-  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, starts), starts, blocks: blockers.has(finding.fingerprint), candidates, onSaved: decided }));
+  const rows = findings.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index), repoId, fixedOn: fixedOnOf(finding, starts), starts, blocks: blockers.has(finding.fingerprint), candidates, onSaved: decided, hintOf }));
   const table = useTable({ features: dataTableFeatures, columns: findingColumns, data: rows, getRowId: (row) => row.finding.id });
 
   return (
@@ -351,6 +370,11 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
         </div>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
+        {skippedPairs > 0 && (
+          <p className="border-b px-6 py-3 text-sm leading-relaxed text-muted-foreground">
+            The latest scan did not check {scanPlural(skippedPairs, "pair", "pairs")} of findings for possible duplicates, to keep the check short.
+          </p>
+        )}
         {findings.length === 0 ? (
           <Empty className="py-10">
             <EmptyHeader>
@@ -406,6 +430,7 @@ function RepoFindings({ repoId, branch, commit, history, fullScanId }: RepoFindi
                 also={[repoKeys.detail(repoId), findingCommentKeys.thread(selectedFinding.repo, selectedFinding.fingerprint)]}
                 candidates={candidates}
                 onSaved={decided}
+                possibleDuplicate={hintOf(selectedFinding.fingerprint)}
               />
             </div>
           ))

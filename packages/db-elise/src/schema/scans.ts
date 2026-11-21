@@ -140,6 +140,8 @@ export const scans = pgTable(
     profileMet: text("profile_met").$type<ProfileMetValue>(),
     // The number of candidate Findings the Trace producer last reported while the Scan ran (a count, never a title). Null: no producer has sent one.
     traceCandidateFindings: integer("trace_candidate_findings"),
+    // How many candidate pairs the possible-duplicate Signal step left unasked because of its per-Scan cap. Null: the step did not run for this Scan.
+    signalPairsSkipped: integer("signal_pairs_skipped"),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),

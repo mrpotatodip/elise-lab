@@ -708,6 +708,13 @@
       "when": 1795289154337,
       "tag": "0100_signals_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1795289755078,
+      "tag": "0102_scan_signal_pairs_skipped",
+      "breakpoints": true
     }
   ]
 }
