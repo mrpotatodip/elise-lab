@@ -290,8 +290,12 @@ export const FindingTriageBodySchema = z
       .string()
       .regex(/^[0-9a-f]{64}$/)
       .optional(),
+    signalId: z.uuid().optional(),
   })
   .superRefine((body, ctx) => {
+    if (body.signalId !== undefined && body.status !== "accepted_risk") {
+      ctx.addIssue({ code: "custom", path: ["signalId"], message: "Only an accepted risk takes the Signal it was saved over" });
+    }
     if (body.status === "duplicate" && body.duplicateOf === undefined) {
       ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "A duplicate needs the Finding it duplicates" });
     } else if (body.status !== "duplicate" && body.duplicateOf !== undefined) {

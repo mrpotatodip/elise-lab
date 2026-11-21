@@ -9,8 +9,8 @@ export const RiskDetailsSchema = z.object({
   days: z.string(),
 });
 
-export { FindingTriageBodySchema, FindingTriageSchema } from "@repo/contracts/elise";
-export type { Finding, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
+export { AcceptedRiskCheckSchema, CheckAcceptedRiskBodySchema, FindingTriageBodySchema, FindingTriageSchema } from "@repo/contracts/elise";
+export type { AcceptedRiskCheck, Finding, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
 
 export type FindingTriageStatus = (typeof FINDING_TRIAGE_STATUS_VALUES)[number];
 export type FindingState = (typeof REPO_FINDING_STATE_VALUES)[number];

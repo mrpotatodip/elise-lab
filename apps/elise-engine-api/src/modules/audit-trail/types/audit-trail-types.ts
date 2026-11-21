@@ -41,6 +41,7 @@ export type AuditDetails = {
   note?: string | null;
   acceptedUntil?: string | null;
   duplicateOf?: string | null;
+  signalId?: string | null;
   monthlyBudgetUsd?: number | null;
   lastFour?: string;
   enabled?: boolean;

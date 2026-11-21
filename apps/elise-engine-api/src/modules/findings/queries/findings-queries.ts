@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
-import type { Finding, FindingsQuery, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
-import { partyPersons, scanFindings, scanFindingTriage, scanRepoFindings, scanRepos, scans, type TFindingTriage } from "@repo/db-elise/schema";
+import { WEAK_REASON_SIGNAL_KIND, type Finding, type FindingsQuery, type FindingTriage, type FindingTriageBody } from "@repo/contracts/elise";
+import { partyPersons, scanFindings, scanFindingTriage, scanRepoFindings, scanRepos, scanSignals, scans, type TFindingTriage } from "@repo/db-elise/schema";
 import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
@@ -171,6 +171,17 @@ export const setTriageEffect = (
       const refusal = yield* duplicateRefusal(db, tenantId, repoId, body.fingerprint, duplicateOf);
       if (refusal) return yield* new Invalid({ message: refusal });
     }
+    if (body.signalId) {
+      const warned = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ id: scanSignals.id })
+            .from(scanSignals)
+            .where(and(eq(scanSignals.id, body.signalId ?? ""), eq(scanSignals.tenantId, tenantId), eq(scanSignals.repoId, repoId), eq(scanSignals.fingerprint, body.fingerprint), eq(scanSignals.kind, WEAK_REASON_SIGNAL_KIND))),
+        catch: toDbError,
+      });
+      if (warned.length === 0) return yield* new Invalid({ message: "That Signal is not a weak-reason warning for this Finding" });
+    }
     const actorPartyId = userId ? yield* Effect.tryPromise({ try: () => actorPartyOf(db, userId), catch: toDbError }) : null;
     if (accepting && !actorPartyId) return yield* new Forbidden({ message: "Forbidden" });
     const acceptedUntil = accepting && body.acceptDays !== undefined ? new Date(now.getTime() + body.acceptDays * DAY_MS) : null;
@@ -192,7 +203,7 @@ export const setTriageEffect = (
           subjectId: row.id,
           tenantId,
           before: previous ? { status: previous.status, note: previous.note, acceptedUntil: previous.acceptedUntil?.toISOString() ?? null, duplicateOf: previous.duplicateOf } : undefined,
-          after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null, duplicateOf },
+          after: { fingerprint: body.fingerprint, status: body.status, note, acceptedUntil: acceptedUntil?.toISOString() ?? null, duplicateOf, signalId: body.signalId },
         });
         const [person] = actorPartyId ? await db.select().from(partyPersons).where(eq(partyPersons.partyId, actorPartyId)) : [];
         return triageView(row, person);

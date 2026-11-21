@@ -86,6 +86,7 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /findings/comments": { kind: "run", path: `/findings/comments?repo=${OTHER_REPO}&fingerprint=${OTHER_FINGERPRINT}`, expect: "empty" },
   "GET /findings/signals": { kind: "run", path: `/findings/signals?repo=${OTHER_REPO}`, expect: "empty" },
   "POST /findings/signals/:signalId/dismiss": { kind: "run", path: `/findings/signals/${OTHER_SIGNAL_ID}/dismiss`, method: "POST", expect: "not-found" },
+  "POST /findings/signals/weak-reason": serviceTest("modules/signals/__tests__/weak-reason.test.ts"),
   "GET /usage/signals": serviceTest("modules/signals/__tests__/signals-routes.test.ts"),
   "PUT /usage/signals": serviceTest("modules/signals/__tests__/signals-routes.test.ts"),
   "POST /findings/comments": {
