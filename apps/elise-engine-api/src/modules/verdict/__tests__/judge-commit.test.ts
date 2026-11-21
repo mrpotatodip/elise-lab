@@ -33,6 +33,7 @@ const triage = (letter: string, overrides: Partial<JudgedTriage>): JudgedTriage 
   status: "open",
   note: null,
   acceptedUntil: null,
+  duplicateOf: null,
   ...overrides,
 });
 
@@ -145,6 +146,49 @@ describe("judgeCommit: decisions by a person", () => {
     const verdict = judge({ findings: [finding("s2", "a", "critical")], triage: [triage("a", { status: "false_positive" })] });
 
     expect(verdict).toMatchObject({ verdict: "pass", open: [], dismissed: [expect.objectContaining({ title: "problem a" })] });
+  });
+
+  it("counts a problem once: a duplicate is dismissed with its link and the kept one blocks", () => {
+    const verdict = judge({
+      findings: [finding("s2", "a", "high"), finding("s2", "b", "high")],
+      triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) })],
+    });
+
+    expect(verdict).toMatchObject({
+      verdict: "fail",
+      counts: { high: 1 },
+      open: [expect.objectContaining({ title: "problem b" })],
+      dismissed: [expect.objectContaining({ title: "problem a", duplicateOf: "b".repeat(64) })],
+    });
+  });
+
+  it("dismisses both when the kept Finding is a false positive", () => {
+    const verdict = judge({
+      findings: [finding("s2", "a", "high"), finding("s2", "b", "high")],
+      triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) }), triage("b", { status: "false_positive" })],
+    });
+
+    expect(verdict).toMatchObject({ verdict: "fail", counts: { high: 1 }, open: [expect.objectContaining({ title: "problem a" })], dismissed: [expect.objectContaining({ title: "problem b" })] });
+  });
+
+  it.each([
+    ["under an accepted risk that is still running", triage("b", { status: "accepted_risk", note: "x", acceptedUntil: new Date("2026-12-01T00:00:00Z") }), 1],
+    ["under an accepted risk that expired", triage("b", { status: "accepted_risk", note: "x", acceptedUntil: new Date("2026-11-09T00:00:00Z") }), 1],
+    ["itself a duplicate", triage("b", { status: "duplicate", duplicateOf: "c".repeat(64) }), 2],
+    ["marked fixed", triage("b", { status: "fixed" }), 1],
+  ])("counts the right open total for a duplicate whose kept Finding is %s", (_name, kept, high) => {
+    const verdict = judge({
+      findings: [finding("s2", "a", "high"), finding("s2", "b", "high")],
+      triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) }), kept],
+    });
+
+    expect(verdict.counts.high).toBe(high);
+  });
+
+  it("counts a duplicate again when the kept Finding is not on this commit", () => {
+    const verdict = judge({ findings: [finding("s2", "a", "high")], triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) })] });
+
+    expect(verdict).toMatchObject({ verdict: "fail", counts: { high: 1 } });
   });
 
   it("lets an accepted risk pass until its end date, and lists it with the reason", () => {

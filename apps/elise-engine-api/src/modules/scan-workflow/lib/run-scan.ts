@@ -59,6 +59,17 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     }
   };
 
+  const detectSignals = async () => {
+    try {
+      await step.do("signals-duplicate", { retries: { limit: 0, delay: "1 second" }, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT }, async () => {
+        await deps.detectSignals(params);
+        return true;
+      });
+    } catch (cause) {
+      console.error("scan: could not look for possible duplicates", cause instanceof Error ? cause.message : cause);
+    }
+  };
+
   const sendTrace = async (ended: boolean) => {
     if (sandbox.drainTrace === undefined) return;
     try {
@@ -182,6 +193,7 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     }
     await mark("status-succeeded", { status: "succeeded", error: null, usage });
     await settle("succeeded", usage);
+    await detectSignals();
     return { ok: true };
   } catch (cause) {
     const error = cause instanceof Error ? cause.message : String(cause);

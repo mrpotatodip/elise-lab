@@ -11,6 +11,7 @@ import {
   platformMasterPlans,
   scanFiles,
   scanFindingComments,
+  scanSignals,
   scanFindings,
   scanRepoBranches,
   scanRepos,
@@ -34,6 +35,7 @@ import {
   CROSS_ACCOUNT_CASES,
   NOT_TENANT_ROUTES,
   OTHER_COMMENT_ID,
+  OTHER_SIGNAL_ID,
   OTHER_GROUP_ID,
   OTHER_GROUP_NAME,
   OTHER_INVITE_ID,
@@ -117,6 +119,7 @@ beforeAll(async () => {
   await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
   await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
   await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs, to delete or edit" });
+  await test.raw.insert(scanSignals).values({ id: OTHER_SIGNAL_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), kind: "possible_duplicate", probability: 0.9, modelVersion: "jev-1.14.0" });
   await test.raw.insert(tenantAnthropicKeys).values({ tenantId: otherTenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
   await seedOtherUsage(otherTenantId, otherRepoId);
   await ensureTenantRoles(test.raw, otherTenantId);

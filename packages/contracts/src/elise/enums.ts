@@ -56,7 +56,7 @@ export const FINDING_SEVERITY_VALUES = ["critical", "high", "medium", "low", "in
 // -----
 export const FINDING_ORIGIN_VALUES = ["new", "carried"] as const;
 export const REPO_FINDING_STATE_VALUES = ["open", "fixed_by_code", "regressed"] as const;
-export const FINDING_TRIAGE_STATUS_VALUES = ["open", "fixed", "false_positive", "accepted_risk"] as const;
+export const FINDING_TRIAGE_STATUS_VALUES = ["open", "fixed", "false_positive", "accepted_risk", "duplicate"] as const;
 
 // -----
 // Which Anthropic key paid for a scan: the platform's, or the one

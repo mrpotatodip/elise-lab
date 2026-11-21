@@ -31,6 +31,7 @@ import { Route as AppSettingsBudgetRouteImport } from './routes/_app/settings.bu
 import { Route as AppSettingsHistoryRouteImport } from './routes/_app/settings.history'
 import { Route as AppSettingsPlanRouteImport } from './routes/_app/settings.plan'
 import { Route as AppSettingsProvidersRouteImport } from './routes/_app/settings.providers'
+import { Route as AppSettingsSignalsRouteImport } from './routes/_app/settings.signals'
 import { Route as AppSummaryIndexRouteImport } from './routes/_app/summary.index'
 import { Route as AppSummaryRepoIdRouteImport } from './routes/_app/summary.$repoId'
 import { Route as AppReposRepoIdBranchesBranchIdRouteImport } from './routes/_app/repos/$repoId_.branches.$branchId'
@@ -144,6 +145,11 @@ const AppSettingsProvidersRoute = AppSettingsProvidersRouteImport.update({
   path: '/providers',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsSignalsRoute = AppSettingsSignalsRouteImport.update({
+  id: '/signals',
+  path: '/signals',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSummaryIndexRoute = AppSummaryIndexRouteImport.update({
   id: '/summary/',
   path: '/summary/',
@@ -180,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/settings/history': typeof AppSettingsHistoryRoute
   '/settings/plan': typeof AppSettingsPlanRoute
   '/settings/providers': typeof AppSettingsProvidersRoute
+  '/settings/signals': typeof AppSettingsSignalsRoute
   '/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/repos/': typeof AppReposIndexRoute
   '/scans/': typeof AppScansIndexRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/settings/history': typeof AppSettingsHistoryRoute
   '/settings/plan': typeof AppSettingsPlanRoute
   '/settings/providers': typeof AppSettingsProvidersRoute
+  '/settings/signals': typeof AppSettingsSignalsRoute
   '/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/repos': typeof AppReposIndexRoute
   '/scans': typeof AppScansIndexRoute
@@ -233,6 +241,7 @@ export interface FileRoutesById {
   '/_app/settings/history': typeof AppSettingsHistoryRoute
   '/_app/settings/plan': typeof AppSettingsPlanRoute
   '/_app/settings/providers': typeof AppSettingsProvidersRoute
+  '/_app/settings/signals': typeof AppSettingsSignalsRoute
   '/_app/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/_app/repos/': typeof AppReposIndexRoute
   '/_app/scans/': typeof AppScansIndexRoute
@@ -261,6 +270,7 @@ export interface FileRouteTypes {
     | '/settings/history'
     | '/settings/plan'
     | '/settings/providers'
+    | '/settings/signals'
     | '/summary/$repoId'
     | '/repos/'
     | '/scans/'
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/settings/history'
     | '/settings/plan'
     | '/settings/providers'
+    | '/settings/signals'
     | '/summary/$repoId'
     | '/repos'
     | '/scans'
@@ -313,6 +324,7 @@ export interface FileRouteTypes {
     | '/_app/settings/history'
     | '/_app/settings/plan'
     | '/_app/settings/providers'
+    | '/_app/settings/signals'
     | '/_app/summary/$repoId'
     | '/_app/repos/'
     | '/_app/scans/'
@@ -488,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsProvidersRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/signals': {
+      id: '/_app/settings/signals'
+      path: '/signals'
+      fullPath: '/settings/signals'
+      preLoaderRoute: typeof AppSettingsSignalsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/summary/': {
       id: '/_app/summary/'
       path: '/summary'
@@ -517,6 +536,7 @@ interface AppSettingsRouteChildren {
   AppSettingsHistoryRoute: typeof AppSettingsHistoryRoute
   AppSettingsPlanRoute: typeof AppSettingsPlanRoute
   AppSettingsProvidersRoute: typeof AppSettingsProvidersRoute
+  AppSettingsSignalsRoute: typeof AppSettingsSignalsRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
@@ -525,6 +545,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsHistoryRoute: AppSettingsHistoryRoute,
   AppSettingsPlanRoute: AppSettingsPlanRoute,
   AppSettingsProvidersRoute: AppSettingsProvidersRoute,
+  AppSettingsSignalsRoute: AppSettingsSignalsRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
 

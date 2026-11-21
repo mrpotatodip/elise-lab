@@ -140,6 +140,8 @@ export const scans = pgTable(
     profileMet: text("profile_met").$type<ProfileMetValue>(),
     // The number of candidate Findings the Trace producer last reported while the Scan ran (a count, never a title). Null: no producer has sent one.
     traceCandidateFindings: integer("trace_candidate_findings"),
+    // How many candidate pairs the possible-duplicate Signal step left unasked because of its per-Scan cap. Null: the step did not run for this Scan.
+    signalPairsSkipped: integer("signal_pairs_skipped"),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),
@@ -329,6 +331,7 @@ export const scanFindingTriage = pgTable(
     status: text("status").$type<FindingTriageStatusValue>().notNull(),
     note: text("note"),
     acceptedUntil: timestamp("accepted_until", { withTimezone: true }),
+    duplicateOf: text("duplicate_of"),
     setByPartyId: uuid("set_by_party_id").references(() => parties.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -342,6 +345,7 @@ export const scanFindingTriage = pgTable(
       "scan_finding_triage_accepted",
       sql`(${t.status} = 'accepted_risk') = (${t.acceptedUntil} is not null) and (${t.status} <> 'accepted_risk' or ${t.note} is not null)`,
     ),
+    chkDuplicate: check("scan_finding_triage_duplicate", sql`(${t.status} = 'duplicate') = (${t.duplicateOf} is not null)`),
     fkRepoTenant: foreignKey({
       name: "scan_finding_triage_repo_tenant_fk",
       columns: [t.repoId, t.tenantId],
