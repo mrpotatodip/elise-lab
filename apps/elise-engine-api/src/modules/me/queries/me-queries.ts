@@ -13,7 +13,7 @@ import {
   tenants,
 } from "@repo/db-elise";
 import type { AccessPower, Me, MeAccount } from "@repo/contracts/elise";
-import type { DbConnectType } from "#/lib/db-connection";
+import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { NotFound, toDbError, type DbError } from "#/lib/effect-query";
 
 // -----
@@ -114,7 +114,7 @@ export const userHasAccountEffect = (db: DbConnectType, userId: string, accountI
   }).pipe(Effect.map((rows) => rows.length > 0));
 
 export const listLoginsWithPowerEffect = (
-  db: DbConnectType,
+  db: AppDbType,
   accountId: string,
   power: AccessPower,
 ): Effect.Effect<{ email: string; name: string; partyId: string }[], DbError> =>

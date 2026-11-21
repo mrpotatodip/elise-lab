@@ -1,16 +1,23 @@
-import type { QueuedEmail } from "#/modules/email/types";
+import type { QueuedEmail, RunnerNames } from "#/modules/email/types";
+import { renderRunnerAdded, renderRunnerRemoved } from "./runner-templates";
 import { renderPasswordReset, renderTeamInvite } from "./templates";
 
 const unreachable = (mail: never): never => {
   throw new Error(`No email template for ${JSON.stringify(mail)}`);
 };
 
-export const renderEmail = (mail: QueuedEmail) => {
+const UNKNOWN_NAMES: RunnerNames = { runnerName: "a Runner", actorName: "Someone", accountName: "your Account" };
+
+export const renderEmail = (mail: QueuedEmail, names: RunnerNames = UNKNOWN_NAMES) => {
   switch (mail.kind) {
     case "team-invite":
       return renderTeamInvite(mail);
     case "password-reset":
       return renderPasswordReset(mail);
+    case "runner-added":
+      return renderRunnerAdded(mail, names);
+    case "runner-removed":
+      return renderRunnerRemoved(mail, names);
     default:
       return unreachable(mail);
   }
