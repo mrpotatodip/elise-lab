@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Users } from "lucide-react";
+import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -35,6 +35,8 @@ type ShellSidebarProps = {
   runnersPaired: number;
   runnersRunning: number;
   showDashboard: boolean;
+  showGettingStarted: boolean;
+  onGettingStarted: () => void;
   collapsed: boolean;
   canToggle: boolean;
   onToggle: () => void;
@@ -48,7 +50,7 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, runnersPaired, runnersRunning, showDashboard, collapsed, canToggle, onToggle }: ShellSidebarProps) {
+export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
   const { open: reposOpen, setOpen: setReposOpen } = useSidebarReposOpen();
   const scansLabel = running > 0 ? `Scans, ${running} in progress` : "Scans";
   const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
@@ -82,6 +84,15 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
             <Link to="/overview" aria-label="Overview" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <LayoutDashboard className={ICON} strokeWidth={1.5} />
               {!collapsed && "Overview"}
+            </Link>
+          </Hint>
+        )}
+
+        {showDashboard && showGettingStarted && (
+          <Hint label="Getting started" collapsed={collapsed}>
+            <Link to="/overview" aria-label="Getting started" className={cn(ROW, collapsed && "justify-center px-0")} onClick={onGettingStarted}>
+              <ListChecks className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Getting started"}
             </Link>
           </Hint>
         )}

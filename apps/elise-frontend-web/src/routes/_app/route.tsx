@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useNow } from "#/lib/use-now";
+import { gettingStarted, useGettingStartedFlag } from "#/modules/getting-started";
 import { runnerShownState, runnersQuery } from "#/modules/runner";
 import { ScanNewDialog, scansQuery, scanSidebarItems } from "#/modules/scan";
 import { hasAccessPower, isWatcher } from "@repo/contracts/elise";
@@ -25,6 +26,9 @@ function AppLayout() {
   const now = useNow();
   const pairedRunners = (runners ?? []).filter((runner) => runner.state === "connected");
   const runnersRunning = pairedRunners.filter((runner) => runnerShownState(runner, now) === "connected").length;
+  const [gitSkipped] = useGettingStartedFlag(user?.accountId ?? "", "git-skipped");
+  const [, setDismissed] = useGettingStartedFlag(user?.accountId ?? "", "dismissed");
+  const showGettingStarted = showRunners && !!runners && !!data && gettingStarted({ runners, scans: data.scans, gitSkipped, dismissed: false }).show;
   const pageHasOwnScanButton = useRouterState({ select: (state) => state.location.pathname.startsWith("/repos/") || state.location.pathname.startsWith("/scans/") });
 
   return (
@@ -42,6 +46,8 @@ function AppLayout() {
       runnersPaired={pairedRunners.length}
       runnersRunning={runnersRunning}
       showDashboard={showDashboard}
+      showGettingStarted={showGettingStarted}
+      onGettingStarted={() => setDismissed(false)}
       actions={showDashboard ? <ScanNewDialog variant={pageHasOwnScanButton ? "outline" : "default"} /> : undefined}
     >
       <Outlet />

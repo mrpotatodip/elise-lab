@@ -58,8 +58,10 @@ export function GettingStartedCard({ accountId, canSeeRunners }: { accountId: st
   const { data: list } = useQuery({ ...scansQuery(), refetchOnWindowFocus: "always" });
   const [gitSkipped, setGitSkipped] = useGettingStartedFlag(accountId, "git-skipped");
 
+  const [dismissed, setDismissed] = useGettingStartedFlag(accountId, "dismissed");
+
   if (!canSeeRunners || !runners || !list) return null;
-  const result = gettingStarted({ runners, scans: list.scans, gitSkipped });
+  const result = gettingStarted({ runners, scans: list.scans, gitSkipped, dismissed });
   if (!result.show) return null;
   const done = (key: GettingStartedTaskKey) => result.tasks.find((task) => task.key === key)?.done ?? false;
   const skip = () => setGitSkipped(true);
@@ -71,9 +73,14 @@ export function GettingStartedCard({ accountId, canSeeRunners }: { accountId: st
           <CardTitle>Getting started</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Five setup tasks take you to your first Report. They tick themselves as Elise sees your Runner and Scans.</p>
         </div>
-        <a href={GETTING_STARTED_DESKTOP_URL} target="_blank" rel="noreferrer" className={LINK}>
-          Prefer a window?
-        </a>
+        <div className="flex shrink-0 items-center gap-3">
+          <a href={GETTING_STARTED_DESKTOP_URL} target="_blank" rel="noreferrer" className={LINK}>
+            Prefer a window?
+          </a>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setDismissed(true)}>
+            Dismiss
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <ol className="grid divide-y">
