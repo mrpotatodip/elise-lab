@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import type { AccessPower } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import { tenantEffectOf } from "#/lib/tenant-effect";
-import { enqueueEmailsQuietly } from "#/modules/email";
+import { dashboardLinkOf, enqueueEmailsQuietly } from "#/modules/email";
 import { listLoginsWithPowerEffect } from "#/modules/me/queries";
 import { RUNNER_NOTICE_PATH } from "#/modules/runners/constants";
 import type { AppEnv } from "#/types/variables";
@@ -23,7 +23,7 @@ export const notifyRunnerChange = async (c: Context<AppEnv>, change: RunnerChang
     ),
   );
   const at = new Date().toISOString();
-  const link = `${c.env.DASHBOARD_URL}${RUNNER_NOTICE_PATH}`;
+  const link = dashboardLinkOf(c.env.DASHBOARD_URL, RUNNER_NOTICE_PATH);
   const deps = c.get("deps");
   await enqueueEmailsQuietly(
     (mail) => deps.enqueueEmail(c.env, mail),

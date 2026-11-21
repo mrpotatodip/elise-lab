@@ -1,4 +1,4 @@
-export { enqueueEmail, enqueueEmailsQuietly, handleEmailQueue, recordInviteStatusOf } from "./lib";
+export { dashboardLinkOf, enqueueEmail, enqueueEmailsQuietly, handleEmailQueue, recordInviteStatusOf } from "./lib";
 export type {
   AnthropicKeyChangedEmail,
   BudgetChangedEmail,

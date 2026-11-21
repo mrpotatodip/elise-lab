@@ -34,7 +34,7 @@ export const renderPasswordResetDone = (mail: PasswordResetDoneEmail) => {
   });
 };
 
-export const renderPasswordReset =(mail: PasswordResetEmail) => {
+export const renderPasswordReset = (mail: PasswordResetEmail) => {
   const expires = new Date(mail.expiresAt).toLocaleTimeString("en-US", { timeStyle: "short", timeZone: "UTC" });
   return renderEmailLayout({
     subject: "Reset your EliseLAB password",

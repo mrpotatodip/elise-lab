@@ -48,7 +48,7 @@ export const changeUsageBudgetSvc = (env: UsageEnv, db: AppDbType, accountId: st
     return { usage, previousBudgetUsd: before.budgetUsd, audience };
   });
 
-export const updateUsageBudgetSvc =(env: UsageEnv, db: AppDbType, accountId: string, userId: string, requestedUsd: number | null): Effect.Effect<Usage, DbError | Invalid> =>
+export const updateUsageBudgetSvc = (env: UsageEnv, db: AppDbType, accountId: string, userId: string, requestedUsd: number | null): Effect.Effect<Usage, DbError | Invalid> =>
   Effect.gen(function* () {
     const now = new Date();
     const spend = yield* monthSpendEffect(db, accountId, monthStartOf(now));
