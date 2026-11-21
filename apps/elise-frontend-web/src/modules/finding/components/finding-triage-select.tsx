@@ -16,7 +16,10 @@ type FindingTriageSelectProps = {
   also?: readonly (readonly unknown[])[];
   candidates?: readonly DuplicateCandidate[];
   onSaved?: (fingerprint: string, triage: FindingTriage) => void;
+  possibleDuplicate?: PossibleDuplicate;
 };
+
+export type PossibleDuplicate = { fingerprint: string; title: string; onDismiss: () => void };
 
 type Decision = { status: FindingTriageStatus; acceptDays?: number; note?: string | null; duplicateOf?: string; signalId?: string };
 
@@ -30,7 +33,7 @@ const SAVED_COPY = {
   duplicate: "Marked as a duplicate. The finding you picked carries the problem now.",
 } as const satisfies Record<FindingTriageStatus, string>;
 
-export function FindingTriageSelect({ finding, also = [], candidates = [], onSaved }: FindingTriageSelectProps) {
+export function FindingTriageSelect({ finding, also = [], candidates = [], onSaved, possibleDuplicate }: FindingTriageSelectProps) {
   const { user } = useRouteContext({ from: "/_app" });
   const canAcceptRisk = hasAccessPower(user?.powers ?? [], "company:findings:accepted_risk:update");
   const queryClient = useQueryClient();
@@ -95,9 +98,25 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
           ))}
         </SelectContent>
       </Select>
+      {possibleDuplicate && (
+        <p className="grid max-w-56 gap-1 text-sm leading-relaxed text-muted-foreground">
+          <span>
+            Possible duplicate of <span className="font-medium text-foreground">{possibleDuplicate.title}</span>
+          </span>
+          <span className="flex gap-3">
+            <button type="button" className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setMarking(true)}>
+              Review
+            </button>
+            <button type="button" className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={possibleDuplicate.onDismiss}>
+              Dismiss
+            </button>
+          </span>
+        </p>
+      )}
       <FindingDuplicateDialog
         open={marking}
         onOpenChange={setMarking}
+        suggested={possibleDuplicate?.fingerprint ?? null}
         findingTitle={finding.title}
         candidates={candidates.filter((candidate) => candidate.fingerprint !== finding.fingerprint)}
         pending={save.isPending}

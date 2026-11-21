@@ -53,6 +53,7 @@ const setup = (options: SetupOptions = {}) => {
   const names: string[] = [];
   const calls: string[] = [];
   const settles: string[] = [];
+  const signalRuns: string[] = [];
   const ledger = memoryScanRepo();
   const bindings = fakeBindings();
   const prepares: { ref?: string }[] = [];
@@ -95,8 +96,9 @@ const setup = (options: SetupOptions = {}) => {
     },
     saveTrace: async () => ({ accepted: 0, dropped: 0 }),
     settleCredit: async (_params: ScanParams, status: "succeeded" | "failed") => void settles.push(status),
+    detectSignals: async (_params: ScanParams) => void signalRuns.push(ledger.rows.get("scan-1")?.status ?? "none"),
   };
-  return { names, calls, ledger, bindings, prepares, anthropicKeys, settles, deps };
+  return { names, calls, ledger, bindings, prepares, anthropicKeys, settles, signalRuns, deps };
 };
 
 const failingSaveTrace = async () => Promise.reject(new Error("database down"));
@@ -270,6 +272,28 @@ describe("runScan", () => {
     const broken = { ...deps, settleCredit: async () => Promise.reject(new Error("database down")) };
 
     await expect(runScan(broken, params(), fakeStep(names))).resolves.toEqual({ ok: true });
+  });
+
+  it("looks for possible duplicates once the scan is succeeded, and only then", async () => {
+    const ok = setup();
+    await queue(ok.ledger, params());
+    await runScan(ok.deps, params(), fakeStep(ok.names));
+    const bad = setup({ agent: "failed" });
+    await queue(bad.ledger, params());
+    await expect(runScan(bad.deps, params(), fakeStep(bad.names))).rejects.toThrow("claude exited 1");
+
+    expect(ok.signalRuns).toEqual(["succeeded"]);
+    expect(bad.signalRuns).toEqual([]);
+  });
+
+  it("leaves the scan succeeded when the duplicate signals step fails", async () => {
+    const { names, ledger, deps } = setup();
+    await queue(ledger, params());
+    const broken = { ...deps, detectSignals: async () => Promise.reject(new Error("TypeSafe answered 500")) };
+
+    await expect(runScan(broken, params(), fakeStep(names))).resolves.toEqual({ ok: true });
+
+    expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded" });
   });
 
   it("saves the branch the clone reported, with the commit", async () => {
