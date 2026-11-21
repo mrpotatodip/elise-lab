@@ -14,6 +14,7 @@ const DecisionAfterSchema = z.object({
   status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
   note: z.string().nullish(),
   acceptedUntil: z.iso.datetime().nullish(),
+  duplicateOf: z.string().nullish(),
 });
 
 const oldestFirst = (a: FindingThreadEvent, b: FindingThreadEvent) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);

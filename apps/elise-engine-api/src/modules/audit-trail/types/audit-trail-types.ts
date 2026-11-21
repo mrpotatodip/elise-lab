@@ -39,6 +39,7 @@ export type AuditDetails = {
   status?: string;
   note?: string | null;
   acceptedUntil?: string | null;
+  duplicateOf?: string | null;
   monthlyBudgetUsd?: number | null;
   lastFour?: string;
   requestIp?: string;

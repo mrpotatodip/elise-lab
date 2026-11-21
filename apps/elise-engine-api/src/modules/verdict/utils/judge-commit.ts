@@ -89,9 +89,11 @@ const overLimit = (counts: ReturnType<typeof emptyCounts>): Reason | null => {
 // at all.
 //
 // A person's decision counts only where the commit's own
-// scans do not contradict it: a false positive and an
-// unexpired accepted risk are taken off the open list and
-// shown beside it, and "fixed" is ignored, because the scan
+// scans do not contradict it: a false positive, a duplicate
+// (it never counts; the Finding it points to carries the
+// problem by its own decision) and an unexpired accepted risk
+// are taken off the open list and shown beside it, and
+// "fixed" is ignored, because the scan
 // of this commit found the problem here.
 // -----
 export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput): Verdict => {
@@ -112,6 +114,10 @@ export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput
     const decision = decisions.get(finding.fingerprint);
     if (decision?.status === "false_positive") {
       dismissed.push(detail(finding));
+      continue;
+    }
+    if (decision?.status === "duplicate") {
+      dismissed.push({ ...detail(finding), duplicateOf: decision.duplicateOf });
       continue;
     }
     const until = decision?.status === "accepted_risk" ? decision.acceptedUntil : null;

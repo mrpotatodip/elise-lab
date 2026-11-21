@@ -54,6 +54,7 @@ export const FindingDecisionSchema = z.object({
   status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
   note: z.string().nullable(),
   acceptedUntil: z.iso.datetime().nullable(),
+  duplicateOf: z.string().nullable().default(null),
   createdAt: z.iso.datetime(),
 });
 

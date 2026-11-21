@@ -69,7 +69,7 @@ describe("an accepted risk", () => {
       expect.objectContaining({
         action: "finding.risk.accepted",
         actorPartyId: partyId,
-        after: { tenantId, fingerprint: fp("a"), status: "accepted_risk", note: "Behind the VPN until the rewrite", acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString() },
+        after: { tenantId, fingerprint: fp("a"), status: "accepted_risk", note: "Behind the VPN until the rewrite", acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString(), duplicateOf: null },
       }),
     ]);
   });
@@ -95,7 +95,7 @@ describe("every other decision", () => {
         action: "finding.triage.set",
         actorPartyId: null,
         before: null,
-        after: { tenantId, fingerprint: fp("b"), status: "false_positive", note: "test fixture", acceptedUntil: null },
+        after: { tenantId, fingerprint: fp("b"), status: "false_positive", note: "test fixture", acceptedUntil: null, duplicateOf: null },
       }),
     ]);
   });

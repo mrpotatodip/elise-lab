@@ -4,7 +4,7 @@ import { authorNameOf, type CommentAuthor } from "./finding-comment-view";
 
 export const DECISION_ACTIONS = ["finding.triage.set", "finding.risk.accepted"];
 
-type DecisionDetails = Pick<FindingDecision, "status"> & { note?: string | null; acceptedUntil?: string | null };
+type DecisionDetails = Pick<FindingDecision, "status"> & { note?: string | null; acceptedUntil?: string | null; duplicateOf?: string | null };
 
 // -----
 // An Audit trail row of a triage decision as the thread shows
@@ -18,5 +18,6 @@ export const findingDecisionView = (entry: TAccessAuditLog, after: DecisionDetai
   status: after.status,
   note: after.note ?? null,
   acceptedUntil: after.acceptedUntil ?? null,
+  duplicateOf: after.duplicateOf ?? null,
   createdAt: entry.createdAt.toISOString(),
 });

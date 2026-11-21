@@ -69,7 +69,7 @@ export const commitEvidenceEffect = (db: AppDbType, tenantId: string, repoId: st
           ),
         );
       const triage = await db
-        .select({ fingerprint: scanFindingTriage.fingerprint, status: scanFindingTriage.status, note: scanFindingTriage.note, acceptedUntil: scanFindingTriage.acceptedUntil })
+        .select({ fingerprint: scanFindingTriage.fingerprint, status: scanFindingTriage.status, note: scanFindingTriage.note, acceptedUntil: scanFindingTriage.acceptedUntil, duplicateOf: scanFindingTriage.duplicateOf })
         .from(scanFindingTriage)
         .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId)));
       return { scans: scanRows, findings, triage };
