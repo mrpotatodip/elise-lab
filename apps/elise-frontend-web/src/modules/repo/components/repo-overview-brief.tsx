@@ -116,13 +116,14 @@ function KpiTile({ kpi, onJump }: { kpi: Kpi; onJump: (key: string) => void }) {
   );
 }
 
-type RepoOverviewBriefProps = { repos: readonly Repo[] };
+type RepoOverviewBriefProps = { repos: readonly Repo[]; hideWhenEmpty?: boolean };
 
-export function RepoOverviewBrief({ repos }: RepoOverviewBriefProps) {
+export function RepoOverviewBrief({ repos, hideWhenEmpty = false }: RepoOverviewBriefProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   if (repos.length === 0) {
+    if (hideWhenEmpty) return null;
     return (
       <Card>
         <CardHeader>
