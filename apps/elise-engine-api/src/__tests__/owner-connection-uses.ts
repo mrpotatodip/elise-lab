@@ -22,6 +22,10 @@ export const OWNER_CONNECTION_USES = {
     uses: 2,
     reason: "The daily cron has no request and no Account: the upload retention sweep crosses Accounts, and touches only upload rows",
   },
+  "modules/email/lib/record-invite-status.ts": {
+    uses: 3,
+    reason: "The queue handler has no request and no Account: it records one invite's email status, filtered by the invite's ID",
+  },
   "modules/me/api/get-me.ts": { uses: 2, reason: "Lists the Accounts a person belongs to, across Accounts" },
   "modules/runners/api/claim-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
   "modules/runners/api/disconnect-runner.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },

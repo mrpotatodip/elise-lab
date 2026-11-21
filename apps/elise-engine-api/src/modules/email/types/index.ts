@@ -5,6 +5,7 @@
 // -----
 export type TeamInviteEmail = {
   kind: "team-invite";
+  inviteId?: string;
   to: string;
   accountName: string;
   inviterName: string;
@@ -39,5 +40,11 @@ export type QueuedEmail = TeamInviteEmail | PasswordResetEmail;
 export type LegacyInviteEmail = Omit<TeamInviteEmail, "kind">;
 
 export type QueueBody = QueuedEmail | LegacyInviteEmail;
+
+// -----
+// How the consumer tells a Team invite whether its email went
+// out. A failed write is logged by the caller and never retried.
+// -----
+export type RecordInviteStatus = (inviteId: string, status: "sent" | "failed") => Promise<void>;
 
 export type RetryRule = "backoff" | "long-wait" | "drop";

@@ -33,8 +33,11 @@ const run = async (queue: string, body: QueueBody, failWith: string | undefined)
       },
     } as never,
   };
-  await handleEmailQueue(batch, env);
-  return { calls, sent };
+  const statuses: string[] = [];
+  await handleEmailQueue(batch, env, async (inviteId, status) => {
+    statuses.push(`${inviteId} ${status}`);
+  });
+  return { calls, sent, statuses };
 };
 
 describe("email queue consumer", () => {
@@ -66,6 +69,24 @@ describe("email queue consumer", () => {
 
     expect(calls).toEqual(["ack"]);
     expect(sent).toHaveLength(1);
+  });
+
+  it.each([
+    ["sent", undefined, "queue", "i-1 sent"],
+    ["dropped", "E_RECIPIENT_SUPPRESSED", "queue", "i-1 failed"],
+    ["retried", "E_DELIVERY_FAILED", "queue", undefined],
+    ["dead-lettered", undefined, "dlq", "i-1 failed"],
+  ])("tells a Team invite with an ID whether it was %s", async (_name, failWith, where, expected) => {
+    const queue = where === "dlq" ? "elise-invite-emails-dlq" : "elise-invite-emails";
+    const { statuses } = await run(queue, { kind: "team-invite", inviteId: "i-1", ...invite }, failWith);
+
+    expect(statuses).toEqual(expected ? [expected] : []);
+  });
+
+  it("records nothing for a message with no invite ID", async () => {
+    const { statuses } = await run("elise-invite-emails", { kind: "team-invite", ...invite }, undefined);
+
+    expect(statuses).toEqual([]);
   });
 
   it("acknowledges a dead letter without sending", async () => {
