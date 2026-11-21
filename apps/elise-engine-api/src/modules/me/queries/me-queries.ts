@@ -113,6 +113,25 @@ export const userHasAccountEffect = (db: DbConnectType, userId: string, accountI
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows.length > 0));
 
+export const listLoginsWithPowerEffect = (
+  db: DbConnectType,
+  accountId: string,
+  power: AccessPower,
+): Effect.Effect<{ email: string; name: string; partyId: string }[], DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .selectDistinct({ email: authUser.email, name: authUser.name, partyId: authUser.partyId })
+        .from(partyRoles)
+        .innerJoin(authUser, eq(authUser.partyId, partyRoles.partyId))
+        .innerJoin(partyMasterRoles, eq(partyMasterRoles.id, partyRoles.roleId))
+        .innerJoin(accessRolePowers, eq(accessRolePowers.masterRoleId, partyMasterRoles.masterRoleId))
+        .innerJoin(accessMasterPowers, eq(accessMasterPowers.id, accessRolePowers.masterPowerId))
+        .where(and(eq(partyRoles.tenantId, accountId), eq(accessMasterPowers.power, power)))
+        .orderBy(asc(authUser.email)),
+    catch: toDbError,
+  });
+
 // -----
 // Does this login hold this Power in this Account? A Role holds
 // the Powers granted to its Master Role. The guard for its team,
