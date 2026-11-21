@@ -1,5 +1,5 @@
 import type { QueuedEmail } from "#/modules/email/types";
-import { renderPasswordReset, renderTeamInvite } from "./templates";
+import { renderPasswordReset, renderPasswordResetDone, renderTeamInvite } from "./templates";
 
 const unreachable = (mail: never): never => {
   throw new Error(`No email template for ${JSON.stringify(mail)}`);
@@ -11,6 +11,8 @@ export const renderEmail = (mail: QueuedEmail) => {
       return renderTeamInvite(mail);
     case "password-reset":
       return renderPasswordReset(mail);
+    case "password-reset-done":
+      return renderPasswordResetDone(mail);
     default:
       return unreachable(mail);
   }

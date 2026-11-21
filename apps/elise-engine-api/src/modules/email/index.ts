@@ -1,2 +1,2 @@
 export { enqueueEmail, handleEmailQueue } from "./lib";
-export type { LegacyInviteEmail, PasswordResetEmail, QueueBody, QueuedEmail, TeamInviteEmail } from "./types";
+export type { LegacyInviteEmail, PasswordResetDoneEmail, PasswordResetEmail, QueueBody, QueuedEmail, TeamInviteEmail } from "./types";
