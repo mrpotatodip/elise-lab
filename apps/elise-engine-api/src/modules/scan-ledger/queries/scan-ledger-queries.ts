@@ -5,6 +5,7 @@ import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCredit
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
+import { clearEndedScanFindingsEffect } from "#/modules/live-findings/queries";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
@@ -174,6 +175,7 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
       .update(scanRunnerJobs)
       .set({ state: "cancelled", finishedAt: new Date() })
       .where(and(inArray(scanRunnerJobs.scanId, stalled), inArray(scanRunnerJobs.state, ["queued", "claimed"]))),
+    db.delete(scanFindings).where(inArray(scanFindings.scanId, stalled)),
     db
       .update(scans)
       .set({ status: "failed", step: null, finishedAt: new Date(), error: "the scan stalled and was closed by a newer request", updatedAt: new Date() })
@@ -255,7 +257,9 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
           })
           .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), ne(scans.status, "stopped"), patch.status === "failed" ? undefined : ne(scans.status, "failed"))),
       catch: toDbError,
-    }).pipe(Effect.asVoid);
+    }).pipe(
+      Effect.flatMap(() => (patch.status === "failed" ? clearEndedScanFindingsEffect(db, accountId, scanId) : Effect.void)),
+    );
   },
 
   addFiles: (accountId, scanId, files) =>
@@ -301,6 +305,7 @@ export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string,
       if (!found) return yield* new NotFound({ message: "Scan not found" });
       return yield* new Conflict({ message: SCAN_ALREADY_ENDED });
     }
+    yield* Effect.tryPromise({ try: () => db.delete(scanFindings).where(and(eq(scanFindings.tenantId, accountId), eq(scanFindings.scanId, scanId))), catch: toDbError });
     yield* Effect.tryPromise({
       try: () =>
         db
