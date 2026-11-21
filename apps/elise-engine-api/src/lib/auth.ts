@@ -4,7 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins";
 import { authAccount, authSession, authUser, authVerification } from "@repo/db-elise/schema";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
-import type { PasswordResetEmail } from "#/modules/auth/types";
+import type { PasswordResetEmail } from "#/modules/email";
 import type { AppEnv } from "#/types/variables";
 
 // -----
@@ -102,7 +102,7 @@ export const createAuth = (c: Context<AppEnv>) => {
     baseUrl: c.env.AUTH_BASE_URL,
     trustedOrigins: c.env.AUTH_TRUSTED_ORIGINS.split(","),
     dashboardUrl: c.env.DASHBOARD_URL,
-    sendPasswordReset: (mail) => c.get("deps").enqueuePasswordResetEmail(c.env, mail),
+    sendPasswordReset: (mail) => c.get("deps").enqueueEmail(c.env, mail),
     waitUntil: (promise) => c.executionCtx.waitUntil(promise),
   });
   return { auth, close: () => c.executionCtx.waitUntil(close()) };

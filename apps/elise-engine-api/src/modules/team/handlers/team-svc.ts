@@ -43,6 +43,7 @@ const queueInviteEmail = (tenant: TenantEffect<AppTxDbType>, accountId: string, 
     yield* Effect.tryPromise({
       try: () =>
         mailer.enqueue({
+          kind: "team-invite",
           to: invite.email,
           accountName,
           inviterName,
