@@ -33,8 +33,8 @@ const requestResets = async (emails: string[], limiter: RateLimit) => {
     baseUrl: "http://localhost:8787",
     trustedOrigins: ["http://localhost:3100"],
     dashboardUrl: "http://localhost:3100",
-    sendPasswordReset: async (mail) => {
-      queued.push(mail);
+    enqueueEmail: async (mail) => {
+      if (mail.kind === "password-reset") queued.push(mail);
     },
     resetAddressLimiter: limiter,
   });

@@ -1,4 +1,4 @@
-import type { AnthropicKeyChangedEmail, BudgetChangedEmail, PasswordResetEmail, TeamInviteEmail } from "#/modules/email/types";
+import type { AnthropicKeyChangedEmail, BudgetChangedEmail, PasswordResetDoneEmail, PasswordResetEmail, TeamInviteEmail } from "#/modules/email/types";
 import { renderEmailLayout } from "./layout";
 
 export const renderTeamInvite = (mail: TeamInviteEmail) => {
@@ -21,7 +21,20 @@ export const renderTeamInvite = (mail: TeamInviteEmail) => {
   });
 };
 
-export const renderPasswordReset = (mail: PasswordResetEmail) => {
+export const renderPasswordResetDone = (mail: PasswordResetDoneEmail) => {
+  const when = new Date(mail.changedAt).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" });
+  return renderEmailLayout({
+    subject: "Your EliseLAB password was changed",
+    preheader: "The password for your EliseLAB account was just changed.",
+    heading: "Your password was changed",
+    intro: [{ text: "The password for your EliseLAB account was changed with a password reset, and you were signed out everywhere." }],
+    facts: [{ label: "Changed", value: `${when} (UTC)` }],
+    button: { label: "Reset your password again", url: mail.link },
+    footer: "If this was not you, reset your password again now with the button above, then check your Account's Runners and Anthropic key.",
+  });
+};
+
+export const renderPasswordReset =(mail: PasswordResetEmail) => {
   const expires = new Date(mail.expiresAt).toLocaleTimeString("en-US", { timeStyle: "short", timeZone: "UTC" });
   return renderEmailLayout({
     subject: "Reset your EliseLAB password",
