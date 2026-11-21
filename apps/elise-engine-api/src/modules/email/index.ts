@@ -8,5 +8,6 @@ export type {
   QueueBody,
   QueuedEmail,
   RecordInviteStatus,
+  RunnerNoticeEmail,
   TeamInviteEmail,
 } from "./types";

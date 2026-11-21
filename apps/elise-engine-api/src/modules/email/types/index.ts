@@ -67,11 +67,28 @@ export type BudgetChangedEmail = {
 };
 
 // -----
+// A Security notice about a Runner. It carries IDs: the
+// consumer loads the Runner's name and the actor at send
+// time. `at` is when the change committed.
+// -----
+export type RunnerNoticeEmail = {
+  kind: "runner-added" | "runner-removed";
+  to: string;
+  accountId: string;
+  runnerId: string;
+  actorUserId: string;
+  at: string;
+  link: string;
+};
+
+export type RunnerNames = { runnerName: string; actorName: string; accountName: string };
+
+// -----
 // What the email queue carries: one member for each
 // email, told apart by `kind`. A kind with no
 // template does not compile (render-email.ts).
 // -----
-export type QueuedEmail = TeamInviteEmail | PasswordResetEmail | PasswordResetDoneEmail | AnthropicKeyChangedEmail | BudgetChangedEmail;
+export type QueuedEmail = TeamInviteEmail | PasswordResetEmail | PasswordResetDoneEmail | AnthropicKeyChangedEmail | BudgetChangedEmail | RunnerNoticeEmail;
 
 // -----
 // The shape queued before `kind` existed: always a

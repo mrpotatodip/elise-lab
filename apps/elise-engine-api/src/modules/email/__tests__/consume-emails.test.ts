@@ -24,6 +24,7 @@ const run = async (queue: string, body: QueueBody, failWith: string | undefined)
   const batch = { queue, messages: [message] } as never;
   const env = {
     EMAIL_FROM: "no-reply@example.com",
+    DATABASE_URL: "postgres://unused",
     // SAFETY: the consumer calls only send, with one builder object.
     EMAIL: {
       send: async (mail: { from: unknown }) => {
