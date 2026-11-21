@@ -18,6 +18,14 @@ export const PLAN_STATUS_VIEW = {
 
 export const planSourceLabel = (source: NonNullable<PlanDetails["source"]>) => (source === "grant" ? "Granted by Elise, no invoice" : "Card, through Stripe");
 
+const PORTAL_STATUSES: ReadonlyArray<PlanDetails["status"]> = ["active", "past_due", "unpaid"];
+
+export const planBillingAction = (data: Pick<PlanDetails, "source" | "status">): "subscribe" | "manage" =>
+  data.source === "stripe" && PORTAL_STATUSES.includes(data.status) ? "manage" : "subscribe";
+
+export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
+  checkout === "success" && !(data.source === "stripe" && data.status === "active");
+
 export const planKeyLabel = (keySource: NonNullable<PlanDetails["plan"]>["keySource"]) =>
   keySource === "account" ? "Your own Claude, through a Runner" : "Our key, paid with credit";
 
