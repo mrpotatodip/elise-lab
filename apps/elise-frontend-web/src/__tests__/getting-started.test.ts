@@ -6,11 +6,6 @@ const CONNECTED = { pairedAt: "2026-11-20T09:00:00.000Z" };
 const WAITING = { pairedAt: null };
 const scan = (status: "queued" | "running" | "succeeded" | "failed" | "stopped", files: string[] | null = null) => ({ status, files, artifacts: null });
 
-// -----
-// Each row is an Account's state and what its Getting started card shows:
-// the five setup tasks in order (install, log in, git access, first Scan, Report)
-// as done (true) or open (false), and whether the card shows.
-// -----
 describe("gettingStarted", () => {
   it.each([
     ["no Runner and no Scan", NONE, [false, false, false, false, false], true],

@@ -1,41 +1,25 @@
 import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Circle, Copy } from "lucide-react";
-import { toast } from "sonner";
+import { Check, Circle } from "lucide-react";
+import { hasAccessPower } from "@repo/contracts/elise";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { cn } from "#/lib/utils";
 import { RUNNER_LOGIN_COMMAND, runnersQuery } from "#/modules/runner";
 import { ScanNewDialog, scansQuery } from "#/modules/scan";
-import { GETTING_STARTED_DESKTOP_URL, GETTING_STARTED_INSTALL_COMMAND } from "../constants";
+import { CopyCommand, INLINE_LINK_CLASS } from "#/modules/shared";
+import { GETTING_STARTED_DESKTOP_URL, GETTING_STARTED_DOCTOR_COMMAND, GETTING_STARTED_INSTALL_COMMAND } from "../constants";
 import { useGettingStartedFlag } from "../hooks";
 import { gettingStarted, type GettingStartedTaskKey } from "../utils";
 
-const DOCTOR_COMMAND = "elise-runner doctor";
-const LINK = "inline-flex min-h-6 items-center gap-1 rounded-sm text-xs font-medium text-primary-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+type TaskProps = {
+  done: boolean;
+  title: string;
+  children: ReactNode;
+};
 
-function Command({ command }: { command: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1.5 font-mono text-xs">{command}</code>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        aria-label={`Copy ${command}`}
-        onClick={() => {
-          void navigator.clipboard.writeText(command).then(() => toast.success("Command copied."));
-        }}
-      >
-        <Copy className="size-3.5" />
-        Copy
-      </Button>
-    </div>
-  );
-}
-
-function Task({ done, title, children }: { done: boolean; title: string; children: ReactNode }) {
+function Task({ done, title, children }: TaskProps) {
   const Icon = done ? Check : Circle;
   return (
     <li className="flex gap-3 py-4 first:pt-0 last:pb-0">
@@ -53,7 +37,10 @@ function Task({ done, title, children }: { done: boolean; title: string; childre
   );
 }
 
-export function GettingStartedCard({ accountId, canSeeRunners }: { accountId: string; canSeeRunners: boolean }) {
+export function GettingStartedCard() {
+  const { user } = useRouteContext({ from: "/_app" });
+  const accountId = user?.accountId ?? "";
+  const canSeeRunners = !!user && hasAccessPower(user.powers, "company:runners:create");
   const { data: runners } = useQuery({ ...runnersQuery(), enabled: canSeeRunners, refetchOnWindowFocus: "always" });
   const { data: list } = useQuery({ ...scansQuery(), refetchOnWindowFocus: "always" });
   const [gitSkipped, setGitSkipped] = useGettingStartedFlag(accountId, "git-skipped");
@@ -74,7 +61,7 @@ export function GettingStartedCard({ accountId, canSeeRunners }: { accountId: st
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Five setup tasks take you to your first Report. They tick themselves as Elise sees your Runner and Scans.</p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <a href={GETTING_STARTED_DESKTOP_URL} target="_blank" rel="noreferrer" className={LINK}>
+          <a href={GETTING_STARTED_DESKTOP_URL} target="_blank" rel="noreferrer" className={cn(INLINE_LINK_CLASS, "min-h-6")}>
             Prefer a window?
           </a>
           <Button type="button" size="sm" variant="ghost" onClick={() => setDismissed(true)}>
@@ -85,15 +72,15 @@ export function GettingStartedCard({ accountId, canSeeRunners }: { accountId: st
       <CardContent>
         <ol className="grid divide-y">
           <Task done={done("install")} title="Install the Runner">
-            <Command command={GETTING_STARTED_INSTALL_COMMAND} />
+            <CopyCommand command={GETTING_STARTED_INSTALL_COMMAND} />
             <p className="text-xs text-muted-foreground">Claude Code must be installed and signed in on that computer.</p>
           </Task>
           <Task done={done("login")} title="Log the Runner in">
-            <Command command={RUNNER_LOGIN_COMMAND} />
+            <CopyCommand command={RUNNER_LOGIN_COMMAND} />
             <p className="text-xs text-muted-foreground">It opens this site so you can approve the computer on the device page.</p>
           </Task>
           <Task done={done("git-access")} title="Check git access (private repositories only)">
-            <Command command={DOCTOR_COMMAND} />
+            <CopyCommand command={GETTING_STARTED_DOCTOR_COMMAND} />
             {done("git-access") ? null : (
               <div>
                 <Button type="button" size="sm" variant="outline" onClick={skip}>
@@ -103,7 +90,9 @@ export function GettingStartedCard({ accountId, canSeeRunners }: { accountId: st
             )}
           </Task>
           <Task done={done("first-scan")} title="Start a first Scan">
-            <p className="text-xs text-muted-foreground">Keep `elise-runner run` open on the computer so it picks the Scan up.</p>
+            <p className="text-xs text-muted-foreground">
+              Keep <code className="font-mono">elise-runner run</code> open on the computer so it picks the Scan up.
+            </p>
             <div>
               <ScanNewDialog label="Start a Scan" variant="outline" />
             </div>
@@ -111,7 +100,7 @@ export function GettingStartedCard({ accountId, canSeeRunners }: { accountId: st
           <Task done={done("report")} title="Read the Report">
             <p className="text-xs text-muted-foreground">
               When the Scan finishes, open it from{" "}
-              <Link to="/scans" className={LINK}>
+              <Link to="/scans" className={INLINE_LINK_CLASS}>
                 Scans
               </Link>
               . This card goes away once you have a Report.

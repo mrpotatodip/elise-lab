@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { SkeletonBar } from "#/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { GithubPrivateBadge } from "#/modules/github";
+import { REPORT_FILE } from "#/modules/shared";
 import { ShellPageHeader } from "#/modules/shell";
 import { SCAN_STEP_COPY } from "../constants";
 import { isScanActive, scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
@@ -24,7 +25,7 @@ import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanSummary } from "./scan-summary";
 import { ScanTrace } from "./scan-trace";
 
-const DEFAULT_FILE = "REPORT.md";
+const DEFAULT_FILE = REPORT_FILE;
 
 function ScanFileViewer({ scanId, file }: { scanId: string; file: string }) {
   const { data, isPending, error } = useQuery(scanFileQuery(scanId, file));

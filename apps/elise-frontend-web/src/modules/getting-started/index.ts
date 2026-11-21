@@ -1,3 +1,4 @@
-export { GettingStartedCard } from "./components/getting-started-card";
+export * from "./components";
+export * from "./constants";
 export * from "./hooks";
 export * from "./utils";

@@ -1,8 +1,5 @@
 name: release-elise-runner
 
-# Pushing a tag such as `elise-runner-v0.3.0` builds the headless Runner on one native runner per
-# target and attaches the four binaries to a GitHub Release. `apps/elise-runner-cli/install.sh`
-# downloads them by these names: elise-runner-<os>-<arch>.
 on:
   push:
     tags: ["elise-runner-v*"]

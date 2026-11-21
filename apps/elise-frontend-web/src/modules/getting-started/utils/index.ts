@@ -1,2 +1,2 @@
 export * from "./getting-started";
-export * from "./getting-started-storage";
+export * from "./getting-started-flag";

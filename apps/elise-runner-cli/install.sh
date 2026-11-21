@@ -1,7 +1,4 @@
 #!/bin/sh
-# Installs the headless Runner (`elise-runner`) from the newest elise-runner-v* GitHub Release.
-#   curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh
-# ELISE_RUNNER_INSTALL_DIR changes where it goes (default: ~/.local/bin). No sudo.
 set -eu
 
 repo="mrpotatodip/ts-mrpotato-lab"
@@ -28,13 +25,18 @@ esac
 asset="elise-runner-$os-$arch"
 command -v curl >/dev/null 2>&1 || fail "curl is required."
 
-# Newest release whose tag starts with the Runner prefix; the API lists newest first.
-releases=$(curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=100") ||
-  fail "could not list releases at https://github.com/$repo/releases"
-tag=$(printf '%s\n' "$releases" |
-  sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' |
-  grep "^$tag_prefix" | head -n 1) || true
-[ -n "$tag" ] || fail "no $tag_prefix* release found at https://github.com/$repo/releases"
+tag="${ELISE_RUNNER_VERSION:-}"
+if [ -z "$tag" ]; then
+  releases=$(curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=100") ||
+    fail "could not list releases from the GitHub API (a rate limit, HTTP 403, or no network). Wait a few minutes and run this again, or skip the lookup: ELISE_RUNNER_VERSION=${tag_prefix}X.Y.Z (a tag from https://github.com/$repo/releases) sh install.sh"
+  tag=$(printf '%s\n' "$releases" | awk -v prefix="$tag_prefix" '
+    /"tag_name":/ { split($0, parts, "\""); candidate = parts[4]; draft = ""; next }
+    /"draft":/ { draft = ($0 ~ /true/) ? "yes" : "no"; next }
+    /"prerelease":/ {
+      if (draft == "no" && $0 ~ /false/ && index(candidate, prefix) == 1) { print candidate; exit }
+    }') || true
+  [ -n "$tag" ] || fail "no published $tag_prefix* release found at https://github.com/$repo/releases"
+fi
 
 url="https://github.com/$repo/releases/download/$tag/$asset"
 mkdir -p "$dir" || fail "cannot create $dir. Set ELISE_RUNNER_INSTALL_DIR to a folder you can write to."

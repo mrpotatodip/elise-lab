@@ -36,7 +36,7 @@ type ShellSidebarProps = {
   runnersRunning: number;
   showDashboard: boolean;
   showGettingStarted: boolean;
-  onGettingStarted: () => void;
+  onReopenGettingStarted: () => void;
   collapsed: boolean;
   canToggle: boolean;
   onToggle: () => void;
@@ -50,7 +50,7 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
+export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onReopenGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
   const { open: reposOpen, setOpen: setReposOpen } = useSidebarReposOpen();
   const scansLabel = running > 0 ? `Scans, ${running} in progress` : "Scans";
   const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
@@ -90,7 +90,7 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
 
         {showDashboard && showGettingStarted && (
           <Hint label="Getting started" collapsed={collapsed}>
-            <Link to="/overview" aria-label="Getting started" className={cn(ROW, collapsed && "justify-center px-0")} onClick={onGettingStarted}>
+            <Link to="/overview" aria-label="Getting started" className={cn(ROW, collapsed && "justify-center px-0")} onClick={onReopenGettingStarted}>
               <ListChecks className={ICON} strokeWidth={1.5} />
               {!collapsed && "Getting started"}
             </Link>

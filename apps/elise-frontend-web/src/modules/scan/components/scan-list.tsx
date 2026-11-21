@@ -16,6 +16,7 @@ import { scansQuery } from "../hooks";
 import type { ScanState, ScanStatus } from "../schemas";
 import { scanCost, scanPlural } from "../utils";
 import { ScanListSummary } from "./scan-list-summary";
+import { INLINE_LINK_CLASS } from "#/modules/shared";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanOrigin } from "./scan-origin";
 import { ScanProfileBadge } from "./scan-profile-badge";
@@ -169,7 +170,7 @@ export function ScanList() {
               <ScanNewDialog label="Start your first audit" size="default" />
               <p className="text-xs text-muted-foreground">
                 New here? Follow{" "}
-                <Link to="/overview" className="inline-flex min-h-6 items-center rounded-sm font-medium text-primary-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Link to="/overview" className={INLINE_LINK_CLASS}>
                   Getting started
                 </Link>{" "}
                 on Overview.

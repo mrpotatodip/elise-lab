@@ -47,7 +47,7 @@ function AppLayout() {
       runnersRunning={runnersRunning}
       showDashboard={showDashboard}
       showGettingStarted={showGettingStarted}
-      onGettingStarted={() => setDismissed(false)}
+      onReopenGettingStarted={() => setDismissed(false)}
       actions={showDashboard ? <ScanNewDialog variant={pageHasOwnScanButton ? "outline" : "default"} /> : undefined}
     >
       <Outlet />
