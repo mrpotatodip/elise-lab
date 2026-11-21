@@ -687,6 +687,13 @@
       "when": 1795226349413,
       "tag": "0097_stripe_plan_manage_power",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795256253055,
+      "tag": "0098_starter_plan_row",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CREDIT_ENTRY_KIND_VALUES, SCAN_KEY_SOURCE_VALUES, SUBSCRIPTION_SOURCE_VALUES, SUBSCRIPTION_STATUS_VALUES } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
+import { CREDIT_DEFAULT_PLAN_KEY } from "./constants";
 
 // -----
 // The most a scan of one profile may spend (capUsd) and the credit it
@@ -73,19 +74,35 @@ export type PlanDetails = z.infer<typeof PlanDetailsSchema>;
 
 // -----
 // POST /usage/plan/checkout and POST /usage/plan/portal: the Stripe
-// page to send the browser to. Checkout starts the Runner plan's
-// Subscription; the Billing portal manages the card, the invoices
-// and the cancel. Both need the Power company:plan:manage. The Plan
+// page to send the browser to. Checkout starts the Subscription of
+// the plan in planKey ("runner" when left out); the Billing portal
+// manages the card, the invoices and the cancel. Both need the Power company:plan:manage. The Plan
 // only changes when Stripe's webhook says so, never on the return.
 // -----
 export const PlanSessionUrlSchema = z.object({ url: z.url() });
 
+export const PlanCheckoutBodySchema = z.object({ planKey: z.string().min(1).default(CREDIT_DEFAULT_PLAN_KEY) });
+
 export type PlanSessionUrl = z.infer<typeof PlanSessionUrlSchema>;
+export type PlanCheckoutBody = z.infer<typeof PlanCheckoutBodySchema>;
+
+// -----
+// POST /usage/plan/change: move an Account with an active Stripe
+// Subscription to another plan. The answer names the plan asked for;
+// the Subscription itself only changes when Stripe's webhook says
+// so. Refused with a Conflict when the target holds fewer people
+// than the Account has (people plus pending invites).
+// -----
+export const PlanChangeBodySchema = z.object({ planKey: z.string().min(1) });
+export const PlanChangeResultSchema = z.object({ planKey: z.string() });
+
+export type PlanChangeBody = z.infer<typeof PlanChangeBodySchema>;
+export type PlanChangeResult = z.infer<typeof PlanChangeResultSchema>;
 
 // -----
 // GET /usage/plan/offers: the plans an Account may pick, cheapest
 // first. A plan the operator has marked not offered is not in it.
-// Today that is the Runner plan alone.
+// The Starter plan joins once its Stripe price is set.
 // -----
 export const PlanOfferSchema = z.object({
   key: z.string(),

@@ -40,7 +40,7 @@ const crumbs = (pathname: string, names: RouteNames | null, when: FormatTime): C
   if (pathname.startsWith("/files")) return [{ label: "Files" }];
   if (pathname.startsWith("/team")) return [{ label: "Team" }];
   if (pathname.startsWith("/groups")) return [{ label: "Groups" }];
-  if (pathname.startsWith("/settings/plan")) return [{ label: "Plan" }];
+  if (pathname.startsWith("/settings/plan")) return [{ label: "Plan and billing" }];
   if (pathname.startsWith("/settings/providers")) return [{ label: "Runners" }];
   if (pathname.startsWith("/summary/")) return [{ label: "Security status", to: "/summary" }, { label: names?.name ?? "Repository" }];
   if (pathname.startsWith("/summary")) return [{ label: "Security status" }];

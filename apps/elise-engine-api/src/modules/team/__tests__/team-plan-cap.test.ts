@@ -70,6 +70,15 @@ describe("createInviteEffect and the plan's member cap", () => {
     ]);
   });
 
+  it("names the enabled plan that holds more people when a full account is refused", async () => {
+    const starter = await account("starter", "starter");
+
+    expect([await attempt(starter, "one@example.com"), await attempt(starter, "two@example.com")]).toEqual([
+      "invited",
+      expect.stringContaining("Runner holds up to 5 people."),
+    ]);
+  });
+
   it("has no cap for an account with no plan", async () => {
     const free = await account("free", null);
 

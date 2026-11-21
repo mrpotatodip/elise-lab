@@ -5,7 +5,7 @@ import { buttonVariants } from "#/components/ui/button";
 import { Card } from "#/components/ui/card";
 import { Progress } from "#/components/ui/progress";
 import { Skeleton } from "#/components/ui/skeleton";
-import { planQuery } from "#/modules/plan";
+import { planQuery, useCanManagePlan } from "#/modules/plan";
 import { groupsQuery, teamQuery, teamRolesQuery } from "../hooks";
 import { teamRoleLabel } from "../utils";
 import { TeamInviteDialog } from "./team-invite-dialog";
@@ -31,6 +31,7 @@ export function TeamSummary() {
   const { data: groups } = useSuspenseQuery(groupsQuery());
   const { data: roles } = useSuspenseQuery(teamRolesQuery());
   const { data: plan } = useQuery(planQuery());
+  const canManagePlan = useCanManagePlan();
 
   const waiting = team.invites.length;
   const people = team.members.length + waiting;
@@ -62,7 +63,19 @@ export function TeamSummary() {
           {maxMembers !== null && <Progress value={percent} indicatorClassName="bg-primary/55" aria-label={`People: ${people} of ${maxMembers}`} />}
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {waiting > 0 ? `${plural(waiting, "invite is", "invites are")} still waiting to be accepted. ` : ""}
-            {maxMembers !== null && people >= maxMembers ? "The plan is full: remove someone or contact us to add seats." : "Everyone here shares the same reports and findings."}
+            {maxMembers === null || people < maxMembers ? (
+              "Everyone here shares the same reports and findings."
+            ) : canManagePlan ? (
+              <>
+                The plan is full: remove someone, or{" "}
+                <Link to="/settings/plan" className="inline-flex min-h-6 items-center rounded-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  switch to a bigger plan
+                </Link>
+                .
+              </>
+            ) : (
+              "The plan is full: remove someone, or ask an account admin to switch to a bigger plan."
+            )}
           </p>
         </Column>
 

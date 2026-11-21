@@ -205,10 +205,10 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
         )}
 
         {showPlan && (
-          <Hint label="Plan" collapsed={collapsed}>
-            <Link to="/settings/plan" aria-label="Plan" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+          <Hint label="Plan and billing" collapsed={collapsed}>
+            <Link to="/settings/plan" aria-label="Plan and billing" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <CreditCard className={ICON} strokeWidth={1.5} />
-              {!collapsed && "Plan"}
+              {!collapsed && "Plan and billing"}
             </Link>
           </Hint>
         )}

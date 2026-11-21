@@ -8,13 +8,12 @@ const SearchSchema = z.object({ checkout: z.enum(["success", "cancelled"]).optio
 
 export const Route = createFileRoute("/_app/settings/plan")({
   validateSearch: SearchSchema,
-  head: () => ({ meta: [{ title: "Plan · Elise" }] }),
+  head: () => ({ meta: [{ title: "Plan and billing · Elise" }] }),
   beforeLoad: ({ context }) => {
     if (!hasAccessPower(context.user?.powers ?? [], "company:plan:read")) throw redirect({ to: "/overview" });
   },
   loader: async ({ context }) => {
-    const plan = await context.queryClient.query({ ...planQuery(), staleTime: "static" });
-    if (plan.plan === null) await context.queryClient.query({ ...planOffersQuery(), staleTime: "static" });
+    const [plan] = await Promise.all([context.queryClient.query({ ...planQuery(), staleTime: "static" }), context.queryClient.query({ ...planOffersQuery(), staleTime: "static" })]);
     return plan;
   },
   component: SettingsPlanPage,
