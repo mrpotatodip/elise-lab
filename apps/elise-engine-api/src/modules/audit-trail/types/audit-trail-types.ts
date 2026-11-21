@@ -22,7 +22,8 @@ export type AuditAction =
   | "anthropic.key.set"
   | "anthropic.key.removed"
   | "runner.login.approve"
-  | "runner.login.deny";
+  | "runner.login.deny"
+  | "signals.switched";
 
 // -----
 // The facts an audit row may carry about the
@@ -41,6 +42,7 @@ export type AuditDetails = {
   acceptedUntil?: string | null;
   monthlyBudgetUsd?: number | null;
   lastFour?: string;
+  enabled?: boolean;
   requestIp?: string;
   approverIp?: string;
 };

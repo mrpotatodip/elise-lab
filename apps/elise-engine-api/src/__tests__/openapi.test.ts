@@ -37,6 +37,7 @@ describe("GET /openapi.json", () => {
       "GET /files",
       "GET /findings",
       "GET /findings/comments",
+      "GET /findings/signals",
       "GET /groups",
       "GET /me",
       "GET /repos",
@@ -65,10 +66,12 @@ describe("GET /openapi.json", () => {
       "GET /usage/credit/entries",
       "GET /usage/plan",
       "GET /usage/plan/offers",
+      "GET /usage/signals",
       "PATCH /findings/comments/{commentId}",
       "PATCH /groups/{groupId}",
       "PATCH /usage/budget",
       "POST /findings/comments",
+      "POST /findings/signals/{signalId}/dismiss",
       "POST /groups",
       "POST /repos",
       "POST /repos/{repoId}/archives",
@@ -94,6 +97,7 @@ describe("GET /openapi.json", () => {
       "PUT /findings/triage",
       "PUT /groups/{groupId}/members/{partyId}",
       "PUT /usage/anthropic-key",
+      "PUT /usage/signals",
     ]);
   });
 

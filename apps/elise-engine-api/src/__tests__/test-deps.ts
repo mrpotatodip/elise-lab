@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import type { AppDeps } from "#/types/variables";
 import { fakeStripe } from "./fake-stripe";
+import { fakeTypeSafe } from "./fake-typesafe";
 import { memoryScanRepo } from "./memory-scan-repo";
 import { noOwnerDb, noTenantDb } from "./no-tenant-db";
 
@@ -27,5 +28,6 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   withTenant: noTenantDb,
   withOwner: noOwnerDb,
   stripe: () => fakeStripe().gateway,
+  typesafe: () => fakeTypeSafe().gateway,
   ...overrides,
 });

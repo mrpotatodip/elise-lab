@@ -164,6 +164,10 @@ _Avoid_: Bug, issue, vulnerability (until a person checks it)
 A triage change to a Finding: its status (`open`, `fixed`, `false_positive` or `accepted_risk`) and its note (`scan_finding_triage`). It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
 _Avoid_: Verdict (that answers a whole commit), status (a Finding has two)
 
+**Signal**:
+A hint about a Finding or a decision from a model other than the Scan's agent, such as "possible duplicate" or "weak reason". It is shown to people and never changes a Finding, a decision or the Verdict; a person acts on it or ignores it. An admin can turn Signals off for the Account, and only people who can make decisions see them.
+_Avoid_: Oracle (in security, a feature that leaks secrets), second opinion, check (the Phase and the Profile check), Jev (the model's name)
+
 **Comment**:
 Plain text a signed-in member wrote about a Finding (`scan_finding_comments`), at most 4,000 characters, kept with its author's Party. It belongs to the Repo and the Finding's fingerprint, so a rescan shows it again. It stays in the database and dashboard, never in the Report, a Scan file or GitHub. Writing one needs the Power `company:findings:comments:create`; the service token cannot.
 _Avoid_: Note (the decision has a note), reply
