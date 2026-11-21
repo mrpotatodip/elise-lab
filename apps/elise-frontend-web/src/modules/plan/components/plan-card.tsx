@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
@@ -12,17 +13,54 @@ import { ShellPageHeader } from "#/modules/shell";
 import { teamQuery, teamRoleLabel } from "#/modules/team";
 import { usageUsd } from "#/modules/usage";
 import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS } from "../constants";
-import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
-import type { PlanBillingActionKind, PlanCheckoutReturn } from "../types";
-import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel } from "../utils";
+import { planKeys, planOffersQuery, planQuery, useBillingPortal, useCanManagePlan, usePlanChange, usePlanCheckout } from "../hooks";
+import type { PlanOffer } from "../schemas";
+import type { PlanCheckoutReturn } from "../types";
+import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel, planSwitchOffers, planSwitchPending } from "../utils";
 
-function BillingButton({ action, variant = "default", size = "sm" }: { action: PlanBillingActionKind; variant?: "default" | "outline"; size?: "sm" | "default" }) {
-  const go = usePlanActions(action);
+function PortalButton({ variant = "default" }: { variant?: "default" | "outline" }) {
+  const go = useBillingPortal();
 
   return (
-    <Button variant={variant} size={size} className="justify-self-start" disabled={go.isPending || go.isSuccess} onClick={() => go.mutate()}>
-      {action === "subscribe" ? "Subscribe" : "Manage billing"}
+    <Button variant={variant} size="sm" className="justify-self-start" disabled={go.isPending || go.isSuccess} onClick={() => go.mutate()}>
+      Manage billing
     </Button>
+  );
+}
+
+function SubscribeButton({ planKey, label = "Subscribe", variant = "default" }: { planKey: string; label?: string; variant?: "default" | "outline" }) {
+  const go = usePlanCheckout();
+
+  return (
+    <Button variant={variant} size="sm" className="justify-self-start" disabled={go.isPending || go.isSuccess} onClick={() => go.mutate(planKey)}>
+      {label}
+    </Button>
+  );
+}
+
+function SwitchButtons({ offers, switchingTo, onSwitch }: { offers: ReadonlyArray<PlanOffer>; switchingTo: string | null; onSwitch: (planKey: string) => void }) {
+  const change = usePlanChange();
+  const busy = change.isPending || switchingTo !== null;
+
+  return (
+    <div className="grid justify-items-start gap-2">
+      {offers.map((offer) => (
+        <Button
+          key={offer.key}
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => change.mutate(offer.key, { onSuccess: () => onSwitch(offer.key) })}
+        >
+          Switch to {offer.label}, {usageUsd(offer.monthlyPriceUsd)} per month
+        </Button>
+      ))}
+      {change.isError && (
+        <Alert variant="destructive">
+          <AlertDescription>{change.error.message}</AlertDescription>
+        </Alert>
+      )}
+    </div>
   );
 }
 
@@ -53,7 +91,6 @@ const ACTION = buttonVariants({ variant: "outline", size: "sm" });
 function PlanOfferCard({ checkout, confirming, gaveUp }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
   const { data: offers } = useSuspenseQuery(planOffersQuery());
   const canManage = useCanManagePlan();
-  const offer = offers[0];
 
   return (
     <>
@@ -64,19 +101,21 @@ function PlanOfferCard({ checkout, confirming, gaveUp }: { checkout: PlanCheckou
           <CardTitle>No plan yet</CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Scans start once this account has a plan.</p>
         </CardHeader>
-        {offer !== undefined && (
-          <CardContent className="grid gap-5">
-            <p className="text-sm font-medium">{offer.label}</p>
-            <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
-              {usageUsd(offer.monthlyPriceUsd)}
-              {PER_MONTH}
-            </p>
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-              Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place.
-            </p>
-            {canManage ? <BillingButton action="subscribe" /> : <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to subscribe.</p>}
-          </CardContent>
-        )}
+        <CardContent className="grid gap-6 sm:grid-cols-2">
+          {offers.map((offer) => (
+            <section key={offer.key} aria-label={`${offer.label} plan`} className="grid content-start gap-4 rounded-lg border p-5">
+              <p className="text-sm font-medium">{offer.label}</p>
+              <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
+                {usageUsd(offer.monthlyPriceUsd)}
+                {PER_MONTH}
+              </p>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place.
+              </p>
+              {canManage ? <SubscribeButton planKey={offer.key} label={`Subscribe to ${offer.label}`} /> : <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to subscribe.</p>}
+            </section>
+          ))}
+        </CardContent>
       </Card>
     </>
   );
@@ -99,10 +138,15 @@ function Column({ label, aside, footer, children }: ColumnProps) {
 
 export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const queryClient = useQueryClient();
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const { data } = useSuspenseQuery({
     ...planQuery(),
-    refetchInterval: (query) => (query.state.data !== undefined && planConfirmingPayment(checkout, query.state.data) && query.state.dataUpdateCount < PLAN_CONFIRM_POLL_MAX ? PLAN_CONFIRM_POLL_MS : false),
+    refetchInterval: (query) => {
+      if (query.state.data === undefined || query.state.dataUpdateCount >= PLAN_CONFIRM_POLL_MAX) return false;
+      return planConfirmingPayment(checkout, query.state.data) || planSwitchPending(switchingTo, query.state.data) ? PLAN_CONFIRM_POLL_MS : false;
+    },
   });
+  const { data: offers } = useSuspenseQuery(planOffersQuery());
   const { data: runners } = useSuspenseQuery(runnersQuery());
   const { data: team } = useSuspenseQuery(teamQuery());
   const canManage = useCanManagePlan();
@@ -117,6 +161,8 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
 
   const status = PLAN_STATUS_VIEW[data.status];
   const billing = planBillingAction(data);
+  const switchOffers = planSwitchOffers(data, offers);
+  const switchWaiting = planSwitchPending(switchingTo, data);
   const granted = data.source === "grant";
   const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
@@ -134,8 +180,14 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
         <Alert variant={ALERT_VARIANT[status.variant]}>
           <AlertDescription className="grid justify-items-start gap-3">
             {status.note}
-            {data.status === "past_due" && canManage && <BillingButton action="manage" variant="outline" />}
+            {data.status === "past_due" && canManage && <PortalButton variant="outline" />}
           </AlertDescription>
+        </Alert>
+      )}
+
+      {switchWaiting && (
+        <Alert variant="info">
+          <AlertDescription>Switching plan. This page updates on its own in a moment.</AlertDescription>
         </Alert>
       )}
 
@@ -144,7 +196,10 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
           label={`${plan.label} plan`}
           footer={
             canManage ? (
-              <BillingButton action={billing} variant={billing === "subscribe" ? "default" : "outline"} />
+              <div className="grid justify-items-start gap-3">
+                {switchOffers.length > 0 && <SwitchButtons offers={switchOffers} switchingTo={switchWaiting ? switchingTo : null} onSwitch={setSwitchingTo} />}
+                {billing === "manage" ? <PortalButton variant="outline" /> : <SubscribeButton planKey={plan.key} />}
+              </div>
             ) : (
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to change the plan.</p>
             )

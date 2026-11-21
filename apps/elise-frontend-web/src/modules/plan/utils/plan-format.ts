@@ -1,4 +1,4 @@
-import type { CreditEntry, PlanDetails } from "@repo/contracts/elise";
+import type { CreditEntry, PlanDetails, PlanOffer } from "@repo/contracts/elise";
 import { usageUsd } from "#/modules/usage";
 
 type StatusView = { label: string; variant: "success" | "warning" | "destructive" | "neutral"; note: string | null };
@@ -22,6 +22,11 @@ const PORTAL_STATUSES: ReadonlyArray<PlanDetails["status"]> = ["active", "past_d
 
 export const planBillingAction = (data: Pick<PlanDetails, "source" | "status">): "subscribe" | "manage" =>
   data.source === "stripe" && PORTAL_STATUSES.includes(data.status) ? "manage" : "subscribe";
+
+export const planSwitchOffers = (data: Pick<PlanDetails, "plan" | "source" | "status">, offers: ReadonlyArray<PlanOffer>) =>
+  data.source === "stripe" && data.status === "active" && data.plan !== null ? offers.filter((offer) => offer.key !== data.plan?.key) : [];
+
+export const planSwitchPending = (switchingTo: string | null, data: Pick<PlanDetails, "plan">) => switchingTo !== null && data.plan?.key !== switchingTo;
 
 export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
   checkout === "success" && !(data.source === "stripe" && data.status === "active");

@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { CREDIT_ENTRY_LABEL, PLAN_STATUS_VIEW, creditAmountLabel, planKeyLabel, planPeriodSentence, planSeatsLabel, planSourceLabel } from "#/modules/plan/utils/plan-format";
+import { CREDIT_ENTRY_LABEL, PLAN_STATUS_VIEW, creditAmountLabel, planKeyLabel, planPeriodSentence, planSeatsLabel, planSourceLabel, planSwitchOffers } from "#/modules/plan/utils/plan-format";
+
+const onPlan = (key: string) => ({ key, label: key, monthlyPriceUsd: 0, includedCreditUsd: 0, carryCapUsd: null, keySource: "account" as const, scanAllowance: null, maxMembers: 5 });
+
+describe("planSwitchOffers", () => {
+  const offers = [
+    { key: "starter", label: "Starter", monthlyPriceUsd: 15, includedCreditUsd: 0, maxMembers: 2 },
+    { key: "runner", label: "Runner", monthlyPriceUsd: 35, includedCreditUsd: 0, maxMembers: 5 },
+  ];
+
+  it.each([
+    ["an active Stripe plan offers the other plan", "stripe", "active", "runner", ["starter"]],
+    ["a Stripe plan that is past due offers none", "stripe", "past_due", "runner", []],
+    ["an operator grant offers none", "grant", "active", "runner", []],
+  ] as const)("%s", (_name, source, status, key, expected) => {
+    expect(planSwitchOffers({ plan: onPlan(key), source, status }, offers).map((offer) => offer.key)).toEqual(expected);
+  });
+
+  it("offers no switch to an account with no plan", () => {
+    expect(planSwitchOffers({ plan: null, source: null, status: null }, offers)).toEqual([]);
+  });
+});
 
 describe("planSeatsLabel", () => {
   it.each([

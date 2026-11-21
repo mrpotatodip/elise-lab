@@ -2,15 +2,23 @@ import { useRouteContext } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { hasAccessPower } from "@repo/contracts/elise";
-import { openBillingPortal, startPlanCheckout } from "../api";
-import type { PlanBillingActionKind } from "../types";
+import { changePlan, openBillingPortal, startPlanCheckout } from "../api";
 
-export const usePlanActions = (action: PlanBillingActionKind) =>
+export const usePlanCheckout = () =>
   useMutation({
-    mutationFn: () => (action === "subscribe" ? startPlanCheckout() : openBillingPortal()),
+    mutationFn: (planKey: string) => startPlanCheckout({ data: { planKey } }),
     onSuccess: ({ url }) => window.location.assign(url),
     onError: (error) => toast.error(`We couldn't open the payment page. ${error.message}`),
   });
+
+export const useBillingPortal = () =>
+  useMutation({
+    mutationFn: () => openBillingPortal(),
+    onSuccess: ({ url }) => window.location.assign(url),
+    onError: (error) => toast.error(`We couldn't open the payment page. ${error.message}`),
+  });
+
+export const usePlanChange = () => useMutation({ mutationFn: (planKey: string) => changePlan({ data: { planKey } }) });
 
 export const useCanManagePlan = () => {
   const { user } = useRouteContext({ from: "/_app" });
