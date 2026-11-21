@@ -24,6 +24,8 @@ export const stripeGateway = (secretKey: string): StripeGateway => {
     return parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { method: "POST", headers: postHeaders, body: form.toString() }), schema, `POST ${path}`);
   };
 
+  const lookup = (subscriptionId: string) => get(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeSubscriptionResponseSchema);
+
   return {
     findCustomer: async ({ accountId }) => {
       const found = await get(`/customers/search?query=${encodeURIComponent(`metadata['accountId']:'${accountId}'`)}&limit=1`, StripeCustomerSearchResponseSchema);
@@ -56,14 +58,13 @@ export const stripeGateway = (secretKey: string): StripeGateway => {
       ),
     createPortalSession: ({ customerId, returnUrl }) => post("/billing_portal/sessions", StripeUrlResponseSchema, new URLSearchParams({ customer: customerId, return_url: returnUrl })),
     changeSubscriptionPrice: async ({ subscriptionId, priceId }) => {
-      const path = `/subscriptions/${encodeURIComponent(subscriptionId)}`;
-      const found = await get(path, StripeSubscriptionResponseSchema);
+      const found = await lookup(subscriptionId);
       const item = found.items.data[0];
       if (!item) throw new Error(`Stripe subscription ${subscriptionId} has no item`);
-      await post(path, StripeIdResponseSchema, new URLSearchParams({ "items[0][id]": item.id, "items[0][price]": priceId, proration_behavior: "create_prorations" }));
+      await post(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeIdResponseSchema, new URLSearchParams({ "items[0][id]": item.id, "items[0][price]": priceId }));
     },
     retrieveSubscription: async (subscriptionId) => {
-      const found = await get(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeSubscriptionResponseSchema);
+      const found = await lookup(subscriptionId);
       const item = found.items.data[0];
       const periodEnd = item?.current_period_end ?? found.current_period_end;
       return {

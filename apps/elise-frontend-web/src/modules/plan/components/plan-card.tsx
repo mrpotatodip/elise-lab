@@ -13,34 +13,44 @@ import { ShellPageHeader } from "#/modules/shell";
 import { teamQuery, teamRoleLabel } from "#/modules/team";
 import { usageUsd } from "#/modules/usage";
 import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS } from "../constants";
-import { planKeys, planOffersQuery, planQuery, useBillingPortal, useCanManagePlan, usePlanChange, usePlanCheckout } from "../hooks";
+import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
 import type { PlanOffer } from "../schemas";
 import type { PlanCheckoutReturn } from "../types";
 import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel, planSwitchOffers, planSwitchPending } from "../utils";
 
-function PortalButton({ variant = "default" }: { variant?: "default" | "outline" }) {
-  const go = useBillingPortal();
-
+function RedirectButton({ label, variant = "default", busy, onClick }: { label: string; variant?: "default" | "outline"; busy: boolean; onClick: () => void }) {
   return (
-    <Button variant={variant} size="sm" className="justify-self-start" disabled={go.isPending || go.isSuccess} onClick={() => go.mutate()}>
-      Manage billing
-    </Button>
-  );
-}
-
-function SubscribeButton({ planKey, label = "Subscribe", variant = "default" }: { planKey: string; label?: string; variant?: "default" | "outline" }) {
-  const go = usePlanCheckout();
-
-  return (
-    <Button variant={variant} size="sm" className="justify-self-start" disabled={go.isPending || go.isSuccess} onClick={() => go.mutate(planKey)}>
+    <Button variant={variant} size="sm" className="justify-self-start" disabled={busy} onClick={onClick}>
       {label}
     </Button>
   );
 }
 
-function SwitchButtons({ offers, switchingTo, onSwitch }: { offers: ReadonlyArray<PlanOffer>; switchingTo: string | null; onSwitch: (planKey: string) => void }) {
-  const change = usePlanChange();
-  const busy = change.isPending || switchingTo !== null;
+function PortalButton() {
+  const { portal } = usePlanActions();
+
+  return <RedirectButton label="Manage billing" variant="outline" busy={portal.isPending || portal.isSuccess} onClick={() => portal.mutate()} />;
+}
+
+function SubscribeButton({ planKey, label = "Subscribe" }: { planKey: string; label?: string }) {
+  const { checkout } = usePlanActions();
+
+  return <RedirectButton label={label} busy={checkout.isPending || checkout.isSuccess} onClick={() => checkout.mutate(planKey)} />;
+}
+
+function SubscribeButtons({ offers }: { offers: ReadonlyArray<PlanOffer> }) {
+  return (
+    <div className="grid justify-items-start gap-2">
+      {offers.map((offer) => (
+        <SubscribeButton key={offer.key} planKey={offer.key} label={`Subscribe to ${offer.label}, ${usageUsd(offer.monthlyPriceUsd)} per month`} />
+      ))}
+    </div>
+  );
+}
+
+function SwitchButtons({ offers, switching, onSwitch }: { offers: ReadonlyArray<PlanOffer>; switching: boolean; onSwitch: (planKey: string) => void }) {
+  const { change } = usePlanActions();
+  const busy = change.isPending || switching;
 
   return (
     <div className="grid justify-items-start gap-2">
@@ -138,12 +148,15 @@ function Column({ label, aside, footer, children }: ColumnProps) {
 
 export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const queryClient = useQueryClient();
-  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+  const [switching, setSwitching] = useState<{ planKey: string; baseline: number } | null>(null);
   const { data } = useSuspenseQuery({
     ...planQuery(),
     refetchInterval: (query) => {
-      if (query.state.data === undefined || query.state.dataUpdateCount >= PLAN_CONFIRM_POLL_MAX) return false;
-      return planConfirmingPayment(checkout, query.state.data) || planSwitchPending(switchingTo, query.state.data) ? PLAN_CONFIRM_POLL_MS : false;
+      const { data: latest, dataUpdateCount } = query.state;
+      if (latest === undefined) return false;
+      const checkoutPolling = planConfirmingPayment(checkout, latest) && dataUpdateCount < PLAN_CONFIRM_POLL_MAX;
+      const switchPolling = switching !== null && planSwitchPending(switching.planKey, latest) && dataUpdateCount - switching.baseline < PLAN_CONFIRM_POLL_MAX;
+      return checkoutPolling || switchPolling ? PLAN_CONFIRM_POLL_MS : false;
     },
   });
   const { data: offers } = useSuspenseQuery(planOffersQuery());
@@ -153,7 +166,10 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const now = useNow();
   const { plan } = data;
   const confirming = planConfirmingPayment(checkout, data);
-  const gaveUp = (queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0) >= PLAN_CONFIRM_POLL_MAX;
+  const updateCount = queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0;
+  const gaveUp = updateCount >= PLAN_CONFIRM_POLL_MAX;
+  const switchWaiting = switching !== null && planSwitchPending(switching.planKey, data);
+  const switchGaveUp = switching !== null && switchWaiting && updateCount - switching.baseline >= PLAN_CONFIRM_POLL_MAX;
 
   if (plan === null || data.status === null || data.source === null) {
     return <PlanOfferCard checkout={checkout} confirming={confirming} gaveUp={gaveUp} />;
@@ -162,7 +178,6 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const status = PLAN_STATUS_VIEW[data.status];
   const billing = planBillingAction(data);
   const switchOffers = planSwitchOffers(data, offers);
-  const switchWaiting = planSwitchPending(switchingTo, data);
   const granted = data.source === "grant";
   const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
@@ -180,14 +195,14 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
         <Alert variant={ALERT_VARIANT[status.variant]}>
           <AlertDescription className="grid justify-items-start gap-3">
             {status.note}
-            {data.status === "past_due" && canManage && <PortalButton variant="outline" />}
+            {data.status === "past_due" && canManage && <PortalButton />}
           </AlertDescription>
         </Alert>
       )}
 
       {switchWaiting && (
         <Alert variant="info">
-          <AlertDescription>Switching plan. This page updates on its own in a moment.</AlertDescription>
+          <AlertDescription>{switchGaveUp ? "Switching is taking longer than expected. Reload this page later to see the new plan." : "Switching plan. This page updates on its own in a moment."}</AlertDescription>
         </Alert>
       )}
 
@@ -197,8 +212,14 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
           footer={
             canManage ? (
               <div className="grid justify-items-start gap-3">
-                {switchOffers.length > 0 && <SwitchButtons offers={switchOffers} switchingTo={switchWaiting ? switchingTo : null} onSwitch={setSwitchingTo} />}
-                {billing === "manage" ? <PortalButton variant="outline" /> : <SubscribeButton planKey={plan.key} />}
+                {switchOffers.length > 0 && (
+                  <SwitchButtons
+                    offers={switchOffers}
+                    switching={switchWaiting && !switchGaveUp}
+                    onSwitch={(planKey) => setSwitching({ planKey, baseline: queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0 })}
+                  />
+                )}
+                {billing === "manage" ? <PortalButton /> : <SubscribeButtons offers={offers} />}
               </div>
             ) : (
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to change the plan.</p>

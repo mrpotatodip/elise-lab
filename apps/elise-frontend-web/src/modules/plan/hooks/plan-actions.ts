@@ -4,21 +4,16 @@ import { toast } from "sonner";
 import { hasAccessPower } from "@repo/contracts/elise";
 import { changePlan, openBillingPortal, startPlanCheckout } from "../api";
 
-export const usePlanCheckout = () =>
-  useMutation({
-    mutationFn: (planKey: string) => startPlanCheckout({ data: { planKey } }),
-    onSuccess: ({ url }) => window.location.assign(url),
-    onError: (error) => toast.error(`We couldn't open the payment page. ${error.message}`),
-  });
+const redirect = {
+  onSuccess: ({ url }: { url: string }) => window.location.assign(url),
+  onError: (error: Error) => toast.error(`We couldn't open the payment page. ${error.message}`),
+};
 
-export const useBillingPortal = () =>
-  useMutation({
-    mutationFn: () => openBillingPortal(),
-    onSuccess: ({ url }) => window.location.assign(url),
-    onError: (error) => toast.error(`We couldn't open the payment page. ${error.message}`),
-  });
-
-export const usePlanChange = () => useMutation({ mutationFn: (planKey: string) => changePlan({ data: { planKey } }) });
+export const usePlanActions = () => ({
+  checkout: useMutation({ mutationFn: (planKey: string) => startPlanCheckout({ data: { planKey } }), ...redirect }),
+  portal: useMutation({ mutationFn: () => openBillingPortal(), ...redirect }),
+  change: useMutation({ mutationFn: (planKey: string) => changePlan({ data: { planKey } }) }),
+});
 
 export const useCanManagePlan = () => {
   const { user } = useRouteContext({ from: "/_app" });

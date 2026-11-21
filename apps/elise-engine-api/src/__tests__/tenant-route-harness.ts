@@ -43,7 +43,8 @@ export type TenantRouteApp = ReturnType<typeof tenantRouteApp>;
 // -----
 export const callAs = (app: TenantRouteApp, accountId: string, path: string, init: { method?: string; body?: unknown; env?: Partial<Bindings> } = {}) => {
   const { env } = fakeBindings(init.env);
-  const headers = new Headers({ authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountId, "content-type": "application/json" });
+  const headers = new Headers({ authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountId });
+  if (init.body !== undefined) headers.set("content-type", "application/json");
   const body = init.body === undefined ? undefined : JSON.stringify(init.body);
   return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers, body }), env, testExecutionContext);
 };

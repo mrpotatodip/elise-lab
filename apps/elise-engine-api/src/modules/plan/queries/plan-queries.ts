@@ -1,9 +1,10 @@
 import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import type { PlanDetails, PlanOffer, SubscriptionSourceValue, SubscriptionStatusValue } from "@repo/contracts/elise";
+import type { PlanDetails, PlanOffer } from "@repo/contracts/elise";
 import { authUser, partyRoles, platformMasterPlans, tenants, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
+import type { BillingContext, PlanByKey } from "#/modules/plan/types";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 
 // -----
@@ -29,20 +30,6 @@ export const offeredPlansEffect = (db: AppDbType): Effect.Effect<PlanOffer[], Db
     },
     catch: toDbError,
   });
-
-export type BillingContext = {
-  accountName: string;
-  adminEmail: string | null;
-  subscription: {
-    source: SubscriptionSourceValue;
-    status: SubscriptionStatusValue;
-    stripeCustomerId: string | null;
-    stripeSubscriptionId: string | null;
-    planId: string;
-  } | null;
-};
-
-export type PlanByKey = { id: string; key: string; label: string; priceId: string | null; enabled: boolean; maxMembers: number };
 
 export const planByKeyEffect = (db: AppDbType, key: string): Effect.Effect<PlanByKey | null, DbError> =>
   Effect.tryPromise({

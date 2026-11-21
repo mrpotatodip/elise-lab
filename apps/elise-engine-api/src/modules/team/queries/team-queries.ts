@@ -236,7 +236,15 @@ export const createInviteEffect = (db: AppTxDbType, invite: NewInvite): Effect.E
             .select({ members: sql<number>`count(distinct ${partyRoles.partyId})::int` })
             .from(partyRoles)
             .where(eq(partyRoles.tenantId, invite.tenantId));
-          if (members + pending >= plan.maxMembers) return refuse(new Conflict({ message: teamPlanFullMessage(plan.maxMembers) }));
+          if (members + pending >= plan.maxMembers) {
+            const [larger] = await tx
+              .select({ label: platformMasterPlans.label, maxMembers: platformMasterPlans.maxMembers })
+              .from(platformMasterPlans)
+              .where(and(eq(platformMasterPlans.enabled, true), gt(platformMasterPlans.maxMembers, plan.maxMembers)))
+              .orderBy(asc(platformMasterPlans.monthlyPriceUsd))
+              .limit(1);
+            return refuse(new Conflict({ message: teamPlanFullMessage(plan.maxMembers, larger ?? null) }));
+          }
         }
 
         const [row] = await tx

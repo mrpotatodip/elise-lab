@@ -124,7 +124,7 @@ describe("POST /usage/plan/change", () => {
 
   it.each([
     { members: 3, invites: 0, status: 409, counts: "3 people and 0 pending invites" },
-    { members: 2, invites: 1, status: 409, counts: "2 people and 1 pending invites" },
+    { members: 2, invites: 1, status: 409, counts: "2 people and 1 pending invite," },
     { members: 2, invites: 0, status: 200, counts: "" },
   ])("to Starter with $members people and $invites invites answers $status", async ({ members, invites, status, counts }) => {
     await subscribe(runnerPlanId);

@@ -1,14 +1,12 @@
 import { Effect } from "effect";
-import { PlanCheckoutBodySchema, type PlanChangeResult, type PlanCheckoutBody, type PlanSessionUrl } from "@repo/contracts/elise";
+import type { PlanChangeResult, PlanSessionUrl } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
-import { billingContextEffect, planByKeyEffect, seatsEffect, type PlanByKey } from "#/modules/plan/queries";
+import { billingContextEffect, planByKeyEffect, seatsEffect } from "#/modules/plan/queries";
+import type { PlanByKey } from "#/modules/plan/types";
 import type { StripeGateway } from "#/modules/stripe/types";
 
 const planPageUrl = (dashboardUrl: string, query = ""): string => `${dashboardUrl.replace(/\/+$/, "")}/settings/plan${query}`;
-
-export const parsePlanCheckoutBodySvc = (rawBody: string): Effect.Effect<PlanCheckoutBody, Invalid> =>
-  Effect.try({ try: () => PlanCheckoutBodySchema.parse(rawBody.trim() === "" ? {} : JSON.parse(rawBody)), catch: () => new Invalid({ message: "planKey must be a plan key" }) });
 
 const offeredPlanEffect = (db: AppDbType, planKey: string): Effect.Effect<PlanByKey & { priceId: string }, DbError | Invalid> =>
   Effect.gen(function* () {
@@ -61,7 +59,7 @@ export const changePlanSvc = (
     if (members + pendingInvites > target.maxMembers) {
       return yield* Effect.fail(
         new Conflict({
-          message: `This account has ${members} people and ${pendingInvites} pending invites, and ${target.label} holds ${target.maxMembers}. Remove members or revoke invites first.`,
+          message: `This account has ${members} ${members === 1 ? "person" : "people"} and ${pendingInvites} pending ${pendingInvites === 1 ? "invite" : "invites"}, and ${target.label} holds ${target.maxMembers}. Remove members or revoke invites first.`,
         }),
       );
     }
