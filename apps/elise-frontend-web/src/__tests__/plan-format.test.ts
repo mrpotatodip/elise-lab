@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { CREDIT_ENTRY_LABEL, PLAN_STATUS_VIEW, creditAmountLabel, planKeyLabel, planPeriodSentence, planCardViews, planSeatsLabel, planSourceLabel, planSwitchOffers } from "#/modules/plan/utils/plan-format";
+import {
+  CREDIT_ENTRY_LABEL,
+  PLAN_STATUS_VIEW,
+  creditAmountLabel,
+  planBilledYearlySentence,
+  planKeyLabel,
+  planPeriodSentence,
+  planCardViews,
+  planPriceView,
+  planSeatsLabel,
+  planSourceLabel,
+  planSwitchOffers,
+  planSwitchPending,
+} from "#/modules/plan/utils/plan-format";
 
 const onPlan = (key: string) => ({ key, label: key, monthlyPriceUsd: 0, includedCreditUsd: 0, carryCapUsd: null, keySource: "account" as const, scanAllowance: null, maxMembers: 5 });
 
@@ -57,6 +70,55 @@ describe("planCardViews", () => {
   });
 });
 
+describe("planPriceView", () => {
+  const starter = { monthlyPriceUsd: 15, yearlyPriceUsd: 150 };
+
+  it.each([
+    ["monthly", starter, "month", { amount: "$15.00", unit: "month", perMonth: null }],
+    ["yearly, with the per-month figure", starter, "year", { amount: "$150.00", unit: "year", perMonth: "$12.50 per month" }],
+    ["yearly, a plan with no yearly price", { monthlyPriceUsd: 15, yearlyPriceUsd: null }, "year", null],
+    ["yearly, an engine that sends no yearly price", { monthlyPriceUsd: 15 }, "year", null],
+  ] as const)("reads %s", (_name, offer, interval, expected) => {
+    expect(planPriceView(offer, interval)).toEqual(expected);
+  });
+});
+
+const actions = (data: Parameters<typeof planCardViews>[0], interval: "month" | "year", list: Parameters<typeof planCardViews>[1]) => planCardViews(data, list, interval).map((view) => view.action);
+
+describe("yearly billing in planCardViews", () => {
+  const offers = [
+    { key: "starter", label: "Starter", monthlyPriceUsd: 15, yearlyPriceUsd: 150, includedCreditUsd: 0, maxMembers: 2 },
+    { key: "runner", label: "Runner", monthlyPriceUsd: 35, yearlyPriceUsd: null, includedCreditUsd: 0, maxMembers: 5 },
+  ];
+  const sub = (key: string, interval: "month" | "year") => ({ plan: onPlan(key), source: "stripe" as const, status: "active" as const, interval, seats: seats(1, 0) });
+
+  it.each([
+    ["a new subscriber on the yearly toggle subscribes only where a yearly price exists", { plan: null, source: null, status: null, seats: seats(1, 0) }, "year", ["subscribe", "none"]],
+    ["a monthly Subscription viewed yearly can switch its own plan to yearly, and no other", sub("starter", "month"), "year", ["switchInterval", "none"]],
+    ["a monthly Subscription viewed monthly keeps the plan switch", sub("starter", "month"), "month", ["none", "switch"]],
+    ["a yearly Subscription never offers monthly, whatever the toggle says", sub("starter", "year"), "month", ["none", "none"]],
+  ] as const)("%s", (_name, data, interval, expected) => {
+    expect(actions(data, interval, offers)).toEqual(expected);
+  });
+
+  it("a yearly Subscription can switch to a plan that has a yearly price", () => {
+    const both = offers.map((offer) => ({ ...offer, yearlyPriceUsd: offer.monthlyPriceUsd * 10 }));
+    expect(actions(sub("starter", "year"), "year", both)).toEqual(["none", "switch"]);
+  });
+});
+
+describe("planSwitchPending", () => {
+  it.each([
+    ["a plan change waits until the plan is the new one", { planKey: "starter", interval: null }, { plan: onPlan("runner"), interval: "month" as const }, true],
+    ["a plan change is done once the plan matches", { planKey: "starter", interval: null }, { plan: onPlan("starter"), interval: "month" as const }, false],
+    ["a switch to yearly waits while the Subscription is monthly", { planKey: "starter", interval: "year" as const }, { plan: onPlan("starter"), interval: "month" as const }, true],
+    ["a switch to yearly is done once the Subscription is yearly", { planKey: "starter", interval: "year" as const }, { plan: onPlan("starter"), interval: "year" as const }, false],
+    ["nothing is pending when no switch was made", null, { plan: onPlan("starter"), interval: "month" as const }, false],
+  ])("%s", (_name, target, data, expected) => {
+    expect(planSwitchPending(target, data)).toBe(expected);
+  });
+});
+
 describe("planSeatsLabel", () => {
   it.each([
     ["no waiting invites", { members: 3, pendingInvites: 0 }, "3 of 5 people"],
@@ -87,6 +149,16 @@ describe("planPeriodSentence", () => {
     ["no period end", "active", false, null, ""],
   ] as const)("reads %s", (_name, status, cancelAtPeriodEnd, currentPeriodEnd, expected) => {
     expect(planPeriodSentence({ status, cancelAtPeriodEnd, currentPeriodEnd })).toBe(expected);
+  });
+});
+
+describe("planBilledYearlySentence", () => {
+  it.each([
+    ["renewing", false, "2027-11-22T00:00:00Z", "Billed yearly, renews on Nov 22, 2027."],
+    ["set to cancel", true, "2027-11-22T00:00:00Z", "Billed yearly, ends on Nov 22, 2027."],
+    ["with no period end", false, null, "Billed yearly."],
+  ] as const)("reads %s", (_name, cancelAtPeriodEnd, currentPeriodEnd, expected) => {
+    expect(planBilledYearlySentence({ cancelAtPeriodEnd, currentPeriodEnd })).toBe(expected);
   });
 });
 
