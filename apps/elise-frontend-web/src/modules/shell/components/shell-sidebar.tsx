@@ -214,7 +214,7 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
         )}
       </nav>
 
-      {empty && !collapsed && showDashboard && (
+      {empty && !collapsed && showDashboard && !showGettingStarted && (
         <Link
           to="/scans"
           className="mx-1 grid gap-1 rounded-xl border border-dashed border-input p-4 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

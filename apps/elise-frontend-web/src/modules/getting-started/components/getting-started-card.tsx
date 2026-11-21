@@ -1,17 +1,15 @@
 import type { ReactNode } from "react";
 import { Link, useRouteContext } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { Check, Circle } from "lucide-react";
-import { hasAccessPower } from "@repo/contracts/elise";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { cn } from "#/lib/utils";
-import { RUNNER_LOGIN_COMMAND, runnersQuery } from "#/modules/runner";
-import { ScanNewDialog, scansQuery } from "#/modules/scan";
+import { RUNNER_LOGIN_COMMAND } from "#/modules/runner";
+import { ScanNewDialog } from "#/modules/scan";
 import { CopyCommand, INLINE_LINK_CLASS } from "#/modules/shared";
 import { GETTING_STARTED_DESKTOP_URL, GETTING_STARTED_DOCTOR_COMMAND, GETTING_STARTED_INSTALL_COMMAND } from "../constants";
-import { useGettingStartedFlag } from "../hooks";
-import { gettingStarted, type GettingStartedTaskKey } from "../utils";
+import { useGettingStarted, useGettingStartedFlag } from "../hooks";
+import type { GettingStartedTaskKey } from "../utils";
 
 type TaskProps = {
   done: boolean;
@@ -40,16 +38,11 @@ function Task({ done, title, children }: TaskProps) {
 export function GettingStartedCard() {
   const { user } = useRouteContext({ from: "/_app" });
   const accountId = user?.accountId ?? "";
-  const canSeeRunners = !!user && hasAccessPower(user.powers, "company:runners:create");
-  const { data: runners } = useQuery({ ...runnersQuery(), enabled: canSeeRunners, refetchOnWindowFocus: "always" });
-  const { data: list } = useQuery({ ...scansQuery(), refetchOnWindowFocus: "always" });
-  const [gitSkipped, setGitSkipped] = useGettingStartedFlag(accountId, "git-skipped");
+  const result = useGettingStarted();
+  const [, setGitSkipped] = useGettingStartedFlag(accountId, "git-skipped");
+  const [, setDismissed] = useGettingStartedFlag(accountId, "dismissed");
 
-  const [dismissed, setDismissed] = useGettingStartedFlag(accountId, "dismissed");
-
-  if (!canSeeRunners || !runners || !list) return null;
-  const result = gettingStarted({ runners, scans: list.scans, gitSkipped, dismissed });
-  if (!result.show) return null;
+  if (!result?.show) return null;
   const done = (key: GettingStartedTaskKey) => result.tasks.find((task) => task.key === key)?.done ?? false;
   const skip = () => setGitSkipped(true);
 
