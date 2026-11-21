@@ -20,7 +20,7 @@ import { PLAN_STATUS_VIEW, planBillingAction, planConfirmingPayment, planPeriodS
 
 function RedirectButton({ label, variant = "default", busy, onClick }: { label: string; variant?: "default" | "outline"; busy: boolean; onClick: () => void }) {
   return (
-    <Button variant={variant} size="sm" className="justify-self-start" disabled={busy} onClick={onClick}>
+    <Button variant={variant} size="sm" className="h-auto min-h-8 max-w-full justify-self-start whitespace-normal py-1.5 text-left" disabled={busy} onClick={onClick}>
       {label}
     </Button>
   );
@@ -32,17 +32,24 @@ function PortalButton() {
   return <RedirectButton label="Manage billing" variant="outline" busy={portal.isPending || portal.isSuccess} onClick={() => portal.mutate()} />;
 }
 
-function SubscribeButton({ planKey, label = "Subscribe" }: { planKey: string; label?: string }) {
+function SubscribeButton({ planKey, label = "Subscribe", variant = "default" }: { planKey: string; label?: string; variant?: "default" | "outline" }) {
   const { checkout } = usePlanActions();
 
-  return <RedirectButton label={label} busy={checkout.isPending || checkout.isSuccess} onClick={() => checkout.mutate(planKey)} />;
+  return <RedirectButton label={label} variant={variant} busy={checkout.isPending || checkout.isSuccess} onClick={() => checkout.mutate(planKey)} />;
 }
+
+const peopleCap = (offer: PlanOffer) => `up to ${offer.maxMembers} people`;
 
 function SubscribeButtons({ offers }: { offers: ReadonlyArray<PlanOffer> }) {
   return (
-    <div className="grid justify-items-start gap-2">
-      {offers.map((offer) => (
-        <SubscribeButton key={offer.key} planKey={offer.key} label={`Subscribe to ${offer.label}, ${usageUsd(offer.monthlyPriceUsd)} per month`} />
+    <div className="grid max-w-full justify-items-start gap-2">
+      {offers.map((offer, index) => (
+        <SubscribeButton
+          key={offer.key}
+          planKey={offer.key}
+          variant={index === 0 ? "default" : "outline"}
+          label={`Subscribe to ${offer.label}, ${usageUsd(offer.monthlyPriceUsd)} per month, ${peopleCap(offer)}`}
+        />
       ))}
     </div>
   );
@@ -59,10 +66,11 @@ function SwitchButtons({ offers, switching, onSwitch }: { offers: ReadonlyArray<
           key={offer.key}
           variant="outline"
           size="sm"
+          className="h-auto min-h-8 max-w-full whitespace-normal py-1.5 text-left"
           disabled={busy}
           onClick={() => change.mutate(offer.key, { onSuccess: () => onSwitch(offer.key) })}
         >
-          Switch to {offer.label}, {usageUsd(offer.monthlyPriceUsd)} per month
+          Switch to {offer.label}, {usageUsd(offer.monthlyPriceUsd)} per month, {peopleCap(offer)}
         </Button>
       ))}
       {change.isError && (
@@ -112,7 +120,7 @@ function PlanOfferCard({ checkout, confirming, gaveUp }: { checkout: PlanCheckou
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Scans start once this account has a plan.</p>
         </CardHeader>
         <CardContent className="grid gap-6 sm:grid-cols-2">
-          {offers.map((offer) => (
+          {offers.map((offer, index) => (
             <section key={offer.key} aria-label={`${offer.label} plan`} className="grid content-start gap-4 rounded-lg border p-5">
               <p className="text-sm font-medium">{offer.label}</p>
               <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
@@ -122,7 +130,7 @@ function PlanOfferCard({ checkout, confirming, gaveUp }: { checkout: PlanCheckou
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
                 Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place.
               </p>
-              {canManage ? <SubscribeButton planKey={offer.key} label={`Subscribe to ${offer.label}`} /> : <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to subscribe.</p>}
+              {canManage ? <SubscribeButton planKey={offer.key} variant={index === 0 ? "default" : "outline"} label={`Subscribe to ${offer.label}`} /> : <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to subscribe.</p>}
             </section>
           ))}
         </CardContent>
