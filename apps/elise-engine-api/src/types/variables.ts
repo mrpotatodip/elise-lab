@@ -40,6 +40,7 @@ export type Bindings = {
   RUNNER_LOGIN_START_LIMITER?: RateLimit;
   RUNNER_LOGIN_START_TOTAL_LIMITER?: RateLimit;
   PASSWORD_RESET_LIMITER?: RateLimit;
+  PASSWORD_RESET_ADDRESS_LIMITER?: RateLimit;
   DASHBOARD_URL: string;
   EMAIL_FROM: string;
   EMAIL: SendEmail;

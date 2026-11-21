@@ -4,7 +4,8 @@ import { runEffect } from "#/lib/effect-query";
 import { requirePower, userIdOf } from "#/lib/require-power";
 import { zValidator } from "#/lib/zod-validator";
 import { AccountHeaderSchema } from "#/modules/scans/schemas";
-import { updateUsageBudgetSvc } from "#/modules/usage/handlers";
+import { enqueueEmailsQuietly } from "#/modules/email";
+import { changeUsageBudgetSvc } from "#/modules/usage/handlers";
 import { updateUsageBudgetDoc } from "#/modules/usage/openapi";
 import type { AppEnv } from "#/types/variables";
 
@@ -14,8 +15,15 @@ app.patch("/budget", updateUsageBudgetDoc, requirePower("company:usage:budget:up
   const { "x-account-id": accountId } = c.req.valid("header");
   const { monthlyBudgetUsd } = c.req.valid("json");
   const userId = userIdOf(c);
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(updateUsageBudgetSvc(c.env, db, accountId, userId, monthlyBudgetUsd)));
-  return c.json({ data, error: null });
+  const deps = c.get("deps");
+  const { usage, previousBudgetUsd, audience } = await deps.withTenant(c, accountId, (db) => runEffect(changeUsageBudgetSvc(c.env, db, accountId, userId, monthlyBudgetUsd)));
+  const changedAt = new Date().toISOString();
+  const link = `${c.env.DASHBOARD_URL.replace(/\/+$/, "")}/settings/providers`;
+  await enqueueEmailsQuietly(
+    (mail) => deps.enqueueEmail(c.env, mail),
+    audience.recipients.map((to) => ({ kind: "budget-changed", to, accountName: audience.accountName, actorName: audience.actorName, changedAt, previousBudgetUsd, budgetUsd: usage.budgetUsd, link })),
+  );
+  return c.json({ data: usage, error: null });
 });
 
 export default app;

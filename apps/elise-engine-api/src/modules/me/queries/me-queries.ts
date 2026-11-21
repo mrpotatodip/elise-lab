@@ -121,13 +121,14 @@ export const listLoginsWithPowerEffect = (
   Effect.tryPromise({
     try: () =>
       db
-        .selectDistinct({ email: authUser.email, name: authUser.name, partyId: authUser.partyId })
+        .select({ email: authUser.email, name: authUser.name, partyId: authUser.partyId })
         .from(partyRoles)
         .innerJoin(authUser, eq(authUser.partyId, partyRoles.partyId))
         .innerJoin(partyMasterRoles, eq(partyMasterRoles.id, partyRoles.roleId))
         .innerJoin(accessRolePowers, eq(accessRolePowers.masterRoleId, partyMasterRoles.masterRoleId))
         .innerJoin(accessMasterPowers, eq(accessMasterPowers.id, accessRolePowers.masterPowerId))
         .where(and(eq(partyRoles.tenantId, accountId), eq(accessMasterPowers.power, power)))
+        .groupBy(authUser.email, authUser.name, authUser.partyId)
         .orderBy(asc(authUser.email)),
     catch: toDbError,
   });
