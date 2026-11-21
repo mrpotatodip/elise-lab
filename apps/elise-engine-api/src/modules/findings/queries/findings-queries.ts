@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
 import { WEAK_REASON_SIGNAL_KIND, type Finding, type FindingsQuery, type FindingTriage, type FindingTriageBody } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepoFindings, scanRepos, scanSignals, scans, type TFindingTriage } from "@repo/db-elise/schema";
@@ -113,7 +113,7 @@ export const findingRepoIdEffect = (db: Pick<AppDbType, "select">, tenantId: str
         .from(scanFindings)
         .innerJoin(scans, eq(scans.id, scanFindings.scanId))
         .innerJoin(scanRepos, eq(scanRepos.id, scans.repoId))
-        .where(and(eq(scanFindings.tenantId, tenantId), sameRepoIdentity(tenantId, repoIdentityOf(repoUrl)), eq(scanFindings.fingerprint, fingerprint)))
+        .where(and(eq(scanFindings.tenantId, tenantId), ne(scans.status, "running"), sameRepoIdentity(tenantId, repoIdentityOf(repoUrl)), eq(scanFindings.fingerprint, fingerprint)))
         .limit(1),
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows[0]?.repoId ?? null));

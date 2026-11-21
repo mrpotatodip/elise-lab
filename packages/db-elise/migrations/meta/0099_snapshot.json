@@ -1,5 +1,5 @@
 {
-  "id": "1b50d262-8274-41cf-affb-37c28bca2a5b",
+  "id": "5b5a8e12-de20-45f1-95a5-de35d9b9c09c",
   "prevId": "84ea6cf6-5eca-4349-a70a-04fcbc9b3745",
   "version": "7",
   "dialect": "postgresql",
@@ -2962,6 +2962,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "email_status": {
+          "name": "email_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_sent'"
+        },
+        "email_status_at": {
+          "name": "email_status_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3098,7 +3111,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "tenant_team_invites_email_status": {
+          "name": "tenant_team_invites_email_status",
+          "value": "\"tenant_team_invites\".\"email_status\" in ('not_sent', 'sent', 'failed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.tenant_anthropic_keys": {
@@ -4202,12 +4220,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "duplicate_of": {
-          "name": "duplicate_of",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "set_by_party_id": {
           "name": "set_by_party_id",
           "type": "uuid",
@@ -4307,15 +4319,11 @@
       "checkConstraints": {
         "scan_finding_triage_status": {
           "name": "scan_finding_triage_status",
-          "value": "\"scan_finding_triage\".\"status\" in ('open', 'fixed', 'false_positive', 'accepted_risk', 'duplicate')"
+          "value": "\"scan_finding_triage\".\"status\" in ('open', 'fixed', 'false_positive', 'accepted_risk')"
         },
         "scan_finding_triage_accepted": {
           "name": "scan_finding_triage_accepted",
           "value": "(\"scan_finding_triage\".\"status\" = 'accepted_risk') = (\"scan_finding_triage\".\"accepted_until\" is not null) and (\"scan_finding_triage\".\"status\" <> 'accepted_risk' or \"scan_finding_triage\".\"note\" is not null)"
-        },
-        "scan_finding_triage_duplicate": {
-          "name": "scan_finding_triage_duplicate",
-          "value": "(\"scan_finding_triage\".\"status\" = 'duplicate') = (\"scan_finding_triage\".\"duplicate_of\" is not null)"
         }
       },
       "isRLSEnabled": false

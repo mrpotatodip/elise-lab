@@ -157,8 +157,12 @@ A Finding that a signed-in `tenant_admin` or `workspace_admin` chose to ship wit
 _Avoid_: Waiver, exception
 
 **Finding**:
-One security problem in `findings.json`, with a status of `confirmed` or `needs_validation`.
+One security problem a Scan's verifier decided, with a status of `confirmed` or `needs_validation`.
 _Avoid_: Bug, issue, vulnerability (until a person checks it)
+
+**Live finding**:
+A Finding of a running Scan, shown before the Scan ends. The Scan's final Findings replace it when the Scan succeeds, and it is dropped when the Scan is stopped or fails. No one can make a decision or write a Comment on it.
+_Avoid_: Candidate, draft finding, preliminary finding
 
 **decision**:
 A triage change to a Finding: its status (`open`, `fixed`, `false_positive`, `accepted_risk` or `duplicate`) and its note (`scan_finding_triage`). A `duplicate` points to another Finding of the same Branch that is not itself a duplicate, and that Finding carries the problem. It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
@@ -251,7 +255,7 @@ Everyone who holds a Role in an Account, plus the invites still waiting. A `tena
 _Avoid_: Members list (when you mean the whole Team), Group
 
 **Team invite**:
-An email, a Role and a one-time link that lets one person join an Account. The Worker emails the link through a queue (`INVITE_EMAIL_QUEUE`, then Cloudflare Email Service), and the create answer also holds the token so the admin can share the link by hand. Only the hash of its token is stored. It lasts 7 days, works once, and a new invite for the same email replaces the old one. It can never give `tenant_admin`.
+An email, a Role and a one-time link that lets one person join an Account. The Worker emails the link through a queue (`EMAIL_QUEUE`, then Cloudflare Email Service), and the create answer also holds the token so the admin can share the link by hand. Only the hash of its token is stored. It lasts 7 days, works once, and a new invite for the same email replaces the old one. It can never give `tenant_admin`.
 _Avoid_: Invitation, invite code (an invite code starts a whole new Account: `platform_invite_codes`)
 
 **Group**:

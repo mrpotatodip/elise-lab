@@ -2969,6 +2969,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "email_status": {
+          "name": "email_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_sent'"
+        },
+        "email_status_at": {
+          "name": "email_status_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3105,7 +3118,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "tenant_team_invites_email_status": {
+          "name": "tenant_team_invites_email_status",
+          "value": "\"tenant_team_invites\".\"email_status\" in ('not_sent', 'sent', 'failed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.tenant_anthropic_keys": {
