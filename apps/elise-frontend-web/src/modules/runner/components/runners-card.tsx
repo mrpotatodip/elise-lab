@@ -1,14 +1,16 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
-import { Bot } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Bot, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "#/components/ui/badge";
+import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { removeRunner } from "../api";
-import { RUNNER_STATE_COPY } from "../constants";
+import { RUNNER_LOGIN_COMMAND, RUNNER_STATE_COPY } from "../constants";
 import { runnerKeys, runnersQuery } from "../hooks";
 import type { Runner } from "../schemas";
 import { runnerAddedBy, runnerDetail, runnerShownState } from "../utils";
@@ -85,8 +87,32 @@ export function RunnersCard() {
                 <Bot aria-hidden="true" />
               </EmptyMedia>
               <EmptyTitle>No runners yet</EmptyTitle>
-              <EmptyDescription>Add a computer to get a pairing code, then type the code into the Elise Runner app on it.</EmptyDescription>
+              <EmptyDescription>On a computer with Claude Code signed in, run this and approve it here.</EmptyDescription>
             </EmptyHeader>
+            <EmptyContent className="max-w-md">
+              <div className="flex w-full items-center gap-2">
+                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-muted px-2 py-1.5 text-left font-mono text-xs">{RUNNER_LOGIN_COMMAND}</code>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  aria-label={`Copy ${RUNNER_LOGIN_COMMAND}`}
+                  onClick={() => {
+                    void navigator.clipboard.writeText(RUNNER_LOGIN_COMMAND).then(() => toast.success("Command copied."));
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                  Copy
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Setup steps are in{" "}
+                <Link to="/overview" className="inline-flex min-h-6 items-center rounded-sm font-medium text-primary-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  Getting started
+                </Link>
+                . For CI or a container, use Add a runner to make a pairing code.
+              </p>
+            </EmptyContent>
           </Empty>
         ) : (
           <DataTable table={table} />

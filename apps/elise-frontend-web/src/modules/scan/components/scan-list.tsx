@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
+import { Link } from "@tanstack/react-router";
 import { ChevronRight, ScanSearch, Search } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -166,6 +167,13 @@ export function ScanList() {
             </EmptyHeader>
             <EmptyContent>
               <ScanNewDialog label="Start your first audit" size="default" />
+              <p className="text-xs text-muted-foreground">
+                New here? Follow{" "}
+                <Link to="/overview" className="inline-flex min-h-6 items-center rounded-sm font-medium text-primary-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  Getting started
+                </Link>{" "}
+                on Overview.
+              </p>
             </EmptyContent>
           </Empty>
         </CardContent>
