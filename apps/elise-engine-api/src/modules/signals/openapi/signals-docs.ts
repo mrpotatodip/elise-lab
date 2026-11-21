@@ -69,7 +69,7 @@ export const checkAcceptedRiskDoc = describeRoute({
   responses: { 200: jsonResponse("The Signal or none.", envelope(AcceptedRiskCheckSchema)), ...errorResponses(400, 401, 403, 404) },
 });
 
-export const dismissSignalDoc =describeRoute({
+export const dismissSignalDoc = describeRoute({
   tags: ["findings"],
   summary: "Dismiss a Signal",
   security: SERVICE_SECURITY,

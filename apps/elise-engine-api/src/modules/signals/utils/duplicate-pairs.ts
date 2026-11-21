@@ -11,8 +11,9 @@ const byFingerprint = (x: PairFinding, y: PairFinding) => x.fingerprint.localeCo
 export const duplicatePairsOf = (fresh: readonly PairFinding[], open: readonly PairFinding[], known: ReadonlySet<string>, cap: number) => {
   const seen = new Set<string>(known);
   const all: FindingPair[] = [];
+  const sortedOpen = open.toSorted(byFingerprint);
   for (const a of fresh.toSorted(byFingerprint)) {
-    for (const b of open.toSorted(byFingerprint)) {
+    for (const b of sortedOpen) {
       if (a.fingerprint === b.fingerprint || !related(a, b)) continue;
       const key = duplicatePairKey(a.fingerprint, b.fingerprint);
       if (seen.has(key)) continue;

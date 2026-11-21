@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { WEAK_REASON_SIGNAL_KIND, type CheckAcceptedRiskBody, type Signal, type SignalsSettings } from "@repo/contracts/elise";
 import { scanFindings, scanRepos, scanSignals, scans, tenants } from "@repo/db-elise/schema";
@@ -44,20 +44,17 @@ export const listSignalsEffect = (db: AppDbType, tenantId: string, repo: string)
       const rows = await db
         .select()
         .from(scanSignals)
-        .where(and(eq(scanSignals.tenantId, tenantId), isNull(scanSignals.dismissedAt)))
+        .where(and(eq(scanSignals.tenantId, tenantId), inArray(scanSignals.repoId, repoIds), isNull(scanSignals.dismissedAt)))
         .orderBy(asc(scanSignals.createdAt), asc(scanSignals.id));
-      const wanted = new Set((await repoIds).map((row) => row.id));
-      return rows
-        .filter((row) => wanted.has(row.repoId))
-        .map((row) => ({
-          id: row.id,
-          kind: row.kind,
-          fingerprint: row.fingerprint,
-          relatedFingerprint: row.relatedFingerprint,
-          probability: row.probability,
-          modelVersion: row.modelVersion,
-          createdAt: row.createdAt.toISOString(),
-        }));
+      return rows.map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        fingerprint: row.fingerprint,
+        relatedFingerprint: row.relatedFingerprint,
+        probability: row.probability,
+        modelVersion: row.modelVersion,
+        createdAt: row.createdAt.toISOString(),
+      }));
     },
     catch: toDbError,
   });
@@ -94,10 +91,15 @@ export const insertWeakReasonSignalEffect = (
 ): Effect.Effect<Signal, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const [row] = await db
-        .insert(scanSignals)
-        .values({ tenantId, repoId, fingerprint, relatedFingerprint: null, kind: WEAK_REASON_SIGNAL_KIND, probability: answer.probability, modelVersion: answer.modelVersion, dismissedAt: new Date() })
-        .returning();
+      const same = and(eq(scanSignals.tenantId, tenantId), eq(scanSignals.repoId, repoId), eq(scanSignals.fingerprint, fingerprint), eq(scanSignals.kind, WEAK_REASON_SIGNAL_KIND));
+      const [existing] = await db.select({ id: scanSignals.id }).from(scanSignals).where(same).orderBy(desc(scanSignals.createdAt)).limit(1);
+      const fields = { probability: answer.probability, modelVersion: answer.modelVersion, dismissedAt: new Date() };
+      const [row] = existing
+        ? await db.update(scanSignals).set(fields).where(eq(scanSignals.id, existing.id)).returning()
+        : await db
+            .insert(scanSignals)
+            .values({ tenantId, repoId, fingerprint, relatedFingerprint: null, kind: WEAK_REASON_SIGNAL_KIND, ...fields })
+            .returning();
       return {
         id: row.id,
         kind: row.kind,
@@ -111,7 +113,7 @@ export const insertWeakReasonSignalEffect = (
     catch: toDbError,
   });
 
-export const dismissSignalEffect =(db: AppDbType, tenantId: string, signalId: string): Effect.Effect<boolean, DbError> =>
+export const dismissSignalEffect = (db: AppDbType, tenantId: string, signalId: string): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const updated = await db
