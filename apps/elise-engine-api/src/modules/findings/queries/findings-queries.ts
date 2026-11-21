@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
 import { WEAK_REASON_SIGNAL_KIND, type Finding, type FindingsQuery, type FindingTriage, type FindingTriageBody } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepoFindings, scanRepos, scanSignals, scans, type TFindingTriage } from "@repo/db-elise/schema";
@@ -6,6 +6,7 @@ import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
 
 // -----
 // Worst first; a finding that still needs
@@ -125,18 +126,37 @@ const RESOLVED_TARGET_MESSAGE = {
   accepted_risk: "That Finding is an accepted risk; point to a Finding that is still open",
 } as const;
 
+const FIXED_BY_SCAN_MESSAGE = "A later Scan found that Finding fixed; point to a Finding that is still open";
+const DIFFERENT_BRANCH_MESSAGE = "Both Findings must appear in Scans of the same Branch. Pick one from this Branch's list";
+
 const duplicateRefusal = (db: TenantDbType, tenantId: string, repoId: string, fingerprint: string, target: string, now: Date): Effect.Effect<string | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       if (target === fingerprint) return "A Finding cannot be a duplicate of itself";
       await db.execute(sql`select pg_advisory_xact_lock(hashtext(${`duplicate:${tenantId}:${repoId}`}))`);
       const shared = await db
+        .select({ branchId: scans.branchId })
+        .from(scanFindings)
+        .innerJoin(scans, eq(scans.id, scanFindings.scanId))
+        .where(
+          and(
+            eq(scanFindings.tenantId, tenantId),
+            eq(scans.repoId, repoId),
+            eq(scans.status, "succeeded"),
+            eq(scans.skill, SCAN_RECORDS_PROFILE_SKILL),
+            isNotNull(scans.branchId),
+            inArray(scanFindings.fingerprint, [fingerprint, target]),
+          ),
+        )
+        .groupBy(scans.branchId)
+        .having(sql`count(distinct ${scanFindings.fingerprint}) = 2`);
+      const branchIds = shared.flatMap((row) => (row.branchId ? [row.branchId] : []));
+      if (branchIds.length === 0) return DIFFERENT_BRANCH_MESSAGE;
+      const closed = await db
         .select({ branchId: scanRepoFindings.branchId })
         .from(scanRepoFindings)
-        .where(and(eq(scanRepoFindings.tenantId, tenantId), eq(scanRepoFindings.repoId, repoId), inArray(scanRepoFindings.fingerprint, [fingerprint, target])))
-        .groupBy(scanRepoFindings.branchId)
-        .having(sql`count(distinct ${scanRepoFindings.fingerprint}) = 2`);
-      if (shared.length === 0) return "A duplicate must point to a Finding of the same Branch";
+        .where(and(eq(scanRepoFindings.tenantId, tenantId), inArray(scanRepoFindings.branchId, branchIds), eq(scanRepoFindings.fingerprint, target), eq(scanRepoFindings.state, "fixed_by_code")));
+      if (closed.length === branchIds.length) return FIXED_BY_SCAN_MESSAGE;
       const [kept] = await db
         .select({ status: scanFindingTriage.status, acceptedUntil: scanFindingTriage.acceptedUntil })
         .from(scanFindingTriage)

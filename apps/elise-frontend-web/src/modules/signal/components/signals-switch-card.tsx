@@ -24,7 +24,7 @@ export function SignalsSwitchCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Signals</CardTitle>
+        <CardTitle>Hints from Jev</CardTitle>
         <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
           Signals are hints from TypeSafe&apos;s Jev model, such as a possible duplicate or a weak reason for an accepted risk. A Signal never changes a Finding, a decision or the Verdict: you act on it or ignore it.
         </p>
@@ -36,7 +36,7 @@ export function SignalsSwitchCard() {
             Show Signals for this account
           </Label>
         </div>
-        <div className="grid gap-2 border-t pt-5 text-sm leading-relaxed text-muted-foreground">
+        <div className="grid max-w-copy gap-2 border-t pt-5 text-sm leading-relaxed text-muted-foreground">
           <p>When Signals are on, Elise sends this to TypeSafe, an outside service:</p>
           <ul className="list-disc pl-5">
             <li>the Finding title and description</li>

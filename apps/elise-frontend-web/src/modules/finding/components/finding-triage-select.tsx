@@ -103,15 +103,25 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
         </SelectContent>
       </Select>
       {possibleDuplicate && (
-        <p className="grid max-w-56 gap-1 text-sm leading-relaxed text-muted-foreground">
-          <span>
+        <p className="grid w-56 max-w-full text-sm text-muted-foreground">
+          <span className="truncate" title={`Possible duplicate of ${possibleDuplicate.title}`}>
             Possible duplicate of <span className="font-medium text-foreground">{possibleDuplicate.title}</span>
           </span>
           <span className="flex gap-3">
-            <button type="button" className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setMarking(true)}>
+            <button
+              type="button"
+              className="inline-flex min-h-6 items-center rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Review possible duplicate of ${possibleDuplicate.title}`}
+              onClick={() => setMarking(true)}
+            >
               Review
             </button>
-            <button type="button" className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={possibleDuplicate.onDismiss}>
+            <button
+              type="button"
+              className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Dismiss possible duplicate of ${possibleDuplicate.title}`}
+              onClick={possibleDuplicate.onDismiss}
+            >
               Dismiss
             </button>
           </span>
