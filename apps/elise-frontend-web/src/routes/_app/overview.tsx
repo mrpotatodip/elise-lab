@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { hasAccessPower } from "@repo/contracts/elise";
+import { GettingStartedCard } from "#/modules/getting-started";
 import { RepoOverviewBrief, reposQuery } from "#/modules/repo";
 import { overviewQuery, ScanOverview, ScanOverviewSkeleton, scansQuery } from "#/modules/scan";
 
@@ -17,7 +19,14 @@ export const Route = createFileRoute("/_app/overview")({
 
 function OverviewWithRepos() {
   const { data } = useSuspenseQuery(reposQuery());
-  return <ScanOverview brief={<RepoOverviewBrief repos={data.repos} />} />;
+  const { user } = Route.useRouteContext();
+  const brief = (
+    <>
+      {user && <GettingStartedCard accountId={user.accountId} canSeeRunners={hasAccessPower(user.powers, "company:runners:create")} />}
+      <RepoOverviewBrief repos={data.repos} />
+    </>
+  );
+  return <ScanOverview brief={brief} />;
 }
 
 function OverviewPage() {
