@@ -1,9 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import { engineJson } from "#/lib/engine-client";
+import { engineJson, jsonPost } from "#/lib/engine-client";
 import { engineAuth } from "#/modules/auth/server/session";
-import { PlanDetailsSchema, PlanOffersSchema, PlanSessionUrlSchema } from "../schemas";
+import { PlanChangeBodySchema, PlanChangeResultSchema, PlanCheckoutBodySchema, PlanDetailsSchema, PlanOffersSchema, PlanSessionUrlSchema } from "../schemas";
 
-export const startPlanCheckout = createServerFn({ method: "POST" }).handler(async () => engineJson(PlanSessionUrlSchema, "/usage/plan/checkout", { method: "POST" }, await engineAuth()));
+export const startPlanCheckout = createServerFn({ method: "POST" })
+  .validator(PlanCheckoutBodySchema)
+  .handler(async ({ data }) => engineJson(PlanSessionUrlSchema, "/usage/plan/checkout", jsonPost(JSON.stringify(data)), await engineAuth()));
+
+export const changePlan = createServerFn({ method: "POST" })
+  .validator(PlanChangeBodySchema)
+  .handler(async ({ data }) => engineJson(PlanChangeResultSchema, "/usage/plan/change", jsonPost(JSON.stringify(data)), await engineAuth()));
 
 export const openBillingPortal = createServerFn({ method: "POST" }).handler(async () => engineJson(PlanSessionUrlSchema, "/usage/plan/portal", { method: "POST" }, await engineAuth()));
 

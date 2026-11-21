@@ -1,4 +1,4 @@
-import type { CreditEntry, PlanDetails } from "@repo/contracts/elise";
+import type { CreditEntry, PlanDetails, PlanOffer } from "@repo/contracts/elise";
 import { usageUsd } from "#/modules/usage";
 
 type StatusView = { label: string; variant: "success" | "warning" | "destructive" | "neutral"; note: string | null };
@@ -22,6 +22,30 @@ const PORTAL_STATUSES: ReadonlyArray<PlanDetails["status"]> = ["active", "past_d
 
 export const planBillingAction = (data: Pick<PlanDetails, "source" | "status">): "subscribe" | "manage" =>
   data.source === "stripe" && PORTAL_STATUSES.includes(data.status) ? "manage" : "subscribe";
+
+export const planSwitchOffers = (data: Pick<PlanDetails, "plan" | "source" | "status">, offers: ReadonlyArray<PlanOffer>) =>
+  data.source === "stripe" && data.status === "active" && data.plan !== null ? offers.filter((offer) => offer.key !== data.plan?.key) : [];
+
+export type PlanCardView = { offer: PlanOffer; current: boolean; action: "switch" | "subscribe" | "none"; blocked: string | null };
+
+export const planCardViews = (data: Pick<PlanDetails, "plan" | "source" | "status" | "seats">, offers: ReadonlyArray<PlanOffer>): PlanCardView[] => {
+  const { members, pendingInvites } = data.seats;
+  const people = members + pendingInvites;
+  const held = data.status === null || data.status === "active" || data.status === "past_due";
+  const counts = `${members} ${members === 1 ? "person" : "people"}${pendingInvites > 0 ? ` and ${pendingInvites} pending invite${pendingInvites === 1 ? "" : "s"}` : ""}`;
+  const switchKeys = new Set(planSwitchOffers(data, offers).map((offer) => offer.key));
+  const subscribes = planBillingAction(data) === "subscribe";
+
+  return offers.map((offer) => {
+    const action = switchKeys.has(offer.key) ? "switch" : subscribes ? "subscribe" : "none";
+    const over = people - offer.maxMembers;
+    const blocked =
+      action !== "none" && over > 0 ? `Your account has ${counts}. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.` : null;
+    return { offer, current: held && data.plan?.key === offer.key, action, blocked };
+  });
+};
+
+export const planSwitchPending = (switchingTo: string | null, data: Pick<PlanDetails, "plan">) => switchingTo !== null && data.plan?.key !== switchingTo;
 
 export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
   checkout === "success" && !(data.source === "stripe" && data.status === "active");

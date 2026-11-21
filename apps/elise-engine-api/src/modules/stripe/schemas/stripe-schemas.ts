@@ -20,7 +20,7 @@ export const StripeSubscriptionResponseSchema = z.object({
   cancel_at_period_end: z.boolean(),
   metadata: z.record(z.string(), z.string()).default({}),
   current_period_end: z.number().optional(),
-  items: z.object({ data: z.array(z.object({ price: z.object({ id: z.string() }), current_period_end: z.number().optional() })) }),
+  items: z.object({ data: z.array(z.object({ id: z.string(), price: z.object({ id: z.string() }), current_period_end: z.number().optional() })) }),
 });
 
 export type StripeEvent = z.infer<typeof StripeEventSchema>;
