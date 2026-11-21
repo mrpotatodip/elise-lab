@@ -25,11 +25,40 @@ export type PasswordResetEmail = {
 };
 
 // -----
+// Security notice: the Account's Anthropic key was set or
+// removed. It never holds any part of the key.
+// -----
+export type AnthropicKeyChangedEmail = {
+  kind: "anthropic-key-changed";
+  to: string;
+  change: "set" | "removed";
+  accountName: string;
+  actorName: string;
+  changedAt: string;
+  link: string;
+};
+
+// -----
+// Security notice: the Account's Monthly budget changed,
+// from one effective value to another.
+// -----
+export type BudgetChangedEmail = {
+  kind: "budget-changed";
+  to: string;
+  accountName: string;
+  actorName: string;
+  changedAt: string;
+  previousBudgetUsd: number;
+  budgetUsd: number;
+  link: string;
+};
+
+// -----
 // What the email queue carries: one member for each
 // email, told apart by `kind`. A kind with no
 // template does not compile (render-email.ts).
 // -----
-export type QueuedEmail = TeamInviteEmail | PasswordResetEmail;
+export type QueuedEmail = TeamInviteEmail | PasswordResetEmail | AnthropicKeyChangedEmail | BudgetChangedEmail;
 
 // -----
 // The shape queued before `kind` existed: always a
