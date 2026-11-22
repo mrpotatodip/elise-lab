@@ -91,7 +91,7 @@ function SignUpFields() {
   const done = useAuthDone();
   const signUpMutation = useMutation({ mutationFn: (input: typeof SignUpInputSchema._output) => signUp({ data: input }), ...done });
   const form = useForm({
-    defaultValues: { inviteCode: "", firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: browserTimezone() },
+    defaultValues: { firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: browserTimezone() },
     validators: { onSubmit: SignUpInputSchema },
     onSubmit: ({ value }) => signUpMutation.mutate(value),
     onSubmitInvalid: focusFirstInvalidField,
@@ -107,18 +107,6 @@ function SignUpFields() {
       }}
       className="grid gap-5"
     >
-      <form.Field name="inviteCode">
-        {(field) => (
-          <div className="grid gap-2">
-            <Label htmlFor="inviteCode">Invite code</Label>
-            <Input id="inviteCode" name={field.name} autoComplete="off" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "inviteCode", "inviteCode-help")} />
-            <p id="inviteCode-help" className="text-sm leading-relaxed text-muted-foreground">
-              {AUTH_COPY.signup.inviteCodeHelp}
-            </p>
-            <FieldError id="inviteCode" message={fieldMessage(field)} />
-          </div>
-        )}
-      </form.Field>
       <div className="grid grid-cols-2 gap-4">
         <form.Field name="firstName">
           {(field) => (
