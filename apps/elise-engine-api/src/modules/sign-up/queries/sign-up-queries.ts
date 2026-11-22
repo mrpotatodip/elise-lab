@@ -5,7 +5,7 @@ import { TENANT_ADMIN_ROLE_KEY, TenantSchema, type Tenant } from "@repo/contract
 import type { PoolDbType } from "#/lib/db-connection";
 import { Conflict, DbError, toDbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
-import { SIGN_UP_EMAIL_TAKEN, SIGN_UP_SLUG_CANDIDATE_COUNT, SIGN_UP_SLUG_CONSTRAINT, SIGN_UP_SLUG_EXHAUSTED } from "#/modules/sign-up/constants";
+import { SIGN_UP_REFUSED, SIGN_UP_SLUG_CANDIDATE_COUNT, SIGN_UP_SLUG_CONSTRAINT } from "#/modules/sign-up/constants";
 import { createPersonLogin } from "#/modules/person-logins";
 import { slugCandidates } from "#/modules/sign-up/lib";
 import type { NewAccount } from "#/modules/sign-up/types";
@@ -30,7 +30,7 @@ export const pickFreeSlugEffect = (db: PoolDbType, accountName: string): Effect.
     });
     const taken = new Set(rows.map((row) => row.slug));
     const free = candidates.find((candidate) => !taken.has(candidate));
-    if (!free) return yield* new Conflict({ message: SIGN_UP_SLUG_EXHAUSTED });
+    if (!free) return yield* new Conflict({ message: SIGN_UP_REFUSED });
     return free;
   });
 
@@ -38,7 +38,7 @@ const classifyInsertFailure = (cause: unknown): SlugTaken | Conflict | DbError =
   if (pgErrorCode(cause) !== PG_UNIQUE_VIOLATION) return toDbError(cause);
   return pgErrorConstraint(cause) === SIGN_UP_SLUG_CONSTRAINT
     ? new SlugTaken({ cause })
-    : new Conflict({ message: SIGN_UP_EMAIL_TAKEN });
+    : new Conflict({ message: SIGN_UP_REFUSED });
 };
 
 // -----

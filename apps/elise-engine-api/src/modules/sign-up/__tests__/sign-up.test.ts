@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { authAccount, authUser, parties, partyRoles, tenants } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { openTestDb, type TestDb } from "#/__tests__/test-db";
+import { SIGN_UP_REFUSED } from "#/modules/sign-up/constants";
 import { insertAccountEffect, pickFreeSlugEffect } from "#/modules/sign-up/queries";
 import type { NewAccount } from "#/modules/sign-up/types";
 
@@ -46,7 +47,7 @@ describe("insertAccountEffect", () => {
     const before = { users: await count(authUser), tenants: await count(tenants), parties: await count(parties) };
     const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, account({ slug: "another" }))));
 
-    expect(error).toMatchObject({ _tag: "Conflict" });
+    expect(error).toMatchObject({ _tag: "Conflict", message: SIGN_UP_REFUSED });
     expect({ users: await count(authUser), tenants: await count(tenants), parties: await count(parties) }).toEqual(before);
   });
 

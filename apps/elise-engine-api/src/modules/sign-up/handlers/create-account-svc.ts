@@ -3,7 +3,7 @@ import { hashPassword } from "better-auth/crypto";
 import type { SignUp, SignUpBody } from "@repo/contracts/elise";
 import type { PoolDbType } from "#/lib/db-connection";
 import { Conflict, type DbError } from "#/lib/effect-query";
-import { SIGN_UP_SLUG_EXHAUSTED, SIGN_UP_SLUG_MAX_ATTEMPTS } from "#/modules/sign-up/constants";
+import { SIGN_UP_REFUSED, SIGN_UP_SLUG_MAX_ATTEMPTS } from "#/modules/sign-up/constants";
 import { insertAccountEffect, pickFreeSlugEffect } from "#/modules/sign-up/queries";
 import type { NewAccount } from "#/modules/sign-up/types";
 
@@ -19,7 +19,7 @@ const insertWithFreshSlug = (db: PoolDbType, account: Omit<NewAccount, "slug">, 
     return yield* insertAccountEffect(db, { ...account, slug }).pipe(
       Effect.catchTag("SlugTaken", () =>
         attempt >= SIGN_UP_SLUG_MAX_ATTEMPTS
-          ? Effect.fail(new Conflict({ message: SIGN_UP_SLUG_EXHAUSTED }))
+          ? Effect.fail(new Conflict({ message: SIGN_UP_REFUSED }))
           : insertWithFreshSlug(db, account, attempt + 1),
       ),
     );
