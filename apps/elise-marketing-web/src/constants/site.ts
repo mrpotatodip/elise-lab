@@ -87,10 +87,11 @@ export const RUNNER = {
     { label: "Linux, x64", href: runnerFile("elise-runner-linux-x64") },
     { label: "Linux, arm64", href: runnerFile("elise-runner-linux-arm64") },
   ],
-  downloadNote: "A downloaded file is not marked as runnable. Run chmod +x on it, and if macOS refuses to open it, run xattr -d com.apple.quarantine on it. Then move it onto your PATH as elise-runner.",
+  // A note is a list of parts: a string is plain text, { code } is set in the mono font.
+  downloadNote: ["A downloaded file is not marked as runnable. Run ", { code: "chmod +x" }, " on it, and if macOS refuses to open it, run ", { code: "xattr -d com.apple.quarantine" }, " on it. Then move it onto your PATH as ", { code: "elise-runner" }, "."],
   commandLabel: "Or install from a terminal, which does all of that for you",
   command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh",
-  after: "Then run elise-runner login and elise-runner doctor. The script installs to ~/.local/bin and takes the newest release for your system.",
+  after: ["With either option, run ", { code: "elise-runner login" }, " and then ", { code: "elise-runner doctor" }, ". The terminal install puts the Runner in ", { code: "~/.local/bin" }, " and takes the newest release for your system."],
   releasesUrl: RUNNER_RELEASES,
   releasesLabel: "All Runner releases on GitHub",
   needs: "The computer also needs your own AI tool installed and signed in, because the scan runs on that login.",

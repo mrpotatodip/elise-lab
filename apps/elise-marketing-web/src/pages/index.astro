@@ -89,12 +89,12 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         <div class="runner-downloads" role="group" aria-labelledby="runner-downloads-label">
           {RUNNER.downloads.map((file) => <a class="button outline lg" href={file.href} rel="noopener">{file.label}</a>)}
         </div>
-        <p class="section-note">{RUNNER.downloadNote}</p>
+        <p class="section-note">{RUNNER.downloadNote.map((part) => (typeof part === "string" ? part : <code>{part.code}</code>))}</p>
         <div class="runner-install">
           <p class="runner-install__label" id="runner-command-label">{RUNNER.commandLabel}</p>
           <pre class="runner-install__command" tabindex="0" aria-labelledby="runner-command-label"><code>{RUNNER.command}</code></pre>
         </div>
-        <p class="section-note">{RUNNER.after}</p>
+        <p class="section-note">{RUNNER.after.map((part) => (typeof part === "string" ? part : <code>{part.code}</code>))}</p>
         <p class="section-note">{RUNNER.needs}</p>
         <p class="section-note"><a href={RUNNER.releasesUrl} rel="noopener">{RUNNER.releasesLabel}</a></p>
       </section>
