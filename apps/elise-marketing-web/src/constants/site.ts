@@ -70,15 +70,29 @@ export const STEPS = [
 // Under "Get the Runner". The command and the releases page are the ones the dashboard's Getting
 // started guide shows (GETTING_STARTED_INSTALL_COMMAND and GETTING_STARTED_DESKTOP_URL), so keep them equal.
 // The site offers only the terminal Runner (the `elise-runner` binary), not the desktop app.
+// The download buttons point at one pinned release. When a new elise-runner-v* release is published,
+// change `version` (the file names come from .github/workflows/release-elise-runner.yml).
+const RUNNER_VERSION = "0.3.0";
+const RUNNER_RELEASES = "https://github.com/mrpotatodip/ts-mrpotato-lab/releases";
+const runnerFile = (asset: string) => `${RUNNER_RELEASES}/download/elise-runner-v${RUNNER_VERSION}/${asset}`;
+
 export const RUNNER = {
   title: "Get the Runner",
   note: "The Runner is the program that audits your code on your own computer. Install it, sign it in to your account, then start audits from the dashboard.",
-  commandLabel: "Install the terminal Runner on macOS or Linux",
+  downloadsLabel: `Download the Runner ${RUNNER_VERSION}`,
+  // A browser cannot tell Apple silicon from Intel, so every build gets its own button.
+  downloads: [
+    { label: "macOS, Apple silicon", href: runnerFile("elise-runner-darwin-arm64") },
+    { label: "macOS, Intel", href: runnerFile("elise-runner-darwin-x64") },
+    { label: "Linux, x64", href: runnerFile("elise-runner-linux-x64") },
+    { label: "Linux, arm64", href: runnerFile("elise-runner-linux-arm64") },
+  ],
+  downloadNote: "A downloaded file is not marked as runnable. Run chmod +x on it, and if macOS refuses to open it, run xattr -d com.apple.quarantine on it. Then move it onto your PATH as elise-runner.",
+  commandLabel: "Or install from a terminal, which does all of that for you",
   command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh",
   after: "Then run elise-runner login and elise-runner doctor. The script installs to ~/.local/bin and takes the newest release for your system.",
-  desktop: "Prefer to download the file yourself? The macOS and Linux builds are on",
-  releasesUrl: "https://github.com/mrpotatodip/ts-mrpotato-lab/releases",
-  releasesLabel: "the releases page on GitHub",
+  releasesUrl: RUNNER_RELEASES,
+  releasesLabel: "All Runner releases on GitHub",
   needs: "The computer also needs your own AI tool installed and signed in, because the scan runs on that login.",
 } as const;
 

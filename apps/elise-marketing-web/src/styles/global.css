@@ -484,6 +484,14 @@ h2 {
   margin: 0 0 1.5rem;
 }
 
+/* Four download buttons, 12px apart like the hero buttons, wrapping on a narrow screen. */
+.runner-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
 .runner-install__label {
   margin: 0 0 0.375rem;
   font-size: 0.875rem;
