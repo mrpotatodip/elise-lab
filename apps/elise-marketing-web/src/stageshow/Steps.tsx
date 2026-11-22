@@ -21,6 +21,8 @@ function Sky() {
 // -----
 type Connect = { pasted: boolean; picked: boolean; starting: boolean };
 const LINK = "github.com/acme/web-app";
+const PROVIDERS = ["GitHub", "GitLab", "GitLab server", "Zip upload"] as const;
+const COVERAGE = ["Focused", "Balanced", "Exhaustive"] as const;
 
 async function connectScript(a: Act<Connect>) {
   await a.wait(1000);
@@ -48,7 +50,7 @@ function RepoRow({ icon, name, note, tag, target }: { icon: "globe" | "lock" | "
 
 export function ConnectStep() {
   return (
-    <Stage {...SIZE} initial={{ pasted: false, picked: false, starting: false }} poster={{ pasted: true, picked: true, starting: false }} script={connectScript} play="once" tokens={DASHBOARD_LOOK} cursor={{ at: { wide: { x: 560, y: 380 }, compact: { x: 250, y: 300 } }, style: "arrow" }} className="sv dl">
+    <Stage {...SIZE} height={620} initial={{ pasted: false, picked: false, starting: false }} poster={{ pasted: true, picked: true, starting: false }} script={connectScript} play="once" tokens={DASHBOARD_LOOK} cursor={{ at: { wide: { x: 560, y: 380 }, compact: { x: 250, y: 300 } }, style: "arrow" }} className="sv dl">
       {(s) => (
         <>
           <Sky />
@@ -59,6 +61,11 @@ export function ConnectStep() {
               <X className="sv-dialog__x" size={16} strokeWidth={1.5} />
             </header>
             <div className="sv-dialog__body">
+              <div className="sv-radios sv-radios--four" role="presentation">
+                {PROVIDERS.map((provider, i) => (
+                  <div key={provider} className="sv-radio sv-radio--chip" data-on={i === 0 || undefined}><span className="sv-radio__t">{provider}</span></div>
+                ))}
+              </div>
               <div className="sv-search">
                 <Search size={16} strokeWidth={1.5} />
                 <Swap id={s.pasted ? "v" : "p"}>{s.pasted ? <span className="sv-search__v">{LINK}</span> : <span className="sv-search__p">Search your repositories or paste a GitHub link</span>}</Swap>
@@ -75,32 +82,30 @@ export function ConnectStep() {
                       <span className="sv-field__label">Branch, tag or commit (optional)</span>
                       <span className="sv-input sv-input--mono">Leave empty for the default branch</span>
                     </div>
-                    <div className="sv-radios">
-                      <div className="sv-radio" data-on>
-                        <i /><span className="sv-radio__t">Quick review</span>
-                        <span className="sv-radio__d">A fast first look for common security mistakes.</span>
+                    <div className="sv-field">
+                      <span className="sv-field__label">Coverage</span>
+                      <div className="sv-radios sv-radios--three" role="presentation">
+                        {COVERAGE.map((option, i) => (
+                          <div key={option} className="sv-radio sv-radio--chip" data-on={i === 1 || undefined}><span className="sv-radio__t">{option}</span></div>
+                        ))}
                       </div>
-                      <div className="sv-radio">
-                        <i /><span className="sv-radio__t">Full audit</span>
-                        <span className="sv-radio__d">Deeper, with every finding checked independently. Takes longer and uses more budget.</span>
-                      </div>
+                      <span className="sv-radio__d">Recommended for most repositories. Good coverage without the longest run time.</span>
                     </div>
                   </div>
                 ) : s.pasted ? (
                   <div className="sv-list"><RepoRow icon="link" name="Scan acme/web-app" note="Public repository, from the link" tag="Public" target="linkrow" /></div>
                 ) : (
                   <div className="sv-list">
-                    <span className="sv-group">Public</span>
+                    <span className="sv-group">Your repositories</span>
                     <RepoRow icon="globe" name="acme/web-app" note="Last scan succeeded" tag="Public" />
                     <RepoRow icon="globe" name="acme/docs-site" note="Not scanned yet" tag="Public" />
-                    <span className="sv-group">Private</span>
-                    <RepoRow icon="lock" name="acme/billing-api" note="Private, connected on GitHub" tag="Private" />
+                    <RepoRow icon="lock" name="acme/billing-api" note="Private repository" tag="Private" />
                   </div>
                 )}
               </Swap>
             </div>
             <footer className="sv-dialog__foot">
-              <span className="sv-dialog__budget">$18.40 of this month&apos;s budget is left. Each audit stops at its own spend limit.</span>
+              <span className="sv-dialog__budget">This audit runs on Maya&apos;s MacBook&apos;s own Claude. Elise charges nothing per audit. It stops at its own spend limit.</span>
               <span className="sv-btn sv-btn--outline">Cancel</span>
               <span className="sv-btn" data-off={!s.picked || undefined} aria-disabled={!s.picked || undefined} data-target="start" data-cursor="pointer"><Swap id={s.starting ? "s" : "a"}>{s.starting ? "Starting…" : "Start audit"}</Swap></span>
             </footer>
@@ -116,7 +121,7 @@ export function ConnectStep() {
 // -----
 type Audit = { step: 0 | 1 | 2 | 3; details: boolean };
 const STEP_TITLE = ["Cloning the repository", "Reading the code for security issues", "Saving the report"];
-const STEP_NOTE = ["Downloading the code to scan.", "This is the longest step.", "Almost done."];
+const STEP_NOTE = ["Your Runner is downloading the code to scan.", "This is the longest step.", "Almost done."];
 const ELAPSED = ["Running for 12s", "Running for 1m 24s", "Running for 2m 38s", "Took 2m 41s"];
 
 async function auditScript(a: Act<Audit>) {
@@ -172,13 +177,13 @@ export function AuditStep() {
                 <div className="dl-card__head" data-target="details" data-cursor="pointer">
                   <span className="sv-cardtitleblock">
                     <span className="sv-cardtitle"><span>Run details</span><ChevronDown className="sv-chev" data-open={s.details || undefined} size={16} strokeWidth={1.5} /></span>
-                    <span className="sv-cardsub sv-cardsub--tight">The kind of review, the model and the effort this scan ran with.</span>
+                    <span className="sv-cardsub sv-cardsub--tight">The coverage, the model and the effort this scan ran with.</span>
                   </span>
                 </div>
                 <Collapse open={s.details}>
                   <div className="dl-card__body">
                     <dl className="sv-terms">
-                      {[["Kind of review", "Quick review"], ["Model", "Claude Sonnet 5.5"], ["Effort", "High"]].map(([k, v]) => (
+                      {[["Coverage", "Balanced"], ["Model", "Claude Sonnet 5.5"], ["Effort", "High"]].map(([k, v]) => (
                         <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
                       ))}
                     </dl>
@@ -201,7 +206,7 @@ const FINDINGS: { sev: PillTone; label: string; title: string; where: string; st
   { sev: "high", label: "High", title: "Open redirect at login", where: "src/routes/login.ts:42", status: "Confirmed", tone: "success" },
   { sev: "medium", label: "Medium", title: "Token in the request log", where: "src/lib/log.ts:17", status: "Confirmed", tone: "success" },
   { sev: "low", label: "Low", title: "Cookie missing SameSite", where: "src/lib/session.ts:9", status: "Confirmed", tone: "success" },
-  { sev: "outline", label: "Unrated", title: "SQL from request input", where: "src/db/search.ts:88", status: "Needs a person", tone: "warning" },
+  { sev: "low", label: "Low", title: "SQL from request input", where: "src/db/search.ts:88", status: "Needs a person", tone: "warning" },
 ];
 
 async function reportScript(a: Act<Report>) {

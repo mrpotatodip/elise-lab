@@ -4,7 +4,7 @@ Generated 2026-11-15 from `apps/elise-frontend-web/DESIGN.md` as the baseline, t
 
 **Verified** means a file in this app defines it. **Rule** means a reviewer rejects a change that breaks it. **Baseline** means it came from the dashboard and has not been re-checked against the site yet: confirm it before relying on it, then promote it to Verified or change it.
 
-The site is one page (`src/pages/index.astro`, static Astro) at `eliselab.com`. It shares no code with the dashboard and talks to no API: every call to action is a link to `SITE.appUrl` (the sign-in page) or, for "Create an account", `SITE.signUpUrl` (`/signup`).
+The site is a landing page (`src/pages/index.astro`) with two legal pages (`privacy.astro`, `terms.astro`, through `layouts/Legal.astro`), static Astro, at `eliselab.com`. It shares no code with the dashboard and talks to no API: every call to action is a link to `SITE.appUrl` (the sign-in page) or, for "Create an account", `SITE.signUpUrl` (`/signup`).
 
 ## Direction
 
@@ -49,7 +49,7 @@ Baseline values, from the dashboard's table. Re-measure against `tokens.css` bef
 
 - **Verified** One column, `.wrap` is `min(70rem, 100% - 2rem)`, centred. Sections have `clamp(2.5rem, 6vw, 4rem)` of vertical padding.
 - **Verified** The anchor links in the nav sit in a second row under the brand and Sign in below 48rem, and beside them from 48rem up. Reading text in the facts and section notes is capped at 50ch, because the audit's script counts about 53 letters in a 52ch box.
-- **Verified** Page order: nav (brand, anchor links, Sign in), hero, the app tour picture with its caption and a "Pause animations" control, How it works (three steps, one row each: text beside a full-size picture), Pricing (two plan cards and a line saying sign-up is not open), What to know (four facts, each an h3), the closing call to action, footer (links and the theme picker).
+- **Verified** Page order: nav (brand, anchor links, Sign in), hero, the app tour picture with its caption and a "Pause animations" control, How it works (three steps, one row each: text beside a full-size picture), Get the Runner (the install command in a one-line scrolling box, notes, and a link to the releases page; `RUNNER` in `src/constants/site.ts` keeps the command equal to the dashboard's Getting started guide), Pricing (a Monthly/Yearly toggle, two plan cards and a "Create an account" button), What to know (four facts, each an h3), the closing call to action, footer (links and the theme picker).
 - **Verified** Hero is two rows so the picture starts high: the headline across the full width, then the paragraph at 52ch on the left and the buttons and their hint on the right, right-aligned to the page edge under Sign in (from 56rem up; stacked and left-aligned on a phone). Keep the paragraph at 52ch or less and the buttons within sight of it.
 - **Verified** Each picture of the app sits in a `.frame` that reserves its exact box (its design ratio, or 358 by 440 below 43rem) and stays invisible until its island has hydrated, so nothing shifts when it arrives. Below 640px the tour switches to a second, narrower design.
 - **Rule** One `main` landmark, one `h1`. Each section has an `h2`; anything under it that needs a heading is `h3`. A picture of the app is a `role="img"` with a label (`PICTURE_LABELS`) and its contents hidden from screen readers.
@@ -110,7 +110,8 @@ The ten items below are a checklist, read for a landing page. A reviewer reports
 - Text contrast on the glass cards in Moonlight and Daylight is judged on screenshots only.
 - The pictures follow the page theme, but their text and glass in Moonlight, Midnight and Greenfields have been checked on screenshots only, at 1440px and one frame of each animation. The kit's own `data-theme="dark"` rules (code blocks, the circle cursor) are not applied: only the arrow cursor is switched.
 - The logo file in the page has an opaque white background and shows as a tile in the dark themes. A transparent version needs new artwork.
-- The footer has no contact or privacy link: there is no content for either yet (decided 2026-11-15). Add both when they exist; a `uiux-audit` run reports it as a major finding (D12, Nielsen 10) until then.
+- The privacy and terms pages run text at 80ch, not 52ch, and show the sub-processor cards two across, by the owner's request (2026-11-23). The landing page keeps 52ch.
+- The privacy and terms wording needs a person's approval (spec #326) before the site deploys.
 - The page says a new account can run a scan today (confirmed by the owner 2026-11-15), and the monthly scan allowance resets on the 1st in UTC (the server's time zone). Re-check both when sign-up or the engine changes.
 - Mobile CLS is 0.366 in Lighthouse on the production build but 0.0009 in a real browser; the cause under Lighthouse's throttling is untraced. The console reports 3 unlabelled form fields that are not in the page's DOM; also untraced.
 - The 16px reading size and the 18px fact title were set 2026-11-15 after a `uiux-audit` run; the page has not been re-audited at those sizes.

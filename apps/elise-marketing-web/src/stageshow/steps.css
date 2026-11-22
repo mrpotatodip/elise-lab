@@ -79,6 +79,9 @@
   .sv-radio i { position: absolute; top: 16px; left: 14px; width: 16px; height: 16px; border: 1px solid var(--input); border-radius: 50%; }
   .sv-radio[data-on] { border-color: var(--primary); background: var(--card); box-shadow: var(--shadow-control); }
   .sv-radio[data-on] i { border-color: var(--primary); background: radial-gradient(circle, var(--primary-foreground) 0 3px, var(--primary) 3.5px); }
+  .sv-radios--three { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sv-radios--four { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .sv-radio--chip { padding: 8px 10px; text-align: center; border-radius: 8px; font-size: 13px; }
   .sv-radio__t { font-weight: 500; }
   .sv-radio__d { font-size: 14px; line-height: 1.5; color: var(--muted-foreground); }
 

@@ -309,7 +309,7 @@ h2 {
 }
 
 .frame--tour { aspect-ratio: 1440 / 760; }
-.frame--connect { aspect-ratio: 760 / 540; }
+.frame--connect { aspect-ratio: 760 / 620; }
 .frame--audit { aspect-ratio: 760 / 480; }
 .frame--report { aspect-ratio: 760 / 700; }
 
@@ -366,8 +366,8 @@ h2 {
 
 .billing:has(#billing-month:checked) label[for="billing-month"],
 .billing:has(#billing-year:checked) label[for="billing-year"] {
-  background: var(--foreground);
-  color: var(--background);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .billing:has(#billing-month:focus-visible) label[for="billing-month"],
@@ -471,6 +471,46 @@ h2 {
   line-height: 1.6;
   color: var(--lede);
   text-shadow: var(--halo);
+}
+
+/* Get the Runner: the install command sits in a card-style box that scrolls sideways rather than
+   wrapping, so it stays one line to copy. Notes under it are 24px apart (DESIGN.md). */
+#get-the-runner .section-note {
+  margin-bottom: 1.5rem;
+}
+
+.runner-install {
+  max-width: 100%;
+  margin: 0 0 1.5rem;
+}
+
+.runner-install__label {
+  margin: 0 0 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--lede);
+  text-shadow: var(--halo);
+}
+
+.runner-install__command {
+  margin: 0;
+  padding: 1rem 1.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.runner-install__command:focus-visible {
+  outline: 2px solid var(--ring, currentColor);
+  outline-offset: 2px;
 }
 
 /* The one next step under the plans, before they can be bought. */
@@ -837,8 +877,9 @@ h2 {
   display: block;
 }
 
-/* A legal page is reading text on the sky: the stronger ink and the halo, 52ch lines, 6px from a
-   heading to its text and 24px between groups (DESIGN.md). */
+/* A legal page is reading text on the sky: the stronger ink and the halo, 80ch lines (wider than the
+   landing page's 52ch, by the owner's request), 6px from a heading to its text and 24px between
+   groups (DESIGN.md). */
 .legal {
   padding-block: 3rem;
   text-shadow: var(--halo);
@@ -858,9 +899,23 @@ h2 {
 }
 
 .legal p {
-  max-width: 52ch;
+  max-width: 80ch;
   margin: 0 0 0.75rem;
   color: var(--lede);
+}
+
+.legal ul:not(.processors) {
+  max-width: 80ch;
+  margin: 0 0 0.75rem;
+  color: var(--lede);
+}
+
+.legal ul:not(.processors) li {
+  margin-bottom: 0.375rem;
+}
+
+.legal .nowrap {
+  white-space: nowrap;
 }
 
 .legal address {
@@ -870,7 +925,7 @@ h2 {
 }
 
 .legal .notice {
-  max-width: 52ch;
+  max-width: 80ch;
   padding: 0.75rem 1rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
@@ -883,10 +938,15 @@ h2 {
 .processors {
   display: grid;
   gap: 2rem;
-  max-width: 52ch;
   margin: 1.5rem 0 0;
   padding: 0;
   list-style: none;
+}
+
+@media (min-width: 48rem) {
+  .processors {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .processors li {
