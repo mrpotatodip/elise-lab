@@ -14,24 +14,25 @@ import "./runner.css";
 // scan-list.tsx does); the Scan page (scan-detail.tsx) is where the work shows: the info notice, a
 // "Findings so far" table that fills as the checks decide, and the Trace, grouped by Phase. Then
 // the Scan succeeds and its first finding opens. The terminal lines are the headless Runner's own
-// log (`Event` in apps/elise-runner-cli/cli/src/commands.rs). The repository, costs, trace entries
-// and findings are made up, and the page says so.
+// log (`Event` in apps/elise-runner-cli/cli/src/commands.rs), reworded in plain language for the
+// picture: the Runner itself prints "the recon phase started" and so on. The repository, costs,
+// trace entries and findings are made up, and the page says so.
 
 const COMMAND = "elise-runner run";
 
 // What the Runner prints for one Scan, in order.
 const LOG = [
-  "Scan claimed",
-  "the recon phase started",
-  "the recon phase ended: spent $0.06",
-  "the hunt phase started",
-  "the hunt phase ended: spent $0.21",
-  "the check phase started",
-  "the check phase ended: spent $0.09",
-  "the report phase started",
-  "the report phase ended: spent $0.06",
-  "result sent to Elise",
-  "Scan succeeded.",
+  "Picked up a scan of acme/billing-api",
+  "Recon: mapping the repository",
+  "Recon done, spent $0.06",
+  "Hunt: looking for weak spots",
+  "Hunt done, spent $0.21",
+  "Check: verifying each candidate",
+  "Check done, spent $0.09",
+  "Report: writing it up",
+  "Report done, spent $0.06",
+  "Sent the report to Elise",
+  "Scan finished",
 ];
 // How long the scene rests after each line. The hunt takes its time; the check is where findings land.
 const PACE = [800, 400, 600, 1500, 700, 300, 700, 500, 600, 500, 900];
@@ -233,7 +234,6 @@ export default function RunnerScene() {
         const page: Page = compact ? "list" : s.page;
         const all = 11 + (s.added ? 1 : 0);
         const succeeded = 9 + (done ? 1 : 0);
-        const prefix = compact ? "" : "[acme/billing-api] ";
         const typing = s.cmd.length < COMMAND.length;
         const now = newestPhase(s.lines);
         // Candidates are raised in the hunt, one a step, and stay at nine after it.
@@ -561,10 +561,7 @@ export default function RunnerScene() {
                 </Collapse>
                 {LOG.map((line, i) => (
                   <Collapse key={line} open={s.lines > i}>
-                    <div className={i === LOG.length - 1 ? "ok" : undefined}>
-                      <span className="dim">{prefix}</span>
-                      {line}
-                    </div>
+                    <div className={i === LOG.length - 1 ? "ok" : i % 2 === 0 && i < 9 && i > 0 ? "dim" : undefined}>{line}</div>
                   </Collapse>
                 ))}
               </div>

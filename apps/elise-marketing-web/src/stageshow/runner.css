@@ -3,14 +3,16 @@
    trace are never under it. The Scan page's classes are `sp-`; the rest are card.css and scenes.css. */
 .rn {
   /* The window leaves room at the left for the terminal to straddle its edge. */
-  & .ed-window { left: 296px; width: calc(100% - 320px); }
+  & .ed-window { left: 160px; width: calc(100% - 184px); }
+  /* The Scans list's columns, sized so the repository keeps room in a window this wide. */
+  & .dt-row { grid-template-columns: minmax(0, 1fr) 128px 216px 156px 64px 148px 32px; }
 
   & .rn-term {
     position: absolute;
     z-index: 8;
     left: 8px;
     bottom: 22px;
-    width: 520px;
+    width: 420px;
     height: 300px;
     --ss-term-ok: #6ee7a8;
     /* No drop shadow: the kit's terminal keeps its hairline edge. */
