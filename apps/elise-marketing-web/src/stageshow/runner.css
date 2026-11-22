@@ -1,13 +1,17 @@
-/* The Runner scene: the dashboard's Scans list (card.css) with the Runner's terminal over its lower
-   left. The terminal straddles the window's left edge and covers only older rows, never the new one. */
+/* The Runner scene: the dashboard window to the right, the Runner's terminal over its sidebar at the
+   lower left. The terminal covers only the sidebar's lower part, so the Scan page's findings and
+   trace are never under it. The Scan page's classes are `sp-`; the rest are card.css and scenes.css. */
 .rn {
+  /* The window leaves room at the left for the terminal to straddle its edge. */
+  & .ed-window { left: 296px; width: calc(100% - 320px); }
+
   & .rn-term {
     position: absolute;
     z-index: 8;
-    left: 6px;
+    left: 8px;
     bottom: 22px;
-    width: 556px;
-    height: 244px;
+    width: 520px;
+    height: 300px;
     --ss-term-ok: #6ee7a8;
     --ss-shadow-hero: 0 24px 60px -12px rgb(0 0 0 / 0.45), 0 4px 14px rgb(0 0 0 / 0.25);
   }
@@ -16,29 +20,77 @@
     flex-direction: column;
     justify-content: flex-end;
     height: 100%;
-    gap: 0;
     padding: 4px 20px 18px;
     overflow: hidden;
     color: #c4c4cc;
-    font: 14px/22px var(--ss-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font: 13px/22px var(--ss-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     font-variant-ligatures: none;
     white-space: pre;
   }
-  & .rn-log .ss-term__line { font-size: 14px; line-height: 22px; }
+  & .rn-log .ss-term__line { font-size: 13px; line-height: 22px; }
   & .rn-log .dim { color: #7c7c86; }
   & .rn-log .ok { color: var(--ss-term-ok); }
-  /* The Phase under the Running pill: four steps, the finished ones filled, the current one pulsing. */
-  & .rn-phase { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 8px; font-size: 12px; line-height: 16px; color: var(--muted-foreground); white-space: nowrap; }
-  & .rn-steps { display: flex; gap: 3px; }
-  & .rn-steps i { width: 14px; height: 4px; border-radius: 2px; background: color-mix(in oklch, var(--muted-foreground) 25%, transparent); transition: background-color 0.3s ease; }
-  & .rn-steps i[data-state="done"] { background: var(--mark-info); }
-  & .rn-steps i[data-state="now"] { background: var(--mark-info); animation: dl-pulse 1.4s ease-in-out infinite; }
-  & .rn-live { color: var(--muted-foreground); }
-  @media (prefers-reduced-motion: reduce) { & .rn-steps i[data-state="now"] { animation: none; } }
 
   /* A paired Runner that is running: the dashboard's green mark beside "Runners". */
   & .rn-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--mark-success); }
 
+  /* ---- the Scan page ---- */
+  & .pg-scroll { height: 100%; }
+  /* The info notice (Alert, variant info): a spinner, a medium line and a note. */
+  & .sp-alert { display: flex; gap: 12px; padding: 14px 16px; border: 1px solid color-mix(in oklch, var(--status-info) 25%, transparent); border-radius: 8px; background: var(--status-info-soft); }
+  & .sp-alert > svg { flex: none; margin-top: 2px; color: var(--status-info); }
+  & .sp-alert__text { display: grid; gap: 4px; }
+  & .sp-alert__title { font-size: 14px; font-weight: 500; line-height: 20px; color: var(--status-info); }
+  & .sp-alert__note { max-width: 62ch; font-size: 14px; line-height: 20px; color: var(--foreground); }
+  & .sp-spin { animation: rn-spin 1s linear infinite; }
+  @keyframes rn-spin { to { transform: rotate(360deg); } }
+
+  /* "Nothing verified yet": the findings table's empty state. */
+  & .sp-empty { display: grid; justify-items: center; gap: 6px; padding: 40px 24px; text-align: center; }
+  & .sp-empty__icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); color: var(--muted-foreground); }
+  & .sp-empty__title { font-size: 16px; font-weight: 600; letter-spacing: -0.025em; }
+  & .sp-empty__text { max-width: 44ch; font-size: 14px; line-height: 20px; color: var(--muted-foreground); }
+
+  /* The findings table: severity, finding, where. */
+  & .sp-copyrow { display: flex; justify-content: flex-end; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+  & .sp-tr { display: grid; grid-template-columns: 150px minmax(0, 1fr) 150px 24px; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  & .sp-tr > svg { color: var(--muted-foreground); }
+  & .sp-tr--head { padding-block: 0; height: 40px; background: color-mix(in oklch, var(--muted) 80%, transparent); font-size: 12px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); }
+  & .sp-sev { display: grid; justify-items: start; gap: 6px; }
+  & .sp-title { font-weight: 500; }
+  & .sp-where { display: grid; gap: 2px; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 16px; }
+  & .sp-where__folder { color: var(--muted-foreground); }
+
+  /* The Trace: the newest entry in a tinted bar, then the Phases, the running one open. */
+  & .sp-trace { display: grid; gap: 20px; }
+  & .sp-now { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: color-mix(in oklch, var(--primary) 5%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 15%, transparent); }
+  & .sp-now__label { flex: 1; font-size: 16px; font-weight: 600; line-height: 24px; }
+  & .sp-cand { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+  & .sp-ping { position: relative; display: block; width: 10px; height: 10px; }
+  & .sp-ping i { position: absolute; inset: 0; border-radius: 50%; background: var(--primary); }
+  & .sp-ping i:first-child { opacity: 0.6; animation: rn-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+  @keyframes rn-ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+  & .sp-times { margin-left: 6px; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+  & .sp-time { margin-left: 8px; font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+  & .sp-phases { display: grid; margin: 0; padding: 0; list-style: none; }
+  & .sp-node { position: relative; padding-bottom: 8px; list-style: none; }
+  & .sp-node:not([data-last])::before { content: ""; position: absolute; left: 11.5px; top: 28px; bottom: 0; width: 1px; background: color-mix(in oklch, var(--foreground) 20%, transparent); }
+  & .sp-node__head { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+  & .sp-node__title { font-size: 14px; font-weight: 600; }
+  & .sp-node__chev { margin-left: auto; color: var(--muted-foreground); }
+  & .sp-node__chev[data-open] { transform: rotate(180deg); }
+  & .sp-mark { z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid color-mix(in oklch, var(--foreground) 20%, transparent); border-radius: 50%; background: var(--muted); color: var(--muted-foreground); }
+  & .sp-mark[data-state="running"] { border-color: var(--primary); background: var(--background); }
+  & .sp-mark i { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+  & .sp-leaves { margin: 0 0 0 38px; padding: 2px 0 8px; list-style: none; }
+  & .sp-leaf { position: relative; display: flex; align-items: center; gap: 8px; min-height: 32px; padding-left: 24px; font-size: 14px; }
+  & .sp-leaf::before { content: ""; position: absolute; left: 0; top: 0; width: 16px; height: 17px; border-bottom: 1px solid color-mix(in oklch, var(--foreground) 20%, transparent); border-left: 1px solid color-mix(in oklch, var(--foreground) 20%, transparent); border-bottom-left-radius: 8px; }
+  & .sp-leaf:not([data-last])::after { content: ""; position: absolute; left: 0; top: 17px; bottom: 0; width: 1px; background: color-mix(in oklch, var(--foreground) 20%, transparent); }
+  & .sp-leaf svg { color: var(--muted-foreground); }
+  @media (prefers-reduced-motion: reduce) { & .sp-spin, & .sp-ping i:first-child { animation: none; } }
+
+  /* ---- phone width: the list only, the terminal under it ---- */
+  & [data-layout="compact"] .ed-window { left: var(--gutter); width: calc(100% - var(--gutter) * 2); }
   & [data-layout="compact"] .pg-head { display: none; }
   & [data-layout="compact"] .rn-term { left: 8px; bottom: 12px; width: 342px; height: 188px; }
   & [data-layout="compact"] .rn-log { padding: 2px 12px 12px; font-size: 11px; line-height: 17px; }
