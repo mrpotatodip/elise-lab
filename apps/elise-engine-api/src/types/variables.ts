@@ -37,6 +37,7 @@ export type Bindings = {
   AUTH_BASE_URL: string;
   AUTH_TRUSTED_ORIGINS: string;
   SIGN_UP_LIMITER?: RateLimit;
+  SIGN_UP_TOTAL_LIMITER?: RateLimit;
   SIGN_IN_LIMITER?: RateLimit;
   TEAM_INVITE_LIMITER?: RateLimit;
   RUNNER_ENROLL_LIMITER?: RateLimit;

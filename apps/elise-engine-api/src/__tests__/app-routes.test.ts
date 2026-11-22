@@ -283,6 +283,14 @@ describe("rate limits", () => {
     expect(await res.json()).toMatchObject({ data: null, error: { code: "SIGN_UP_RATE_LIMITED", message: "Too many sign-up attempts. Wait a minute and try again." } });
   });
 
+  it("answers 429 to a sign-up when the total limit is spent, whatever the IP", async () => {
+    const { env } = fakeBindings({ SIGN_UP_LIMITER: limiter(true), SIGN_UP_TOTAL_LIMITER: limiter(false) });
+    const res = await call(env, "/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: signUpBody });
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ error: { code: "SIGN_UP_RATE_LIMITED" } });
+  });
+
   it("answers 429 to a limited sign-in", async () => {
     const { env } = fakeBindings({ SIGN_IN_LIMITER: limiter(false) });
     const res = await call(env, "/auth/sign-in/email", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });

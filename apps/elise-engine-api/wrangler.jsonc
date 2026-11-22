@@ -33,7 +33,8 @@
     { "name": "PASSWORD_RESET_LIMITER", "namespace_id": "1006", "simple": { "limit": 5, "period": 60 } },
     { "name": "RUNNER_LOGIN_START_LIMITER", "namespace_id": "1007", "simple": { "limit": 5, "period": 60 } },
     { "name": "RUNNER_LOGIN_START_TOTAL_LIMITER", "namespace_id": "1008", "simple": { "limit": 30, "period": 60 } },
-    { "name": "PASSWORD_RESET_ADDRESS_LIMITER", "namespace_id": "1009", "simple": { "limit": 3, "period": 60 } }
+    { "name": "PASSWORD_RESET_ADDRESS_LIMITER", "namespace_id": "1009", "simple": { "limit": 3, "period": 60 } },
+    { "name": "SIGN_UP_TOTAL_LIMITER", "namespace_id": "1010", "simple": { "limit": 20, "period": 60 } }
   ],
   "r2_buckets": [{ "binding": "REPORTS", "bucket_name": "repo-scan-reports" }],
   // Upload retention (docs/adr/0008-git-providers.md): once a day the scheduled handler deletes zips no Scan has read 30 days after upload, and upload objects with no row.

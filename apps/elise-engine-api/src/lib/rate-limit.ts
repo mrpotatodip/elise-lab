@@ -4,6 +4,7 @@ import type { AppEnv, Bindings } from "#/types/variables";
 
 type LimiterName =
   | "SIGN_UP_LIMITER"
+  | "SIGN_UP_TOTAL_LIMITER"
   | "SIGN_IN_LIMITER"
   | "TEAM_INVITE_LIMITER"
   | "RUNNER_ENROLL_LIMITER"
