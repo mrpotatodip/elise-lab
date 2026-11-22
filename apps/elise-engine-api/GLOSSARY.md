@@ -263,8 +263,11 @@ _Avoid_: Members list (when you mean the whole Team), Group
 
 **Team invite**:
 An email, a Role and a one-time link that lets one person join an Account. The Worker emails the link through a queue (`EMAIL_QUEUE`, then Cloudflare Email Service), and the create answer also holds the token so the admin can share the link by hand. Only the hash of its token is stored. It lasts 7 days, works once, and a new invite for the same email replaces the old one. It can never give `tenant_admin`.
-Sign-up is open: anyone can start a new Account at `/sign-up` without a code. The `platform_invite_codes` tables stay in the database but nothing reads or writes them.
-_Avoid_: Invitation, invite code
+_Avoid_: Invitation
+
+**Open sign-up**:
+Anyone can start a new Account at `/sign-up` with a name, Account name, email and password, and no code. A Plan still gates every Scan. The old invite code is retired: the `platform_invite_codes` tables stay in the database as history, and nothing reads or writes them.
+_Avoid_: Invite code
 
 **Group**:
 A named set of people in one Account, for example "Backend". It grants nothing: Powers still come from a Role. Names are unique per Account, ignoring case. Losing the Role in the Account removes the person from its Groups.
