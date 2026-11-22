@@ -22,6 +22,11 @@ describe("engineFetch", () => {
     await expect(engineFetch("/scans")).rejects.toMatchObject({ status: 403, code: "FORBIDDEN", message: "No role" });
   });
 
+  it("replaces the engine's generic text on an outside-service failure", async () => {
+    answer(JSON.stringify({ data: null, error: { code: "EXTERNAL_SERVICE_ERROR", message: "Internal server error" } }), 502);
+    await expect(engineFetch("/usage/plan/checkout")).rejects.toMatchObject({ status: 502, code: "EXTERNAL_SERVICE_ERROR", message: expect.stringContaining("payment provider") });
+  });
+
   it("reads a Better Auth error body", async () => {
     answer(JSON.stringify({ code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" }), 401);
     await expect(engineFetch("/auth/sign-in/email")).rejects.toBeInstanceOf(EngineError);

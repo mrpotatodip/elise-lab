@@ -31,6 +31,9 @@ const ErrorBodySchema = z.union([
 // -----
 const ParseFailureSchema = z.object({ issues: z.array(z.object({ path: z.array(z.union([z.string(), z.number()])), message: z.string() })) });
 
+const EXTERNAL_SERVICE_CODE = "EXTERNAL_SERVICE_ERROR";
+const EXTERNAL_SERVICE_MESSAGE = "We could not reach the payment provider. Try again, and contact support if it keeps failing.";
+
 export type EngineAuth = { token?: string; accountId?: string };
 
 export async function engineFetch(path: string, init: RequestInit = {}, auth: EngineAuth = {}) {
@@ -42,7 +45,9 @@ export async function engineFetch(path: string, init: RequestInit = {}, auth: En
   if (!res.ok) {
     console.error(`engine: ${init.method ?? "GET"} ${path} answered ${res.status}`);
     const body = ErrorBodySchema.safeParse(await res.json().catch(() => null));
-    throw new EngineError(body.success ? body.data.message : `Engine error ${res.status}`, res.status, body.success ? body.data.code : undefined);
+    const code = body.success ? body.data.code : undefined;
+    const message = code === EXTERNAL_SERVICE_CODE ? EXTERNAL_SERVICE_MESSAGE : body.success ? body.data.message : `Engine error ${res.status}`;
+    throw new EngineError(message, res.status, code);
   }
   return res;
 }
