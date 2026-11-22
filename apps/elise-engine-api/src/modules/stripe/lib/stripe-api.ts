@@ -14,7 +14,17 @@ const parse = async <S extends z.ZodType>(response: Response, schema: S, what: s
   return schema.parse(await response.json());
 };
 
-export const stripeGateway = (secretKey: string): StripeGateway => {
+export type StripeBrandingFiles = { iconFileId?: string; logoFileId?: string };
+
+const brandingFields = ({ iconFileId, logoFileId }: StripeBrandingFiles) => {
+  const fields = [["branding_settings[display_name]", "EliseLAB"]];
+  for (const [key, fileId] of [["icon", iconFileId], ["logo", logoFileId]] as const) {
+    if (fileId) fields.push([`branding_settings[${key}][type]`, "file"], [`branding_settings[${key}][file]`, fileId]);
+  }
+  return fields;
+};
+
+export const stripeGateway = (secretKey: string, brandingFiles: StripeBrandingFiles = {}): StripeGateway => {
   const headers = { authorization: `Bearer ${secretKey}`, "stripe-version": STRIPE_API_VERSION };
   const get = async <S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> => parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { headers }), schema, `GET ${path}`);
   const post = async <S extends z.ZodType>(path: string, schema: S, form: URLSearchParams, idempotencyKey?: string): Promise<z.infer<S>> => {
@@ -40,7 +50,9 @@ export const stripeGateway = (secretKey: string): StripeGateway => {
       post(
         "/checkout/sessions",
         StripeUrlResponseSchema,
-        new URLSearchParams({
+        new URLSearchParams([
+          ...brandingFields(brandingFiles),
+          ...Object.entries({
         mode: "subscription",
         customer: customerId,
         client_reference_id: accountId,
@@ -54,7 +66,8 @@ export const stripeGateway = (secretKey: string): StripeGateway => {
         "subscription_data[metadata][accountId]": accountId,
         success_url: successUrl,
         cancel_url: cancelUrl,
-        }),
+          }),
+        ]),
       ),
     createPortalSession: ({ customerId, returnUrl }) => post("/billing_portal/sessions", StripeUrlResponseSchema, new URLSearchParams({ customer: customerId, return_url: returnUrl })),
     changeSubscriptionPrice: async ({ subscriptionId, priceId }) => {
