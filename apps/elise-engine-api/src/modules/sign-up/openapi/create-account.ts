@@ -9,6 +9,7 @@ export const createAccountDoc = describeRoute({
     context:
       "A visitor starts their own account. One request creates the Person, their login, the Tenant and the membership with the role `tenant_admin`. No login and no code are needed. Too many requests from one address get 429.",
     steps: [
+      "The server checks the Turnstile token in `turnstileToken` with Cloudflare. A missing or failed token gets the same 409 as any other refusal, with no reason.",
       "The server checks that the email has no login yet. If it has, the answer is 409.",
       "The server makes the Tenant slug from the account name, for example `Acme Labs` becomes `acme-labs`. If it is taken, it adds `-2`, `-3` and so on.",
       "The server saves everything in one transaction. If any step fails, nothing is saved.",

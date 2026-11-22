@@ -1,1 +1,5 @@
 ELISE_ENGINE_URL=https://api.eliselab.com
+# Public Cloudflare Turnstile site key for the sign-up form. This is Cloudflare's published always-pass test key;
+# it matches the engine's test secret in its .dev.vars.example. Always-fail test key: 2x00000000000000000000AB.
+# Production: set the real widget's site key as a Worker variable or secret named TURNSTILE_SITE_KEY.
+TURNSTILE_SITE_KEY=1x00000000000000000000AA

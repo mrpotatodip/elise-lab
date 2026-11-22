@@ -34,6 +34,7 @@ export const AUTH_COPY = {
     swap: "I already have an account",
     to: "/signin",
     accountNameHelp: "The name of the new Elise account you are creating, for example your company or team.",
+    checkUnavailable: "Sign-up is not available right now. Try again later.",
     consequence: "You will own this new account, and we will sign you in.",
   },
 } as const;
@@ -60,6 +61,7 @@ export const AUTH_ERRORS = {
   firstName: "Enter your first name.",
   lastName: "Enter your last name.",
   accountName: "Enter a name for your account.",
+  turnstile: "Complete the check above, then try again.",
   tooLong: (limit: number) => `Use ${limit} characters or fewer.`,
   newPasswordTooShort: (min: number) => `Use at least ${min} characters.`,
 } as const;

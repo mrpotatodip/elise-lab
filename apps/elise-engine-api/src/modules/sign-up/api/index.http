@@ -1,10 +1,10 @@
 @baseUrl = http://localhost:8787
 
-# Start an account. Sign-up is open: no code needed.
+# Start an account. Sign-up is open: no code, but a Turnstile token (the dummy one passes with the test secret).
 POST {{baseUrl}}/sign-up
 Content-Type: application/json
 
-{ "firstName": "Ada", "lastName": "Rossi", "email": "ada@example.com", "password": "correct-horse-battery", "accountName": "Acme Labs", "timezone": "Europe/Rome" }
+{ "firstName": "Ada", "lastName": "Rossi", "email": "ada@example.com", "password": "correct-horse-battery", "accountName": "Acme Labs", "timezone": "Europe/Rome", "turnstileToken": "XXXX.DUMMY.TOKEN.XXXX" }
 
 ###
 
