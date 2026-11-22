@@ -1,26 +1,11 @@
-import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { Data, Effect } from "effect";
-import {
-  accessMasterPowers,
-  accessRolePowers,
-  ensureTenantRoles,
-  findTenantRole,
-  partyRoles,
-  platformInviteCodeRedemptions,
-  platformInviteCodes,
-  tenants,
-} from "@repo/db-elise";
+import { accessMasterPowers, accessRolePowers, ensureTenantRoles, findTenantRole, partyRoles, tenants } from "@repo/db-elise";
 import { TENANT_ADMIN_ROLE_KEY, TenantSchema, type Tenant } from "@repo/contracts/elise";
 import type { PoolDbType } from "#/lib/db-connection";
-import { Conflict, DbError, Forbidden, toDbError } from "#/lib/effect-query";
+import { Conflict, DbError, toDbError } from "#/lib/effect-query";
 import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
-import {
-  SIGN_UP_EMAIL_TAKEN,
-  SIGN_UP_INVALID_INVITE,
-  SIGN_UP_SLUG_CANDIDATE_COUNT,
-  SIGN_UP_SLUG_CONSTRAINT,
-  SIGN_UP_SLUG_EXHAUSTED,
-} from "#/modules/sign-up/constants";
+import { SIGN_UP_EMAIL_TAKEN, SIGN_UP_SLUG_CANDIDATE_COUNT, SIGN_UP_SLUG_CONSTRAINT, SIGN_UP_SLUG_EXHAUSTED } from "#/modules/sign-up/constants";
 import { createPersonLogin } from "#/modules/person-logins";
 import { slugCandidates } from "#/modules/sign-up/lib";
 import type { NewAccount } from "#/modules/sign-up/types";
@@ -49,14 +34,7 @@ export const pickFreeSlugEffect = (db: PoolDbType, accountName: string): Effect.
     return free;
   });
 
-// -----
-// Thrown inside the transaction when the code
-// matches nothing; it rolls everything back.
-// -----
-class InviteRefused extends Data.TaggedError("InviteRefused") {}
-
-const classifyInsertFailure = (cause: unknown): SlugTaken | Forbidden | Conflict | DbError => {
-  if (cause instanceof InviteRefused) return new Forbidden({ message: SIGN_UP_INVALID_INVITE });
+const classifyInsertFailure = (cause: unknown): SlugTaken | Conflict | DbError => {
   if (pgErrorCode(cause) !== PG_UNIQUE_VIOLATION) return toDbError(cause);
   return pgErrorConstraint(cause) === SIGN_UP_SLUG_CONSTRAINT
     ? new SlugTaken({ cause })
@@ -66,36 +44,16 @@ const classifyInsertFailure = (cause: unknown): SlugTaken | Forbidden | Conflict
 // -----
 // Person, login, credential, Tenant and its
 // tenant_admin membership in one transaction: if
-// any step fails, nothing is saved. The first step
-// uses the invite code in one UPDATE: it matches a
-// code that is not revoked, expired or used up, or
-// nothing. Two people racing for the last use: the
-// second waits, re-checks and matches nothing. A
-// failure later (a taken email, say) rolls the use
-// back. A taken email shows only after the code passed.
+// any step fails (a taken email, say), nothing is saved.
 // -----
 export const insertAccountEffect = (
   db: PoolDbType,
   account: NewAccount,
-): Effect.Effect<{ userId: string; tenant: Tenant }, SlugTaken | Forbidden | Conflict | DbError> =>
+): Effect.Effect<{ userId: string; tenant: Tenant }, SlugTaken | Conflict | DbError> =>
   Effect.gen(function* () {
     const created = yield* Effect.tryPromise({
       try: () =>
         db.transaction(async (tx) => {
-          const [invite] = await tx
-            .update(platformInviteCodes)
-            .set({ useCount: sql`${platformInviteCodes.useCount} + 1` })
-            .where(
-              and(
-                eq(platformInviteCodes.codeHash, account.inviteCodeHash),
-                isNull(platformInviteCodes.revokedAt),
-                or(isNull(platformInviteCodes.expiresAt), gt(platformInviteCodes.expiresAt, account.now)),
-                lt(platformInviteCodes.useCount, platformInviteCodes.maxUses),
-              ),
-            )
-            .returning({ id: platformInviteCodes.id });
-          if (!invite) throw new InviteRefused();
-
           const { userId, partyId } = await createPersonLogin(tx, {
             firstName: account.firstName,
             lastName: account.lastName,
@@ -115,12 +73,6 @@ export const insertAccountEffect = (
             tenantId: tenant.id,
             roleId: tenantAdminRole.id,
             roleScope: tenantAdminRole.scope,
-          });
-          await tx.insert(platformInviteCodeRedemptions).values({
-            inviteCodeId: invite.id,
-            personPartyId: partyId,
-            tenantId: tenant.id,
-            redeemedAt: account.now,
           });
 
           const granted = await tx

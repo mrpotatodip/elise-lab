@@ -1,7 +1,8 @@
 // -----
 // Messages
 // -----
-export const SIGN_UP_INVALID_INVITE = "Invalid invite code";
+export const SIGN_UP_RATE_LIMITED = "Too many sign-up attempts. Wait a minute and try again.";
+export const SIGN_UP_RATE_LIMITED_CODE = "SIGN_UP_RATE_LIMITED";
 export const SIGN_UP_EMAIL_TAKEN = "An account with this email already exists";
 export const SIGN_UP_SLUG_EXHAUSTED = "Could not pick an address for this account. Try again.";
 

@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   SIGN_UP_ACCOUNT_NAME_MAX,
   SIGN_UP_EMAIL_MAX,
-  SIGN_UP_INVITE_CODE_MAX,
   SIGN_UP_PASSWORD_MAX,
   SIGN_UP_PASSWORD_MIN,
   SIGN_UP_PERSON_NAME_MAX,
@@ -23,10 +22,10 @@ const isTimezone = (value: string): boolean => {
 };
 
 // -----
-// Requests: one invited person starts their account
+// Requests: a visitor starts their account. An old
+// client's stray `inviteCode` key is stripped, not refused.
 // -----
 export const SignUpBodySchema = z.object({
-  inviteCode: z.string().min(1).max(SIGN_UP_INVITE_CODE_MAX),
   firstName: z.string().trim().min(1).max(SIGN_UP_PERSON_NAME_MAX),
   lastName: z.string().trim().min(1).max(SIGN_UP_PERSON_NAME_MAX),
   email: z.email().max(SIGN_UP_EMAIL_MAX).trim().toLowerCase(),

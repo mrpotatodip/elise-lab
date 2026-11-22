@@ -1,7 +1,7 @@
 // -----
 // What the insert needs: the validated body
-// with the password already hashed, the slug
-// picked and the invite code reduced to its hash.
+// with the password already hashed and the slug
+// picked.
 // -----
 export type NewAccount = {
   firstName: string;
@@ -11,6 +11,4 @@ export type NewAccount = {
   accountName: string;
   timezone: string;
   slug: string;
-  inviteCodeHash: string;
-  now: Date;
 };
