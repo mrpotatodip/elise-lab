@@ -7,7 +7,7 @@ import { cn } from "#/lib/utils";
 import { RUNNER_LOGIN_COMMAND } from "#/modules/runner";
 import { ScanNewDialog } from "#/modules/scan";
 import { CopyCommand, INLINE_LINK_CLASS } from "#/modules/shared";
-import { GETTING_STARTED_DESKTOP_URL, GETTING_STARTED_DOCTOR_COMMAND, GETTING_STARTED_INSTALL_COMMAND } from "../constants";
+import { GETTING_STARTED_RELEASES_URL,GETTING_STARTED_DOCTOR_COMMAND, GETTING_STARTED_INSTALL_COMMAND } from "../constants";
 import { useGettingStarted, useGettingStartedFlag } from "../hooks";
 import type { GettingStartedTaskKey } from "../utils";
 
@@ -54,8 +54,8 @@ export function GettingStartedCard() {
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Five setup tasks take you to your first Report. They tick themselves as Elise sees your Runner and Scans.</p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <a href={GETTING_STARTED_DESKTOP_URL} target="_blank" rel="noreferrer" className={cn(INLINE_LINK_CLASS, "min-h-6")}>
-            Prefer a window?
+          <a href={GETTING_STARTED_RELEASES_URL} target="_blank" rel="noreferrer" className={cn(INLINE_LINK_CLASS, "min-h-6")}>
+            All downloads
           </a>
           <Button type="button" size="sm" variant="ghost" onClick={() => setDismissed(true)}>
             Dismiss

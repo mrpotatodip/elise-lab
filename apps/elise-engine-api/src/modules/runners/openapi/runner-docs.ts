@@ -20,7 +20,7 @@ export const createRunnerDoc = describeRoute({
   summary: "Add a Runner and get its pairing code",
   description: routeText({
     context:
-      "A member of the account adds a computer that will run Scans. The answer holds a pairing code, shown once. The person types it into the EliseLAB Runner app on that computer, within 10 minutes.",
+      "A member of the account adds a computer that will run Scans. The answer holds a pairing code, shown once. The person runs `elise-runner pair` with it on that computer, within 10 minutes.",
     steps: [
       "The Worker checks the session and that the login holds a Role in the account named by `x-account-id`.",
       "The Worker makes a pairing code and saves only its hash, with the name and an expiry 10 minutes away.",
@@ -40,7 +40,7 @@ export const enrollRunnerDoc = describeRoute({
   summary: "Pair a Runner with a pairing code",
   description: routeText({
     context:
-      "The Runner app trades the pairing code for a token. The token is the Runner's login from then on: the app keeps it in the computer's keychain and sends it as a bearer token. No session is needed, because the code is the proof.",
+      "The Runner trades the pairing code for a token. The token is the Runner's login from then on: the Runner keeps it in the computer's keychain and sends it as a bearer token. No session is needed, because the code is the proof.",
     steps: [
       "The Worker rate-limits by IP, then reads the code (any case, with or without the dash).",
       "In one UPDATE it finds a code that is unexpired, unused and not revoked, clears the code and saves the hash of a new token, so a code works once.",
