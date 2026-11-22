@@ -103,7 +103,7 @@ describe("POST /scans for an upload app", () => {
     );
     const written = await test.raw.select({ id: scans.id }).from(scans).where(eq(scans.repoId, appId));
 
-    expect({ status: res.status, message: ErrorSchema.parse(await res.json()).error.message, written }).toEqual({ status: 400, message: expect.stringContaining("Update the Elise Runner"), written: [] });
+    expect({ status: res.status, message: ErrorSchema.parse(await res.json()).error.message, written }).toEqual({ status: 400, message: expect.stringContaining("Update the Runner"), written: [] });
   });
 
   it("refuses a zip on a GitHub Scan", async () => {

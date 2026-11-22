@@ -69,7 +69,7 @@ export function RunnerAddDialog() {
           <>
             <DialogBody className="grid gap-3">
               <p className="text-sm">
-                Open the Elise Runner app on <span className="font-medium">{created.name}</span> and type this code. It works once and expires at {runnerWhen(created.expiresAt)}.
+                On <span className="font-medium">{created.name}</span>, run <span className="font-mono">elise-runner pair</span> followed by this code. It works once and expires at {runnerWhen(created.expiresAt)}.
               </p>
               <Label htmlFor="runner-code">Pairing code</Label>
               <Input id="runner-code" readOnly value={created.pairingCode} onFocus={(event) => event.target.select()} className="h-12 text-center font-mono text-2xl tracking-widest" />

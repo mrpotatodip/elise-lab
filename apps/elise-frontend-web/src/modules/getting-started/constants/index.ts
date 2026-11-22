@@ -2,4 +2,4 @@ export const GETTING_STARTED_INSTALL_COMMAND = "curl -fsSL https://raw.githubuse
 
 export const GETTING_STARTED_DOCTOR_COMMAND = "elise-runner doctor";
 
-export const GETTING_STARTED_DESKTOP_URL = "https://github.com/mrpotatodip/ts-mrpotato-lab/releases";
+export const GETTING_STARTED_RELEASES_URL = "https://github.com/mrpotatodip/ts-mrpotato-lab/releases";

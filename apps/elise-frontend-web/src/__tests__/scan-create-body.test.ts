@@ -31,8 +31,8 @@ describe("scanStartProblem", () => {
   it.each([
     [
       "an older Runner asked for an upload Scan",
-      "runner_id: this Runner cannot read uploaded zips. Update the Elise Runner app on that computer and let it connect, then start the Scan again.",
-      "This Runner cannot read uploaded zips. Update the Elise Runner app on that computer and let it connect, then start the Scan again.",
+      "runner_id: this Runner cannot read uploaded zips. Update the Runner on that computer and let it connect, then start the Scan again.",
+      "This Runner cannot read uploaded zips. Update the Runner on that computer and let it connect, then start the Scan again.",
     ],
     ["a refusal with no field", "This plan allows 10 scans a month", "This plan allows 10 scans a month"],
   ])("says the engine's reason without its field name for %s", (_, message, shown) => {
