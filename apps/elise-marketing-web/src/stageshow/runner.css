@@ -1,19 +1,15 @@
-/* The Runner scene: the Runner's terminal in a strip across the top, the dashboard window under it,
-   both at one width (the stacked-cards layout). The Runner prints long lines (a repository, a
-   scan id, then the message), so the strip is wide enough to show each whole, as a terminal would.
+/* The Runner scene: the dashboard window fills the stage and the Runner's terminal is a small
+   overlay at its lower right, over the Scan page. The Runner prints long lines (a repository, a
+   scan id, then the message), so in a window this size they wrap, as in a real terminal.
    The Scan page's classes are `sp-`; the rest are card.css and scenes.css. */
 .rn {
-  /* The window starts under the terminal strip and runs to the stage's foot. */
-  --visible: 626px;
-  & .ed-window { top: 236px; height: calc(100% - 236px); }
-
   & .rn-term {
     position: absolute;
     z-index: 8;
-    left: 24px;
-    top: 24px;
-    width: calc(100% - 48px);
-    height: 200px;
+    right: 24px;
+    bottom: 24px;
+    width: 560px;
+    height: 250px;
     /* No drop shadow: the kit's terminal keeps its hairline edge. */
     --ss-shadow-hero: 0 0 0 0 transparent;
   }
@@ -23,15 +19,15 @@
     flex-direction: column;
     justify-content: flex-end;
     height: 100%;
-    padding: 4px 20px 16px;
+    padding: 4px 16px 14px;
     overflow: hidden;
     color: #d4d4d8;
-    font: 13px/22px var(--ss-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font: 12px/19px var(--ss-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     font-variant-ligatures: none;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  & .rn-log .ss-term__line { font-size: 13px; line-height: 22px; }
+  & .rn-log .ss-term__line { font-size: 12px; line-height: 19px; }
 
   /* A paired Runner that is running: the dashboard's green mark beside "Runners". */
   & .rn-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--mark-success); }
@@ -94,9 +90,8 @@
   @media (prefers-reduced-motion: reduce) { & .sp-spin, & .sp-ping i:first-child { animation: none; } }
 
   /* ---- phone width: the list only, the terminal under it ---- */
-  & [data-layout="compact"] .ed-window { top: var(--gutter); height: calc(100% - var(--gutter)); }
   & [data-layout="compact"] .pg-head { display: none; }
-  & [data-layout="compact"] .rn-term { left: 8px; top: auto; bottom: 12px; width: 342px; height: 188px; }
+  & [data-layout="compact"] .rn-term { left: 8px; right: auto; bottom: 12px; width: 342px; height: 188px; }
   & [data-layout="compact"] .rn-log { padding: 2px 12px 12px; font-size: 11px; line-height: 17px; }
   & [data-layout="compact"] .rn-log .ss-term__line { font-size: 11px; line-height: 17px; }
 }

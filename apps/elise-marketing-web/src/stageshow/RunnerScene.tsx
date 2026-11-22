@@ -222,7 +222,7 @@ export default function RunnerScene() {
   return (
     <Stage
       width={1440}
-      height={900}
+      height={760}
       compact={{ below: 640, width: 358, height: 440 }}
       initial={initial}
       poster={poster}
