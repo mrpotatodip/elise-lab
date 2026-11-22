@@ -14,6 +14,25 @@ export const SITE = {
 // is gone, so there is one audit and the coverage setting (Focused, Balanced, Exhaustive) sets its depth.
 export const CLOUDFLARE_SKILL_URL = "https://github.com/cloudflare/security-audit-skill";
 
+// The public repository holds the dashboard, the engine, the Runner and this site, under the MIT license
+// (LICENSE at its root). Secrets and customer data are not in it.
+export const SOURCE_URL = "https://github.com/mrpotatodip/ts-mrpotato-lab";
+
+export const OPEN_SOURCE = {
+  title: "Open source",
+  heroLine: "The code is open source under the MIT license, so you can read what runs on your computer.",
+  heroLink: "Read it on GitHub",
+  note: "Everything in EliseLAB is in one public repository under the MIT license: the Runner that audits your code, the dashboard, the engine behind it and this site. You can read it, run it and copy it.",
+  points: [
+    { title: "The Runner", text: "The program that reads your code runs on your computer. Its source is public, and each Runner download is built from it by a public GitHub workflow." },
+    { title: "The audit method", text: "Every scan runs Cloudflare's open-source security-audit skill. Our copy is in the repository with the four files we changed listed, so you can compare it with the original." },
+    { title: "The dashboard and engine", text: "The code that runs eliselab.com is in the repository too: how a pass or a fail is worked out, how Findings are stored and what each page shows. Passwords, keys and customer data are not." },
+  ],
+  pageLink: "More about the open source code",
+  repoLabel: "Source code on GitHub",
+  licenseLabel: "MIT license",
+} as const;
+
 // The hero paragraph. It follows the headline ("Security agents that read your code before an
 // attacker does") with how it works, what you get and why to trust it.
 export const LEDE = {

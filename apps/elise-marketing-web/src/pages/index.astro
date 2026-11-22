@@ -4,7 +4,7 @@ import Logo from "../layouts/Logo.astro";
 import ThemeSelect from "../layouts/ThemeSelect.astro";
 import ScansCard from "../stageshow/ScansCard";
 import { AuditStep, ConnectStep, ReportStep } from "../stageshow/Steps";
-import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, PRICING, RUNNER, SHOWCASE_CAPTION, SITE, STEPS, STEPS_NOTE } from "../constants/site";
+import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PICTURE_LABELS, PRICING, RUNNER, SHOWCASE_CAPTION, SITE, SOURCE_URL, STEPS, STEPS_NOTE } from "../constants/site";
 ---
 
 <Base>
@@ -19,6 +19,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         <a href="#how-it-works">How it works</a>
         <a href="#get-the-runner">Get the Runner</a>
         <a href="#pricing">Pricing</a>
+        <a href="#open-source">Open source</a>
         <a href="#what-to-know">What to know</a>
       </nav>
       <div class="nav-actions">
@@ -39,6 +40,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
             <p class="hint">{HERO_HINT}</p>
           </div>
         </div>
+        <p class="hint">{OPEN_SOURCE.heroLine} <a href={SOURCE_URL} rel="noopener">{OPEN_SOURCE.heroLink}</a>.</p>
       </div>
 
       <figure class="showcase" aria-labelledby="showcase-caption">
@@ -135,6 +137,25 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         </div>
       </section>
 
+      <section id="open-source" aria-labelledby="open-source-heading">
+        <h2 id="open-source-heading">{OPEN_SOURCE.title}</h2>
+        <p class="section-note">{OPEN_SOURCE.note}</p>
+        <div class="facts">
+          {
+            OPEN_SOURCE.points.map((point) => (
+              <div>
+                <h3>{point.title}</h3>
+                <p>{point.text}</p>
+              </div>
+            ))
+          }
+        </div>
+        <div class="plans-action">
+          <a class="button outline" href={SOURCE_URL} rel="noopener">{OPEN_SOURCE.repoLabel}</a>
+          <p class="hint"><a href="/open-source">{OPEN_SOURCE.pageLink}</a></p>
+        </div>
+      </section>
+
       <section id="what-to-know" aria-labelledby="know-heading">
         <h2 id="know-heading">What to know</h2>
         <div class="facts">
@@ -168,6 +189,8 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         <a href="#how-it-works">How it works</a>
         <a href="#pricing">Pricing</a>
         <a href="#what-to-know">What to know</a>
+        <a href="/open-source">Open source</a>
+        <a href={SOURCE_URL} rel="noopener">GitHub</a>
         <a href={CLOUDFLARE_SKILL_URL} rel="noopener">Cloudflare's open-source security-audit method</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>

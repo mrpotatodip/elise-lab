@@ -1,0 +1,26 @@
+---
+import Legal from "../layouts/Legal.astro";
+import { CLOUDFLARE_SKILL_URL, OPEN_SOURCE, SOURCE_URL } from "../constants/site";
+---
+
+<Legal title="Open source" description="EliseLAB is open source under the MIT license: the Runner, the dashboard, the engine and the audit method.">
+  <h1>Open source</h1>
+  <p>{OPEN_SOURCE.note}</p>
+
+  <h2>The repository</h2>
+  <p>All of it is in one place: <a href={SOURCE_URL} rel="noopener">{SOURCE_URL.replace("https://", "")}</a>. The {OPEN_SOURCE.licenseLabel} is the <code>LICENSE</code> file at its root. You may use, copy, change and sell the code, as long as you keep the copyright notice.</p>
+
+  <h2>What is in it</h2>
+  <ul>
+    {OPEN_SOURCE.points.map((point) => <li><strong>{point.title}.</strong> {point.text}</li>)}
+  </ul>
+
+  <h2>Code from others</h2>
+  <p>Third-party code keeps its own license. The audit skill is a modified copy of <a href={CLOUDFLARE_SKILL_URL} rel="noopener">Cloudflare's security-audit skill</a>, which is MIT licensed and copyright Cloudflare, Inc. Its license text sits in the skill's folder, and a file there says which files we changed. The brand icons used in the pictures on this site carry the licenses listed beside them in the repository.</p>
+
+  <h2>What is not in it</h2>
+  <p>Passwords, API keys and customer data are not in the repository. You can run your own copy of the code, but the hosted service at eliselab.com, with its accounts and plans, is run by Lynkfire Limited.</p>
+
+  <h2>Found a problem?</h2>
+  <p>Open an issue on <a href={SOURCE_URL} rel="noopener">GitHub</a>. To report a vulnerability in EliseLAB itself, email the address on the Privacy page rather than posting it in public.</p>
+</Legal>

@@ -140,6 +140,11 @@ a {
   text-shadow: var(--halo);
 }
 
+/* The open source line under the hero row: 24px below it, like the notes in the Runner section. */
+.hero > .hint {
+  margin-top: 1.5rem;
+}
+
 .hero-row {
   display: grid;
   gap: 1.5rem 3rem;
