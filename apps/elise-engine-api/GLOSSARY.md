@@ -157,12 +157,20 @@ A Finding that a signed-in `tenant_admin` or `workspace_admin` chose to ship wit
 _Avoid_: Waiver, exception
 
 **Finding**:
-One security problem in `findings.json`, with a status of `confirmed` or `needs_validation`.
+One security problem a Scan's verifier decided, with a status of `confirmed` or `needs_validation`.
 _Avoid_: Bug, issue, vulnerability (until a person checks it)
 
+**Live finding**:
+A Finding of a running Scan, shown before the Scan ends. The Scan's final Findings replace it when the Scan succeeds, and it is dropped when the Scan is stopped or fails. No one can make a decision or write a Comment on it.
+_Avoid_: Candidate, draft finding, preliminary finding
+
 **decision**:
-A triage change to a Finding: its status (`open`, `fixed`, `false_positive` or `accepted_risk`) and its note (`scan_finding_triage`). It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
+A triage change to a Finding: its status (`open`, `fixed`, `false_positive`, `accepted_risk` or `duplicate`) and its note (`scan_finding_triage`). A `duplicate` points to another Finding of the same Branch that is not itself a duplicate, and that Finding carries the problem. It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
 _Avoid_: Verdict (that answers a whole commit), status (a Finding has two)
+
+**Signal**:
+A hint about a Finding or a decision from a model other than the Scan's agent, such as "possible duplicate" or "weak reason". It is shown to people and never changes a Finding, a decision or the Verdict; a person acts on it or ignores it. An admin can turn Signals off for the Account, and only people who can make decisions see them.
+_Avoid_: Oracle (in security, a feature that leaks secrets), second opinion, check (the Phase and the Profile check), Jev (the model's name)
 
 **Comment**:
 Plain text a signed-in member wrote about a Finding (`scan_finding_comments`), at most 4,000 characters, kept with its author's Party. It belongs to the Repo and the Finding's fingerprint, so a rescan shows it again. It stays in the database and dashboard, never in the Report, a Scan file or GitHub. Writing one needs the Power `company:findings:comments:create`; the service token cannot.
@@ -211,8 +219,19 @@ The most an admin may set as the Monthly budget: `tenants.monthly_scan_budget_al
 _Avoid_: Ceiling (the ceiling of a Budget cap is in its own entry), limit
 
 **Plan**:
-What an Account pays for: Pro (`pro`, $49 a month, $49 of Included credit) or Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month), a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap (5). The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
+What an Account pays for. Two Plans are offered, both paid through Stripe: Starter (`starter`, $15 a month or $150 a year, 2 members) and Runner (`runner`, $35 a month or $350 a year, 5 members); the yearly price needs its Stripe yearly price ID on the row before it is offered. Older rows stay because subscriptions still point to them: Pro (`pro`, $49 a month, $49 of Included credit) and Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month). A Plan is a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap. The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
 _Avoid_: Tier, subscription (for the Plan itself)
+
+**Billing interval**:
+How often a Subscription is charged, `month` or `year` (`tenant_subscriptions.billing_interval`). It belongs to the Subscription, not the Plan: a Plan row holds both a monthly and a nullable yearly price, and a Plan with no yearly price is monthly-only. The webhook sets the interval from the Stripe price that Stripe reports; existing Stripe rows read as `month`, and an operator grant has none. Checkout takes an optional `interval` (default `month`). A Plan change keeps the interval; `POST /usage/plan/change` with `interval: "year"` moves the same Plan from monthly to yearly, and yearly to monthly is refused (cancel at the end of the paid period and subscribe again).
+_Avoid_: Annual plan, yearly tier
+
+**Billing portal**:
+Stripe's hosted page, opened through `POST /usage/plan/portal`, where an admin manages the card, the invoices and the cancel. A cancel takes effect at the end of the paid period (a month or a year, by the Billing interval), and the Subscription stays active until then.
+
+**Plan change**:
+Moving an Account with an active Stripe Subscription from one Plan to another through `POST /usage/plan/change`. It keeps the Billing interval, and never changes the Plan and the interval in one step. It is refused when the target Plan holds fewer people than the Account has people plus pending invites (the message names the counts), and refused for an Account whose Plan is an operator `grant`. The call only swaps the price in Stripe: the webhook alone changes the Subscription. A first Checkout for a Plan is refused on the same member cap.
+_Avoid_: Upgrade, downgrade, switch
 
 **Included credit**:
 The dollars a paid period of a Plan adds to the Account's credit balance (`tenant_credit_ledger`, one signed sum of grants, top-ups, holds and charges). A balance may not be pushed past the Plan's carry cap ($100 on Pro) by a grant. A new scan on the platform's key holds its Budget cap times the markup and is refused with `INSUFFICIENT_CREDIT` when the balance is lower; when it ends it is charged its metered cost times the markup. Scans on the Account's own key take no credit.
@@ -243,7 +262,7 @@ Everyone who holds a Role in an Account, plus the invites still waiting. A `tena
 _Avoid_: Members list (when you mean the whole Team), Group
 
 **Team invite**:
-An email, a Role and a one-time link that lets one person join an Account. The Worker emails the link through a queue (`INVITE_EMAIL_QUEUE`, then Cloudflare Email Service), and the create answer also holds the token so the admin can share the link by hand. Only the hash of its token is stored. It lasts 7 days, works once, and a new invite for the same email replaces the old one. It can never give `tenant_admin`.
+An email, a Role and a one-time link that lets one person join an Account. The Worker emails the link through a queue (`EMAIL_QUEUE`, then Cloudflare Email Service), and the create answer also holds the token so the admin can share the link by hand. Only the hash of its token is stored. It lasts 7 days, works once, and a new invite for the same email replaces the old one. It can never give `tenant_admin`.
 _Avoid_: Invitation, invite code (an invite code starts a whole new Account: `platform_invite_codes`)
 
 **Group**:

@@ -21,10 +21,11 @@ import runnersRoutes from "#/modules/runners";
 import scansRoutes from "#/modules/scans";
 import scanTraceRoutes from "#/modules/scan-trace";
 import signUpRoutes from "#/modules/sign-up";
+import stripeRoutes from "#/modules/stripe";
 import teamRoutes from "#/modules/team";
-import type { QueuedEmail } from "#/modules/auth/types";
-import { consumeQueuedEmails } from "#/modules/team/lib";
+import { handleEmailQueue, recordInviteStatusOf, type QueueBody } from "#/modules/email";
 import anthropicKeyRoutes from "#/modules/anthropic-key";
+import { findingSignalsAPI, signalsSettingsAPI } from "#/modules/signals";
 import creditRoutes from "#/modules/credit/api";
 import planRoutes from "#/modules/plan/api";
 import usageRoutes from "#/modules/usage";
@@ -48,7 +49,9 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
   // Every /scans route needs the service token or a
   // signed-in session. /auth, /sign-up and /me do
   // their own checks, and so do /team and /groups. The OpenAPI routes below are
-  // not here: they answer only in development.
+  // not here: they answer only in development. /stripe/webhook is
+  // public on purpose: Stripe sends no session, and the route
+  // checks the stripe-signature header itself.
   // -----
   app.use("/scans/*", requireScanAccess);
   app.use("/usage/*", requireScanAccess);
@@ -85,7 +88,7 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     return c.json({ data: null, error: { code: "INTERNAL_ERROR", message: "Internal server error" } }, 500);
   });
 
-  const routes = app.route("/scans", scansRoutes).route("/scans", scanTraceRoutes).route("/auth", authRoutes).route("/sign-up", signUpRoutes).route("/me", meRoutes).route("/usage", usageRoutes).route("/usage/anthropic-key", anthropicKeyRoutes).route("/usage/credit", creditRoutes).route("/usage/plan", planRoutes).route("/findings", findingsRoutes).route("/findings/comments", findingCommentsRoutes).route("/files", filesRoutes).route("/team", teamRoutes).route("/groups", groupsRoutes).route("/repos", reposRoutes).route("/repos", verdictRoutes).route("/repos", archivesRoutes).route("/runners", runnersRoutes);
+  const routes = app.route("/scans", scansRoutes).route("/scans", scanTraceRoutes).route("/auth", authRoutes).route("/sign-up", signUpRoutes).route("/me", meRoutes).route("/usage", usageRoutes).route("/usage/anthropic-key", anthropicKeyRoutes).route("/usage/signals", signalsSettingsAPI).route("/findings/signals", findingSignalsAPI).route("/usage/credit", creditRoutes).route("/usage/plan", planRoutes).route("/findings", findingsRoutes).route("/findings/comments", findingCommentsRoutes).route("/files", filesRoutes).route("/team", teamRoutes).route("/groups", groupsRoutes).route("/repos", reposRoutes).route("/repos", verdictRoutes).route("/repos", archivesRoutes).route("/runners", runnersRoutes).route("/stripe", stripeRoutes);
 
   // -----
   // The OpenAPI spec, for developers only.
@@ -114,7 +117,7 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
 
 export default {
   fetch: buildApp().app.fetch,
-  queue: (batch: MessageBatch<QueuedEmail>, env: Bindings) => consumeQueuedEmails(batch, env),
+  queue: (batch: MessageBatch<QueueBody>, env: Bindings, ctx: ExecutionContext) => handleEmailQueue(batch, env, recordInviteStatusOf(env, (promise) => ctx.waitUntil(promise))),
   // -----
   // The daily cron (wrangler.jsonc "triggers"): deletes the zips
   // no Scan has read 30 days after upload, and stored objects

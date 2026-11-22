@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Users } from "lucide-react";
+import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, Radio, ScanSearch, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -32,9 +32,12 @@ type ShellSidebarProps = {
   showTeam: boolean;
   showRunners: boolean;
   showPlan: boolean;
+  showSignals: boolean;
   runnersPaired: number;
   runnersRunning: number;
   showDashboard: boolean;
+  showGettingStarted: boolean;
+  onReopenGettingStarted: () => void;
   collapsed: boolean;
   canToggle: boolean;
   onToggle: () => void;
@@ -48,7 +51,7 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, runnersPaired, runnersRunning, showDashboard, collapsed, canToggle, onToggle }: ShellSidebarProps) {
+export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, showSignals, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onReopenGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
   const { open: reposOpen, setOpen: setReposOpen } = useSidebarReposOpen();
   const scansLabel = running > 0 ? `Scans, ${running} in progress` : "Scans";
   const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
@@ -82,6 +85,15 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
             <Link to="/overview" aria-label="Overview" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <LayoutDashboard className={ICON} strokeWidth={1.5} />
               {!collapsed && "Overview"}
+            </Link>
+          </Hint>
+        )}
+
+        {showDashboard && showGettingStarted && (
+          <Hint label="Getting started" collapsed={collapsed}>
+            <Link to="/overview" aria-label="Getting started" className={cn(ROW, collapsed && "justify-center px-0")} onClick={onReopenGettingStarted}>
+              <ListChecks className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Getting started"}
             </Link>
           </Hint>
         )}
@@ -194,16 +206,25 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
         )}
 
         {showPlan && (
-          <Hint label="Plan" collapsed={collapsed}>
-            <Link to="/settings/plan" aria-label="Plan" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+          <Hint label="Plan and billing" collapsed={collapsed}>
+            <Link to="/settings/plan" aria-label="Plan and billing" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <CreditCard className={ICON} strokeWidth={1.5} />
-              {!collapsed && "Plan"}
+              {!collapsed && "Plan and billing"}
+            </Link>
+          </Hint>
+        )}
+
+        {showSignals && (
+          <Hint label="Signals" collapsed={collapsed}>
+            <Link to="/settings/signals" aria-label="Signals" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <Radio className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Signals"}
             </Link>
           </Hint>
         )}
       </nav>
 
-      {empty && !collapsed && showDashboard && (
+      {empty && !collapsed && showDashboard && !showGettingStarted && (
         <Link
           to="/scans"
           className="mx-1 grid gap-1 rounded-xl border border-dashed border-input p-4 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

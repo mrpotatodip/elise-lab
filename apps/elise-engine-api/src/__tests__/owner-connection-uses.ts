@@ -12,14 +12,21 @@
 // -----
 export const OWNER_CONNECTION_USES = {
   "lib/app-deps.ts": {
-    uses: 6,
-    reason: "The membership checks read a person's Roles across Accounts before one is chosen; a Runner token names the Runner, and only the Runner row names its Account",
+    uses: 8,
+    reason:
+      "The membership checks read a person's Roles across Accounts before one is chosen; a Runner token names the Runner, and only the Runner row names its Account; Stripe's webhook has no session, so only the event names its Account",
   },
   "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
   "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },
   "modules/archives/api/run-upload-retention.ts": {
     uses: 2,
     reason: "The daily cron has no request and no Account: the upload retention sweep crosses Accounts, and touches only upload rows",
+  },
+  "modules/email/lib/consume-emails.ts": { uses: 4, reason: "The queue consumer has no request and no session: it passes the connection to the lookup of names" },
+  "modules/email/lib/load-runner-names.ts": { uses: 1, reason: "The queue consumer has no request: it reads names of one Runner, one Login and one Account, each filtered by an ID from the message" },
+  "modules/email/lib/record-invite-status.ts": {
+    uses: 3,
+    reason: "The queue handler has no request and no Account: it records one invite's email status, filtered by the invite's ID",
   },
   "modules/me/api/get-me.ts": { uses: 2, reason: "Lists the Accounts a person belongs to, across Accounts" },
   "modules/runners/api/claim-job.ts": { uses: 2, reason: "A Runner token names the Runner, and only the Runner row names its Account" },
@@ -35,8 +42,9 @@ export const OWNER_CONNECTION_USES = {
   "modules/scan-records/handlers/record-scan-svc.ts": { uses: 4, reason: "A Workflow step with no request: records the finished Scan, its files and findings, filtered by the Scan's Account" },
   "modules/scan-records/types/scan-records-types.ts": { uses: 1, reason: "The env type of record-scan, which the Workflow passes" },
   "modules/scan-workflow/lib/full-scan-workflow.ts": {
-    uses: 8,
-    reason: "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, write its Trace entries, each filtered by the Scan's Account",
+    uses: 10,
+    reason:
+      "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, write its Trace entries, store the possible-duplicate Signals, each filtered by the Scan's Account",
   },
   "modules/scan-workflow/lib/settle-scan-credit.ts": { uses: 4, reason: "A Workflow step with no request: reads the Plan and settles the Scan's credit hold for the Scan's Account" },
   "modules/sign-up/api/create-account.ts": { uses: 2, reason: "Creates the Account, so none exists to run as yet" },

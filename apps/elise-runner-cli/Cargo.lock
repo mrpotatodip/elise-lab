@@ -978,7 +978,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "elise-runner-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "elise-runner-core",
@@ -989,7 +989,7 @@ dependencies = [
 
 [[package]]
 name = "elise-runner-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "keyring",
  "reqwest",
@@ -1002,7 +1002,7 @@ dependencies = [
 
 [[package]]
 name = "elise-runner-desktop"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "elise-runner-core",
  "serde",

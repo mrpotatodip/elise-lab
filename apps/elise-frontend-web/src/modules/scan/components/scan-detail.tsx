@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { SkeletonBar } from "#/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { GithubPrivateBadge } from "#/modules/github";
+import { REPORT_FILE } from "#/modules/shared";
 import { ShellPageHeader } from "#/modules/shell";
 import { SCAN_STEP_COPY } from "../constants";
 import { isScanActive, scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
@@ -24,7 +25,7 @@ import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanSummary } from "./scan-summary";
 import { ScanTrace } from "./scan-trace";
 
-const DEFAULT_FILE = "REPORT.md";
+const DEFAULT_FILE = REPORT_FILE;
 
 function ScanFileViewer({ scanId, file }: { scanId: string; file: string }) {
   const { data, isPending, error } = useQuery(scanFileQuery(scanId, file));
@@ -159,7 +160,22 @@ export function ScanDetail({ scanId }: { scanId: string }) {
 
       <ScanStatusNotice scan={scan} />
 
-      {isScanActive(scan.status) && <ScanTrace scan={scan} />}
+      {isScanActive(scan.status) && (
+        <>
+          <Card>
+            <CardHeader className="gap-1.5">
+              <CardTitle>Findings so far</CardTitle>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Found so far, still being checked. They can change before the Report.</p>
+            </CardHeader>
+            <CardContent className="overflow-hidden p-0">
+              <Suspense fallback={<ScanFindingsTableSkeleton />}>
+                <ScanFindingsTable scanId={scanId} repoId={scan.repoId} repoLabel={owner ? `${owner}/${name}` : name} commit={scan.commitSha ?? undefined} live />
+              </Suspense>
+            </CardContent>
+          </Card>
+          <ScanTrace scan={scan} />
+        </>
+      )}
 
       {succeeded && (
         <>

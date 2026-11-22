@@ -25,6 +25,7 @@ export const ACCESS_ACTION_VALUES = [
   "reorder",
   "publish",
   "dismiss",
+  "manage",
 ] as const;
 
 export type AccessActionValue = (typeof ACCESS_ACTION_VALUES)[number];
@@ -32,6 +33,14 @@ export type AccessActionValue = (typeof ACCESS_ACTION_VALUES)[number];
 export const INVITE_CODE_STATUS_VALUES = ["active", "used_up", "expired", "revoked"] as const;
 
 export type InviteCodeStatusValue = (typeof INVITE_CODE_STATUS_VALUES)[number];
+
+// -----
+// Whether a Team invite's email went out. Twin of the CHECK
+// constraint on tenant_team_invites in db-elise.
+// -----
+export const INVITE_EMAIL_STATUS_VALUES = ["not_sent", "sent", "failed"] as const;
+
+export type InviteEmailStatusValue = (typeof INVITE_EMAIL_STATUS_VALUES)[number];
 
 // -----
 // Scans. Twins of the CHECK constraints on
@@ -47,7 +56,7 @@ export const FINDING_SEVERITY_VALUES = ["critical", "high", "medium", "low", "in
 // -----
 export const FINDING_ORIGIN_VALUES = ["new", "carried"] as const;
 export const REPO_FINDING_STATE_VALUES = ["open", "fixed_by_code", "regressed"] as const;
-export const FINDING_TRIAGE_STATUS_VALUES = ["open", "fixed", "false_positive", "accepted_risk"] as const;
+export const FINDING_TRIAGE_STATUS_VALUES = ["open", "fixed", "false_positive", "accepted_risk", "duplicate"] as const;
 
 // -----
 // Which Anthropic key paid for a scan: the platform's, or the one
@@ -80,6 +89,13 @@ export const SUBSCRIPTION_STATUS_VALUES = ["active", "past_due", "canceled", "un
 export const SUBSCRIPTION_SOURCE_VALUES = ["stripe", "grant"] as const;
 
 // -----
+// Billing interval: how often a Subscription is charged. Twin of the
+// CHECK on tenant_subscriptions.billing_interval. An operator grant
+// has none.
+// -----
+export const BILLING_INTERVAL_VALUES = ["month", "year"] as const;
+
+// -----
 // What a credit ledger entry is. grant and topup add credit; scan_hold
 // takes what a running scan may spend; scan_settle gives back the hold
 // and takes the real charge; expiry takes credit that lapsed; adjustment
@@ -98,6 +114,7 @@ export type RunnerLoginStateValue = (typeof RUNNER_LOGIN_STATE_VALUES)[number];
 export type RunnerJobStateValue = (typeof RUNNER_JOB_STATE_VALUES)[number];
 export type SubscriptionStatusValue = (typeof SUBSCRIPTION_STATUS_VALUES)[number];
 export type SubscriptionSourceValue = (typeof SUBSCRIPTION_SOURCE_VALUES)[number];
+export type BillingIntervalValue = (typeof BILLING_INTERVAL_VALUES)[number];
 export type CreditEntryKindValue = (typeof CREDIT_ENTRY_KIND_VALUES)[number];
 
 // -----

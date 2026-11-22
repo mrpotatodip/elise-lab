@@ -1,7 +1,9 @@
 import { Effect } from "effect";
 import type { AppDeps } from "#/types/variables";
+import { fakeStripe } from "./fake-stripe";
+import { fakeTypeSafe } from "./fake-typesafe";
 import { memoryScanRepo } from "./memory-scan-repo";
-import { noTenantDb } from "./no-tenant-db";
+import { noOwnerDb, noTenantDb } from "./no-tenant-db";
 
 // -----
 // Every AppDeps a route test needs, answered without a database: no
@@ -21,8 +23,10 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   runnerIdentity: async () => null,
   userHasAccount: async () => true,
   userHasPower: async () => true,
-  enqueueInviteEmail: async () => undefined,
-  enqueuePasswordResetEmail: async () => undefined,
+  enqueueEmail: async () => undefined,
   withTenant: noTenantDb,
+  withOwner: noOwnerDb,
+  stripe: () => fakeStripe().gateway,
+  typesafe: () => fakeTypeSafe().gateway,
   ...overrides,
 });

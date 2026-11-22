@@ -30,6 +30,7 @@ const OTHER_FINGERPRINT = "b".repeat(64);
 export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
 export const OTHER_REPO_ID = "00000000-0000-4000-8000-0000000000b2";
 export const OTHER_SECOND_REPO = "https://github.com/octocat/Spoon-Knife";
+export const OTHER_SIGNAL_ID = "00000000-0000-4000-8000-0000000000d1";
 export const OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000b5";
 export const OTHER_GROUP_NAME = "Backend";
 export const OTHER_INVITE_ID = "00000000-0000-4000-8000-0000000000b6";
@@ -47,6 +48,7 @@ export const OTHER_RUNNER_NAME = "runner-of-the-other";
 // -----
 export const NOT_TENANT_ROUTES: readonly string[] = [
   "GET /usage/plan/offers",
+  "POST /stripe/webhook",
   "GET /auth/*",
   "POST /auth/*",
   "POST /sign-up",
@@ -62,6 +64,7 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
   "GET /runners/jobs/:scanId",
   "GET /runners/jobs/:scanId/archive",
   "POST /runners/jobs/:scanId/trace",
+  "POST /runners/jobs/:scanId/findings",
   "GET /runners/me",
   "DELETE /runners/me",
   "GET /openapi.json",
@@ -82,6 +85,11 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 export const CROSS_ACCOUNT_CASES = {
   "GET /findings": { kind: "run", path: "/findings?scanId=theirs", expect: "empty" },
   "GET /findings/comments": { kind: "run", path: `/findings/comments?repo=${OTHER_REPO}&fingerprint=${OTHER_FINGERPRINT}`, expect: "empty" },
+  "GET /findings/signals": { kind: "run", path: `/findings/signals?repo=${OTHER_REPO}`, expect: "empty" },
+  "POST /findings/signals/:signalId/dismiss": { kind: "run", path: `/findings/signals/${OTHER_SIGNAL_ID}/dismiss`, method: "POST", expect: "not-found" },
+  "POST /findings/signals/weak-reason": serviceTest("modules/signals/__tests__/weak-reason.test.ts"),
+  "GET /usage/signals": serviceTest("modules/signals/__tests__/signals-routes.test.ts"),
+  "PUT /usage/signals": serviceTest("modules/signals/__tests__/signals-routes.test.ts"),
   "POST /findings/comments": {
     kind: "run",
     path: "/findings/comments",
@@ -133,6 +141,9 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /usage/credit": { kind: "run", path: "/usage/credit", expect: "own", own: { planKey: null, balanceUsd: 0, scans: 0 } },
   "GET /usage/credit/entries": { kind: "run", path: "/usage/credit/entries", expect: "empty" },
   "GET /usage/plan": { kind: "run", path: "/usage/plan", expect: "own", own: { plan: null, status: null, scans: 0 } },
+  "POST /usage/plan/change": serviceTest("modules/plan/__tests__/plan-change.test.ts"),
+  "POST /usage/plan/checkout": serviceTest("modules/plan/__tests__/plan-checkout.test.ts"),
+  "POST /usage/plan/portal": serviceTest("modules/plan/__tests__/plan-checkout.test.ts"),
   // -----
   // After the two change lists: the change writes the caller's own
   // audit row, which those lists would then show.

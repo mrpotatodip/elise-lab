@@ -1,6 +1,6 @@
 [package]
 name = "elise-runner-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "What every Elise Runner does apart from drawing a window: pairing, the token store, the claim loop and the Scan"
 edition = "2021"
 

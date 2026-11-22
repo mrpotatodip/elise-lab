@@ -1,15 +1,16 @@
 import type { Context } from "hono";
 import type { Effect } from "effect";
 import type { AccessPower, RunnerIdentity, ScanUsage } from "@repo/contracts/elise";
-import type { TenantDbType } from "#/lib/db-connection";
+import type { PoolDbType, TenantDbType } from "#/lib/db-connection";
+import type { StripeGateway } from "#/modules/stripe/types";
+import type { TypeSafeGateway } from "#/modules/typesafe";
 import type { DbError, Invalid } from "#/lib/effect-query";
 import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { MonthSpend } from "#/modules/usage";
 import type { FullScanSandbox } from "#/modules/scan-sandbox";
-import type { PasswordResetEmail, QueuedEmail } from "#/modules/auth/types";
-import type { InviteEmail } from "#/modules/team/types";
+import type { QueuedEmail } from "#/modules/email";
 import type { ScanParams } from "#/schemas";
 
 export type Bindings = {
@@ -24,6 +25,11 @@ export type Bindings = {
   BILLING_ENFORCED: string;
   ANTHROPIC_API_KEY: string;
   KEY_ENCRYPTION_SECRET?: string;
+  TYPESAFE_API_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_BRANDING_ICON_FILE_ID?: string;
+  STRIPE_BRANDING_LOGO_FILE_ID?: string;
   SCAN_API_TOKEN: string;
   DATABASE_URL: string;
   HYPERDRIVE_TENANT: Hyperdrive;
@@ -38,10 +44,11 @@ export type Bindings = {
   RUNNER_LOGIN_START_LIMITER?: RateLimit;
   RUNNER_LOGIN_START_TOTAL_LIMITER?: RateLimit;
   PASSWORD_RESET_LIMITER?: RateLimit;
+  PASSWORD_RESET_ADDRESS_LIMITER?: RateLimit;
   DASHBOARD_URL: string;
-  INVITE_FROM: string;
+  EMAIL_FROM: string;
   EMAIL: SendEmail;
-  INVITE_EMAIL_QUEUE: Queue<QueuedEmail>;
+  EMAIL_QUEUE: Queue<QueuedEmail>;
   REPORTS: R2Bucket;
   SANDBOX_FULL: DurableObjectNamespace<FullScanSandbox>;
   SCAN_WORKFLOW_FULL: Workflow<ScanParams>;
@@ -63,9 +70,11 @@ export type AppDeps = {
   runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
-  enqueueInviteEmail: (env: Bindings, mail: InviteEmail) => Promise<void>;
-  enqueuePasswordResetEmail: (env: Bindings, mail: PasswordResetEmail) => Promise<void>;
+  enqueueEmail: (env: Bindings, mail: QueuedEmail) => Promise<void>;
   withTenant: <T>(c: Context<AppEnv>, accountId: string, run: (db: TenantDbType) => Promise<T>) => Promise<T>;
+  withOwner: <T>(c: Context<AppEnv>, run: (db: PoolDbType) => Promise<T>) => Promise<T>;
+  stripe: (env: Bindings) => StripeGateway;
+  typesafe: (env: Bindings) => TypeSafeGateway | null;
 };
 
 export type Variables = { userId?: string; deps: AppDeps };

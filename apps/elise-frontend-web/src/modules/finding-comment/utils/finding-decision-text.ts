@@ -6,6 +6,7 @@ const DECISION_VERBS = {
   open: "reopened this",
   fixed: "marked this fixed. A scan has not confirmed it yet.",
   false_positive: "marked this a false positive",
+  duplicate: "marked this a duplicate of another finding",
 } satisfies Record<Exclude<FindingDecision["status"], "accepted_risk">, string>;
 
 // -----

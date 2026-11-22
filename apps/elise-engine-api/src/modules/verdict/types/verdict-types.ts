@@ -40,6 +40,7 @@ export type JudgedTriage = {
   status: FindingTriageStatusValue;
   note: string | null;
   acceptedUntil: Date | null;
+  duplicateOf: string | null;
 };
 
 export type JudgeInput = {

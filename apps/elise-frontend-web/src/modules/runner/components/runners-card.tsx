@@ -1,14 +1,16 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
+import { Link } from "@tanstack/react-router";
 import { Bot } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "#/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
+import { CopyCommand, INLINE_LINK_CLASS } from "#/modules/shared";
 import { removeRunner } from "../api";
-import { RUNNER_STATE_COPY } from "../constants";
+import { RUNNER_LOGIN_COMMAND, RUNNER_STATE_COPY } from "../constants";
 import { runnerKeys, runnersQuery } from "../hooks";
 import type { Runner } from "../schemas";
 import { runnerAddedBy, runnerDetail, runnerShownState } from "../utils";
@@ -85,8 +87,18 @@ export function RunnersCard() {
                 <Bot aria-hidden="true" />
               </EmptyMedia>
               <EmptyTitle>No runners yet</EmptyTitle>
-              <EmptyDescription>Add a computer to get a pairing code, then type the code into the Elise Runner app on it.</EmptyDescription>
+              <EmptyDescription>On a computer with Claude Code signed in, run this and approve it here.</EmptyDescription>
             </EmptyHeader>
+            <EmptyContent className="max-w-md">
+              <CopyCommand command={RUNNER_LOGIN_COMMAND} />
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                The setup tasks are in{" "}
+                <Link to="/overview" className={INLINE_LINK_CLASS}>
+                  Getting started
+                </Link>
+                . For CI or a container, use Add a runner to make a pairing code.
+              </p>
+            </EmptyContent>
           </Empty>
         ) : (
           <DataTable table={table} />

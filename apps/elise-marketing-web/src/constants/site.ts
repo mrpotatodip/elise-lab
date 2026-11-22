@@ -67,17 +67,44 @@ export const STEPS = [
   },
 ] as const;
 
-// The one plan the live plans table offers (Runner, $35 a month, 5 members). Older plans stay in
-// the table but are not offered, so they are not printed. Card checkout is not claimed: the
+// The two plans the live plans table offers (Starter, $15 a month, 2 members; Runner, $35 a month,
+// 5 members). Older plans stay in the table but are not offered, so they are not printed. Card checkout is not claimed: the
 // subscription path is not live yet. Update this when the plans table changes.
+// -----
+// The yearly prices below must match the engine's plan rows (platform_master_plans: monthly and
+// yearly price). The per-month figures and the "months free" badge are worked out from them.
+// -----
+const PLAN_USD = { starter: { month: 15, year: 150 }, runner: { month: 35, year: 350 } } as const;
+
+const usd = (amount: number) => `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+const perMonth = (yearly: number) => usd(Math.round((yearly / 12) * 100) / 100);
+const MONTHS_FREE = Math.floor(Math.min(...Object.values(PLAN_USD).map((plan) => 12 - plan.year / plan.month)));
+
 export const PRICING = {
-  note: "One plan, one price. Paid sign-up opens soon. Until then, create an account and set up a Runner. There is no card checkout yet and no free trial.",
+  note: "Two plans, one flat price each. Paid sign-up opens soon. Until then, create an account and set up a Runner. There is no card checkout yet and no free trial.",
+  intervals: { month: "Monthly", year: "Yearly" },
+  yearlyBadge: `${MONTHS_FREE} months free`,
   action: "Create an account",
   actionHint: "Create an account opens the sign-up page in Elise.",
   plans: [
     {
+      name: "Starter",
+      price: usd(PLAN_USD.starter.month),
+      yearlyPrice: usd(PLAN_USD.starter.year),
+      yearlyPerMonth: perMonth(PLAN_USD.starter.year),
+      summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place. For one or two people.",
+      points: [
+        "Flat price. EliseLAB adds no charge per scan.",
+        "Install a Runner on your computer or a server and pair it to your account. Scans run there, on your own AI subscription, which you pay for directly.",
+        "See Runners, scans, reports and findings for every repository and branch in one dashboard.",
+        "Up to 2 members per account.",
+      ],
+    },
+    {
       name: "Runner",
-      price: "$35",
+      price: usd(PLAN_USD.runner.month),
+      yearlyPrice: usd(PLAN_USD.runner.year),
+      yearlyPerMonth: perMonth(PLAN_USD.runner.year),
       summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place.",
       points: [
         "Flat price. EliseLAB adds no charge per scan.",
@@ -95,7 +122,7 @@ export const FACTS = [
   { title: "It reads your code and never changes it", text: "Elise can read the repositories you choose and cannot write to them. Public repositories need no connection. Private ones need GitHub connected." },
   { title: "What a pass or a fail means", text: "A commit passes when it has been scanned at least twice, Elise re-checked the earlier findings, no Critical or High finding is open and no more than 3 Medium ones are. A fail says \"Do not ship yet\" and lists what blocks the commit. With too few scans, Elise says \"not enough scans\" instead of guessing. Scan the commit again to get an answer. Pass or fail, treat it as advice. An agent can miss a vulnerability." },
   { title: "What the severities mean", text: "Critical is the worst rating. An attacker could do serious harm with it. High is nearly as bad. Fix both before shipping. Medium is worth fixing, and a few can ship. Low is minor and does not block shipping. Unrated means nobody has rated the finding yet." },
-  { title: "What it costs", text: "The Runner plan is $35 a month. Scans run on your own AI subscription through a Runner, so you pay that provider directly and EliseLAB adds no per-scan charge. A quick review is one agent's fast first pass. A full audit runs several agents through Cloudflare's open-source security-audit method and takes longer.", more: { href: "#pricing", label: "See the plans under Pricing." } },
+  { title: "What it costs", text: "Starter is $15 a month for up to 2 members and Runner is $35 a month for up to 5. Both have the same features. Scans run on your own AI subscription through a Runner, so you pay that provider directly and EliseLAB adds no per-scan charge. A quick review is one agent's fast first pass. A full audit runs several agents through Cloudflare's open-source security-audit method and takes longer.", more: { href: "#pricing", label: "See the plans under Pricing." } },
 ] as const;
 
 // Under "How it works": the pictures are real screens with made-up data.

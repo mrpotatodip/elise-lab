@@ -12,3 +12,7 @@ const missing = () => {
 export const noTenantDb: AppDeps["withTenant"] = async (_c, _accountId, run) =>
   // SAFETY: every use of the stand-in throws, so no query runs on it.
   run(new Proxy({}, { get: missing }) as never);
+
+export const noOwnerDb: AppDeps["withOwner"] = async (_c, run) =>
+  // SAFETY: every use of the stand-in throws, so no query runs on it.
+  run(new Proxy({}, { get: missing }) as never);

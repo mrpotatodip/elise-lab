@@ -1,50 +1,69 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
-import { buttonVariants } from "#/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
+import { Button, buttonVariants } from "#/components/ui/button";
+import { Card } from "#/components/ui/card";
 import { Progress } from "#/components/ui/progress";
 import { useNow } from "#/lib/use-now";
 import { runnerShownState, runnersQuery, runnerWhen } from "#/modules/runner";
 import { ShellPageHeader } from "#/modules/shell";
 import { teamQuery, teamRoleLabel } from "#/modules/team";
 import { usageUsd } from "#/modules/usage";
-import { planOffersQuery, planQuery } from "../hooks";
-import { PLAN_STATUS_VIEW, planDateLabel, planSourceLabel } from "../utils";
+import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS, PLAN_REFUND_LINE, PLAN_YEARLY_BACK_LINE } from "../constants";
+import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
+import type { PlanDetails, PlanOffer } from "../schemas";
+import type { PlanCheckoutReturn } from "../types";
+import { PLAN_STATUS_VIEW, planBilledYearlySentence, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel, planSwitchPending, type PlanSwitchTarget } from "../utils";
+import { ComparePlans } from "./compare-plans";
+import { PriceLine } from "./price-line";
 
-const PER_MONTH = <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per month</span>;
+function RedirectButton({ label, variant = "default", busy, onClick }: { label: string; variant?: "default" | "outline"; busy: boolean; onClick: () => void }) {
+  return (
+    <Button variant={variant} size="sm" className="h-auto min-h-8 max-w-full justify-self-start whitespace-normal py-1.5 text-left" disabled={busy} onClick={onClick}>
+      {label}
+    </Button>
+  );
+}
+
+function PortalButton() {
+  const { portal } = usePlanActions();
+
+  return <RedirectButton label="Manage billing" variant="outline" busy={portal.isPending || portal.isSuccess} onClick={() => portal.mutate()} />;
+}
+
+function CheckoutNote({ checkout, confirming, gaveUp }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
+  if (checkout === "cancelled") {
+    return (
+      <Alert variant="info">
+        <AlertDescription>Checkout was cancelled. Nothing was charged.</AlertDescription>
+      </Alert>
+    );
+  }
+  if (confirming) {
+    return (
+      <Alert variant="info">
+        <AlertDescription>{gaveUp ? "Still waiting: refresh in a minute." : "Confirming payment. This page updates on its own in a moment."}</AlertDescription>
+      </Alert>
+    );
+  }
+  return null;
+}
 
 const ALERT_VARIANT = { success: "success", warning: "warning", destructive: "destructive", neutral: "info" } as const;
 
 const ACTION = buttonVariants({ variant: "outline", size: "sm" });
 
-function PlanOfferCard() {
-  const { data: offers } = useSuspenseQuery(planOffersQuery());
-  const offer = offers[0];
+function NoPlanView({ data, offers, checkout, confirming, gaveUp }: { data: PlanDetails; offers: ReadonlyArray<PlanOffer>; checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
+  const canManage = useCanManagePlan();
 
   return (
     <>
-      <ShellPageHeader title="Plan" description="What this account pays for." />
-      <Card className="max-w-3xl">
-        <CardHeader>
-          <CardTitle>No plan yet</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Scans start once this account has a plan.</p>
-        </CardHeader>
-        {offer !== undefined && (
-          <CardContent className="grid gap-5">
-            <p className="text-sm font-medium">{offer.label}</p>
-            <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
-              {usageUsd(offer.monthlyPriceUsd)}
-              {PER_MONTH}
-            </p>
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-              Up to {offer.maxMembers} people. Scans run on your own Claude through a Runner, and Elise gathers every result in one place. To subscribe, contact us.
-            </p>
-          </CardContent>
-        )}
-      </Card>
+      <ShellPageHeader title="Plan and billing" description="No plan yet. Scans start once this account has a plan." />
+      <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
+      <ComparePlans data={data} offers={offers} from={null} canManage={canManage} switching={false} onSwitched={() => undefined} />
     </>
   );
 }
@@ -64,19 +83,39 @@ function Column({ label, aside, footer, children }: ColumnProps) {
   );
 }
 
-export function PlanCard() {
-  const { data } = useSuspenseQuery(planQuery());
+export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
+  const queryClient = useQueryClient();
+  const [switching, setSwitching] = useState<(PlanSwitchTarget & { baseline: number }) | null>(null);
+  const { data } = useSuspenseQuery({
+    ...planQuery(),
+    refetchInterval: (query) => {
+      const { data: latest, dataUpdateCount } = query.state;
+      if (latest === undefined) return false;
+      const checkoutPolling = planConfirmingPayment(checkout, latest) && dataUpdateCount < PLAN_CONFIRM_POLL_MAX;
+      const switchPolling = switching !== null && planSwitchPending(switching, latest) && dataUpdateCount - switching.baseline < PLAN_CONFIRM_POLL_MAX;
+      return checkoutPolling || switchPolling ? PLAN_CONFIRM_POLL_MS : false;
+    },
+  });
+  const { data: offers } = useSuspenseQuery(planOffersQuery());
   const { data: runners } = useSuspenseQuery(runnersQuery());
   const { data: team } = useSuspenseQuery(teamQuery());
+  const canManage = useCanManagePlan();
   const now = useNow();
   const { plan } = data;
+  const confirming = planConfirmingPayment(checkout, data);
+  const updateCount = queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0;
+  const gaveUp = updateCount >= PLAN_CONFIRM_POLL_MAX;
+  const switchWaiting = switching !== null && planSwitchPending(switching, data);
+  const switchGaveUp = switching !== null && switchWaiting && updateCount - switching.baseline >= PLAN_CONFIRM_POLL_MAX;
 
   if (plan === null || data.status === null || data.source === null) {
-    return <PlanOfferCard />;
+    return <NoPlanView data={data} offers={offers} checkout={checkout} confirming={confirming} gaveUp={gaveUp} />;
   }
 
   const status = PLAN_STATUS_VIEW[data.status];
+  const billing = planBillingAction(data);
   const granted = data.source === "grant";
+  const yearly = !granted && data.interval === "year";
   const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
   const people = data.seats.members + data.seats.pendingInvites;
@@ -85,16 +124,38 @@ export function PlanCard() {
 
   return (
     <>
-      <ShellPageHeader title="Plan" description="What this account pays for." badges={<Badge variant={status.variant}>{status.label}</Badge>} />
+      <ShellPageHeader title="Plan and billing" description="What this account pays for." badges={<Badge variant={status.variant}>{status.label}</Badge>} />
+
+      <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
 
       {status.note !== null && (
         <Alert variant={ALERT_VARIANT[status.variant]}>
-          <AlertDescription>{status.note}</AlertDescription>
+          <AlertDescription className="grid justify-items-start gap-3">
+            {status.note}
+            {data.status === "past_due" && canManage && <PortalButton />}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {switchWaiting && (
+        <Alert variant="info">
+          <AlertDescription>{switchGaveUp ? "Switching is taking longer than expected. Reload this page later to see the new plan." : "Switching plan. This page updates on its own in a moment."}</AlertDescription>
         </Alert>
       )}
 
       <Card className="grid overflow-hidden lg:grid-cols-3 lg:divide-x">
-        <Column label={`${plan.label} plan`} footer={<p className="max-w-copy text-sm leading-relaxed text-muted-foreground">To change your plan, contact us.</p>}>
+        <Column
+          label={`${plan.label} plan`}
+          footer={
+            billing === "manage" ? (
+              canManage ? (
+                <PortalButton />
+              ) : (
+                <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to change the plan.</p>
+              )
+            ) : undefined
+          }
+        >
           {granted ? (
             <>
               <p className="text-[40px] font-semibold leading-none tracking-tight">No charge</p>
@@ -105,14 +166,18 @@ export function PlanCard() {
             </>
           ) : (
             <>
-              <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
-                {usageUsd(plan.monthlyPriceUsd)}
-                {PER_MONTH}
-              </p>
+              <PriceLine terms={plan} interval={yearly ? "year" : "month"} />
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
                 {planSourceLabel(data.source)}
-                {data.currentPeriodEnd !== null ? `. Renews ${planDateLabel(data.currentPeriodEnd)}` : ""}. Elise charges nothing per scan.
+                {planPeriodSentence(data)}. Elise charges nothing per scan.
               </p>
+              {yearly && (
+                <>
+                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{planBilledYearlySentence(data)}</p>
+                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{PLAN_YEARLY_BACK_LINE}</p>
+                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{PLAN_REFUND_LINE}</p>
+                </>
+              )}
             </>
           )}
         </Column>
@@ -190,6 +255,15 @@ export function PlanCard() {
           )}
         </Column>
       </Card>
+
+      <ComparePlans
+        data={data}
+        offers={offers}
+        from={plan}
+        canManage={canManage}
+        switching={switchWaiting && !switchGaveUp}
+        onSwitched={(target) => setSwitching({ ...target, baseline: queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0 })}
+      />
     </>
   );
 }

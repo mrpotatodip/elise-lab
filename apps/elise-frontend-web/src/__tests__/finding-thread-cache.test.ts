@@ -29,6 +29,7 @@ const decision: FindingDecision = {
   status: "fixed",
   note: null,
   acceptedUntil: null,
+  duplicateOf: null,
   createdAt: "2026-11-15T08:15:00.000Z",
 };
 

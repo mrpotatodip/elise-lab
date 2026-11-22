@@ -29,7 +29,7 @@ export function FindingDecisionNote({ state, triage, fixedOn }: FindingStatusPro
   const key = findingStatusKey(state, triage);
   if (key === "open" || key === "came_back") return null;
 
-  const verb = key === "accepted_risk" ? "Accepted" : key === "false_positive" ? "Dismissed" : "Marked fixed";
+  const verb = key === "accepted_risk" ? "Accepted" : key === "false_positive" ? "Dismissed" : key === "duplicate" ? "Marked duplicate" : "Marked fixed";
   let first: ReactNode = `${verb} by ${whoOf(triage)}`;
   let second: ReactNode = <ScanTime value={triage?.updatedAt} />;
   if (key === "fixed_by_scan") {
@@ -86,6 +86,8 @@ function bannerOf({ state, triage, fixedOn }: FindingStatusProps): Banner {
       };
     case "false_positive":
       return { tone: "neutral", title: `Dismissed as a false positive by ${who}`, body: <>{when}. It no longer counts as open.</> };
+    case "duplicate":
+      return { tone: "neutral", title: `Marked a duplicate by ${who}`, body: <>{when}. Another finding carries this problem, so this one no longer counts.</> };
     case "accepted_risk":
       return isExpired(triage)
         ? {
