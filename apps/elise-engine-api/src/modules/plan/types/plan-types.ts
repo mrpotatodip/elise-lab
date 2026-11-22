@@ -1,4 +1,4 @@
-import type { SubscriptionSourceValue, SubscriptionStatusValue } from "@repo/contracts/elise";
+import type { BillingIntervalValue, SubscriptionSourceValue, SubscriptionStatusValue } from "@repo/contracts/elise";
 
 // -----
 // What a billing call needs to know about the Account: its name, an
@@ -13,7 +13,16 @@ export type BillingContext = {
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;
     planId: string;
+    billingInterval: BillingIntervalValue | null;
   } | null;
 };
 
-export type PlanByKey = { id: string; key: string; label: string; priceId: string | null; enabled: boolean; maxMembers: number };
+export type PlanByKey = {
+  id: string;
+  key: string;
+  label: string;
+  priceId: string | null;
+  yearlyPriceId: string | null;
+  enabled: boolean;
+  maxMembers: number;
+};

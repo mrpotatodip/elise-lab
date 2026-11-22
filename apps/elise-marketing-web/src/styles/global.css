@@ -335,6 +335,52 @@ h2 {
   overflow-x: clip;
 }
 
+/* Monthly/Yearly toggle: two visually hidden radios drive it, so it needs no script. */
+.billing-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin: 0 0 1.5rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.billing-toggle label {
+  padding: 0.375rem 0.875rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: var(--muted-foreground);
+}
+
+.billing-badge {
+  margin-left: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.billing:has(#billing-month:checked) .billing-badge {
+  display: none;
+}
+
+.billing:has(#billing-month:checked) label[for="billing-month"],
+.billing:has(#billing-year:checked) label[for="billing-year"] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.billing:has(#billing-month:focus-visible) label[for="billing-month"],
+.billing:has(#billing-year:focus-visible) label[for="billing-year"] {
+  outline: 2px solid var(--ring, currentColor);
+  outline-offset: 2px;
+}
+
+.billing:has(#billing-month:checked) .when-year,
+.billing:has(#billing-year:checked) .when-month {
+  display: none;
+}
+
 /* Pricing: two cards in the dashboard's card style (token surface, hairline, card shadow). */
 .plans {
   display: grid;

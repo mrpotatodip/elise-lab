@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CREDIT_ENTRY_KIND_VALUES, SCAN_KEY_SOURCE_VALUES, SUBSCRIPTION_SOURCE_VALUES, SUBSCRIPTION_STATUS_VALUES } from "../enums";
+import { BILLING_INTERVAL_VALUES, CREDIT_ENTRY_KIND_VALUES, SCAN_KEY_SOURCE_VALUES, SUBSCRIPTION_SOURCE_VALUES, SUBSCRIPTION_STATUS_VALUES } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 import { CREDIT_DEFAULT_PLAN_KEY } from "./constants";
 
@@ -55,6 +55,7 @@ export const PlanDetailsSchema = z.object({
       key: z.string(),
       label: z.string(),
       monthlyPriceUsd: z.number().min(0),
+      yearlyPriceUsd: z.number().min(0).nullable().optional(),
       includedCreditUsd: z.number().min(0),
       carryCapUsd: z.number().min(0).nullable(),
       keySource: z.enum(SCAN_KEY_SOURCE_VALUES),
@@ -64,6 +65,7 @@ export const PlanDetailsSchema = z.object({
     .nullable(),
   status: z.enum(SUBSCRIPTION_STATUS_VALUES).nullable(),
   source: z.enum(SUBSCRIPTION_SOURCE_VALUES).nullable(),
+  interval: z.enum(BILLING_INTERVAL_VALUES).nullable().optional(),
   currentPeriodEnd: z.string().nullable(),
   cancelAtPeriodEnd: z.boolean().optional(),
   scans: z.number().int().min(0),
@@ -81,7 +83,10 @@ export type PlanDetails = z.infer<typeof PlanDetailsSchema>;
 // -----
 export const PlanSessionUrlSchema = z.object({ url: z.url() });
 
-export const PlanCheckoutBodySchema = z.object({ planKey: z.string().min(1).default(CREDIT_DEFAULT_PLAN_KEY) });
+export const PlanCheckoutBodySchema = z.object({
+  planKey: z.string().min(1).default(CREDIT_DEFAULT_PLAN_KEY),
+  interval: z.enum(BILLING_INTERVAL_VALUES).default("month"),
+});
 
 export type PlanSessionUrl = z.infer<typeof PlanSessionUrlSchema>;
 export type PlanCheckoutBody = z.infer<typeof PlanCheckoutBodySchema>;
@@ -93,7 +98,7 @@ export type PlanCheckoutBody = z.infer<typeof PlanCheckoutBodySchema>;
 // so. Refused with a Conflict when the target holds fewer people
 // than the Account has (people plus pending invites).
 // -----
-export const PlanChangeBodySchema = z.object({ planKey: z.string().min(1) });
+export const PlanChangeBodySchema = z.object({ planKey: z.string().min(1), interval: z.enum(BILLING_INTERVAL_VALUES).optional() });
 export const PlanChangeResultSchema = z.object({ planKey: z.string() });
 
 export type PlanChangeBody = z.infer<typeof PlanChangeBodySchema>;
@@ -108,6 +113,7 @@ export const PlanOfferSchema = z.object({
   key: z.string(),
   label: z.string(),
   monthlyPriceUsd: z.number().min(0),
+  yearlyPriceUsd: z.number().min(0).nullable().optional(),
   includedCreditUsd: z.number().min(0),
   maxMembers: z.number().int().min(1),
 });

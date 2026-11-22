@@ -26,10 +26,35 @@ export const planBillingAction = (data: Pick<PlanDetails, "source" | "status">):
 export const planSwitchOffers = (data: Pick<PlanDetails, "plan" | "source" | "status">, offers: ReadonlyArray<PlanOffer>) =>
   data.source === "stripe" && data.status === "active" && data.plan !== null ? offers.filter((offer) => offer.key !== data.plan?.key) : [];
 
-export type PlanCardView = { offer: PlanOffer; current: boolean; action: "switch" | "subscribe" | "none"; blocked: string | null };
+export type PlanInterval = NonNullable<PlanDetails["interval"]>;
 
-export const planCardViews = (data: Pick<PlanDetails, "plan" | "source" | "status" | "seats">, offers: ReadonlyArray<PlanOffer>): PlanCardView[] => {
+export type PlanPriceView = { amount: string; unit: PlanInterval; perMonth: string | null };
+
+export const planPriceView = (offer: Pick<PlanOffer, "monthlyPriceUsd" | "yearlyPriceUsd">, interval: PlanInterval): PlanPriceView | null => {
+  if (interval === "month") return { amount: usageUsd(offer.monthlyPriceUsd), unit: "month", perMonth: null };
+  if (offer.yearlyPriceUsd === null || offer.yearlyPriceUsd === undefined) return null;
+  return { amount: usageUsd(offer.yearlyPriceUsd), unit: "year", perMonth: `${usageUsd(offer.yearlyPriceUsd / 12)} per month` };
+};
+
+export const planYearlyOffered = (offers: ReadonlyArray<Pick<PlanOffer, "yearlyPriceUsd">>) => offers.some((offer) => offer.yearlyPriceUsd !== null && offer.yearlyPriceUsd !== undefined);
+
+export const planYearlyLocked = (data: Pick<PlanDetails, "source" | "status" | "interval">) =>
+  data.source === "stripe" && data.interval === "year" && (data.status === "active" || data.status === "past_due");
+
+export const planShownInterval = (data: Pick<PlanDetails, "source" | "status" | "interval">, chosen: PlanInterval): PlanInterval =>
+  planYearlyLocked(data) ? "year" : chosen;
+
+export type PlanCardView = { offer: PlanOffer; current: boolean; action: "switch" | "switchInterval" | "subscribe" | "none"; blocked: string | null };
+
+export const planCardViews = (
+  data: Pick<PlanDetails, "plan" | "source" | "status" | "seats" | "interval">,
+  offers: ReadonlyArray<PlanOffer>,
+  chosen: PlanInterval = "month",
+): PlanCardView[] => {
   const { members, pendingInvites } = data.seats;
+  const shown = planShownInterval(data, chosen);
+  const subInterval = data.interval ?? "month";
+  const active = data.source === "stripe" && data.status === "active" && data.plan !== null;
   const people = members + pendingInvites;
   const held = data.status === null || data.status === "active" || data.status === "past_due";
   const counts = `${members} ${members === 1 ? "person" : "people"}${pendingInvites > 0 ? ` and ${pendingInvites} pending invite${pendingInvites === 1 ? "" : "s"}` : ""}`;
@@ -37,15 +62,27 @@ export const planCardViews = (data: Pick<PlanDetails, "plan" | "source" | "statu
   const subscribes = planBillingAction(data) === "subscribe";
 
   return offers.map((offer) => {
-    const action = switchKeys.has(offer.key) ? "switch" : subscribes ? "subscribe" : "none";
+    const priced = planPriceView(offer, shown) !== null;
+    const action = ((): PlanCardView["action"] => {
+      if (active && offer.key === data.plan?.key) return subInterval === "month" && chosen === "year" && priced ? "switchInterval" : "none";
+      if (switchKeys.has(offer.key)) return priced && shown === subInterval ? "switch" : "none";
+      return subscribes && priced ? "subscribe" : "none";
+    })();
     const over = people - offer.maxMembers;
     const blocked =
-      action !== "none" && over > 0 ? `Your account has ${counts}. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.` : null;
+      (action === "switch" || action === "subscribe") && over > 0
+        ? `Your account has ${counts}. ${offer.label} holds ${offer.maxMembers}. Remove ${over} to ${action === "switch" ? "switch" : "subscribe"}.`
+        : action === "none" && switchKeys.has(offer.key) && priced && shown !== subInterval
+          ? "Switch to yearly first, then change plan."
+          : null;
     return { offer, current: held && data.plan?.key === offer.key, action, blocked };
   });
 };
 
-export const planSwitchPending = (switchingTo: string | null, data: Pick<PlanDetails, "plan">) => switchingTo !== null && data.plan?.key !== switchingTo;
+export type PlanSwitchTarget = { planKey: string; interval?: PlanInterval };
+
+export const planSwitchPending = (target: PlanSwitchTarget | null, data: Pick<PlanDetails, "plan" | "interval">) =>
+  target !== null && (data.plan?.key !== target.planKey || (target.interval !== undefined && (data.interval ?? "month") !== target.interval));
 
 export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
   checkout === "success" && !(data.source === "stripe" && data.status === "active");
@@ -74,6 +111,12 @@ export const planPeriodSentence = (data: Pick<PlanDetails, "status" | "cancelAtP
   if (data.currentPeriodEnd === null || data.status === "canceled") return "";
   const date = planDateLabel(data.currentPeriodEnd);
   return data.cancelAtPeriodEnd === true ? `. Ends on ${date}` : `. Renews ${date}`;
+};
+
+export const planBilledYearlySentence = (data: Pick<PlanDetails, "cancelAtPeriodEnd" | "currentPeriodEnd">) => {
+  if (data.currentPeriodEnd === null) return "Billed yearly.";
+  const date = planDateLabel(data.currentPeriodEnd);
+  return data.cancelAtPeriodEnd === true ? `Billed yearly, ends on ${date}.` : `Billed yearly, renews on ${date}.`;
 };
 
 export const CREDIT_ENTRY_LABEL = {

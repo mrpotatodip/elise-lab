@@ -20,13 +20,22 @@ export const offeredPlansEffect = (db: AppDbType): Effect.Effect<PlanOffer[], Db
           key: platformMasterPlans.key,
           label: platformMasterPlans.label,
           price: platformMasterPlans.monthlyPriceUsd,
+          yearlyPrice: platformMasterPlans.yearlyPriceUsd,
+          yearlyPriceId: platformMasterPlans.stripeYearlyPriceId,
           credit: platformMasterPlans.includedCreditUsd,
           maxMembers: platformMasterPlans.maxMembers,
         })
         .from(platformMasterPlans)
         .where(eq(platformMasterPlans.enabled, true))
         .orderBy(asc(platformMasterPlans.monthlyPriceUsd));
-      return rows.map((row) => ({ key: row.key, label: row.label, monthlyPriceUsd: Number(row.price), includedCreditUsd: Number(row.credit), maxMembers: row.maxMembers }));
+      return rows.map((row) => ({
+        key: row.key,
+        label: row.label,
+        monthlyPriceUsd: Number(row.price),
+        yearlyPriceUsd: row.yearlyPrice !== null && row.yearlyPriceId ? Number(row.yearlyPrice) : null,
+        includedCreditUsd: Number(row.credit),
+        maxMembers: row.maxMembers,
+      }));
     },
     catch: toDbError,
   });
@@ -40,6 +49,7 @@ export const planByKeyEffect = (db: AppDbType, key: string): Effect.Effect<PlanB
           key: platformMasterPlans.key,
           label: platformMasterPlans.label,
           priceId: platformMasterPlans.stripePriceId,
+          yearlyPriceId: platformMasterPlans.stripeYearlyPriceId,
           enabled: platformMasterPlans.enabled,
           maxMembers: platformMasterPlans.maxMembers,
         })
@@ -78,6 +88,7 @@ export const billingContextEffect = (db: AppDbType, tenantId: string, userId: st
           stripeCustomerId: tenantSubscriptions.stripeCustomerId,
           stripeSubscriptionId: tenantSubscriptions.stripeSubscriptionId,
           planId: tenantSubscriptions.planId,
+          billingInterval: tenantSubscriptions.billingInterval,
         })
         .from(tenantSubscriptions)
         .where(eq(tenantSubscriptions.tenantId, tenantId));
@@ -102,6 +113,8 @@ export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): E
             key: platformMasterPlans.key,
             label: platformMasterPlans.label,
             price: platformMasterPlans.monthlyPriceUsd,
+            yearlyPrice: platformMasterPlans.yearlyPriceUsd,
+            yearlyPriceId: platformMasterPlans.stripeYearlyPriceId,
             credit: platformMasterPlans.includedCreditUsd,
             carryCap: platformMasterPlans.carryCapUsd,
             keySource: platformMasterPlans.keySource,
@@ -109,6 +122,7 @@ export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): E
             maxMembers: platformMasterPlans.maxMembers,
             status: tenantSubscriptions.status,
             source: tenantSubscriptions.source,
+            interval: tenantSubscriptions.billingInterval,
             periodEnd: tenantSubscriptions.currentPeriodEnd,
             cancelAtPeriodEnd: tenantSubscriptions.cancelAtPeriodEnd,
           })
@@ -127,6 +141,7 @@ export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): E
             key: row.key,
             label: row.label,
             monthlyPriceUsd: Number(row.price),
+            yearlyPriceUsd: row.yearlyPrice !== null && row.yearlyPriceId ? Number(row.yearlyPrice) : null,
             includedCreditUsd: Number(row.credit),
             carryCapUsd: row.carryCap === null ? null : Number(row.carryCap),
             keySource: row.keySource,
@@ -136,6 +151,7 @@ export const planDetailsEffect = (db: AppDbType, tenantId: string, now: Date): E
         : null,
       status: row?.status ?? null,
       source: row?.source ?? null,
+      interval: row?.interval ?? null,
       currentPeriodEnd: row?.periodEnd?.toISOString() ?? null,
       cancelAtPeriodEnd: row?.cancelAtPeriodEnd ?? false,
       scans,

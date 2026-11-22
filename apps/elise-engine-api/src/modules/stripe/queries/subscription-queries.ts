@@ -1,6 +1,6 @@
 import { eq, isNull, notInArray, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import type { SubscriptionStatusValue } from "@repo/contracts/elise";
+import type { BillingIntervalValue, SubscriptionStatusValue } from "@repo/contracts/elise";
 import { platformMasterPlans, tenants, tenantSubscriptions } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
@@ -24,11 +24,14 @@ export const tenantOfStripeCustomerEffect = (db: AppDbType, customerId: string):
     catch: toDbError,
   });
 
-export const planIdOfPriceEffect = (db: AppDbType, priceId: string): Effect.Effect<string | null, DbError> =>
+export const planOfPriceEffect = (db: AppDbType, priceId: string): Effect.Effect<{ id: string; interval: BillingIntervalValue } | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const [found] = await db.select({ id: platformMasterPlans.id }).from(platformMasterPlans).where(eq(platformMasterPlans.stripePriceId, priceId));
-      return found?.id ?? null;
+      const [found] = await db
+        .select({ id: platformMasterPlans.id, monthly: platformMasterPlans.stripePriceId })
+        .from(platformMasterPlans)
+        .where(or(eq(platformMasterPlans.stripePriceId, priceId), eq(platformMasterPlans.stripeYearlyPriceId, priceId)));
+      return found ? { id: found.id, interval: found.monthly === priceId ? ("month" as const) : ("year" as const) } : null;
     },
     catch: toDbError,
   });
@@ -36,6 +39,7 @@ export const planIdOfPriceEffect = (db: AppDbType, priceId: string): Effect.Effe
 export type StripeSubscriptionRow = {
   tenantId: string;
   planId: string;
+  billingInterval: BillingIntervalValue;
   status: SubscriptionStatusValue;
   stripeCustomerId: string;
   stripeSubscriptionId: string;
@@ -56,6 +60,7 @@ export const upsertStripeSubscriptionEffect = (db: AppDbType, row: StripeSubscri
           setWhere: or(isNull(stored), eq(stored, row.stripeSubscriptionId), row.status === "canceled" ? undefined : notInArray(tenantSubscriptions.status, [...STRIPE_SUBSCRIPTION_LIVE_STATUSES])),
           set: {
             planId: row.planId,
+            billingInterval: row.billingInterval,
             status: row.status,
             source: "stripe",
             stripeCustomerId: row.stripeCustomerId,

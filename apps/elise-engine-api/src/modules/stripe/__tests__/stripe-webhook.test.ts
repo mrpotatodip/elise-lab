@@ -8,6 +8,7 @@ import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 
 const SECRET = "whsec_test_secret";
 const PRICE = "price_runner_test";
+const YEARLY_PRICE = "price_runner_year_test";
 const hex = (bytes: ArrayBuffer) => [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 const signed = async (body: string, secret = SECRET) => {
@@ -37,7 +38,7 @@ const rowOf = async () => (await test.raw.select().from(tenantSubscriptions).whe
 beforeAll(async () => {
   test = await openTestDb();
   accountId = (await seedTenant(test, "acme")).tenantId;
-  await test.raw.update(platformMasterPlans).set({ stripePriceId: PRICE }).where(eq(platformMasterPlans.key, "runner"));
+  await test.raw.update(platformMasterPlans).set({ stripePriceId: PRICE, stripeYearlyPriceId: YEARLY_PRICE }).where(eq(platformMasterPlans.key, "runner"));
 });
 
 afterAll(async () => {
@@ -85,6 +86,25 @@ describe("POST /stripe/webhook: Stripe's status becomes the Account's Subscripti
       periodEnd.toISOString(),
       true,
     ]);
+  });
+
+  it.each([
+    ["the monthly price", PRICE, "month"],
+    ["the yearly price", YEARLY_PRICE, "year"],
+  ])("sets the interval from %s", async (_name, priceId, expected) => {
+    stripe.subscriptions.set("sub_1", { id: "sub_1", customerId: "cus_1", status: "active", priceId, currentPeriodEnd: null, cancelAtPeriodEnd: false, accountId });
+    await post(subscriptionEvent("customer.subscription.updated"));
+    const row = await rowOf();
+    const [runner] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "runner"));
+    expect([row.billingInterval, row.planId]).toEqual([expected, runner.id]);
+  });
+
+  it("follows a switch from monthly to yearly on the same subscription", async () => {
+    stripe.subscriptions.set("sub_1", { id: "sub_1", customerId: "cus_1", status: "active", priceId: PRICE, currentPeriodEnd: null, cancelAtPeriodEnd: false, accountId });
+    await post(subscriptionEvent("customer.subscription.created"));
+    stripe.subscriptions.set("sub_1", { id: "sub_1", customerId: "cus_1", status: "active", priceId: YEARLY_PRICE, currentPeriodEnd: null, cancelAtPeriodEnd: false, accountId });
+    await post(subscriptionEvent("customer.subscription.updated"));
+    expect((await rowOf()).billingInterval).toBe("year");
   });
 
   it("sets past_due_since on the first past_due, keeps it on the next and clears it on active", async () => {
