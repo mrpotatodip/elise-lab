@@ -321,7 +321,7 @@ export function FilesScene({ s }: { s: S }) {
 // Runners: the computers that run this account's scans.
 // -----
 const COMPUTERS = [
-  { name: "Maya's MacBook", note: "macOS · Elise Runner app" },
+  { name: "Maya's MacBook", note: "macOS · headless Runner" },
   { name: "build-server-1", note: "Linux · headless Runner" },
   { name: "Dev laptop", note: "macOS · headless Runner" },
 ];
