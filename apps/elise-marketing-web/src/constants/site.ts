@@ -1,5 +1,7 @@
 export const SITE = {
   name: "EliseLAB",
+  // The wordmark next to the logo in the nav and the link preview: the product's own short name, as in the dashboard.
+  logoName: "Elise",
   title: "Agent security audits for your repositories · EliseLAB",
   // The meta description: short, and plain text.
   description: "Agent security audits for your GitHub and GitLab repositories and zip files. The audit runs on your own computer and your own AI subscription, using Cloudflare's open-source security-audit skill.",
@@ -15,7 +17,7 @@ export const CLOUDFLARE_SKILL_URL = "https://github.com/cloudflare/security-audi
 // The hero paragraph. It follows the headline ("Security agents that read your code before an
 // attacker does") with how it works, what you get and why to trust it.
 export const LEDE = {
-  start: "For teams whose code is on GitHub or GitLab, or in a zip file. Point Elise at a repository and get a report with a fix beside every finding. The audit runs on your own computer, with your own AI subscription, through",
+  start: "For teams whose code is on GitHub or GitLab, or in a zip file. Point Elise at a repository and get a report with a fix beside every finding. The audit runs on your own computer, with your own AI subscription, through ",
   link: "Cloudflare's open-source security-audit method",
   middle: ". Once a commit has enough scans, it gets a pass or a fail. ",
   rulesLink: "What to know",
