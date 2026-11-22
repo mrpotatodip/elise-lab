@@ -18,7 +18,6 @@
     "db:seed": "tsx --env-file=.env src/seed.ts",
     "db:sync-powers": "tsx --env-file=.env src/sync-powers.ts",
     "db:add-superuser": "tsx --env-file=.env src/add-superuser.ts",
-    "db:create-invite-code": "tsx --env-file=.env src/create-invite-code.ts",
     "check": "tsc --noEmit && tsx src/check-table-names.ts",
     "db:query": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/query.ts",
     "db:rehearse": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/rehearse.ts",
