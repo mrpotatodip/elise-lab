@@ -313,7 +313,7 @@ h2 {
   contain: size;
 }
 
-.frame--tour { aspect-ratio: 1440 / 760; }
+.frame--tour { aspect-ratio: 1440 / 900; }
 .frame--connect { aspect-ratio: 760 / 620; }
 .frame--audit { aspect-ratio: 760 / 480; }
 .frame--report { aspect-ratio: 760 / 700; }

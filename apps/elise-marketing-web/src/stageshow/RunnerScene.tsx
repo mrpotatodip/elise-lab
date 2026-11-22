@@ -14,25 +14,30 @@ import "./runner.css";
 // scan-list.tsx does); the Scan page (scan-detail.tsx) is where the work shows: the info notice, a
 // "Findings so far" table that fills as the checks decide, and the Trace, grouped by Phase. Then
 // the Scan succeeds and its first finding opens. The terminal lines are the headless Runner's own
-// log (`Event` in apps/elise-runner-cli/cli/src/commands.rs), reworded in plain language for the
-// picture: the Runner itself prints "the recon phase started" and so on. The repository, costs,
-// trace entries and findings are made up, and the page says so.
+// log, word for word: `ScanLog::tell` in apps/elise-runner-cli/cli/src/commands.rs prints
+// `[repo scan_id] line` for each event, and the lines are the ones it builds (`Scan claimed`,
+// `the recon phase started`, `... ended: spent $X, $Y left of the Pool`, `result sent to Elise`,
+// `Scan succeeded.`). The scan id has the engine's shape (`newScanId`: nine base-36 characters, a
+// dash, a UUID). The repository, the id, the costs and the Pool (the Focused profile's $6 cap)
+// are made up, and the page says so. The terminal prints plain text, as the Runner does: no colour.
 
 const COMMAND = "elise-runner run";
 
-// What the Runner prints for one Scan, in order.
+const PREFIX = "[acme/billing-api 0k3f9z2qd-4b2f6c1e-8a3d-4e7b-9c15-2f0a6d8b3e71] ";
+
+// What the Runner prints for one Scan, in order. The Phases spent $3.24 of the $6 Pool.
 const LOG = [
-  "Picked up a scan of acme/billing-api",
-  "Recon: mapping the repository",
-  "Recon done, spent $0.06",
-  "Hunt: looking for weak spots",
-  "Hunt done, spent $0.21",
-  "Check: verifying each candidate",
-  "Check done, spent $0.09",
-  "Report: writing it up",
-  "Report done, spent $0.06",
-  "Sent the report to Elise",
-  "Scan finished",
+  "Scan claimed",
+  "the recon phase started",
+  "the recon phase ended: spent $0.31, $5.69 left of the Pool",
+  "the hunt phase started",
+  "the hunt phase ended: spent $1.62, $4.07 left of the Pool",
+  "the check phase started",
+  "the check phase ended: spent $0.94, $3.13 left of the Pool",
+  "the report phase started",
+  "the report phase ended: spent $0.37, $2.76 left of the Pool",
+  "result sent to Elise",
+  "Scan succeeded.",
 ];
 // How long the scene rests after each line. The hunt takes its time; the check is where findings land.
 const PACE = [800, 400, 600, 1500, 700, 300, 700, 500, 600, 500, 900];
@@ -217,7 +222,7 @@ export default function RunnerScene() {
   return (
     <Stage
       width={1440}
-      height={760}
+      height={900}
       compact={{ below: 640, width: 358, height: 440 }}
       initial={initial}
       poster={poster}
@@ -371,7 +376,7 @@ export default function RunnerScene() {
                                   <span className="dt-review">{FRESH.review}</span>
                                   <span className="dt-origin">{MODEL}</span>
                                 </div>
-                                <div className="dt-cell dt-cell--cost"><Swap id={done ? "done" : "wait"}>{done ? FRESH.cost : "-"}</Swap></div>
+                                <div className="dt-cell dt-cell--cost"><Swap id={done ? "done" : "wait"}>{done ? "$3.24" : "-"}</Swap></div>
                                 <div className="dt-cell dt-cell--time">{FRESH.started}</div>
                                 <div className="dt-cell dt-cell--open"><ChevronRight size={16} strokeWidth={1.5} aria-hidden /></div>
                               </div>
@@ -557,11 +562,11 @@ export default function RunnerScene() {
                   {typing && <Caret still />}
                 </Prompt>
                 <Collapse open={s.waiting}>
-                  <div className="dim">Waiting for Scans from Elise. Stop with Ctrl-C.</div>
+                  <div>Waiting for Scans from Elise. Stop with Ctrl-C.</div>
                 </Collapse>
                 {LOG.map((line, i) => (
                   <Collapse key={line} open={s.lines > i}>
-                    <div className={i === LOG.length - 1 ? "ok" : i % 2 === 0 && i < 9 && i > 0 ? "dim" : undefined}>{line}</div>
+                    <div>{PREFIX + line}</div>
                   </Collapse>
                 ))}
               </div>
