@@ -69,13 +69,14 @@ export const STEPS = [
 
 // Under "Get the Runner". The command and the releases page are the ones the dashboard's Getting
 // started guide shows (GETTING_STARTED_INSTALL_COMMAND and GETTING_STARTED_DESKTOP_URL), so keep them equal.
+// The site offers only the terminal Runner (the `elise-runner` binary), not the desktop app.
 export const RUNNER = {
   title: "Get the Runner",
   note: "The Runner is the program that audits your code on your own computer. Install it, sign it in to your account, then start audits from the dashboard.",
   commandLabel: "Install the terminal Runner on macOS or Linux",
   command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh",
   after: "Then run elise-runner login and elise-runner doctor. The script installs to ~/.local/bin and takes the newest release for your system.",
-  desktop: "Prefer a window? The desktop app is on",
+  desktop: "Prefer to download the file yourself? The macOS and Linux builds are on",
   releasesUrl: "https://github.com/mrpotatodip/ts-mrpotato-lab/releases",
   releasesLabel: "the releases page on GitHub",
   needs: "The computer also needs your own AI tool installed and signed in, because the scan runs on that login.",
