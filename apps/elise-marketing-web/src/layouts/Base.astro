@@ -17,7 +17,7 @@ interface Props {
 const { title = SITE.title, description = SITE.description } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const ogImage = new URL("/og.jpg", Astro.site);
-const ogImageAlt = "EliseLAB: Security agents that read your code before an attacker does.";
+const ogImageAlt = "Elise: Security agents that read your code before an attacker does.";
 
 // Structured data for search engines. It states only what the page says: no price, rating or review.
 const structuredData = JSON.stringify({

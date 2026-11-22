@@ -13,7 +13,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
     <header class="nav">
       <a class="brand" href="/">
         <Logo class="brand-mark" />
-        {SITE.name}
+        {SITE.logoName}
       </a>
       <nav class="nav-links" aria-label="On this page">
         <a href="#how-it-works">How it works</a>
@@ -85,13 +85,18 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
       <section id="get-the-runner" aria-labelledby="runner-heading">
         <h2 id="runner-heading">{RUNNER.title}</h2>
         <p class="section-note">{RUNNER.note}</p>
+        <p class="runner-install__label" id="runner-downloads-label">{RUNNER.downloadsLabel}</p>
+        <div class="runner-downloads" role="group" aria-labelledby="runner-downloads-label">
+          {RUNNER.downloads.map((file) => <a class="button outline lg" href={file.href} rel="noopener">{file.label}</a>)}
+        </div>
+        <p class="section-note">{RUNNER.downloadNote.map((part) => (typeof part === "string" ? part : <code>{part.code}</code>))}</p>
         <div class="runner-install">
           <p class="runner-install__label" id="runner-command-label">{RUNNER.commandLabel}</p>
           <pre class="runner-install__command" tabindex="0" aria-labelledby="runner-command-label"><code>{RUNNER.command}</code></pre>
         </div>
-        <p class="section-note">{RUNNER.after}</p>
+        <p class="section-note">{RUNNER.after.map((part) => (typeof part === "string" ? part : <code>{part.code}</code>))}</p>
         <p class="section-note">{RUNNER.needs}</p>
-        <p class="section-note">{RUNNER.desktop} <a href={RUNNER.releasesUrl} rel="noopener">{RUNNER.releasesLabel}</a>.</p>
+        <p class="section-note"><a href={RUNNER.releasesUrl} rel="noopener">{RUNNER.releasesLabel}</a></p>
       </section>
 
       <section id="pricing" aria-labelledby="pricing-heading">
