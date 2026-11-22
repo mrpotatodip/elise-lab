@@ -24,6 +24,12 @@ describe("parseAgentUsage", () => {
     });
   });
 
+  it("takes the last line of a streamed log, after the lines of the run", () => {
+    const stream = [JSON.stringify({ type: "system", subtype: "init" }), JSON.stringify({ type: "assistant", message: { content: [] } }), JSON.stringify(result)].join("\n");
+
+    expect(parseAgentUsage(`${stream}\n`)).toMatchObject({ costUsd: 0.4132, turns: 14 });
+  });
+
   it("skips a stray line before the report", () => {
     expect(parseAgentUsage(`warning: something\n${JSON.stringify(result)}\n`)?.outputTokens).toBe(5400);
   });

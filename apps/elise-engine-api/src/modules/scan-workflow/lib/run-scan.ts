@@ -59,6 +59,27 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     }
   };
 
+  const detectSignals = async () => {
+    try {
+      await step.do("signals-duplicate", { retries: { limit: 0, delay: "1 second" }, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT }, async () => {
+        await deps.detectSignals(params);
+        return true;
+      });
+    } catch (cause) {
+      console.error("scan: could not look for possible duplicates", cause instanceof Error ? cause.message : cause);
+    }
+  };
+
+  const sendTrace = async (ended: boolean) => {
+    if (sandbox.drainTrace === undefined) return;
+    try {
+      const entries = await sandbox.drainTrace(ended);
+      if (entries.length > 0) await deps.saveTrace(params, { entries });
+    } catch (cause) {
+      console.error("scan: could not send the trace", cause instanceof Error ? cause.message : cause);
+    }
+  };
+
   // -----
   // One Phase of a full Scan: start it and wait for it within its own
   // time slot. The Phases share one pool, the Scan's Budget cap. A Phase
@@ -80,7 +101,14 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
       await step.sleep(`wait-${phase}-${i}`, `${SCAN_WORKFLOW_POLL_SECONDS} seconds`);
       outcome = await step.do(`poll-${phase}-${i}`, async () => {
         const polled = await sandbox.pollAgent();
+        await sendTrace(false);
         return polled.state === "failed" ? { state: "failed" as const, error: polled.error } : { state: polled.state };
+      });
+    }
+    if (sandbox.drainTrace !== undefined) {
+      await step.do(`trace-end-${phase}`, async () => {
+        await sendTrace(true);
+        return true;
       });
     }
     if (outcome.state === "running") {
@@ -105,7 +133,6 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
   try {
     await mark("status-running", { status: "running", step: "cloning" });
     await step.do("prepare", { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_PREPARE_TIMEOUT }, async () => {
-      const { github } = params;
       // -----
       // Read inside the step, so the sealed key is never kept in the
       // Workflow's saved state, and a key set or removed before a
@@ -115,7 +142,6 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
       const checkout = await sandbox.prepare(
         params.repo,
         params.ref,
-        github && { installationId: github.installationId, repoId: github.repoId, repo: github.repo },
         sealed === null ? undefined : { accountId: params.accountId, sealed },
       );
       await runEffect(ledger.mark(params.accountId, params.scanId, checkout));
@@ -167,6 +193,7 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     }
     await mark("status-succeeded", { status: "succeeded", error: null, usage });
     await settle("succeeded", usage);
+    await detectSignals();
     return { ok: true };
   } catch (cause) {
     const error = cause instanceof Error ? cause.message : String(cause);

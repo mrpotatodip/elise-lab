@@ -3,11 +3,15 @@ SCAN_API_TOKEN=
 ANTHROPIC_API_KEY=
 # Optional: lets an account save its own Anthropic key. Any long random string.
 KEY_ENCRYPTION_SECRET=
+# Stripe, test mode first: the secret key and the webhook endpoint's signing secret.
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+# Optional: TypeSafe's key for Signals (hints about Findings). Without it no Signal is made.
+TYPESAFE_API_KEY=
+# Sign-up checks a Cloudflare Turnstile token. Without this secret every sign-up is refused.
+# This is Cloudflare's published always-pass test secret; the dashboard's matching test site key is 1x00000000000000000000AA.
+# Always-fail pair: secret 2x0000000000000000000000000000000AA, site key 2x00000000000000000000AB.
+# Production: `wrangler secret put TURNSTILE_SECRET_KEY` with the real widget's secret.
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 DATABASE_URL=
 AUTH_SECRET=
-# Private repos only. The key is PKCS#8 PEM: openssl pkcs8 -topk8 -nocrypt -in app.pem
-GITHUB_APP_ID=
-GITHUB_APP_PRIVATE_KEY=
-# Connect GitHub (the install flow) also needs the App's OAuth pair: Client ID, and a client secret from the App's Credentials tab
-GITHUB_APP_CLIENT_ID=
-GITHUB_APP_CLIENT_SECRET=

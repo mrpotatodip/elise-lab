@@ -50,12 +50,27 @@ const rewritesTrackedFile = (command) => {
   const redirected = [...command.matchAll(/(?:>>?|\btee\s+(?:-a\s+)?)\s*([^\s|;&<>]+)/g)].map((match) => match[1]);
   const words = command.split(/\s+/).map((word) => word.replace(/^['"]|['"]$/g, ""));
   const dirs = workDirs(command);
-  return (inPlace && words.some((word) => isTracked(word, dirs))) || redirected.some((target) => isTracked(target, dirs));
+  // An inline script (`python3 - <<EOF`, `node -e`) that opens a file for writing does the same.
+  const scripted =
+    /\b(?:python3?|node|ruby|perl|deno|bun)\b/.test(command) && /open\([^)]*['"][wa]\+?['"]|writeFileSync|writeFile\(|write_text|File\.write/.test(command);
+  const named = scripted ? (command.match(/[\w@./~-]+\.[A-Za-z]{1,5}\b/g) ?? []) : [];
+  return (
+    (inPlace && words.some((word) => isTracked(word, dirs))) ||
+    redirected.some((target) => isTracked(target, dirs)) ||
+    named.some((target) => isTracked(target, dirs))
+  );
 };
+
+// zsh stops on an unmatched glob such as `--include=*.tsx`; the shell must not see the `*`.
+const unquotedIncludeGlob = (command) => /--(?:include|exclude)=\*/.test(command);
 
 if (input.hook_event_name === "PreToolUse") {
   if (input.tool_name === "Bash" && rewritesTrackedFile(input.tool_input?.command ?? "")) {
-    console.error("This command rewrites a tracked file. Use the Edit tool on existing files (sed -i, perl -i, >, >> and tee skip its stale-read check). New files may be written any way.");
+    console.error("This command rewrites a tracked file. Use the Edit tool on existing files (sed -i, perl -i, >, >>, tee and an inline python or node script skip its stale-read check). New files may be written any way.");
+    process.exit(2);
+  }
+  if (input.tool_name === "Bash" && unquotedIncludeGlob(input.tool_input?.command ?? "")) {
+    console.error("Quote the glob: --include='*.tsx'. zsh stops on an unmatched `--include=*.tsx`. `rg -n pattern --glob '*.tsx'` avoids the problem.");
     process.exit(2);
   }
   if (input.tool_name === "Bash") fs.writeFileSync(snapshotPath, JSON.stringify(Object.fromEntries(dirty())));
@@ -102,6 +117,7 @@ for (const [app, list] of byApp) {
   if (lines.some((line) => /: error /.test(line))) report.push(lines.join("\n"));
 }
 if (report.length) {
-  console.error(report.join("\n").split("\n").slice(0, MAX_LINES).join("\n"));
+  const pending = input.tool_name === "Bash" ? "" : "\n(If more edits of this change are still to come, an error above may clear after them.)";
+  console.error(report.join("\n").split("\n").slice(0, MAX_LINES).join("\n") + pending);
   process.exit(2);
 }

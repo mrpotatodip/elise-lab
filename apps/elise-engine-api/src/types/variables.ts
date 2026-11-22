@@ -1,15 +1,16 @@
 import type { Context } from "hono";
 import type { Effect } from "effect";
-import type { AccessPower } from "@repo/contracts/elise";
-import type { TenantDbType } from "#/lib/db-connection";
-import type { DbError } from "#/lib/effect-query";
+import type { AccessPower, RunnerIdentity, ScanUsage } from "@repo/contracts/elise";
+import type { PoolDbType, TenantDbType } from "#/lib/db-connection";
+import type { StripeGateway } from "#/modules/stripe/types";
+import type { TypeSafeGateway } from "#/modules/typesafe";
+import type { DbError, Invalid } from "#/lib/effect-query";
+import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
-import type { GithubAccess } from "#/modules/github-installs";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { MonthSpend } from "#/modules/usage";
 import type { FullScanSandbox } from "#/modules/scan-sandbox";
-import type { PasswordResetEmail, QueuedEmail } from "#/modules/auth/types";
-import type { InviteEmail } from "#/modules/team/types";
+import type { QueuedEmail } from "#/modules/email";
 import type { ScanParams } from "#/schemas";
 
 export type Bindings = {
@@ -19,23 +20,25 @@ export type Bindings = {
   MAX_BUDGET_FULL_USD: string;
   MAX_ACTIVE_SCANS: string;
   MAX_ACTIVE_FULL_SCANS: string;
-  MAX_GLOBAL_FULL_SCANS: string;
   MONTHLY_BUDGET_USD: string;
   BUDGET_ALLOWANCE_USD: string;
   BILLING_ENFORCED: string;
   ANTHROPIC_API_KEY: string;
   KEY_ENCRYPTION_SECRET?: string;
+  TYPESAFE_API_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  STRIPE_BRANDING_ICON_FILE_ID?: string;
+  STRIPE_BRANDING_LOGO_FILE_ID?: string;
   SCAN_API_TOKEN: string;
   DATABASE_URL: string;
   HYPERDRIVE_TENANT: Hyperdrive;
   AUTH_SECRET: string;
-  GITHUB_APP_ID?: string;
-  GITHUB_APP_PRIVATE_KEY?: string;
-  GITHUB_APP_CLIENT_ID?: string;
-  GITHUB_APP_CLIENT_SECRET?: string;
   AUTH_BASE_URL: string;
   AUTH_TRUSTED_ORIGINS: string;
   SIGN_UP_LIMITER?: RateLimit;
+  SIGN_UP_TOTAL_LIMITER?: RateLimit;
   SIGN_IN_LIMITER?: RateLimit;
   TEAM_INVITE_LIMITER?: RateLimit;
   RUNNER_ENROLL_LIMITER?: RateLimit;
@@ -43,10 +46,11 @@ export type Bindings = {
   RUNNER_LOGIN_START_LIMITER?: RateLimit;
   RUNNER_LOGIN_START_TOTAL_LIMITER?: RateLimit;
   PASSWORD_RESET_LIMITER?: RateLimit;
+  PASSWORD_RESET_ADDRESS_LIMITER?: RateLimit;
   DASHBOARD_URL: string;
-  INVITE_FROM: string;
+  EMAIL_FROM: string;
   EMAIL: SendEmail;
-  INVITE_EMAIL_QUEUE: Queue<QueuedEmail>;
+  EMAIL_QUEUE: Queue<QueuedEmail>;
   REPORTS: R2Bucket;
   SANDBOX_FULL: DurableObjectNamespace<FullScanSandbox>;
   SCAN_WORKFLOW_FULL: Workflow<ScanParams>;
@@ -58,17 +62,22 @@ export type Bindings = {
 // -----
 export type AppDeps = {
   scanRepo: (env: Bindings, db: TenantDbType) => ScanRepo;
-  githubAccess: (env: Bindings, accountId: string) => GithubAccess;
   monthSpend: (db: TenantDbType, accountId: string) => Effect.Effect<MonthSpend, DbError>;
   holdCredit: (db: TenantDbType, accountId: string, scanId: string, holdUsd: number) => Effect.Effect<HoldResult, DbError>;
-  runnerConnected: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<boolean, DbError>;
+  connectedRunnerSources: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<string[] | null, DbError>;
+  linkArchive: (db: TenantDbType, accountId: string, link: ScanArchiveLink) => Effect.Effect<void, Invalid | DbError>;
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
+  teardownScan: (env: Bindings, scanId: string) => Promise<ScanUsage | null>;
   sessionUserId: (c: Context<AppEnv>) => Promise<string | undefined>;
+  runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
-  enqueueInviteEmail: (env: Bindings, mail: InviteEmail) => Promise<void>;
-  enqueuePasswordResetEmail: (env: Bindings, mail: PasswordResetEmail) => Promise<void>;
+  enqueueEmail: (env: Bindings, mail: QueuedEmail) => Promise<void>;
+  verifyTurnstile: (env: Bindings, token: string | undefined, ip: string | undefined) => Promise<boolean>;
   withTenant: <T>(c: Context<AppEnv>, accountId: string, run: (db: TenantDbType) => Promise<T>) => Promise<T>;
+  withOwner: <T>(c: Context<AppEnv>, run: (db: PoolDbType) => Promise<T>) => Promise<T>;
+  stripe: (env: Bindings) => StripeGateway;
+  typesafe: (env: Bindings) => TypeSafeGateway | null;
 };
 
 export type Variables = { userId?: string; deps: AppDeps };

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ACCEPTED_RISK_MAX_DAYS } from "../constants";
-import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STEP_VALUES } from "../enums";
+import { ScanArchiveRefSchema } from "../upload/dto";
+import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STATE_VALUES, SCAN_STEP_VALUES, SOURCE_PROVIDER_VALUES } from "../enums";
 
 export const SCAN_MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"] as const;
 // Opus is not offered for new scans, but a stored scan may still carry it.
@@ -18,7 +19,7 @@ export type ProfileMetValue = (typeof PROFILE_MET_VALUES)[number];
 // -----
 // Responses: what GET /scans and GET /scans/:scanId answer
 // -----
-export const ScanStateSchema = z.enum(["queued", "running", "succeeded", "failed"]);
+export const ScanStateSchema = z.enum(SCAN_STATE_VALUES);
 
 export const ScanOptionsSchema = z.object({
   skill: z.enum(SCAN_SKILLS),
@@ -110,6 +111,7 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   branchId: z.uuid().nullish(),
   untrackedReason: z.string().nullish(),
   profileMet: z.enum(PROFILE_MET_VALUES).nullish(),
+  signalPairsSkipped: z.number().int().min(0).nullish(),
   status: ScanStateSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -121,6 +123,7 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   usage: ScanUsageSchema.nullish(),
   summary: ScanSummarySchema.nullish(),
   runner: ScanRunnerSchema.nullish(),
+  archive: ScanArchiveRefSchema.nullish(),
 });
 
 export const ScanListSchema = z.object({
@@ -230,6 +233,7 @@ export const FindingTriageSchema = z.object({
   status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
   note: z.string().nullable(),
   acceptedUntil: z.string().nullable(),
+  duplicateOf: z.string().nullable().default(null),
   updatedAt: z.string(),
   decidedBy: z.string().nullable().default(null),
 });
@@ -272,7 +276,9 @@ export const FindingsQuerySchema = z.object({
 
 // -----
 // An accepted risk needs a reason and a number of days (at most
-// ACCEPTED_RISK_MAX_DAYS); no other status takes days.
+// ACCEPTED_RISK_MAX_DAYS); no other status takes days. A
+// duplicate names the fingerprint of the Finding kept (ADR
+// 0012); no other status takes one.
 // -----
 export const FindingTriageBodySchema = z
   .object({
@@ -281,8 +287,21 @@ export const FindingTriageBodySchema = z
     status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
     note: z.string().max(2000).nullish(),
     acceptDays: z.number().int().min(1).max(ACCEPTED_RISK_MAX_DAYS).optional(),
+    duplicateOf: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
+    signalId: z.uuid().optional(),
   })
   .superRefine((body, ctx) => {
+    if (body.signalId !== undefined && body.status !== "accepted_risk") {
+      ctx.addIssue({ code: "custom", path: ["signalId"], message: "Only an accepted risk takes the Signal it was saved over" });
+    }
+    if (body.status === "duplicate" && body.duplicateOf === undefined) {
+      ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "A duplicate needs the Finding it duplicates" });
+    } else if (body.status !== "duplicate" && body.duplicateOf !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "Only a duplicate takes a Finding it duplicates" });
+    }
     if (body.status === "accepted_risk") {
       if (!body.note?.trim()) ctx.addIssue({ code: "custom", path: ["note"], message: "An accepted risk needs a reason" });
       if (body.acceptDays === undefined) ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "An accepted risk needs a number of days" });
@@ -330,9 +349,16 @@ export const RepoOpenSchema = z.object({
 // isPrivate is what GitHub said at the last scan request: null when
 // no connected install covered the repo. It is optional so an older
 // engine that does not send it still parses.
+// provider and host, with canonical as the path, are the Repo's
+// identity; host is null for an upload app. Optional so an older
+// engine still parses: a Repo without them is github on github.com.
 // -----
+export const SourceProviderSchema = z.enum(SOURCE_PROVIDER_VALUES);
+
 export const RepoSchema = z.object({
   id: z.uuid(),
+  provider: SourceProviderSchema.optional(),
+  host: z.string().nullable().optional(),
   url: z.string(),
   canonical: z.string(),
   isPrivate: z.boolean().nullable().optional(),

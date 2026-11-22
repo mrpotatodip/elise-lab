@@ -18,13 +18,12 @@ export type AuditAction =
   | "finding.triage.set"
   | "finding.risk.accepted"
   | "finding.comment.deleted"
-  | "github.install.connected"
-  | "github.install.removed"
   | "usage.budget.updated"
   | "anthropic.key.set"
   | "anthropic.key.removed"
   | "runner.login.approve"
-  | "runner.login.deny";
+  | "runner.login.deny"
+  | "signals.switched";
 
 // -----
 // The facts an audit row may carry about the
@@ -41,13 +40,11 @@ export type AuditDetails = {
   status?: string;
   note?: string | null;
   acceptedUntil?: string | null;
-  installationId?: number;
-  accountLogin?: string;
-  repositorySelection?: string;
-  noticeAcceptedAt?: string;
-  reconnected?: boolean;
+  duplicateOf?: string | null;
+  signalId?: string | null;
   monthlyBudgetUsd?: number | null;
   lastFour?: string;
+  enabled?: boolean;
   requestIp?: string;
   approverIp?: string;
 };

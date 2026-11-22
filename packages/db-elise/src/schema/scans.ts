@@ -24,6 +24,7 @@ import {
   SCAN_KEY_SOURCE_VALUES,
   SCAN_STATE_VALUES,
   SCAN_STEP_VALUES,
+  SOURCE_PROVIDER_VALUES,
   type FindingOriginValue,
   type FindingSeverityValue,
   type FindingStatusValue,
@@ -33,19 +34,21 @@ import {
   type ScanKeySourceValue,
   type ScanStateValue,
   type ScanStepValue,
+  type SourceProviderValue,
 } from "@repo/contracts/elise";
 import { parties } from "./party";
 import { tenants } from "./tenant";
-import { tenantGithubInstallations } from "./tenant-github-installations";
 
 const inList = (values: readonly string[]) => sql.raw(values.map((value) => `'${value}'`).join(", "));
 
 // -----
 // One row per repo an Account scans, so a repo has
-// one history however its URL was spelled. canonical
-// is owner/name in lowercase, without .git or a
-// trailing slash. url keeps the first spelling seen,
-// minus those two.
+// one history however its URL was spelled. Its
+// identity is (provider, host, canonical), so a gitlab
+// acme/app and a github acme/app are two Repos.
+// canonical is the path (owner/name for github) in
+// lowercase, without .git or a trailing slash. url
+// keeps the first spelling seen, minus those two.
 // -----
 export const scanRepos = pgTable(
   "scan_repos",
@@ -54,16 +57,23 @@ export const scanRepos = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    provider: text("provider").notNull().default("github"),
+    provider: text("provider").$type<SourceProviderValue>().notNull().default("github"),
+    // Lowercase. Null only for an upload app, which has no host. The default keeps a row written without it a github one.
+    host: text("host").default("github.com"),
     canonical: text("canonical").notNull(),
     url: text("url").notNull(),
     defaultBranch: text("default_branch"),
     // Last answer GitHub gave at a Scan request. For display only: each Scan keeps its own.
     isPrivate: boolean("is_private"),
+    // Set when a person removes an upload app: its zips are deleted, and the row stays so its Scans keep their History. Adding the app again clears it.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
-    uqTenantCanonical: uniqueIndex("uq_scan_repos_tenant_canonical").on(t.tenantId, t.canonical),
+    chkProvider: check("scan_repos_provider", sql`${t.provider} in (${inList(SOURCE_PROVIDER_VALUES)})`),
+    chkHost: check("scan_repos_host", sql`${t.host} = lower(${t.host})`),
+    // A constraint, not an index: only a constraint takes NULLS NOT DISTINCT in drizzle, and two upload apps of one name both have a null host.
+    uqTenantIdentity: unique("uq_scan_repos_tenant_identity").on(t.tenantId, t.provider, t.host, t.canonical).nullsNotDistinct(),
     uqIdTenant: uniqueIndex("uq_scan_repos_id_tenant").on(t.id, t.tenantId),
   }),
 );
@@ -118,9 +128,7 @@ export const scans = pgTable(
     branch: text("branch"),
     branchId: uuid("branch_id"),
     untrackedReason: text("untracked_reason"),
-    // Set when an install of the Account covered the repo at the request. Null: cloned anonymously.
-    installationId: uuid("installation_id"),
-    githubRepoId: bigint("github_repo_id", { mode: "number" }),
+    // Nothing writes it since the GitHub App was retired: null on every new Scan, and the dashboard still reads old rows.
     isPrivate: boolean("is_private"),
     priorsGiven: integer("priors_given"),
     priorsCarried: integer("priors_carried"),
@@ -130,6 +138,10 @@ export const scans = pgTable(
     partial: boolean("partial"),
     // Set with the findings of a succeeded Runner Scan whose profile check ran: the profile it met (quick, standard or deep) or none. Null: not checked (a cloud Scan, a Partial Scan, a Scan that did not succeed, or a row from before this column). Plain text, not a database enum; the agent's own files are what it measures.
     profileMet: text("profile_met").$type<ProfileMetValue>(),
+    // The number of candidate Findings the Trace producer last reported while the Scan ran (a count, never a title). Null: no producer has sent one.
+    traceCandidateFindings: integer("trace_candidate_findings"),
+    // How many candidate pairs the possible-duplicate Signal step left unasked because of its per-Scan cap. Null: the step did not run for this Scan.
+    signalPairsSkipped: integer("signal_pairs_skipped"),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),
@@ -165,11 +177,6 @@ export const scans = pgTable(
       foreignColumns: [scanRepos.id, scanRepos.tenantId],
     }).onDelete("cascade"),
     idxRepoCreated: index("idx_scans_repo_id_created_at").on(t.repoId, t.createdAt),
-    fkInstallationTenant: foreignKey({
-      name: "scans_installation_tenant_fk",
-      columns: [t.installationId, t.tenantId],
-      foreignColumns: [tenantGithubInstallations.id, tenantGithubInstallations.tenantId],
-    }).onDelete("restrict"),
     fkBranchTenant: foreignKey({
       name: "scans_branch_tenant_fk",
       columns: [t.branchId, t.tenantId],
@@ -324,6 +331,7 @@ export const scanFindingTriage = pgTable(
     status: text("status").$type<FindingTriageStatusValue>().notNull(),
     note: text("note"),
     acceptedUntil: timestamp("accepted_until", { withTimezone: true }),
+    duplicateOf: text("duplicate_of"),
     setByPartyId: uuid("set_by_party_id").references(() => parties.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -337,6 +345,7 @@ export const scanFindingTriage = pgTable(
       "scan_finding_triage_accepted",
       sql`(${t.status} = 'accepted_risk') = (${t.acceptedUntil} is not null) and (${t.status} <> 'accepted_risk' or ${t.note} is not null)`,
     ),
+    chkDuplicate: check("scan_finding_triage_duplicate", sql`(${t.status} = 'duplicate') = (${t.duplicateOf} is not null)`),
     fkRepoTenant: foreignKey({
       name: "scan_finding_triage_repo_tenant_fk",
       columns: [t.repoId, t.tenantId],

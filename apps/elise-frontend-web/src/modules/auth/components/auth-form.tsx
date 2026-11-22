@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
@@ -15,6 +16,7 @@ import { AUTH_COPY } from "../constants";
 import { AuthBrandPanel } from "./auth-brand-panel";
 import { ForgotPasswordFields } from "./forgot-password-fields";
 import { ResetPasswordFields } from "./reset-password-fields";
+import { TurnstileWidget } from "./turnstile-widget";
 import { authKeys } from "../hooks";
 import { SignInSchema, SignUpInputSchema } from "../schemas";
 
@@ -78,7 +80,7 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
       <Button type="submit" size="lg" className="mt-1 w-full" disabled={signInMutation.isPending}>
         {signInMutation.isPending ? "Please wait…" : AUTH_COPY.signin.submit}
       </Button>
-      <Link to={AUTH_COPY.signin.forgotTo} className="justify-self-start rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Link to={AUTH_COPY.signin.forgotTo} className="inline-flex min-h-6 items-center justify-self-start rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {AUTH_COPY.signin.forgot}
       </Link>
     </form>
@@ -87,15 +89,25 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
 
 const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-function SignUpFields() {
+function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null }) {
   const done = useAuthDone();
-  const signUpMutation = useMutation({ mutationFn: (input: typeof SignUpInputSchema._output) => signUp({ data: input }), ...done });
+  const [attempt, setAttempt] = useState(0);
+  const signUpMutation = useMutation({
+    mutationFn: (input: typeof SignUpInputSchema._output) => signUp({ data: input }),
+    onSuccess: done.onSuccess,
+    onError: (error: Error) => {
+      setAttempt((count) => count + 1);
+      form.setFieldValue("turnstileToken", "");
+      done.onError(error);
+    },
+  });
   const form = useForm({
-    defaultValues: { inviteCode: "", firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: browserTimezone() },
+    defaultValues: { firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: browserTimezone(), turnstileToken: "" },
     validators: { onSubmit: SignUpInputSchema },
     onSubmit: ({ value }) => signUpMutation.mutate(value),
     onSubmitInvalid: focusFirstInvalidField,
   });
+  const setToken = useCallback((token: string) => form.setFieldValue("turnstileToken", token), [form]);
 
   return (
     <form
@@ -107,18 +119,6 @@ function SignUpFields() {
       }}
       className="grid gap-5"
     >
-      <form.Field name="inviteCode">
-        {(field) => (
-          <div className="grid gap-2">
-            <Label htmlFor="inviteCode">Invite code</Label>
-            <Input id="inviteCode" name={field.name} autoComplete="off" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "inviteCode", "inviteCode-help")} />
-            <p id="inviteCode-help" className="text-sm leading-relaxed text-muted-foreground">
-              {AUTH_COPY.signup.inviteCodeHelp}
-            </p>
-            <FieldError id="inviteCode" message={fieldMessage(field)} />
-          </div>
-        )}
-      </form.Field>
       <div className="grid grid-cols-2 gap-4">
         <form.Field name="firstName">
           {(field) => (
@@ -172,6 +172,14 @@ function SignUpFields() {
           </div>
         )}
       </form.Field>
+      <form.Field name="turnstileToken">
+        {(field) => (
+          <div className="grid gap-2">
+            {turnstileSiteKey ? <TurnstileWidget key={attempt} siteKey={turnstileSiteKey} onToken={setToken} /> : <p className="text-sm text-muted-foreground">{AUTH_COPY.signup.checkUnavailable}</p>}
+            <FieldError id="turnstileToken" message={fieldMessage(field)} />
+          </div>
+        )}
+      </form.Field>
       <p className="text-sm leading-relaxed text-muted-foreground">{AUTH_COPY.signup.consequence}</p>
       <Button type="submit" size="lg" className="w-full" disabled={signUpMutation.isPending}>
         {signUpMutation.isPending ? "Please wait…" : AUTH_COPY.signup.submit}
@@ -182,8 +190,8 @@ function SignUpFields() {
 
 type AuthMode = "signin" | "signup" | "forgot" | "reset";
 
-function AuthFields({ mode, token, redirectTo }: { mode: AuthMode; token: string | undefined; redirectTo: string | undefined }) {
-  if (mode === "signup") return <SignUpFields />;
+function AuthFields({ mode, token, redirectTo, turnstileSiteKey }: { mode: AuthMode; token: string | undefined; redirectTo: string | undefined; turnstileSiteKey: string | null }) {
+  if (mode === "signup") return <SignUpFields turnstileSiteKey={turnstileSiteKey} />;
   if (mode === "forgot") return <ForgotPasswordFields />;
   if (mode === "reset") return <ResetPasswordFields token={token} />;
   return <SignInFields redirectTo={redirectTo} />;
@@ -193,7 +201,7 @@ function AuthFields({ mode, token, redirectTo }: { mode: AuthMode; token: string
 // `token` is only read by the reset page: the one from the emailed link.
 // `redirectTo` is only read by sign-in: the page to open once signed in.
 // -----
-export function AuthForm({ mode, token, redirectTo }: { mode: AuthMode; token?: string; redirectTo?: string }) {
+export function AuthForm({ mode, token, redirectTo, turnstileSiteKey = null }: { mode: AuthMode; token?: string; redirectTo?: string; turnstileSiteKey?: string | null }) {
   const copy = AUTH_COPY[mode];
 
   return (
@@ -210,7 +218,7 @@ export function AuthForm({ mode, token, redirectTo }: { mode: AuthMode; token?: 
             <p className="text-sm text-muted-foreground">{copy.hint}</p>
           </CardHeader>
           <CardContent className="p-8">
-            <AuthFields mode={mode} token={token} redirectTo={redirectTo} />
+            <AuthFields mode={mode} token={token} redirectTo={redirectTo} turnstileSiteKey={turnstileSiteKey} />
           </CardContent>
         </Card>
         <Link to={copy.to} className="inline-flex min-h-6 items-center justify-self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

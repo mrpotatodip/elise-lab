@@ -14,7 +14,7 @@ export type CrossAccountCase =
 // -----
 // A write that takes no ID but the caller's own Account, so
 // there is no other Account's ID to pass, and that needs the
-// GitHub App or the key secret, which the guard has not got.
+// key secret, which the guard has not got.
 // The test it names shows the write stays in the caller's
 // Account.
 // -----
@@ -30,7 +30,7 @@ const OTHER_FINGERPRINT = "b".repeat(64);
 export const OTHER_COMMENT_ID = "00000000-0000-4000-8000-0000000000b1";
 export const OTHER_REPO_ID = "00000000-0000-4000-8000-0000000000b2";
 export const OTHER_SECOND_REPO = "https://github.com/octocat/Spoon-Knife";
-export const OTHER_INSTALL_ID = "00000000-0000-4000-8000-0000000000b3";
+export const OTHER_SIGNAL_ID = "00000000-0000-4000-8000-0000000000d1";
 export const OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000b5";
 export const OTHER_GROUP_NAME = "Backend";
 export const OTHER_INVITE_ID = "00000000-0000-4000-8000-0000000000b6";
@@ -48,6 +48,7 @@ export const OTHER_RUNNER_NAME = "runner-of-the-other";
 // -----
 export const NOT_TENANT_ROUTES: readonly string[] = [
   "GET /usage/plan/offers",
+  "POST /stripe/webhook",
   "GET /auth/*",
   "POST /auth/*",
   "POST /sign-up",
@@ -60,6 +61,10 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
   "POST /runners/login/check",
   "GET /runners/login/lookup",
   "POST /runners/jobs/:scanId/result",
+  "GET /runners/jobs/:scanId",
+  "GET /runners/jobs/:scanId/archive",
+  "POST /runners/jobs/:scanId/trace",
+  "POST /runners/jobs/:scanId/findings",
   "GET /runners/me",
   "DELETE /runners/me",
   "GET /openapi.json",
@@ -80,6 +85,11 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
 export const CROSS_ACCOUNT_CASES = {
   "GET /findings": { kind: "run", path: "/findings?scanId=theirs", expect: "empty" },
   "GET /findings/comments": { kind: "run", path: `/findings/comments?repo=${OTHER_REPO}&fingerprint=${OTHER_FINGERPRINT}`, expect: "empty" },
+  "GET /findings/signals": { kind: "run", path: `/findings/signals?repo=${OTHER_REPO}`, expect: "empty" },
+  "POST /findings/signals/:signalId/dismiss": { kind: "run", path: `/findings/signals/${OTHER_SIGNAL_ID}/dismiss`, method: "POST", expect: "not-found" },
+  "POST /findings/signals/weak-reason": serviceTest("modules/signals/__tests__/weak-reason.test.ts"),
+  "GET /usage/signals": serviceTest("modules/signals/__tests__/signals-routes.test.ts"),
+  "PUT /usage/signals": serviceTest("modules/signals/__tests__/signals-routes.test.ts"),
   "POST /findings/comments": {
     kind: "run",
     path: "/findings/comments",
@@ -107,9 +117,14 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /repos/:repoId": { kind: "run", path: `/repos/${OTHER_REPO_ID}`, expect: "not-found" },
   "GET /repos/:repoId/findings": { kind: "run", path: `/repos/${OTHER_REPO_ID}/findings`, expect: "not-found" },
   "POST /repos/:repoId/branches": { kind: "run", path: `/repos/${OTHER_REPO_ID}/branches`, method: "POST", body: { name: "release" }, expect: "not-found" },
+  "GET /repos/:repoId/archives": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives`, expect: "not-found" },
+  "POST /repos/:repoId/archives": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives?label=app.zip`, method: "POST", body: {}, expect: "not-found" },
+  "DELETE /repos/:repoId/archives/:archiveId": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives/${OTHER_REPO_ID}`, method: "DELETE", expect: "not-found" },
+  "DELETE /repos/:repoId": { kind: "run", path: `/repos/${OTHER_REPO_ID}`, method: "DELETE", expect: "not-found" },
   "GET /scans": { kind: "run", path: "/scans", expect: "empty" },
   "GET /scans/:scanId": { kind: "run", path: "/scans/theirs", expect: "not-found" },
   "GET /scans/:scanId/diff": { kind: "run", path: "/scans/theirs/diff", expect: "not-found" },
+  "GET /scans/:scanId/trace": { kind: "run", path: "/scans/theirs/trace", expect: "not-found" },
   "GET /scans/:scanId/files/:file": { kind: "run", path: "/scans/theirs/files/REPORT.md", expect: "not-found" },
   // -----
   // The stranger, on a key of its own, scans the repo the other
@@ -117,6 +132,7 @@ export const CROSS_ACCOUNT_CASES = {
   // the caller's, so the answer is "created", not 409 or 429.
   // -----
   "POST /scans": { kind: "run", path: "/scans", method: "POST", body: { repo: OTHER_REPO }, as: "stranger", expect: "created" },
+  "POST /scans/:scanId/stop": { kind: "run", path: "/scans/theirs/stop", method: "POST", expect: "not-found" },
   "GET /files": { kind: "run", path: "/files", listedIn: "files", expect: "empty" },
   "GET /repos/:repoId/verdict": { kind: "run", path: `/repos/${OTHER_REPO_ID}/verdict?commit=${"c".repeat(40)}`, expect: "not-found" },
   "GET /usage": { kind: "run", path: "/usage", expect: "own", own: { budgetUsd: 20, spentUsd: 0, reservedUsd: 0, remainingUsd: 20, scans: 0 } },
@@ -125,6 +141,9 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /usage/credit": { kind: "run", path: "/usage/credit", expect: "own", own: { planKey: null, balanceUsd: 0, scans: 0 } },
   "GET /usage/credit/entries": { kind: "run", path: "/usage/credit/entries", expect: "empty" },
   "GET /usage/plan": { kind: "run", path: "/usage/plan", expect: "own", own: { plan: null, status: null, scans: 0 } },
+  "POST /usage/plan/change": serviceTest("modules/plan/__tests__/plan-change.test.ts"),
+  "POST /usage/plan/checkout": serviceTest("modules/plan/__tests__/plan-checkout.test.ts"),
+  "POST /usage/plan/portal": serviceTest("modules/plan/__tests__/plan-checkout.test.ts"),
   // -----
   // After the two change lists: the change writes the caller's own
   // audit row, which those lists would then show.
@@ -146,12 +165,6 @@ export const CROSS_ACCOUNT_CASES = {
   "DELETE /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "DELETE", expect: "not-found" },
   "PUT /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "PUT", expect: "not-found" },
   "DELETE /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "DELETE", expect: "not-found" },
-  "POST /github/connect": serviceTest("modules/github-installs/__tests__/github-installs-svc.test.ts"),
-  "POST /github/installations": serviceTest("modules/github-installs/__tests__/github-installs-svc.test.ts"),
-  "GET /github/installations": { kind: "run", path: "/github/installations", expect: "empty" },
-  "DELETE /github/installations/:id": { kind: "run", path: `/github/installations/${OTHER_INSTALL_ID}`, method: "DELETE", expect: "not-found" },
-  "GET /github/branches": { kind: "run", path: `/github/branches?installationId=${OTHER_INSTALL_ID}&repo=octo/hello`, expect: "not-found" },
-  "GET /github/repos": { kind: "run", path: "/github/repos", expect: "empty" },
   "GET /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", expect: "own", own: { source: "platform", lastFour: null } },
   "PUT /usage/anthropic-key": serviceTest("modules/anthropic-key/__tests__/anthropic-key-svc.test.ts"),
   "DELETE /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", method: "DELETE", expect: "own", own: { source: "platform", lastFour: null } },

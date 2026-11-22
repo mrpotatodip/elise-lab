@@ -16,13 +16,12 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SignupRouteImport } from './routes/signup'
-import { Route as AppConnectionsRouteImport } from './routes/_app/connections'
 import { Route as AppFilesRouteImport } from './routes/_app/files'
+import { Route as AppGroupsRouteImport } from './routes/_app/groups'
 import { Route as AppOverviewRouteImport } from './routes/_app/overview'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppTeamRouteImport } from './routes/_app/team'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
-import { Route as AppGithubCallbackRouteImport } from './routes/_app/github.callback'
 import { Route as AppReposIndexRouteImport } from './routes/_app/repos/index'
 import { Route as AppReposRepoIdRouteImport } from './routes/_app/repos/$repoId'
 import { Route as AppScansIndexRouteImport } from './routes/_app/scans/index'
@@ -32,6 +31,7 @@ import { Route as AppSettingsBudgetRouteImport } from './routes/_app/settings.bu
 import { Route as AppSettingsHistoryRouteImport } from './routes/_app/settings.history'
 import { Route as AppSettingsPlanRouteImport } from './routes/_app/settings.plan'
 import { Route as AppSettingsProvidersRouteImport } from './routes/_app/settings.providers'
+import { Route as AppSettingsSignalsRouteImport } from './routes/_app/settings.signals'
 import { Route as AppSummaryIndexRouteImport } from './routes/_app/summary.index'
 import { Route as AppSummaryRepoIdRouteImport } from './routes/_app/summary.$repoId'
 import { Route as AppReposRepoIdBranchesBranchIdRouteImport } from './routes/_app/repos/$repoId_.branches.$branchId'
@@ -70,14 +70,14 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppConnectionsRoute = AppConnectionsRouteImport.update({
-  id: '/connections',
-  path: '/connections',
-  getParentRoute: () => AppRouteRoute,
-} as any)
 const AppFilesRoute = AppFilesRouteImport.update({
   id: '/files',
   path: '/files',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppGroupsRoute = AppGroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppOverviewRoute = AppOverviewRouteImport.update({
@@ -99,11 +99,6 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
-} as any)
-const AppGithubCallbackRoute = AppGithubCallbackRouteImport.update({
-  id: '/github/callback',
-  path: '/github/callback',
-  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppReposIndexRoute = AppReposIndexRouteImport.update({
   id: '/repos/',
@@ -150,6 +145,11 @@ const AppSettingsProvidersRoute = AppSettingsProvidersRouteImport.update({
   path: '/providers',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsSignalsRoute = AppSettingsSignalsRouteImport.update({
+  id: '/signals',
+  path: '/signals',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSummaryIndexRoute = AppSummaryIndexRouteImport.update({
   id: '/summary/',
   path: '/summary/',
@@ -174,19 +174,19 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/connections': typeof AppConnectionsRoute
   '/files': typeof AppFilesRoute
+  '/groups': typeof AppGroupsRoute
   '/overview': typeof AppOverviewRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/team': typeof AppTeamRoute
   '/invite/$token': typeof InviteTokenRoute
-  '/github/callback': typeof AppGithubCallbackRoute
   '/repos/$repoId': typeof AppReposRepoIdRoute
   '/scans/$scanId': typeof AppScansScanIdRoute
   '/settings/budget': typeof AppSettingsBudgetRoute
   '/settings/history': typeof AppSettingsHistoryRoute
   '/settings/plan': typeof AppSettingsPlanRoute
   '/settings/providers': typeof AppSettingsProvidersRoute
+  '/settings/signals': typeof AppSettingsSignalsRoute
   '/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/repos/': typeof AppReposIndexRoute
   '/scans/': typeof AppScansIndexRoute
@@ -201,18 +201,18 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/connections': typeof AppConnectionsRoute
   '/files': typeof AppFilesRoute
+  '/groups': typeof AppGroupsRoute
   '/overview': typeof AppOverviewRoute
   '/team': typeof AppTeamRoute
   '/invite/$token': typeof InviteTokenRoute
-  '/github/callback': typeof AppGithubCallbackRoute
   '/repos/$repoId': typeof AppReposRepoIdRoute
   '/scans/$scanId': typeof AppScansScanIdRoute
   '/settings/budget': typeof AppSettingsBudgetRoute
   '/settings/history': typeof AppSettingsHistoryRoute
   '/settings/plan': typeof AppSettingsPlanRoute
   '/settings/providers': typeof AppSettingsProvidersRoute
+  '/settings/signals': typeof AppSettingsSignalsRoute
   '/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/repos': typeof AppReposIndexRoute
   '/scans': typeof AppScansIndexRoute
@@ -229,19 +229,19 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/_app/connections': typeof AppConnectionsRoute
   '/_app/files': typeof AppFilesRoute
+  '/_app/groups': typeof AppGroupsRoute
   '/_app/overview': typeof AppOverviewRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/team': typeof AppTeamRoute
   '/invite/$token': typeof InviteTokenRoute
-  '/_app/github/callback': typeof AppGithubCallbackRoute
   '/_app/repos/$repoId': typeof AppReposRepoIdRoute
   '/_app/scans/$scanId': typeof AppScansScanIdRoute
   '/_app/settings/budget': typeof AppSettingsBudgetRoute
   '/_app/settings/history': typeof AppSettingsHistoryRoute
   '/_app/settings/plan': typeof AppSettingsPlanRoute
   '/_app/settings/providers': typeof AppSettingsProvidersRoute
+  '/_app/settings/signals': typeof AppSettingsSignalsRoute
   '/_app/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/_app/repos/': typeof AppReposIndexRoute
   '/_app/scans/': typeof AppScansIndexRoute
@@ -258,19 +258,19 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signin'
     | '/signup'
-    | '/connections'
     | '/files'
+    | '/groups'
     | '/overview'
     | '/settings'
     | '/team'
     | '/invite/$token'
-    | '/github/callback'
     | '/repos/$repoId'
     | '/scans/$scanId'
     | '/settings/budget'
     | '/settings/history'
     | '/settings/plan'
     | '/settings/providers'
+    | '/settings/signals'
     | '/summary/$repoId'
     | '/repos/'
     | '/scans/'
@@ -285,18 +285,18 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signin'
     | '/signup'
-    | '/connections'
     | '/files'
+    | '/groups'
     | '/overview'
     | '/team'
     | '/invite/$token'
-    | '/github/callback'
     | '/repos/$repoId'
     | '/scans/$scanId'
     | '/settings/budget'
     | '/settings/history'
     | '/settings/plan'
     | '/settings/providers'
+    | '/settings/signals'
     | '/summary/$repoId'
     | '/repos'
     | '/scans'
@@ -312,19 +312,19 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signin'
     | '/signup'
-    | '/_app/connections'
     | '/_app/files'
+    | '/_app/groups'
     | '/_app/overview'
     | '/_app/settings'
     | '/_app/team'
     | '/invite/$token'
-    | '/_app/github/callback'
     | '/_app/repos/$repoId'
     | '/_app/scans/$scanId'
     | '/_app/settings/budget'
     | '/_app/settings/history'
     | '/_app/settings/plan'
     | '/_app/settings/providers'
+    | '/_app/settings/signals'
     | '/_app/summary/$repoId'
     | '/_app/repos/'
     | '/_app/scans/'
@@ -395,18 +395,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/connections': {
-      id: '/_app/connections'
-      path: '/connections'
-      fullPath: '/connections'
-      preLoaderRoute: typeof AppConnectionsRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
     '/_app/files': {
       id: '/_app/files'
       path: '/files'
       fullPath: '/files'
       preLoaderRoute: typeof AppFilesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/groups': {
+      id: '/_app/groups'
+      path: '/groups'
+      fullPath: '/groups'
+      preLoaderRoute: typeof AppGroupsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/overview': {
@@ -436,13 +436,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/invite/$token'
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_app/github/callback': {
-      id: '/_app/github/callback'
-      path: '/github/callback'
-      fullPath: '/github/callback'
-      preLoaderRoute: typeof AppGithubCallbackRouteImport
-      parentRoute: typeof AppRouteRoute
     }
     '/_app/repos/': {
       id: '/_app/repos/'
@@ -507,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsProvidersRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/signals': {
+      id: '/_app/settings/signals'
+      path: '/signals'
+      fullPath: '/settings/signals'
+      preLoaderRoute: typeof AppSettingsSignalsRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/summary/': {
       id: '/_app/summary/'
       path: '/summary'
@@ -536,6 +536,7 @@ interface AppSettingsRouteChildren {
   AppSettingsHistoryRoute: typeof AppSettingsHistoryRoute
   AppSettingsPlanRoute: typeof AppSettingsPlanRoute
   AppSettingsProvidersRoute: typeof AppSettingsProvidersRoute
+  AppSettingsSignalsRoute: typeof AppSettingsSignalsRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
@@ -544,6 +545,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsHistoryRoute: AppSettingsHistoryRoute,
   AppSettingsPlanRoute: AppSettingsPlanRoute,
   AppSettingsProvidersRoute: AppSettingsProvidersRoute,
+  AppSettingsSignalsRoute: AppSettingsSignalsRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
 
@@ -552,12 +554,11 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteRouteChildren {
-  AppConnectionsRoute: typeof AppConnectionsRoute
   AppFilesRoute: typeof AppFilesRoute
+  AppGroupsRoute: typeof AppGroupsRoute
   AppOverviewRoute: typeof AppOverviewRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppTeamRoute: typeof AppTeamRoute
-  AppGithubCallbackRoute: typeof AppGithubCallbackRoute
   AppReposRepoIdRoute: typeof AppReposRepoIdRoute
   AppScansScanIdRoute: typeof AppScansScanIdRoute
   AppSummaryRepoIdRoute: typeof AppSummaryRepoIdRoute
@@ -568,12 +569,11 @@ interface AppRouteRouteChildren {
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
-  AppConnectionsRoute: AppConnectionsRoute,
   AppFilesRoute: AppFilesRoute,
+  AppGroupsRoute: AppGroupsRoute,
   AppOverviewRoute: AppOverviewRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppTeamRoute: AppTeamRoute,
-  AppGithubCallbackRoute: AppGithubCallbackRoute,
   AppReposRepoIdRoute: AppReposRepoIdRoute,
   AppScansScanIdRoute: AppScansScanIdRoute,
   AppSummaryRepoIdRoute: AppSummaryRepoIdRoute,

@@ -11,10 +11,14 @@ export const VERDICT_VALUES = ["pass", "fail", "cannot_tell"] as const;
 // -----
 export const VERDICT_REASON_VALUES = ["not_scanned", "too_few_scans", "unchecked_priors", "too_many_priors", "over_limit"] as const;
 
+// -----
+// A git commit (40 hex digits), or for an upload app the SHA-256
+// of a zip (64), which stands in for its commit.
+// -----
 export const VerdictQuerySchema = z.object({
   commit: z
     .string()
-    .regex(/^[0-9a-fA-F]{40}$/)
+    .regex(/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/)
     .transform((sha) => sha.toLowerCase()),
 });
 
@@ -29,6 +33,14 @@ export const VerdictFindingSchema = z.object({
   evidence: z.string().nullable().optional(),
   fix: z.string().nullable().optional(),
   needs: z.string().nullable().optional(),
+});
+
+// -----
+// duplicateOf is set when the problem was dismissed as a
+// duplicate: the fingerprint of the Finding kept.
+// -----
+export const VerdictDismissedSchema = VerdictFindingSchema.extend({
+  duplicateOf: z.string().nullable().optional(),
 });
 
 export const VerdictAcceptedSchema = VerdictFindingSchema.extend({
@@ -53,7 +65,7 @@ export const VerdictSchema = z.object({
   counts: SeverityCountsSchema.extend({ needsValidation: z.number().int().min(0) }),
   open: z.array(VerdictOpenSchema),
   accepted: z.array(VerdictAcceptedSchema),
-  dismissed: z.array(VerdictFindingSchema),
+  dismissed: z.array(VerdictDismissedSchema),
 });
 
 export type VerdictValue = (typeof VERDICT_VALUES)[number];

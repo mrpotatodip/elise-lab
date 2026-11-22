@@ -1,12 +1,20 @@
 import type { Context } from "hono";
+import { ScanUsageSchema } from "@repo/contracts/elise";
 import { createAuth } from "#/lib/auth";
-import { dbConnect, withTenant } from "#/lib/db-connection";
+import { dbConnect, withPool, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
+import { linkScanArchiveEffect } from "#/modules/archives/queries";
 import { holdCreditEffect, settleCreditEffect } from "#/modules/credit";
+import { enqueueEmail } from "#/modules/email";
+import { runnerIdentitySvc } from "#/modules/runners/handlers";
 import { findConnectedRunnerEffect } from "#/modules/runners/queries";
-import { githubAccessFor, neonInstallationRepo } from "#/modules/github-installs";
 import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
-import { activeCountsEffect, tenantScanRepo } from "#/modules/scan-ledger";
+import { tenantScanRepo } from "#/modules/scan-ledger";
+import { InternalServiceError } from "#/lib/errors";
+import { STRIPE_NOT_CONFIGURED_MESSAGE } from "#/modules/stripe/constants";
+import { verifyTurnstileToken } from "#/modules/sign-up/lib";
+import { stripeGateway } from "#/modules/stripe/lib";
+import { typesafeGateway } from "#/modules/typesafe";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 import type { AppEnv, AppDeps } from "#/types/variables";
 
@@ -20,25 +28,32 @@ const sessionUserId = async (c: Context<AppEnv>): Promise<string | undefined> =>
 };
 
 export const realAppDeps: AppDeps = {
-  // -----
-  // The Scan's own rows run as the Account. The global count of
-  // live Scans (MAX_GLOBAL_FULL_SCANS) crosses Accounts, which a
-  // withTenant transaction cannot see, so it stays on the owner role.
-  // -----
-  scanRepo: (env, db) => tenantScanRepo(db, (nowMs) => activeCountsEffect(dbConnect(env.DATABASE_URL), nowMs)),
-  githubAccess: (env, accountId) => githubAccessFor(env, neonInstallationRepo(dbConnect(env.DATABASE_URL)), accountId),
+  scanRepo: (_env, db) => tenantScanRepo(db),
   monthSpend: (db, accountId) => monthSpendEffect(db, accountId, monthStartOf(new Date())),
   holdCredit: (db, accountId, scanId, holdUsd) => holdCreditEffect(db, { tenantId: accountId, scanId, holdUsd }),
-  runnerConnected: findConnectedRunnerEffect,
+  connectedRunnerSources: findConnectedRunnerEffect,
+  linkArchive: linkScanArchiveEffect,
   releaseCredit: (db, accountId, scanId) => settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: 0 }),
+  teardownScan: async (env, scanId) => {
+    await env.SCAN_WORKFLOW_FULL.get(scanId)
+      .then((workflow) => workflow.terminate())
+      .catch(() => undefined);
+    const sandbox = env.SANDBOX_FULL.getByName(scanId);
+    const usage = ScanUsageSchema.nullable().parse(await sandbox.readUsage());
+    await sandbox.destroy();
+    return usage;
+  },
   sessionUserId,
+  runnerIdentity: (c, token) => runEffect(runnerIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) => runEffect(userHasPowerEffect(dbConnect(c.env.DATABASE_URL), userId, accountId, power)),
-  enqueueInviteEmail: async (env, mail) => {
-    await env.INVITE_EMAIL_QUEUE.send(mail, { contentType: "json" });
-  },
-  enqueuePasswordResetEmail: async (env, mail) => {
-    await env.INVITE_EMAIL_QUEUE.send(mail, { contentType: "json" });
-  },
+  enqueueEmail,
+  verifyTurnstile: (env, token, ip) => verifyTurnstileToken({ secret: env.TURNSTILE_SECRET_KEY, token, ip }),
   withTenant: (c, accountId, run) => withTenant(c.env.HYPERDRIVE_TENANT.connectionString, (promise) => c.executionCtx.waitUntil(promise), accountId, run),
+  withOwner: (c, run) => withPool(c.env.DATABASE_URL, (promise) => c.executionCtx.waitUntil(promise), run),
+  stripe: (env) => {
+    if (!env.STRIPE_SECRET_KEY) throw new InternalServiceError(STRIPE_NOT_CONFIGURED_MESSAGE);
+    return stripeGateway(env.STRIPE_SECRET_KEY, { iconFileId: env.STRIPE_BRANDING_ICON_FILE_ID, logoFileId: env.STRIPE_BRANDING_LOGO_FILE_ID });
+  },
+  typesafe: (env) => (env.TYPESAFE_API_KEY ? typesafeGateway(env.TYPESAFE_API_KEY) : null),
 };

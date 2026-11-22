@@ -1,0 +1,1 @@
+ALTER TABLE "scans" ADD COLUMN "signal_pairs_skipped" integer;

@@ -1,10 +1,12 @@
-import { ForbiddenError } from "#/lib/errors";
-import { rateLimitByIp } from "#/lib/rate-limit";
-import { SIGN_UP_INVALID_INVITE } from "#/modules/sign-up/constants";
+import { TooManyRequestsError } from "#/lib/errors";
+import { rateLimitByIp, rateLimitTotal } from "#/lib/rate-limit";
+import { SIGN_UP_RATE_LIMITED, SIGN_UP_RATE_LIMITED_CODE } from "#/modules/sign-up/constants";
+
+const refuse = () => new TooManyRequestsError(SIGN_UP_RATE_LIMITED, SIGN_UP_RATE_LIMITED_CODE);
 
 // -----
-// Over the limit it answers exactly like a wrong
-// invite code (403, same body), so a guesser cannot
-// tell a refused code from a refused request.
+// Over a limit it answers 429 with its own message.
+// The total limit holds when one caller rotates IPs.
 // -----
-export const requireSignUpLimit = rateLimitByIp("SIGN_UP_LIMITER", () => new ForbiddenError(SIGN_UP_INVALID_INVITE));
+export const requireSignUpLimit = rateLimitByIp("SIGN_UP_LIMITER", refuse);
+export const requireSignUpTotalLimit = rateLimitTotal("SIGN_UP_TOTAL_LIMITER", refuse);

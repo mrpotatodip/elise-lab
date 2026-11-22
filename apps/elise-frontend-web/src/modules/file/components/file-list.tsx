@@ -18,6 +18,7 @@ import type { FileEntry, FilesSearch } from "../schemas";
 import { FileDownloadButton } from "./file-download-button";
 import { FileFilters } from "./file-filters";
 import { FileListSkeleton } from "./file-list-skeleton";
+import { FileListSummary } from "./file-list-summary";
 
 type FileListViewProps = {
   filters: FilesSearch;
@@ -113,9 +114,14 @@ function FileListView({ filters, onChange }: FileListViewProps) {
   const table = useTable({ features: dataTableFeatures, columns, data: files, getRowId: rowKey });
 
   return (
+    <>
+    <FileListSummary files={files} counts={data.counts} more={Boolean(nextCursor)} />
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>All files</CardTitle>
+        <div className="grid gap-1.5">
+          <CardTitle>All files</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Reports and finding lists saved by each scan. Filter by type, repository or date.</p>
+        </div>
         <ShellListCount shown={files.length} total={files.length} more={Boolean(nextCursor)} noun="file" plural="files" />
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
@@ -152,6 +158,7 @@ function FileListView({ filters, onChange }: FileListViewProps) {
         )}
       </CardContent>
     </Card>
+    </>
   );
 }
 

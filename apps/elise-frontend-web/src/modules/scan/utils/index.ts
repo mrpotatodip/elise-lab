@@ -1,5 +1,7 @@
 export * from "./scan-activity";
+export * from "./scan-archive-note";
 export * from "./scan-branch-scans";
+export * from "./scan-create-body";
 export * from "./scan-finding-prompt";
 export * from "./scan-plan-summary";
 export * from "./scan-profile-note";
@@ -7,6 +9,7 @@ export * from "./scan-repo-name";
 export * from "./scan-repo-picks";
 export * from "./scan-sidebar";
 export * from "./scan-success-rate";
+export * from "./scan-trace";
 export * from "./scan-format";
 export * from "./scan-known-repos";
 export * from "./verdict-blockers";

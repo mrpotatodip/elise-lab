@@ -9,6 +9,7 @@ export const RUNNER_LOGIN_INVALID = "This login code is invalid or has expired";
 export const RUNNER_LOGIN_LIMITED = "Too many login requests; try again in a minute";
 export const RUNNER_LOGIN_CLEANUP_BATCH = 100;
 export const RUNNER_LOGIN_VERIFY_PATH = "/device";
+export const RUNNER_NOTICE_PATH = "/settings/providers";
 export const RUNNER_LOGIN_USER_CODE_LENGTH = 8;
 
 // -----
@@ -47,9 +48,10 @@ export const RUNNER_PROMPT_PLACE = {
   metered: false,
 } as const;
 export const RUNNER_JOB_NOT_FOUND = "This scan is not waiting for a report from this runner";
-export const RUNNER_JOB_PRIVATE = "A private repository can't run on a runner yet. Run it in EliseLAB's cloud.";
 export const RUNNER_PLAN_HOSTED_MESSAGE = "The Runner plan runs Scans on your own computer only. Connect a Runner on the Runners page, then start the Scan there.";
 export const RUNNER_JOB_NOT_CONNECTED = "runner_id: this runner is not connected to the account";
-export const RUNNER_JOB_NOT_PICKED_UP = "The runner did not pick up this scan in time. Check that the EliseLAB Runner app is open and connected on that computer.";
+export const RUNNER_JOB_NOT_PICKED_UP = "The runner did not pick up this scan in time. Check that the Runner is running and connected on that computer.";
 export const RUNNER_JOB_BAD_OPTIONS = "The scan's settings could not be read, so it was not run. Start a new scan.";
 export const RUNNER_JOB_NO_REPORT ="the audit finished without writing REPORT.md";
+export const RUNNER_JOB_ARCHIVE_REMOVED = "The zip this Scan reads was removed before the Runner could download it, so the Scan did not run. Upload the zip again and start a new Scan.";
+export const RUNNER_ARCHIVE_UNSUPPORTED = "runner_id: this Runner cannot read uploaded zips. Update the Runner on that computer and let it connect, then start the Scan again.";

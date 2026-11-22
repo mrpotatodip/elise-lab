@@ -20,7 +20,8 @@ The folder is one Cargo workspace (`Cargo.toml`, one `Cargo.lock`, one `target`)
 | `core/src/pairing.rs` | Enroll a code, accept or decline it, the Runner's status, unpairing. |
 | `core/src/login.rs` | Log in through the browser: start a login, wait for approval, hand back the enrolled Runner. |
 | `core/src/store.rs` | Where the token is kept: the keychain (each program has its own service name), an owner-only file, or a token given from outside (read only). |
-| `core/src/scan.rs` | The work loop: claim, clone, run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
+| `core/src/scan.rs` | The work loop: claim, clone (or unpack an upload's zip), run `claude` with a fixed tool allowlist, validate the output, upload, and the events it reports. |
+| `core/src/providers/` | Where a Scan's code comes from: one module per provider (`github`, `gitlab`, `gitlab_sh`, `upload`), the shared address rules in `address.rs`, and `mod.rs`, the only file that knows them all. A test fails when one provider's module names another's. |
 | `src-tauri/src/lib.rs` | The desktop app: the commands, the pending pairing, the activity, the tray. |
 | `cli/src/` | The headless Runner: `args.rs` (command line, help text), `browser.rs` (opens the login link), `store.rs` (which token store a run uses), `commands.rs` (one function per command, and the log of `run`), `tools.rs` (the built-in Skill, `claude` and `node`). |
 | `cli/tests/` | Process tests: the debug `elise-runner` run against a stub engine (`support/mod.rs`). |
@@ -36,11 +37,23 @@ The runner status is one of `unpaired`, `revoked`, `offline` or `connected`. The
 ```bash
 pnpm --filter elise-runner-cli app:dev     # tauri dev
 pnpm --filter elise-runner-cli app:build   # tauri build
-pnpm --filter elise-runner-cli check       # tsc --noEmit, then cargo test for the core and the terminal program
+pnpm --filter elise-runner-cli check       # tsc --noEmit, cargo fmt --check, cargo clippy (-D warnings) and cargo test for the core and the terminal program
 ```
 
 ## The headless Runner
 
 `elise-runner` does what the desktop app does without a window, on macOS and Linux. It is its own Runner with its own token, so on one computer it and the desktop app are two Runners. Its commands, exit codes, token store order and setup are in `cli/README.md`. Build it with `cargo build -p elise-runner-cli` (or `--release`).
+
+### Install
+
+On macOS (arm64 or x64) or Linux (x64 or arm64), one command installs the newest release of the headless Runner to `~/.local/bin` (set `ELISE_RUNNER_INSTALL_DIR` to change it):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh
+```
+
+Then run `elise-runner login`. The script is `install.sh` in this folder. It takes the newest GitHub Release whose tag starts with `elise-runner-v` and downloads `elise-runner-<darwin|linux>-<arm64|x64>`. Any other system is refused with a message.
+
+Pushing a tag `elise-runner-v<version>` (the version in `cli/Cargo.toml`) runs `.github/workflows/release-elise-runner.yml`: it builds the four binaries on native runners and publishes them on a release. Linux binaries link `libdbus` (for the keychain), so a minimal image needs `libdbus-1-3`. The script is checked by hand on a clean macOS and Linux computer, not by a test.
 
 You need a Rust toolchain for `app:dev`, `app:build` and `check`. `pnpm check:apps` and the pre-commit check run `check` for this folder, so a commit that touches it runs the Rust tests.

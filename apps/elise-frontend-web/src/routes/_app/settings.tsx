@@ -1,10 +1,6 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { hasAccessPower } from "@repo/contracts/elise";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/settings")({
-  head: () => ({ meta: [{ title: "Settings · Elise" }] }),
-  beforeLoad: ({ context }) => {
-    if (!hasAccessPower(context.user?.powers ?? [], "company:usage:budget:update")) throw redirect({ to: "/overview" });
-  },
+  head: () => ({ meta: [{ title: "Elise" }] }),
   component: Outlet,
 });

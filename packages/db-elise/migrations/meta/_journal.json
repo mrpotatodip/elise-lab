@@ -631,6 +631,104 @@
       "when": 1794975000001,
       "tag": "0089_aspiring_pixie",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1794995109060,
+      "tag": "0090_scan_repos_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1794995674001,
+      "tag": "0091_upload_archives",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1795018360304,
+      "tag": "0092_upload_app_removed_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1795019095582,
+      "tag": "0093_runner_job_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1795057768378,
+      "tag": "0094_scan_trace_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1795072183900,
+      "tag": "0095_scan_state_stopped",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1795203740794,
+      "tag": "0096_retire_github_app",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1795226349413,
+      "tag": "0097_stripe_plan_manage_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795256253055,
+      "tag": "0098_starter_plan_row",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1795282227133,
+      "tag": "0099_team_invite_email_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1795288326104,
+      "tag": "0100_signals_duplicate_decision",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1795289154337,
+      "tag": "0101_signals_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1795289755078,
+      "tag": "0102_scan_signal_pairs_skipped",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1795300802292,
+      "tag": "0103_tense_lucky_pierre",
+      "breakpoints": true
     }
   ]
 }

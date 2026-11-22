@@ -15,25 +15,23 @@ import { Segmented } from "#/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
 import { cn } from "#/lib/utils";
-import { creditProfileHold, creditQuery } from "#/modules/credit";
-import { githubInstallationsQuery, githubReposQuery } from "#/modules/github";
-import { runnersQuery } from "#/modules/runner";
-import { usageBlockedNote, usageQuery, usageUsd } from "#/modules/usage";
+import { RUNNER_GIT_LOGIN_HINT, runnersQuery } from "#/modules/runner";
 import {
   SCAN_DEFAULT_BRANCH,
   SCAN_EFFORT_OPTIONS,
   SCAN_MODEL_OPTIONS,
   SCAN_OTHER_BRANCH,
   SCAN_PRIVATE_BRANCH_FAILED,
-  SCAN_PRIVATE_TRUNCATED,
   SCAN_PROFILE_OPTIONS,
   type ScanOption,
 } from "../constants";
 import { createScan } from "../api";
 import { scanKeys, scanReposQuery, scansQuery } from "../hooks";
-import { CreateScanInputSchema, type CreateScanInput } from "../schemas";
-import { scanKnownRepos, scanPlanSummary, scanRepoChoices, scanRepoLinkPick, scanRepoPickSame, scanRepoPicks, type ScanRepoPick } from "../utils";
+import { DEFAULT_SOURCE_PROVIDER_ID, isGitSourceProvider, sourceProviderOf, sourceProviderOfAddress } from "#/providers/registry";
+import { CreateScanInputSchema, type CreateScanInput, type SourceProviderValue } from "../schemas";
+import { scanArchivePick, scanKnownRepos, scanPlanSummary, scanRepoChoices, scanRepoLinkPick, scanRepoPickSame, scanRepoPicks, scanStartProblem, type ScanRepoPick } from "../utils";
 import { ScanNewBranch, useScanBranches } from "./scan-new-branch";
+import { ScanNewProvider } from "./scan-new-provider";
 import { ScanNewSearch, ScanRepoIcon } from "./scan-new-search";
 
 const INITIAL: CreateScanInput = {
@@ -83,8 +81,6 @@ function OptionSelect<T extends string>({ id, label, options, value, onPick }: O
   );
 }
 
-const RUN_IN_CLOUD = "cloud";
-
 const labelOf = (options: readonly { value: string; label: string }[], value: string) => options.find((option) => option.value === value)?.label ?? value;
 
 type ScanNewFormProps = {
@@ -93,6 +89,8 @@ type ScanNewFormProps = {
   startBranch?: string;
   startRef?: string;
   startOptions?: Partial<Pick<CreateScanInput, "model" | "effort" | "profile">>;
+  provider?: SourceProviderValue;
+  repoId?: string;
 };
 
 // -----
@@ -109,7 +107,7 @@ const planErrors = (plan: CreateScanInput) => {
   return { fields: { ...(repoIssue && { repo: repoIssue.message }), ...(refIssue && { ref: refIssue.message }) } };
 };
 
-export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions }: ScanNewFormProps) {
+export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions, provider: startProvider, repoId: startRepoId }: ScanNewFormProps) {
   const initial: CreateScanInput = { ...INITIAL, ...startOptions, ref: startRef ?? startBranch };
   const form = useForm({
     defaultValues: initial,
@@ -121,48 +119,60 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
     },
   });
   const values = useStore(form.store, (state) => state.values);
+  // -----
+  // The provider comes first. "Scan again" opens on the provider its
+  // address belongs to, or the one it names: an upload app's name is
+  // no address, so its pages name the provider and the app.
+  // -----
+  const [providerId, setProviderId] = useState<SourceProviderValue>(() => startProvider ?? (repo === undefined ? undefined : sourceProviderOfAddress(repo)?.id) ?? DEFAULT_SOURCE_PROVIDER_ID);
+  const provider = sourceProviderOf(providerId);
+  const hasBranches = provider.capabilities.hasBranches;
+  const [startProblem, setStartProblem] = useState<string | null>(null);
   const [picked, setPicked] = useState<ScanRepoPick | null | undefined>(undefined);
   const [branchPick, setBranchPick] = useState(startRef ? SCAN_OTHER_BRANCH : (startBranch ?? SCAN_DEFAULT_BRANCH));
   const { data: list } = useQuery(scansQuery());
-  const { data: usage } = useQuery(usageQuery());
-  const { data: credit } = useQuery(creditQuery());
-  const hold = creditProfileHold(credit, values.profile);
-  const budgetSpent = usage !== undefined && usage.budgetApplies !== false && usage.remainingUsd <= 0;
   const { data: repoList } = useQuery(scanReposQuery());
-  const { data: connected, isPending: connecting } = useQuery(githubReposQuery());
-  const { data: installs } = useQuery(githubInstallationsQuery());
   const everyKnown = repoList ? scanRepoChoices(repoList.repos, list?.scans ?? []) : scanKnownRepos(list?.scans ?? []);
-  const picks = scanRepoPicks(everyKnown, connected ?? []);
-  const fromProp = repo === undefined ? null : (picks.find((item) => scanRepoPickSame(item.url, repo)) ?? scanRepoLinkPick(repo));
+  const picks = scanRepoPicks(everyKnown, providerId);
+  const fromProp = repo === undefined || provider.capabilities.isArchive ? null : (picks.find((item) => scanRepoPickSame(item.url, repo)) ?? scanRepoLinkPick(repo, providerId));
   // -----
   // The choice is remembered as a repository, not as the row that was clicked:
-  // the list changes when the GitHub connection's repositories arrive (a
-  // repository the account scanned turns out to be private), and the card
-  // must follow it. A pasted link is in no list, so it keeps its own row.
+  // the list changes as scans load, and the card must follow it. A pasted
+  // link is in no list, so it keeps its own row, and so does an upload app's
+  // pick, which carries its zip.
   // -----
-  const selected = picked === undefined ? fromProp : picked === null ? null : (picks.find((item) => scanRepoPickSame(item.url, picked.url)) ?? picked);
-  const isPrivate = selected?.isPrivate === true;
-  const branches = useScanBranches(selected);
-  const typedBranch = selected !== null && (branches.kind === "typed" || branches.isError || branchPick === SCAN_OTHER_BRANCH);
-  const noConnection = installs !== undefined && !installs.some((install) => install.status === "active");
+  const selected = picked === undefined ? fromProp : picked === null ? null : picked.archive ? picked : (picks.find((item) => scanRepoPickSame(item.url, picked.url)) ?? picked);
   // -----
-  // A scan can run on one of the account's connected runners: the person's own
-  // computer, on their own Claude. Only a public repository can, because a private one
-  // needs the GitHub token that only Elise's container can make.
+  // An upload app has no branches: the zip is the version, so
+  // nothing asks for a branch and the plan sends no ref.
+  // -----
+  const branches = useScanBranches(hasBranches ? selected : null);
+  const typedBranch = hasBranches && selected !== null && (branches.kind === "typed" || branches.isError || branchPick === SCAN_OTHER_BRANCH);
+  // -----
+  // Every Scan runs on one of the account's connected Runners: the person's own
+  // computer, on their own Claude and their own git login. It takes the first
+  // connected one until the person picks another, and starts nothing without one.
   // -----
   const { data: runners } = useQuery(runnersQuery());
   const connectedRunners = (runners ?? []).filter((item) => item.state === "connected");
-  const runner = isPrivate ? undefined : connectedRunners.find((item) => item.id === values.runnerId);
-  const showRunner = !isPrivate && connectedRunners.length > 0;
-  const ref = typedBranch ? values.ref : branchPick === SCAN_DEFAULT_BRANCH ? undefined : branchPick;
-  const plan: CreateScanInput = { ...values, runnerId: runner?.id, repo: selected?.url ?? "", ref };
+  const runner = connectedRunners.find((item) => item.id === values.runnerId) ?? connectedRunners[0];
+  const showRunner = connectedRunners.length > 1;
+  const noRunner = runners !== undefined && runner === undefined;
+  const ref = !hasBranches ? undefined : typedBranch ? values.ref : branchPick === SCAN_DEFAULT_BRANCH ? undefined : branchPick;
+  const plan: CreateScanInput = { ...values, provider: providerId, runnerId: runner?.id, repo: selected?.url ?? "", ref, archiveId: selected?.archive?.id };
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const choose = (next: ScanRepoPick | null) => {
     setPicked(next);
+    setStartProblem(null);
     setBranchPick(SCAN_DEFAULT_BRANCH);
     form.setFieldValue("ref", undefined);
+  };
+
+  const chooseProvider = (next: SourceProviderValue) => {
+    setProviderId(next);
+    choose(null);
   };
 
   const start = useMutation({
@@ -173,11 +183,18 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
       await queryClient.invalidateQueries({ queryKey: scanKeys.all });
       await navigate({ to: "/scans/$scanId", params: { scanId: scan.scanId } });
     },
-    onError: (error) => toast.error(`We couldn't start the audit. ${error.message}`),
+    // -----
+    // The reason also stays in the form, so a refusal the person must act
+    // on (an older Runner that cannot read zips) is not gone with the toast.
+    // -----
+    onError: (error) => {
+      setStartProblem(scanStartProblem(error.message));
+      toast.error(`We couldn't start the audit. ${error.message}`);
+    },
   });
 
-  const summary = scanPlanSummary(plan, runner?.name);
-  const chips = [runner?.name ?? "Elise's cloud", labelOf(SCAN_MODEL_OPTIONS, values.model), `${labelOf(SCAN_EFFORT_OPTIONS, values.effort)} effort`];
+  const summary = scanPlanSummary(plan, runner?.name, selected?.archive?.label);
+  const chips = [runner?.name ?? "No Runner connected", labelOf(SCAN_MODEL_OPTIONS, values.model), `${labelOf(SCAN_EFFORT_OPTIONS, values.effort)} effort`];
 
   return (
     <form
@@ -191,22 +208,23 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
     >
       <DialogBody className="grid content-start gap-6">
         {selected === null ? (
-          <ScanNewSearch
-            picks={picks}
-            loading={connecting}
-            onPick={choose}
-            hint={
-              noConnection ? (
-                <p className="px-1 text-sm leading-relaxed text-muted-foreground">
-                  To scan a private repository, an admin connects GitHub on the{" "}
-                  <Link to="/connections" className="font-medium underline underline-offset-2">
-                    Connections
-                  </Link>{" "}
-                  page.
-                </p>
-              ) : undefined
-            }
-          />
+          <div className="grid gap-4">
+            <ScanNewProvider value={providerId} onChange={chooseProvider} />
+            {provider.ArchivePicker !== null && <provider.ArchivePicker key={provider.id} startRepoId={startRepoId} onPick={(pick) => choose({ ...scanArchivePick(pick), running: everyKnown.some((item) => item.repoId === pick.repoId && item.running) })} />}
+            {isGitSourceProvider(provider) && (
+              <ScanNewSearch
+                key={provider.id}
+                provider={provider}
+                picks={picks}
+                onPick={choose}
+                hint={
+                  provider.Help !== null ? (
+                    <provider.Help />
+                  ) : undefined
+                }
+              />
+            )}
+          </div>
         ) : (
           <div className="grid gap-6 animate-in fade-in-0 duration-200">
             <div className="grid gap-3">
@@ -215,7 +233,9 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                   <ScanRepoIcon pick={selected} />
                   <span className="grid min-w-0 flex-1">
                     <span className="truncate text-sm font-medium">{selected.label}</span>
-                    <span className="text-xs text-muted-foreground">{selected.isPrivate ? "Private repository" : "Public repository"}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {selected.archive ? `Zip ${selected.archive.label}` : selected.isPrivate ? "Private repository" : isGitSourceProvider(provider) ? provider.address.repoNote : provider.label}
+                    </span>
                   </span>
                   <Button type="button" variant="ghost" size="sm" onClick={() => choose(null)}>
                     Change
@@ -228,7 +248,6 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                   <AlertDescription>{SCAN_PRIVATE_BRANCH_FAILED}</AlertDescription>
                 </Alert>
               )}
-              {branches.truncated && <p className="px-1 text-sm leading-relaxed text-muted-foreground">{SCAN_PRIVATE_TRUNCATED}</p>}
               {typedBranch && (
                 <form.Field name="ref">
                   {(field) => (
@@ -256,6 +275,22 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                   )}
                 </form.Field>
               )}
+              {noRunner && (
+                <Alert>
+                  <AlertDescription>
+                    An audit runs on one of your Runners, and none is connected. Add one on the{" "}
+                    <Link to="/settings/providers" className="font-medium underline underline-offset-2">
+                      Runners
+                    </Link>{" "}
+                    page.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {startProblem !== null && (
+                <Alert variant="destructive">
+                  <AlertDescription>{startProblem}</AlertDescription>
+                </Alert>
+              )}
               {selected.running && (
                 <output className="block rounded-md border border-status-warning/25 bg-status-warning-soft px-3 py-2 text-sm text-status-warning">
                   A scan of {selected.label} is already running. Wait for it to finish before you start another.
@@ -275,11 +310,6 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                 />
               </div>
               <p className="text-sm leading-relaxed text-muted-foreground">{SCAN_PROFILE_OPTIONS.find((option) => option.value === values.profile)?.description}</p>
-              {hold !== null && runner === undefined && (
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  This audit may hold up to {usageUsd(hold)} of your credit while it runs. You pay only what it uses.
-                </p>
-              )}
             </div>
 
             <Collapsible>
@@ -302,25 +332,19 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                         Run on
                       </Label>
                       <Select
-                        value={runner?.id ?? RUN_IN_CLOUD}
-                        items={[{ value: RUN_IN_CLOUD, label: "Elise's cloud" }, ...connectedRunners.map((item) => ({ value: item.id, label: item.name }))]}
+                        value={runner?.id}
+                        items={connectedRunners.map((item) => ({ value: item.id, label: item.name }))}
                         onValueChange={(next) => form.setFieldValue("runnerId", connectedRunners.find((item) => item.id === next)?.id)}
                       >
                         <SelectTrigger id="run-where" className="h-9">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={RUN_IN_CLOUD}>
-                            <span className="grid">
-                              <span>Elise&apos;s cloud</span>
-                              <span className="text-xs text-muted-foreground">Runs in an isolated container, and uses your plan&apos;s credit or key.</span>
-                            </span>
-                          </SelectItem>
                           {connectedRunners.map((item) => (
                             <SelectItem key={item.id} value={item.id}>
                               <span className="grid">
                                 <span>{item.name}</span>
-                                <span className="text-xs text-muted-foreground">Your own computer. Uses its Claude login, not your credit.</span>
+                                <span className="text-xs text-muted-foreground">Your own computer. Uses its Claude login and its git login.</span>
                               </span>
                             </SelectItem>
                           ))}
@@ -332,9 +356,7 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
                   <OptionSelect id="effort" label="Effort" options={SCAN_EFFORT_OPTIONS} value={values.effort} onPick={(v) => form.setFieldValue("effort", v)} />
                 </div>
                 <p className="pt-3 text-sm leading-relaxed text-muted-foreground">
-                  {runner === undefined
-                    ? "More effort can find more issues, but takes longer and costs more."
-                    : "The Elise Runner app must be open on that computer, with Claude Code signed in. Private repositories can't run there yet."}
+                  More effort can find more issues, but takes longer. The Elise Runner must be running on that computer, with Claude Code signed in.
                 </p>
               </CollapsiblePanel>
             </Collapsible>
@@ -346,20 +368,13 @@ export function ScanNewForm({ onDone, repo, startBranch, startRef, startOptions 
         <p className="sr-only" aria-live="polite">
           {summary ?? (selected === null ? "Choose a repository and we'll summarise what is about to run." : "")}
         </p>
+        <p className="text-xs text-muted-foreground">{RUNNER_GIT_LOGIN_HINT}</p>
         <div className="flex items-center justify-end gap-3">
-          <p className={cn("mr-auto text-sm leading-relaxed", budgetSpent ? "text-status-danger" : "text-muted-foreground")} role={budgetSpent ? "alert" : undefined}>
-            {runner !== undefined
-              ? `This audit runs on ${runner.name}'s own Claude, so no monthly budget applies. The audit still stops at its own spend limit. It will show what it would have cost.`
-              : usage === undefined
-                ? "Each audit stops at a spend limit, and your account has a monthly budget."
-                : usage.budgetApplies === false
-                  ? "Your own key pays for this audit, so no monthly budget applies. Each audit still stops at its own spend limit."
-                  : budgetSpent
-                    ? usageBlockedNote(usage)
-                    : `${usageUsd(usage.remainingUsd)} of this month's budget is left. Each audit stops at its own spend limit.`}
+          <p className="mr-auto text-sm leading-relaxed text-muted-foreground">
+            {runner !== undefined ? `This audit runs on ${runner.name}'s own Claude. Elise charges nothing per audit. It stops at its own spend limit and shows what it would have cost.` : "Connect a Runner to start an audit."}
           </p>
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="submit" disabled={start.isPending || connecting || selected === null || selected.running || (budgetSpent && runner === undefined)}>
+          <Button type="submit" disabled={start.isPending || selected === null || selected.running || noRunner}>
             {start.isPending ? "Starting…" : "Start audit"}
           </Button>
         </div>

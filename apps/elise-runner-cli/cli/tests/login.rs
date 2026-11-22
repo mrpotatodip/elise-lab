@@ -47,10 +47,8 @@ fn login_tells_the_engine_the_computer_and_the_version_and_nothing_else() {
 
 #[test]
 fn login_only_prints_with_no_browser_flag_or_over_ssh() {
-    let cases: [(&str, &[&str], Option<&str>); 2] = [
-        ("flag", &["login", "--no-browser"], None),
-        ("ssh", &["login"], Some("10.0.0.1 5000 10.0.0.2 22")),
-    ];
+    let cases: [(&str, &[&str], Option<&str>); 2] =
+        [("flag", &["login", "--no-browser"], None), ("ssh", &["login"], Some("10.0.0.1 5000 10.0.0.2 22"))];
     for (name, args, ssh) in cases {
         let engine = Engine::start();
         let mut runner = Runner::new(&engine);

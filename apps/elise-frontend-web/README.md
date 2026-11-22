@@ -2,7 +2,7 @@
 
 Dashboard for `elise-engine-api`: start a security scan of a public GitHub repo, watch its status, read the saved report. TanStack Start (React 19) on Cloudflare Workers, Tailwind CSS v4, shadcn/ui.
 
-The engine has no CORS, so the browser never calls it. Server functions do, using `ELISE_ENGINE_URL` (copy `.dev.vars.example` to `.dev.vars`). Sign-in and sign-up go to the engine (`/auth/sign-in/email`, `/sign-up`, which needs an invite code); the session token it returns is kept in an httpOnly cookie. Each call sends that token plus `x-account-id`, the first account from `/me`, so a user sees only their own account's scans.
+The engine has no CORS, so the browser never calls it. Server functions do, using `ELISE_ENGINE_URL` (copy `.dev.vars.example` to `.dev.vars`). Sign-in and sign-up go to the engine (`/auth/sign-in/email`, `/sign-up`); the session token it returns is kept in an httpOnly cookie. Each call sends that token plus `x-account-id`, the first account from `/me`, so a user sees only their own account's scans. The sign-up form shows a Cloudflare Turnstile check: its public site key is `TURNSTILE_SITE_KEY` (a Worker variable; the engine holds the matching secret `TURNSTILE_SECRET_KEY`). With no site key the form says sign-up is unavailable.
 
 ## Commands
 

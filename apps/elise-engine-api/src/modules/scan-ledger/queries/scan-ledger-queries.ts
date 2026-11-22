@@ -1,16 +1,19 @@
-import { and, asc, eq, gt, inArray, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, ne, sql } from "drizzle-orm";
 import { Effect } from "effect";
+import type { ScanUsage } from "@repo/contracts/elise";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
-import { Conflict, toDbError, type DbError } from "#/lib/effect-query";
+import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { scanArchivesEffect } from "#/modules/archives/queries";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
-import type { ActiveCounts, ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
-import { canonicalRepo, displayRepoUrl, liveScansSql, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
+import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
+import { displayRepoUrlOf, liveScansSql, repoIdentityOf, sameRepoIdentity, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
 
 const ACTIVE_SCAN_CONFLICT = "This repo already has an active scan";
+export const SCAN_ALREADY_ENDED = "This Scan already ended";
 
 // -----
 // The Runner each of these scans is on, from its job row. A scan
@@ -74,12 +77,14 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
           catch: toDbError,
         });
         const runners = yield* runnersOf(db, ids);
+        const archives = yield* scanArchivesEffect(db, ids);
         return rows.map((row) =>
           scanRowToStatus(
             row,
             files.filter((file) => file.scanId === row.id).map(({ name, sizeBytes, contentType }) => ({ name, sizeBytes, contentType })),
             summaryOf(row, counts.filter((count) => count.scanId === row.id)),
             runners.find((runner) => runner.scanId === row.id) ?? null,
+            archives.get(row.id) ?? null,
           ),
         );
       });
@@ -169,6 +174,7 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
       .update(scanRunnerJobs)
       .set({ state: "cancelled", finishedAt: new Date() })
       .where(and(inArray(scanRunnerJobs.scanId, stalled), inArray(scanRunnerJobs.state, ["queued", "claimed"]))),
+    db.delete(scanFindings).where(inArray(scanFindings.scanId, stalled)),
     db
       .update(scans)
       .set({ status: "failed", step: null, finishedAt: new Date(), error: "the scan stalled and was closed by a newer request", updatedAt: new Date() })
@@ -186,12 +192,8 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
       profile: params.options.profile,
       maxBudgetUsd: params.options.maxBudgetUsd.toFixed(2),
       keySource: params.keySource ?? "platform",
-      installationId: params.github?.installationRowId ?? null,
-      githubRepoId: params.github?.repoId ?? null,
-      isPrivate: params.github?.isPrivate ?? null,
       createdAt: new Date(params.createdAt),
     }),
-    ...(params.github ? [db.update(scanRepos).set({ isPrivate: params.github.isPrivate }).where(eq(scanRepos.id, repoId))] : []),
   ] as const;
 };
 
@@ -203,23 +205,26 @@ const activeConflictOf = (db: AppDbType, repoId: string) => (): Effect.Effect<ne
     catch: toDbError,
   }).pipe(Effect.flatMap(([active]) => Effect.fail(new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT }))));
 
-const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> => ({
+const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   ...scanReads(db),
 
   // -----
   // Insert or find the repo's record. The unique index
-  // on (account, canonical) settles a race between two
-  // first scans of the same repo.
+  // on (account, provider, host, canonical) settles a
+  // race between two first scans of the same repo.
   // -----
-  ensureRepo: (accountId, url) =>
+  ensureRepo: (accountId, url, provider) =>
     Effect.tryPromise({
       try: async () => {
-        const canonical = canonicalRepo(url);
-        await db.insert(scanRepos).values({ tenantId: accountId, canonical, url: displayRepoUrl(url) }).onConflictDoNothing();
+        const identity = repoIdentityOf(url, provider);
+        await db
+          .insert(scanRepos)
+          .values({ tenantId: accountId, ...identity, url: displayRepoUrlOf(url, provider) })
+          .onConflictDoNothing();
         const [row] = await db
           .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url })
           .from(scanRepos)
-          .where(and(eq(scanRepos.tenantId, accountId), eq(scanRepos.canonical, canonical)));
+          .where(sameRepoIdentity(accountId, identity));
         return row;
       },
       catch: toDbError,
@@ -228,8 +233,8 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> =>
   mark: (accountId, scanId, patch) => {
     const ended = patch.status === "succeeded" || patch.status === "failed";
     return Effect.tryPromise({
-      try: () =>
-        db
+      try: () => {
+        const update = db
           .update(scans)
           .set({
             ...(patch.status !== undefined && { status: patch.status }),
@@ -249,7 +254,17 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> =>
             }),
             updatedAt: new Date(),
           })
-          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), patch.status === "failed" ? undefined : ne(scans.status, "failed"))),
+          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), ne(scans.status, "stopped"), patch.status === "failed" ? undefined : ne(scans.status, "failed")));
+        if (patch.status !== "failed") return update;
+        const changed = db.$with("changed").as(update.returning({ id: scans.id }));
+        const cleared = db.$with("cleared").as(
+          db
+            .delete(scanFindings)
+            .where(inArray(scanFindings.scanId, db.select({ id: changed.id }).from(changed)))
+            .returning({ id: scanFindings.id }),
+        );
+        return db.with(changed, cleared).select({ id: changed.id }).from(changed);
+      },
       catch: toDbError,
     }).pipe(Effect.asVoid);
   },
@@ -281,29 +296,59 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create" | "activeCounts"> =>
   activeSince: (accountId, nowMs) => activeScansEffect(db, accountId, nowMs),
 });
 
-// -----
-// How many live scans each path holds, over every Account. It is
-// the global cap's count, so it is the one read here that crosses
-// Accounts, and it returns counts only: it runs on the owner role,
-// since a withTenant transaction sees one Account's scans. A scan
-// on a Runner runs on the person's computer and holds no Sandbox
-// of ours, so it is left out.
-// -----
-export const activeCountsEffect = (db: DbConnectType, nowMs: number): Effect.Effect<ActiveCounts, DbError> =>
+export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string, now: Date): Effect.Effect<void, NotFound | Conflict | DbError> =>
+  Effect.gen(function* () {
+    const stopped = yield* Effect.tryPromise({
+      try: () => {
+        const ended = db.$with("ended").as(
+          db
+            .update(scans)
+            .set({ status: "stopped", step: null, finishedAt: now, updatedAt: now })
+            .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), inArray(scans.status, ["queued", "running"])))
+            .returning({ id: scans.id }),
+        );
+        const cleared = db.$with("cleared").as(
+          db
+            .delete(scanFindings)
+            .where(inArray(scanFindings.scanId, db.select({ id: ended.id }).from(ended)))
+            .returning({ id: scanFindings.id }),
+        );
+        return db.with(ended, cleared).select({ id: ended.id }).from(ended);
+      },
+      catch: toDbError,
+    });
+    if (stopped.length === 0) {
+      const [found] = yield* Effect.tryPromise({ try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))), catch: toDbError });
+      if (!found) return yield* new NotFound({ message: "Scan not found" });
+      return yield* new Conflict({ message: SCAN_ALREADY_ENDED });
+    }
+    yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(scanRunnerJobs)
+          .set({ state: "cancelled", finishedAt: now })
+          .where(and(eq(scanRunnerJobs.scanId, scanId), inArray(scanRunnerJobs.state, ["queued", "claimed"]))),
+      catch: toDbError,
+    });
+  });
+
+export const stoppedUsageEffect = (db: AppDbType, accountId: string, scanId: string, usage: ScanUsage): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ skill: scans.skill, total: sql<string>`count(*)` })
-        .from(scans)
-        .where(and(liveScansSql(nowMs), notExists(db.select({ one: sql`1` }).from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scans.id)))))
-        .groupBy(scans.skill),
+        .update(scans)
+        .set({
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          cacheReadTokens: usage.cacheReadTokens,
+          cacheWriteTokens: usage.cacheWriteTokens,
+          costUsd: usage.costUsd.toFixed(4),
+          turns: usage.turns,
+          durationMs: usage.durationMs,
+        })
+        .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), eq(scans.status, "stopped"))),
     catch: toDbError,
-  }).pipe(
-    Effect.map((rows) => ({
-      lite: rows.filter((row) => row.skill !== "full").reduce((sum, row) => sum + Number(row.total), 0),
-      full: rows.filter((row) => row.skill === "full").reduce((sum, row) => sum + Number(row.total), 0),
-    })),
-  );
+  }).pipe(Effect.asVoid);
 
 // -----
 // For the Workflow, on the owner connection: one batch is one
@@ -316,19 +361,15 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
       Effect.catchTag("Conflict", activeConflictOf(db, repoId)),
       Effect.asVoid,
     ),
-  activeCounts: (nowMs) => activeCountsEffect(db, nowMs),
 });
 
 // -----
 // For POST /scans, inside a withTenant transaction. The writes of
 // a new scan run under a savepoint, so a refused insert rolls back
-// alone and the Conflict can still name the running scan. The
-// global count crosses Accounts, which the transaction cannot see,
-// so the caller hands it in.
+// alone and the Conflict can still name the running scan.
 // -----
-export const tenantScanRepo = (db: AppTxDbType, activeCounts: ScanRepo["activeCounts"]): ScanRepo => ({
+export const tenantScanRepo = (db: AppTxDbType): ScanRepo => ({
   ...scanWrites(db),
-  activeCounts,
   create: (params, repoId, nowMs) =>
     Effect.tryPromise({
       try: () =>

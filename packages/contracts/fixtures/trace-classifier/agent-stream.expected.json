@@ -1,0 +1,25 @@
+{
+  "note": "One entry per line of agent-stream.ndjson, in order: the labels the line gives, in the order of its content blocks. An empty list is a line the classifier ignores. Both the Runner (Rust) and the cloud (TypeScript) classifier must give exactly these.",
+  "lines": [
+    [],
+    ["reasoning"],
+    ["reasoning"],
+    ["reading_files"],
+    [],
+    ["reading_files"],
+    ["searching"],
+    ["running_command"],
+    ["writing"],
+    ["writing"],
+    ["calling_tool"],
+    ["calling_tool"],
+    ["reading_files"],
+    ["reasoning", "searching"],
+    [],
+    [],
+    [],
+    [],
+    [],
+    []
+  ]
+}

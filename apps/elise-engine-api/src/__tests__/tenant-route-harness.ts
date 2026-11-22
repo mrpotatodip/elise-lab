@@ -1,22 +1,20 @@
-import { Effect } from "effect";
 import { buildApp } from "#/index";
 import { realAppDeps } from "#/lib/app-deps";
 import { tenantScanRepo } from "#/modules/scan-ledger";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
 import { asTenant, type TestDb } from "#/__tests__/test-db";
 import { testDeps } from "#/__tests__/test-deps";
-import type { AppDeps } from "#/types/variables";
+import type { AppDeps, Bindings } from "#/types/variables";
 
 // -----
 // POST /scans on the real queries of the withTenant transaction.
-// The global count of live Scans runs on the owner role in the
-// Worker; here no other Account has one.
 // -----
 const tenantScanDeps: Partial<AppDeps> = {
-  scanRepo: (_env, db) => tenantScanRepo(db, () => Effect.succeed({ lite: 0, full: 0 })),
+  scanRepo: (_env, db) => tenantScanRepo(db),
   monthSpend: realAppDeps.monthSpend,
   holdCredit: realAppDeps.holdCredit,
   releaseCredit: realAppDeps.releaseCredit,
+  linkArchive: realAppDeps.linkArchive,
 };
 
 // -----
@@ -32,6 +30,7 @@ export const tenantRouteApp = (openDb: () => TestDb, overrides: Partial<AppDeps>
       ...tenantScanDeps,
       ...overrides,
       withTenant: (_c, accountId, run) => asTenant(openDb(), accountId, run),
+      withOwner: (_c, run) => run(openDb().pool),
     }),
   ).app;
 
@@ -42,9 +41,10 @@ export type TenantRouteApp = ReturnType<typeof tenantRouteApp>;
 // x-account-id the dashboard server would vouch for. Pass another
 // Account's IDs in the path or query to try to cross over.
 // -----
-export const callAs = (app: TenantRouteApp, accountId: string, path: string, init: { method?: string; body?: unknown } = {}) => {
-  const { env } = fakeBindings();
-  const headers = new Headers({ authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountId, "content-type": "application/json" });
+export const callAs = (app: TenantRouteApp, accountId: string, path: string, init: { method?: string; body?: unknown; env?: Partial<Bindings> } = {}) => {
+  const { env } = fakeBindings(init.env);
+  const headers = new Headers({ authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountId });
+  if (init.body !== undefined) headers.set("content-type", "application/json");
   const body = init.body === undefined ? undefined : JSON.stringify(init.body);
   return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers, body }), env, testExecutionContext);
 };

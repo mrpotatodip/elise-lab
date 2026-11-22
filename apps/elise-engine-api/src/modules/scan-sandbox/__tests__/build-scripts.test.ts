@@ -129,6 +129,21 @@ describe("buildAgentPrompt", () => {
     expect(sharedLines(onRunner).slice(0, 5)).toEqual(sharedLines(prompt).slice(0, 5));
   });
 
+  it.each([
+    ["recon", false],
+    ["hunt", true],
+    ["check", true],
+    ["report", false],
+  ] as const)("tells the %s run to wait for its sub-agents in the foreground: %s", (phase, told) => {
+    const prompts = (["quick", "standard", "deep"] as const).flatMap((profile) => [
+      buildPhasePrompt({ ...options, skill: "full", profile }, phase),
+      buildPhasePrompt({ ...options, skill: "full", profile }, phase, RUNNER_PLACE),
+    ]);
+
+    expect(prompts.map((prompt) => prompt.includes("Run each sub-agent in the foreground and wait for its result"))).toEqual(prompts.map(() => told));
+    expect(prompts.map((prompt) => prompt.includes("never sleep or schedule a wakeup"))).toEqual(prompts.map(() => told));
+  });
+
   it("has only the check and report runs validate, and only the report run write the report files", () => {
     const full: ScanOptions = { ...options, skill: "full" };
 

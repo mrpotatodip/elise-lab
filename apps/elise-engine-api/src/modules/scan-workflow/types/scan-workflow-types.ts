@@ -1,15 +1,15 @@
-import type { ScanUsage } from "@repo/contracts/elise";
+import type { SaveTraceBody, ScanUsage, TraceEntry, TraceSaved } from "@repo/contracts/elise";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions, ScanParams, ScanState } from "#/schemas";
 import type { ScanRepo } from "#/modules/scan-ledger";
-import type { AgentState, FullPhase, OutboundAnthropicKey, OutboundGithub, ScanCheckout } from "#/modules/scan-sandbox";
+import type { AgentState, FullPhase, OutboundAnthropicKey, ScanCheckout } from "#/modules/scan-sandbox";
 
 // -----
 // The sandbox as the Workflow uses it. Its Durable Object
 // stub fits, and a test can stand in a fake.
 // -----
 export type SandboxPort = {
-  prepare: (repoUrl: string, ref?: string, github?: OutboundGithub, anthropicKey?: OutboundAnthropicKey) => Promise<ScanCheckout>;
+  prepare: (repoUrl: string, ref?: string, anthropicKey?: OutboundAnthropicKey) => Promise<ScanCheckout>;
   launchAgent: (options: ScanOptions) => Promise<void>;
   // -----
   // The two calls of a full Scan's Phases. A Phase is one run of the agent;
@@ -23,6 +23,12 @@ export type SandboxPort = {
   pollAgent: () => Promise<AgentState>;
   agentLogTail: () => Promise<string>;
   readUsage: () => Promise<ScanUsage | null>;
+  // -----
+  // The Trace entries that are new or grew in the running Phase's log
+  // since the last call, and a Phase's end marker when `ended`. Only
+  // the cloud Sandbox has it: a Runner sends its own entries.
+  // -----
+  drainTrace?: (ended: boolean) => Promise<TraceEntry[]>;
   readFiles: () => Promise<ScanFiles>;
   // -----
   // Only a sandbox that learns the commit after the agent ends has
@@ -48,6 +54,8 @@ export type ScanRunDeps = {
   reports: R2Bucket;
   sealedKeyFor: (accountId: string) => Promise<string | null>;
   recordScan: (params: ScanParams, status: ScanState, error: string | null, usage: ScanUsage | null) => Promise<void>;
+  saveTrace: (params: ScanParams, body: SaveTraceBody) => Promise<TraceSaved>;
+  detectSignals: (params: ScanParams) => Promise<void>;
   settleCredit: (params: ScanParams, status: "succeeded" | "failed", usage: ScanUsage | null) => Promise<void>;
 };
 

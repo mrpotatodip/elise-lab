@@ -97,7 +97,7 @@ export function ShellThemeSwitch({ collapsed = false, tooltipSide = "right" }: S
                       <span className="text-sm font-medium">{copy.label}</span>
                       <span className="text-xs text-muted-foreground">{copy.note}</span>
                     </span>
-                    {selected && <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" strokeWidth={2} />}
+                    {selected && <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} />}
                   </span>
                 </button>
               );

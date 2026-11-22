@@ -13,6 +13,7 @@ export function UsageCard() {
   const { data } = useSuspenseQuery(usageQuery());
   const { user } = useRouteContext({ from: "/_app" });
   const canManage = hasAccessPower(user?.powers ?? [], "company:usage:budget:update");
+  if (data.budgetApplies !== true) return null;
   const percent = usageCommittedPercent(data.budgetUsd, data.spentUsd, data.reservedUsd);
   const tight = percent >= 90;
   const tokenTotal = data.tokens.input + data.tokens.output + data.tokens.cacheRead + data.tokens.cacheWrite;

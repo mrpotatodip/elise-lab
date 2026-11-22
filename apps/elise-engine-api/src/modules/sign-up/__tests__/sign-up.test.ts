@@ -1,18 +1,15 @@
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
-import { hashInviteCode } from "@repo/db-elise";
-import { authAccount, authUser, parties, partyRoles, platformInviteCodeRedemptions, platformInviteCodes, tenants } from "@repo/db-elise/schema";
+import { authAccount, authUser, parties, partyRoles, tenants } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { openTestDb, type TestDb } from "#/__tests__/test-db";
+import { SIGN_UP_REFUSED } from "#/modules/sign-up/constants";
 import { insertAccountEffect, pickFreeSlugEffect } from "#/modules/sign-up/queries";
 import type { NewAccount } from "#/modules/sign-up/types";
 
 let test: TestDb;
-let creatorPartyId: string;
 
-const CODE = "ABCD-EFGH-JKMN";
-
-const account = async (overrides: Partial<NewAccount> = {}): Promise<NewAccount> => ({
+const account = (overrides: Partial<NewAccount> = {}): NewAccount => ({
   firstName: "Ada",
   lastName: "Rossi",
   email: "ada@example.com",
@@ -20,23 +17,13 @@ const account = async (overrides: Partial<NewAccount> = {}): Promise<NewAccount>
   accountName: "Acme Labs",
   timezone: "UTC",
   slug: "acme-labs",
-  inviteCodeHash: await hashInviteCode(CODE),
-  now: new Date("2026-11-07T00:00:00Z"),
   ...overrides,
 });
-
-const addCode = async (code: string, extra: Partial<typeof platformInviteCodes.$inferInsert> = {}) => {
-  await test.raw.insert(platformInviteCodes).values({ codeHash: await hashInviteCode(code), createdBy: creatorPartyId, maxUses: 1, ...extra });
-};
-
-const useCount = async (code: string) =>
-  (await test.raw.select().from(platformInviteCodes).where(eq(platformInviteCodes.codeHash, await hashInviteCode(code))))[0].useCount;
 
 const count = async (table: typeof authUser | typeof tenants | typeof parties) => (await test.raw.select().from(table)).length;
 
 beforeAll(async () => {
   test = await openTestDb();
-  creatorPartyId = (await seedTenant(test, "creator")).partyId;
 });
 
 afterAll(async () => {
@@ -44,9 +31,8 @@ afterAll(async () => {
 });
 
 describe("insertAccountEffect", () => {
-  it("creates the person, login, credential, tenant, admin role and redemption in one go", async () => {
-    await addCode(CODE);
-    const result = await Effect.runPromise(insertAccountEffect(test.pool, await account()));
+  it("creates the person, login, credential, tenant and admin role with no invite code", async () => {
+    const result = await Effect.runPromise(insertAccountEffect(test.pool, account()));
 
     expect(result.tenant).toMatchObject({ name: "Acme Labs", slug: "acme-labs", timezone: "UTC", role: "tenant_admin" });
     const [login] = await test.raw.select().from(authUser).where(eq(authUser.id, result.userId));
@@ -54,51 +40,21 @@ describe("insertAccountEffect", () => {
     expect((await test.raw.select().from(authAccount).where(eq(authAccount.userId, result.userId)))[0]).toMatchObject({ providerId: "credential", password: "hash" });
     const [tenant] = await test.raw.select().from(tenants).where(eq(tenants.id, result.tenant.id));
     expect(tenant.partyId).toBe(login.partyId);
-    expect((await test.raw.select().from(partyRoles).where(eq(partyRoles.partyId, login.partyId)))).toHaveLength(1);
-    expect((await test.raw.select().from(platformInviteCodeRedemptions)).at(-1)).toMatchObject({ personPartyId: login.partyId, tenantId: tenant.id });
-    expect(await useCount(CODE)).toBe(1);
+    expect(await test.raw.select().from(partyRoles).where(eq(partyRoles.partyId, login.partyId))).toHaveLength(1);
   });
 
-  it("refuses a code that is used up, and saves nothing", async () => {
+  it("answers Conflict for a taken email and saves nothing", async () => {
     const before = { users: await count(authUser), tenants: await count(tenants), parties: await count(parties) };
-    const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, await account({ email: "second@example.com", slug: "second" }))));
+    const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, account({ slug: "another" }))));
 
-    expect(error).toMatchObject({ _tag: "Forbidden", message: "Invalid invite code" });
+    expect(error).toMatchObject({ _tag: "Conflict", message: SIGN_UP_REFUSED });
     expect({ users: await count(authUser), tenants: await count(tenants), parties: await count(parties) }).toEqual(before);
   });
 
-  it("refuses an unknown code", async () => {
-    const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, await account({ inviteCodeHash: await hashInviteCode("NOPE-NOPE-NOPE") }))));
-
-    expect(error._tag).toBe("Forbidden");
-  });
-
-  it("refuses a revoked or expired code", async () => {
-    await addCode("REVO-KEDX-CODE", { revokedAt: new Date("2026-11-01T00:00:00Z") });
-    await addCode("EXPI-REDX-CODE", { expiresAt: new Date("2026-11-06T00:00:00Z") });
-
-    for (const code of ["REVO-KEDX-CODE", "EXPI-REDX-CODE"]) {
-      const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, await account({ inviteCodeHash: await hashInviteCode(code), email: `${code}@example.com`, slug: code.toLowerCase() }))));
-      expect(error._tag).toBe("Forbidden");
-    }
-  });
-
-  it("answers Conflict for a taken email and gives the code use back", async () => {
-    await addCode("FREE-CODE-ONE2");
-    const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, await account({ inviteCodeHash: await hashInviteCode("FREE-CODE-ONE2"), slug: "another" }))));
-
-    expect(error).toMatchObject({ _tag: "Conflict" });
-    expect(await useCount("FREE-CODE-ONE2")).toBe(0);
-  });
-
   it("tells a taken slug apart so the caller can pick another", async () => {
-    await addCode("SLUG-CODE-TWO3");
-    const error = await Effect.runPromise(
-      Effect.flip(insertAccountEffect(test.pool, await account({ inviteCodeHash: await hashInviteCode("SLUG-CODE-TWO3"), email: "slug@example.com" }))),
-    );
+    const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, account({ email: "slug@example.com" }))));
 
     expect(error._tag).toBe("SlugTaken");
-    expect(await useCount("SLUG-CODE-TWO3")).toBe(0);
   });
 });
 

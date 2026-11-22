@@ -1,23 +1,44 @@
 export const SITE = {
   name: "EliseLAB",
+  // The wordmark next to the logo in the nav and the link preview: the product's own short name, as in the dashboard.
+  logoName: "Elise",
   title: "Agent security audits for your repositories · EliseLAB",
   // The meta description: short, and plain text.
-  description: "Agent security audits for your GitHub repositories. A full audit runs Cloudflare's open-source security-audit skill, and every finding is checked independently.",
+  description: "Agent security audits for your GitHub and GitLab repositories and zip files. The audit runs on your own computer and your own AI subscription, using Cloudflare's open-source security-audit skill.",
   appUrl: "https://app.eliselab.com",
   // The app's own sign-up page (route /signup). appUrl lands on the sign-in page.
   signUpUrl: "https://app.eliselab.com/signup",
 } as const;
 
-// The Full audit runs this skill as published (the engine pins it in skills-lock.json). The Quick
-// review runs Elise's own lighter single-agent skill, so only the full audit is credited to it.
+// Every scan runs this skill as published (the engine pins it in skills-lock.json). The lite skill
+// is gone, so there is one audit and the coverage setting (Focused, Balanced, Exhaustive) sets its depth.
 export const CLOUDFLARE_SKILL_URL = "https://github.com/cloudflare/security-audit-skill";
+
+// The public repository holds the dashboard, the engine, the Runner and this site, under the MIT license
+// (LICENSE at its root). Secrets and customer data are not in it.
+export const SOURCE_URL = "https://github.com/mrpotatodip/ts-mrpotato-lab";
+
+export const OPEN_SOURCE = {
+  title: "Open source",
+  heroLine: "The code is open source under the MIT license, so you can read what runs on your computer.",
+  heroLink: "Read it on GitHub",
+  note: "Everything in EliseLAB is in one public repository under the MIT license: the Runner that audits your code, the dashboard, the engine behind it and this site. You can read it, run it and copy it.",
+  points: [
+    { title: "The Runner", text: "The program that reads your code runs on your computer. Its source is public, and each Runner download is built from it by a public GitHub workflow." },
+    { title: "The audit method", text: "Every scan runs Cloudflare's open-source security-audit skill. Our copy is in the repository with the four files we changed listed, so you can compare it with the original." },
+    { title: "The dashboard and engine", text: "The code that runs eliselab.com is in the repository too: how a pass or a fail is worked out, how Findings are stored and what each page shows. Passwords, keys and customer data are not." },
+  ],
+  pageLink: "More about the open source code",
+  repoLabel: "Source code on GitHub",
+  licenseLabel: "MIT license",
+} as const;
 
 // The hero paragraph. It follows the headline ("Security agents that read your code before an
 // attacker does") with how it works, what you get and why to trust it.
 export const LEDE = {
-  start: "For teams that keep their code on GitHub. Point Elise at a repository and get a report with a fix beside every finding. A full audit runs AI agents through ",
+  start: "For teams whose code is on GitHub or GitLab, or in a zip file. Point Elise at a repository and get a report with a fix beside every finding. The audit runs on your own computer, with your own AI subscription, through ",
   link: "Cloudflare's open-source security-audit method",
-  middle: ", and every finding is checked independently. Once a commit has enough scans, it gets a pass or a fail. ",
+  middle: ". Once a commit has enough scans, it gets a pass or a fail. ",
   rulesLink: "What to know",
   end: " has the rules.",
 } as const;
@@ -29,8 +50,8 @@ export const SHOWCASE_CAPTION = "An example account. Every repository and findin
 
 // What a screen reader gets for each picture of the dashboard. The pictures themselves are hidden from it.
 export const PICTURE_LABELS = {
-  tour: "A tour of the Elise dashboard. A scan finishes and opens its first finding. A commit gets its answer. Then the overview, the reports and the GitHub connection. Every name and number is made up.",
-  connect: "The Start a security audit dialog. Someone pastes a GitHub link, picks a repository and a quick review, then starts the audit.",
+  tour: "A tour of the Elise dashboard. A scan finishes and opens its first finding. A commit gets its answer. Then the overview, the reports and the Runners. Every name and number is made up.",
+  connect: "The Start a security audit dialog. Someone picks where the code lives, pastes a GitHub link, picks a coverage level, then starts the audit.",
   audit: "A scan page during an audit. It steps through cloning, reading the code and saving the report, then shows Succeeded.",
   report: "The finished report. Four summary figures sit above four findings, each with a severity, file and status.",
 } as const;
@@ -39,21 +60,21 @@ export const PICTURE_LABELS = {
 // sentence, the dashboard's own words (scan, finding, report, Files), nothing the product does not do.
 export const STEPS = [
   {
-    title: "Connect a repository",
-    text: "Paste a GitHub URL into the Start a security audit dialog. Elise resolves the repository from it.",
+    title: "Pick the code and a Runner",
+    text: "Install a Runner on your computer or a server and sign it in to your account. Then start an audit in the dashboard and pick where the code lives.",
     points: [
-      "A public repository needs no connection. Paste the URL and start.",
-      "For a private repository, connect your GitHub account first. Elise gets read access to the repositories you choose and no write access.",
-      "Pick a quick review or a full audit. A quick review is one agent and finishes fast. A full audit runs several agents and takes longer.",
+      "Choose GitHub, GitLab, a GitLab server of your own or a zip file you upload. Paste a link or search your repositories.",
+      "The Runner clones the code with the git login already on its computer, so a private repository works when your own git can read it. We store no git token.",
+      "Pick the coverage: Focused is one bounded pass, Balanced suits most repositories and Exhaustive covers the most and takes longest.",
     ],
   },
   {
-    title: "Elise audits the code",
-    text: "Elise clones the repository into an isolated sandbox made for that one scan. The agents read the code there.",
+    title: "The Runner audits the code",
+    text: "The scan runs on the Runner's computer, with that computer's own AI login. Your code is not uploaded to us.",
     points: [
-      "The scan page shows each phase as it runs: cloning, reading the code, saving the report. Succeeded means the scan finished. It does not mean the code is safe.",
-      "The sandbox can reach only GitHub, to clone, and the model provider that does the review. It holds no passwords or keys of its own.",
-      "On a branch Elise has scanned before, the agents re-check the earlier findings first, then look for new ones.",
+      "The scan page shows each step as it runs: cloning, reading the code, saving the report. Succeeded means the scan finished. It does not mean the code is safe.",
+      "A running scan lists what the agent is doing, by label only, and shows verified findings as they come in. You can stop a scan at any time.",
+      "The Runner sends back the report and the findings, not the repository. You pay your own AI subscription directly, and we add no per-scan charge.",
     ],
   },
   {
@@ -61,26 +82,83 @@ export const STEPS = [
     text: "The report opens with four summary figures. A list of findings follows.",
     points: [
       "Each finding names its file, explains the issue and gives a fix.",
-      "Severity is Critical, High, Medium, Low or Informational. Informational is a note, not a defect. A finding nobody has rated yet shows as Unrated.",
-      "If an agent could not confirm a finding, the report marks it as needing validation so a person can check it. The report stays on the Files page in Elise.",
+      "Severity is Critical, High, Medium, Low or Informational. Informational is a note, not a defect.",
+      "If an agent could not confirm a finding, the report marks it as needing validation so a person can check it. Your team can mark a finding fixed, a false positive, an accepted risk or a duplicate, and comment on it. The report stays on the Files page in Elise.",
     ],
   },
 ] as const;
 
-// The one plan the live plans table offers (Runner, $35 a month, 5 members). Older plans stay in
-// the table but are not offered, so they are not printed. Card checkout is not claimed: the
-// subscription path is not live yet. Update this when the plans table changes.
+// Under "Get the Runner". The command and the releases page are the ones the dashboard's Getting
+// started guide shows (GETTING_STARTED_INSTALL_COMMAND and GETTING_STARTED_DESKTOP_URL), so keep them equal.
+// The site offers only the terminal Runner (the `elise-runner` binary), not the desktop app.
+// The download buttons point at one pinned release. When a new elise-runner-v* release is published,
+// change `version` (the file names come from .github/workflows/release-elise-runner.yml).
+const RUNNER_VERSION = "0.3.0";
+const RUNNER_RELEASES = "https://github.com/mrpotatodip/ts-mrpotato-lab/releases";
+const runnerFile = (asset: string) => `${RUNNER_RELEASES}/download/elise-runner-v${RUNNER_VERSION}/${asset}`;
+
+export const RUNNER = {
+  title: "Get the Runner",
+  note: "The Runner is the program that audits your code on your own computer. Install it, sign it in to your account, then start audits from the dashboard.",
+  downloadsLabel: `Download the Runner ${RUNNER_VERSION}`,
+  // A browser cannot tell Apple silicon from Intel, so every build gets its own button.
+  downloads: [
+    { label: "macOS, Apple silicon", href: runnerFile("elise-runner-darwin-arm64") },
+    { label: "macOS, Intel", href: runnerFile("elise-runner-darwin-x64") },
+    { label: "Linux, x64", href: runnerFile("elise-runner-linux-x64") },
+    { label: "Linux, arm64", href: runnerFile("elise-runner-linux-arm64") },
+  ],
+  // A note is a list of parts: a string is plain text, { code } is set in the mono font.
+  downloadNote: ["A downloaded file is not marked as runnable. Run ", { code: "chmod +x" }, " on it, and if macOS refuses to open it, run ", { code: "xattr -d com.apple.quarantine" }, " on it. Then move it onto your PATH as ", { code: "elise-runner" }, "."],
+  commandLabel: "Or install from a terminal, which does all of that for you",
+  command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh",
+  after: ["With either option, run ", { code: "elise-runner login" }, " and then ", { code: "elise-runner doctor" }, ". The terminal install puts the Runner in ", { code: "~/.local/bin" }, " and takes the newest release for your system."],
+  releasesUrl: RUNNER_RELEASES,
+  releasesLabel: "All Runner releases on GitHub",
+  needs: "The computer also needs your own AI tool installed and signed in, because the scan runs on that login.",
+} as const;
+
+// The two plans the live plans table offers (Starter, $15 a month, 2 members; Runner, $35 a month,
+// 5 members). Older plans stay in the table but are not offered, so they are not printed. Both rows are
+// enabled with Stripe prices (checked against the live table 2026-11-22). Update this when the plans table changes.
+// -----
+// The yearly prices below must match the engine's plan rows (platform_master_plans: monthly and
+// yearly price). The per-month figures and the "months free" badge are worked out from them.
+// -----
+const PLAN_USD = { starter: { month: 15, year: 150 }, runner: { month: 35, year: 350 } } as const;
+
+const usd = (amount: number) => `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+const perMonth = (yearly: number) => usd(Math.round((yearly / 12) * 100) / 100);
+const MONTHS_FREE = Math.floor(Math.min(...Object.values(PLAN_USD).map((plan) => 12 - plan.year / plan.month)));
+
 export const PRICING = {
-  note: "One plan, one price. Paid sign-up opens soon. Until then, create an account and set up a Runner. There is no card checkout yet and no free trial.",
+  note: "Two plans, one flat price each, billed monthly or yearly by card through Stripe. There is no free trial.",
+  intervals: { month: "Monthly", year: "Yearly" },
+  yearlyBadge: `${MONTHS_FREE} months free`,
   action: "Create an account",
   actionHint: "Create an account opens the sign-up page in Elise.",
   plans: [
     {
-      name: "Runner",
-      price: "$35",
-      summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place.",
+      name: "Starter",
+      price: usd(PLAN_USD.starter.month),
+      yearlyPrice: usd(PLAN_USD.starter.year),
+      yearlyPerMonth: perMonth(PLAN_USD.starter.year),
+      summary: "Every scan runs on your own AI subscription. For one or two people.",
       points: [
-        "Flat price. EliseLAB adds no charge per scan.",
+        "Flat price. We add no charge per scan.",
+        "Install a Runner on your computer or a server and pair it to your account. Scans run there, on your own AI subscription, which you pay for directly.",
+        "See Runners, scans, reports and findings for every repository and branch in one dashboard.",
+        "Up to 2 members per account.",
+      ],
+    },
+    {
+      name: "Runner",
+      price: usd(PLAN_USD.runner.month),
+      yearlyPrice: usd(PLAN_USD.runner.year),
+      yearlyPerMonth: perMonth(PLAN_USD.runner.year),
+      summary: "Every scan runs on your own AI subscription. For up to five people.",
+      points: [
+        "Flat price. We add no charge per scan.",
         "Install a Runner on your computer or a server and pair it to your account. Scans run there, on your own AI subscription, which you pay for directly.",
         "See Runners, scans, reports and findings for every repository and branch in one dashboard.",
         "Up to 5 members per account.",
@@ -89,13 +167,14 @@ export const PRICING = {
   ],
 } as const;
 
-// Each line is stated on the dashboard's own screens (Connections, the Ready to ship? card, the
+// Each line is stated on the dashboard's own screens (Runners, the Ready to ship? card, the
 // New scan dialog). Nothing here promises more than the product says.
 export const FACTS = [
-  { title: "It reads your code and never changes it", text: "Elise can read the repositories you choose and cannot write to them. Public repositories need no connection. Private ones need GitHub connected." },
-  { title: "What a pass or a fail means", text: "A commit passes when it has been scanned at least twice, Elise re-checked the earlier findings, no Critical or High finding is open and no more than 3 Medium ones are. A fail says \"Do not ship yet\" and lists what blocks the commit. With too few scans, Elise says \"not enough scans\" instead of guessing. Scan the commit again to get an answer. Pass or fail, treat it as advice. An agent can miss a vulnerability." },
-  { title: "What the severities mean", text: "Critical is the worst rating. An attacker could do serious harm with it. High is nearly as bad. Fix both before shipping. Medium is worth fixing, and a few can ship. Low is minor and does not block shipping. Unrated means nobody has rated the finding yet." },
-  { title: "What it costs", text: "The Runner plan is $35 a month. Scans run on your own AI subscription through a Runner, so you pay that provider directly and EliseLAB adds no per-scan charge. A quick review is one agent's fast first pass. A full audit runs several agents through Cloudflare's open-source security-audit method and takes longer.", more: { href: "#pricing", label: "See the plans under Pricing." } },
+  { title: "Where your code goes", text: "A scan runs in the Runner on your own computer or server, with your own AI login. The Runner sends us the report and the findings, not the repository. A zip file you upload is the one case where we store your code. Private repositories work when the git login on the Runner's computer can read them. We never hold that login." },
+  { title: "Signals", text: "Signals are optional hints, such as a possible duplicate finding. They come from an outside model provider, which receives a finding's title, description, evidence text and decision notes, and never your source code. A hint never changes a finding or a pass or fail. Signals are on for new and existing accounts, and an account admin can turn them off in Account settings.", more: { href: "/privacy", label: "The privacy page names the provider." } },
+  { title: "What a pass or a fail means", text: "A commit shows \"Clear to ship\" when it has at least one finished scan, no Critical or High finding is open, no more than 3 Medium ones are, and no finding still needs validation. Low and Informational findings never block it. Otherwise the commit shows \"Blocked\" and lists what blocks it. A commit with no finished scan shows \"Needs more scans\". Treat the answer as advice. An agent can miss a vulnerability." },
+  { title: "What the severities mean", text: "Critical is the worst rating. An attacker could do serious harm with it. High is nearly as bad. Fix both before shipping. Medium is worth fixing, and a few can ship. Low is minor and does not block shipping. Informational is a note, not a defect. A finding an agent could not confirm is marked as needing validation, and it blocks a pass until a person checks it." },
+  { title: "What it costs", text: "Starter is $15 a month for up to 2 members and Runner is $35 a month for up to 5. Both have the same features, and yearly billing is available. Scans run on your own AI subscription through a Runner, so you pay that provider directly. We add no per-scan charge. Coverage sets how deep a scan goes: Focused is one bounded pass, Balanced suits most repositories and Exhaustive covers the most and takes longest.", more: { href: "#pricing", label: "See the plans under Pricing." } },
 ] as const;
 
 // Under "How it works": the pictures are real screens with made-up data.
@@ -104,7 +183,7 @@ export const STEPS_NOTE = "The pictures are Elise's own screens. The repositorie
 export const CLOSING = {
   title: "Audit your first repository",
   signUp: "Create an account",
-  text: " in Elise, then pair a Runner and scan a GitHub repository. Paid sign-up opens soon.",
+  text: " in Elise, then sign in a Runner and scan a repository from GitHub, GitLab or a zip file.",
   link: "See the plans under Pricing.",
   hint: "Audit a repository opens Elise.",
 } as const;

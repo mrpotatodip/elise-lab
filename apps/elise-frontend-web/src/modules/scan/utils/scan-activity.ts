@@ -24,7 +24,7 @@ export function scanActivity(scans: readonly ScanActivityInput[], days: number, 
 
   for (const scan of scans) {
     const bucket = byKey.get(scan.createdAt.slice(0, 10));
-    if (!bucket) continue;
+    if (!bucket || scan.status === "stopped") continue;
     bucket.total += 1;
     if (scan.status === "succeeded") bucket.succeeded += 1;
     else if (scan.status === "failed") bucket.failed += 1;

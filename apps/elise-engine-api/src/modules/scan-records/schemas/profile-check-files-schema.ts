@@ -24,9 +24,17 @@ const UnitSchema = z.object({
   canonical_refs: z.object({ subsystem: z.string().optional(), lifecycle: z.string().optional() }).optional(),
 });
 
+// -----
+// The Skill words `accepted` as "accepted missing units plus legitimate
+// reassignments", so an agent often writes the list it accepted, not a count,
+// and the Skill's validators do not check the field. A list counts as its
+// length: a run that recorded a critic pass is not read as having none.
+// -----
+const AcceptedSchema = z.union([z.number().min(0), z.array(z.unknown()).transform((items) => items.length)]);
+
 const MetadataSchema = z.object({
   run_status: z.string().optional(),
-  critic_passes: z.array(z.object({ wave: z.number(), accepted: z.number().min(0) })).default([]),
+  critic_passes: z.array(z.object({ wave: z.number(), accepted: AcceptedSchema })).default([]),
   final_verifiers: z.array(z.object({ fingerprint: z.string(), agent_id: z.string() })).default([]),
 });
 

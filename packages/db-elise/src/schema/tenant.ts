@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -37,6 +38,7 @@ export const tenants = pgTable(
     timezone: text("timezone").notNull(),
     monthlyScanBudgetUsd: numeric("monthly_scan_budget_usd", { precision: 10, scale: 2 }),
     monthlyScanBudgetAllowanceUsd: numeric("monthly_scan_budget_allowance_usd", { precision: 10, scale: 2 }),
+    signalsEnabled: boolean("signals_enabled").default(true).notNull(),
     ...timestamps(),
   },
   (t) => ({

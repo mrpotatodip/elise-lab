@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
+import { Link } from "@tanstack/react-router";
 import { ChevronRight, ScanSearch, Search } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -14,12 +15,15 @@ import { SCAN_MODEL_NAMES, SCAN_SKILL_OPTIONS } from "../constants";
 import { scansQuery } from "../hooks";
 import type { ScanState, ScanStatus } from "../schemas";
 import { scanCost, scanPlural } from "../utils";
+import { ScanListSummary } from "./scan-list-summary";
+import { INLINE_LINK_CLASS } from "#/modules/shared";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanOrigin } from "./scan-origin";
 import { ScanProfileBadge } from "./scan-profile-badge";
 import { ScanRepoLink } from "./scan-repo-link";
 import { ScanSeverityDots } from "./scan-severity-dots";
 import { ScanStatusBadge } from "./scan-status-badge";
+import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanTime } from "./scan-time";
 
 const FILTERS = [
@@ -27,6 +31,7 @@ const FILTERS = [
   { value: "active", label: "In progress" },
   { value: "succeeded", label: "Succeeded" },
   { value: "failed", label: "Failed" },
+  { value: "stopped", label: "Stopped" },
 ] as const;
 
 type Filter = (typeof FILTERS)[number]["value"];
@@ -41,7 +46,7 @@ const labelOf = <T extends string>(options: readonly { value: T; label: string }
 
 function FindingsCell({ scan }: { scan: ScanStatus }) {
   if (scan.status === "queued" || scan.status === "running") return <span className="text-muted-foreground">In progress</span>;
-  if (scan.status === "failed") return <span className="text-muted-foreground">No report</span>;
+  if (scan.status === "failed" || scan.status === "stopped") return <span className="text-muted-foreground">No report</span>;
   if (!scan.summary) return <span className="text-muted-foreground">Not recorded</span>;
   const { summary } = scan;
   if (summary.total === 0) return <span className="text-muted-foreground">None found</span>;
@@ -99,11 +104,16 @@ const columns = column.columns([
     cell: ({ row }) => (
       <>
         {row.original.usage ? scanCost(row.original.usage.costUsd) : "-"}
-        {row.original.runner && <span className="block text-xs">on {row.original.runner.name}</span>}
+        {row.original.runner && <span className="block whitespace-nowrap text-xs">on {row.original.runner.name}</span>}
       </>
     ),
   }),
   column.display({ id: "started", header: "Started", cell: ({ row }) => <ScanTime value={row.original.createdAt} /> }),
+  column.display({
+    id: "stop",
+    header: () => <span className="sr-only">Stop</span>,
+    cell: ({ row }) => (canStopScan(row.original) ? <ScanStopButton scanId={row.original.scanId} onRunner={Boolean(row.original.runner)} className="relative" /> : null),
+  }),
   column.display({
     id: "open",
     header: () => <span className="sr-only">Open</span>,
@@ -136,9 +146,14 @@ export function ScanList() {
   const table = useTable({ features: dataTableFeatures, columns, data: visible, getRowId: (scan) => scan.scanId });
 
   return (
+    <>
+    <ScanListSummary scans={all} />
     <Card>
       <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>All scans</CardTitle>
+        <div className="grid gap-1.5">
+          <CardTitle>All scans</CardTitle>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Every audit on this account, newest first. Filter by status or search by repository.</p>
+        </div>
         <ShellListCount shown={visible.length} total={all.length} more={Boolean(nextCursor)} noun="scan" plural="scans" />
       </CardHeader>
       {all.length === 0 ? (
@@ -153,6 +168,13 @@ export function ScanList() {
             </EmptyHeader>
             <EmptyContent>
               <ScanNewDialog label="Start your first audit" size="default" />
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                New here? Follow{" "}
+                <Link to="/overview" className={INLINE_LINK_CLASS}>
+                  Getting started
+                </Link>{" "}
+                on Overview.
+              </p>
             </EmptyContent>
           </Empty>
         </CardContent>
@@ -214,5 +236,6 @@ export function ScanList() {
         </CardContent>
       )}
     </Card>
+    </>
   );
 }

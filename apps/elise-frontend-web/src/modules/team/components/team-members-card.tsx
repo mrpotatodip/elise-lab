@@ -1,19 +1,17 @@
-import { Suspense } from "react";
 import { useMutation, useQueryClient, useSuspenseQueries } from "@tanstack/react-query";
 import { useTable } from "@tanstack/react-table";
 import { toast } from "sonner";
+import type { InviteEmailStatusValue } from "@repo/contracts/elise";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
-import { Skeleton } from "#/components/ui/skeleton";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
 import { createTeamInvite, revokeTeamInvite } from "../api";
 import { groupsQuery, teamKeys, teamQuery } from "../hooks";
 import type { CreateInviteInput } from "../schemas";
 import { teamRoleLabel } from "../utils";
 import { TeamConfirmDialog } from "./team-confirm-dialog";
-import { TeamInviteDialog } from "./team-invite-dialog";
 
 const DATE = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -26,6 +24,7 @@ type PersonRow = {
   groupNames: string[];
   you: boolean;
   expiresAt: string;
+  emailStatus: InviteEmailStatusValue | undefined;
   busy: boolean;
   resend: () => void;
   revoke: () => Promise<void>;
@@ -57,6 +56,8 @@ const columns = column.columns([
           <span className="flex items-center gap-2 font-medium">
             {person.email}
             <Badge variant="warning">Invited</Badge>
+            {person.emailStatus === "sent" && <Badge variant="secondary">Sent</Badge>}
+            {person.emailStatus === "failed" && <Badge variant="destructive">Not delivered</Badge>}
           </span>
           <span className="block text-xs text-muted-foreground">Link expires {DATE.format(new Date(person.expiresAt))}</span>
         </>
@@ -138,6 +139,7 @@ export function TeamMembersCard({ email }: { email: string }) {
       groupNames: groupNames(member.groupIds),
       you: member.email.toLowerCase() === email.toLowerCase(),
       expiresAt: "",
+      emailStatus: undefined,
       busy: false,
       resend: noAction,
       revoke: async () => undefined,
@@ -151,6 +153,7 @@ export function TeamMembersCard({ email }: { email: string }) {
       groupNames: groupNames(invite.groupIds),
       you: false,
       expiresAt: invite.expiresAt,
+      emailStatus: invite.emailStatus,
       busy: resend.isPending || revoke.isPending,
       resend: () => resend.mutate({ email: invite.email, role: invite.role, groupIds: [...invite.groupIds] }),
       revoke: async () => {
@@ -161,12 +164,10 @@ export function TeamMembersCard({ email }: { email: string }) {
   const table = useTable({ features: dataTableFeatures, columns, data: rows, getRowId: (person) => person.id });
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
+    <Card id="people">
+      <CardHeader>
         <CardTitle>People</CardTitle>
-        <Suspense fallback={<Skeleton className="h-8 w-20" />}>
-          <TeamInviteDialog />
-        </Suspense>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Everyone on this account and any invite still waiting. A role sets what each person can do.</p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         <DataTable table={table} />

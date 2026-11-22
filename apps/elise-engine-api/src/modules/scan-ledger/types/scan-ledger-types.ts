@@ -2,6 +2,7 @@ import type { Effect } from "effect";
 import type { ScanArtifact, ScanUsage } from "@repo/contracts/elise";
 import type { Conflict, DbError } from "#/lib/effect-query";
 import type { ScanParams, ScanState, ScanStatus } from "#/schemas";
+import type { SourceProviderId } from "#/providers/registry";
 
 // -----
 // What changes on the way: state, step, error and
@@ -24,11 +25,6 @@ export type NewScanFile = ScanArtifact & { r2Key: string };
 
 export type ScanFileRef = { r2Key: string; contentType: string };
 
-// -----
-// Live scans of every Account on our own Sandboxes, by path.
-// -----
-export type ActiveCounts = { lite: number; full: number };
-
 export type ScanPage ={ scans: ScanStatus[]; nextCursor: string | null };
 
 // -----
@@ -37,14 +33,13 @@ export type ScanPage ={ scans: ScanStatus[]; nextCursor: string | null };
 // bytes of each file, and scan_files says where.
 // -----
 export type ScanRepo = {
-  ensureRepo: (accountId: string, url: string) => Effect.Effect<RepoRecord, DbError>;
+  ensureRepo: (accountId: string, url: string, provider?: SourceProviderId) => Effect.Effect<RepoRecord, DbError>;
   create: (params: ScanParams, repoId: string, nowMs: number) => Effect.Effect<void, DbError | Conflict>;
   mark: (accountId: string, scanId: string, patch: ScanPatch) => Effect.Effect<void, DbError>;
   addFiles: (accountId: string, scanId: string, files: NewScanFile[]) => Effect.Effect<void, DbError>;
   list: (accountId: string, limit: number, cursor?: string, filter?: ScanFilter) => Effect.Effect<ScanPage, DbError>;
   get: (accountId: string, scanId: string) => Effect.Effect<ScanStatus | null, DbError>;
   activeSince: (accountId: string, nowMs: number) => Effect.Effect<ScanStatus[], DbError>;
-  activeCounts: (nowMs: number) => Effect.Effect<ActiveCounts, DbError>;
   file: (accountId: string, scanId: string, name: string) => Effect.Effect<ScanFileRef | null, DbError>;
 };
 

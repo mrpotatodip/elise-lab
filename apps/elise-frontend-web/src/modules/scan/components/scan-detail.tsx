@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { SkeletonBar } from "#/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs";
 import { GithubPrivateBadge } from "#/modules/github";
+import { REPORT_FILE } from "#/modules/shared";
 import { ShellPageHeader } from "#/modules/shell";
 import { SCAN_STEP_COPY } from "../constants";
-import { scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
+import { isScanActive, scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
 import type { ScanStatus } from "../schemas";
 import { scanBytes, scanCost, scanFailure, scanPlural, scanProfileNote, scanRepoName } from "../utils";
 import { ScanBranchScans } from "./scan-branch-scans";
@@ -20,9 +21,11 @@ import { ScanHeaderMeta } from "./scan-header-meta";
 import { ScanMarkdown } from "./scan-markdown";
 import { ScanNewDialog } from "./scan-new-dialog";
 import { ScanRunDetails } from "./scan-run-details";
+import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanSummary } from "./scan-summary";
+import { ScanTrace } from "./scan-trace";
 
-const DEFAULT_FILE = "REPORT.md";
+const DEFAULT_FILE = REPORT_FILE;
 
 function ScanFileViewer({ scanId, file }: { scanId: string; file: string }) {
   const { data, isPending, error } = useQuery(scanFileQuery(scanId, file));
@@ -60,6 +63,17 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
               <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-background/60 p-3 font-mono [overflow-wrap:anywhere]">{failure.detail}</pre>
             </details>
           )}
+        </div>
+      </Alert>
+    );
+  }
+  if (scan.status === "stopped") {
+    return (
+      <Alert>
+        <OctagonX />
+        <div className="grid gap-1">
+          <AlertDescription className="font-medium">You stopped this scan.</AlertDescription>
+          <AlertDescription>It kept no report and no findings, and it does not count toward a Verdict. Start a new scan when you are ready.</AlertDescription>
         </div>
       </Alert>
     );
@@ -129,17 +143,39 @@ export function ScanDetail({ scanId }: { scanId: string }) {
         badges={<GithubPrivateBadge isPrivate={scan.isPrivate} />}
         below={<ScanHeaderMeta scan={scan} />}
       >
-        <ScanNewDialog
-          label={scan.branch ? "Scan this branch again" : "Scan again"}
-          size="default"
-          variant="outline"
-          repo={scan.repo}
-          startBranch={scan.branch ?? undefined}
-          startRef={scan.branch ? undefined : (scan.ref ?? undefined)}
-        />
+        {canStopScan(scan) && <ScanStopButton scanId={scan.scanId} onRunner={Boolean(scan.runner)} size="default" />}
+        {scan.archive ? (
+          <ScanNewDialog label="Scan a zip again" size="default" variant="outline" repo={scan.repo} provider="upload" repoId={scan.repoId} />
+        ) : (
+          <ScanNewDialog
+            label={scan.branch ? "Scan this branch again" : "Scan again"}
+            size="default"
+            variant="outline"
+            repo={scan.repo}
+            startBranch={scan.branch ?? undefined}
+            startRef={scan.branch ? undefined : (scan.ref ?? undefined)}
+          />
+        )}
       </ShellPageHeader>
 
       <ScanStatusNotice scan={scan} />
+
+      {isScanActive(scan.status) && (
+        <>
+          <Card>
+            <CardHeader className="gap-1.5">
+              <CardTitle>Findings so far</CardTitle>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Found so far, still being checked. They can change before the Report.</p>
+            </CardHeader>
+            <CardContent className="overflow-hidden p-0">
+              <Suspense fallback={<ScanFindingsTableSkeleton />}>
+                <ScanFindingsTable scanId={scanId} repoId={scan.repoId} repoLabel={owner ? `${owner}/${name}` : name} commit={scan.commitSha ?? undefined} live />
+              </Suspense>
+            </CardContent>
+          </Card>
+          <ScanTrace scan={scan} />
+        </>
+      )}
 
       {succeeded && (
         <>
@@ -207,6 +243,8 @@ export function ScanDetail({ scanId }: { scanId: string }) {
           </Tabs>
         </Card>
       )}
+
+      {!isScanActive(scan.status) && <ScanTrace scan={scan} />}
     </>
   );
 }

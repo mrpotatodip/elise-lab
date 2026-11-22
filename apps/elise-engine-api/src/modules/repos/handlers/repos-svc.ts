@@ -8,6 +8,7 @@ import { addBranchesEffect, isCommitId, listBranchesEffect, normalizeBranchName 
 import { addRepoEffect, getRepoEffect, listRepoBranchesEffect, listReposEffect, repoFindingsEffect, scanDiffEffect } from "#/modules/repos/queries";
 import type { AddBranchBody, AddRepoBody } from "#/modules/repos/schemas";
 import { severityRank } from "#/modules/repos/utils";
+import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
 
 export const listReposSvc = (db: AppDbType, accountId: string): Effect.Effect<RepoList, DbError> =>
   listReposEffect(db, accountId).pipe(Effect.map((repos) => ({ repos })));
@@ -60,12 +61,14 @@ const branchNamesOf = (names: string[]): Effect.Effect<string[], Invalid> =>
 // -----
 // Add a repo (and the branches to track) without scanning it.
 // Adding a repo that is already there changes nothing but
-// adds the branches named.
+// adds the branches named. An upload app gets its one hidden
+// Branch instead, and adding it again finds the same app.
 // -----
 export const addRepoSvc = (db: AppTxDbType, accountId: string, body: AddRepoBody): Effect.Effect<RepoDetail, Invalid | Conflict | NotFound | DbError> =>
   Effect.gen(function* () {
-    const names = yield* branchNamesOf(body.branches ?? []);
-    const repoId = yield* addRepoEffect(db, accountId, body.repo, names);
+    const fixed = sourceProviderOf(body.provider ?? DEFAULT_SOURCE_PROVIDER_ID).fixedBranch;
+    const names = fixed === null ? yield* branchNamesOf(body.branches ?? []) : [fixed];
+    const repoId = yield* addRepoEffect(db, accountId, body.repo, names, body.provider);
     return yield* getRepoSvc(db, accountId, repoId);
   });
 

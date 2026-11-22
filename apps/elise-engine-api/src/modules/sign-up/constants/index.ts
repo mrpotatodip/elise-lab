@@ -1,9 +1,20 @@
 // -----
 // Messages
 // -----
-export const SIGN_UP_INVALID_INVITE = "Invalid invite code";
-export const SIGN_UP_EMAIL_TAKEN = "An account with this email already exists";
-export const SIGN_UP_SLUG_EXHAUSTED = "Could not pick an address for this account. Try again.";
+export const SIGN_UP_RATE_LIMITED = "Too many sign-up attempts. Wait a minute and try again.";
+export const SIGN_UP_RATE_LIMITED_CODE = "SIGN_UP_RATE_LIMITED";
+// -----
+// One answer for every refusal that is not a
+// limit or bad input, so a caller cannot tell a
+// taken email from any other failure.
+// -----
+export const SIGN_UP_REFUSED = "We could not create this account. Check your details and try again, or sign in if you already have an account.";
+
+// -----
+// Cloudflare Turnstile: the server-side check of the sign-up token
+// -----
+export const TURNSTILE_SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+export const TURNSTILE_SITEVERIFY_TIMEOUT_MS = 10_000;
 
 // -----
 // Tenant slug: from the account name, up to 40

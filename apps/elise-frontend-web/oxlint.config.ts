@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { defineConfig, type OxlintOverride } from "oxlint";
 
 // -----
@@ -18,10 +19,45 @@ const SHARED_IMPORT_RULES = [
   },
 ];
 
+// -----
+// Source providers (docs/adr/0008-git-providers.md): modules read a provider
+// only through `#/providers/port` and `#/providers/registry`, a provider
+// imports only the port and its own folder, and only the registry imports
+// every provider. The `**/` form also catches a relative path. Each folder
+// under src/providers gets its own override, so a new provider is covered as
+// soon as its folder exists.
+// -----
+const FORBID_PROVIDER_IN_CORE = {
+  group: ["**/providers/*", "**/providers/*/**", "!**/providers/port", "!**/providers/registry"],
+  message: "Modules read a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
+};
+const CORE_IMPORT_RULES = [...SHARED_IMPORT_RULES, FORBID_PROVIDER_IN_CORE];
+const PROVIDER_IDS = readdirSync(new URL("src/providers", import.meta.url), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name);
+const providerOverride = (id: string): OxlintOverride => ({
+  files: [`src/providers/${id}/**`],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        paths: [FORBID_HONO_RPC],
+        patterns: [
+          ...SHARED_IMPORT_RULES,
+          {
+            group: ["../**", "**/providers/*", "**/providers/*/**", "!**/providers/port", `!**/providers/${id}`, `!**/providers/${id}/**`],
+            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
+          },
+        ],
+      },
+    ],
+  },
+});
+
 const forbidModules = (files: string, modules: readonly string[], message: string): OxlintOverride => ({
   files: [files],
   rules: {
-    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [...SHARED_IMPORT_RULES, { group: modules.flatMap((name) => [`#/modules/${name}`, `#/modules/${name}/*`]), message }] }],
+    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [...CORE_IMPORT_RULES, { group: modules.flatMap((name) => [`#/modules/${name}`, `#/modules/${name}/*`]), message }] }],
   },
 });
 
@@ -57,20 +93,22 @@ export default defineConfig({
       rules: { "anti-slop/no-use-effect": "off" },
     },
     {
-      files: ["src/modules/*/components/**", "src/modules/*/hooks/**", "src/routes/**"],
+      files: ["src/modules/*/components/**", "src/modules/*/hooks/**", "src/providers/*/components/**", "src/providers/*/hooks/**", "src/routes/**"],
       rules: {
         "anti-slop/no-engine-client-import": "error",
       },
     },
     {
-      files: ["src/modules/**"],
+      files: ["src/modules/**", "src/providers/**"],
       excludeFiles: ["src/modules/**/__tests__/**"],
       rules: {
         "anti-slop/no-raw-colors": "error",
+        "anti-slop/no-off-design-classes": "error",
+        "anti-slop/require-link-target-size": "error",
       },
     },
     {
-      files: ["src/modules/*/api/**"],
+      files: ["src/modules/*/api/**", "src/providers/*/api/**"],
       rules: {
         "anti-slop/require-imported-server-fn-schema": "error",
       },
@@ -93,12 +131,46 @@ export default defineConfig({
     },
     {
       // -----
+      // The sidebar rows take their class from `NAV_ROW` and `TREE_LINK` in other files, and `NAV_ROW` is 40px tall.
+      // -----
+      files: ["src/modules/shell/components/shell-sidebar.tsx", "src/modules/shell/components/shell-settings-nav.tsx"],
+      rules: {
+        "anti-slop/require-link-target-size": "off",
+      },
+    },
+    {
+      // -----
+      // These render links inside running prose (a report, a comment), where a link is inline and WCAG 2.5.8 exempts it from the 24px size.
+      // -----
+      files: ["src/modules/scan/components/scan-markdown.tsx", "src/modules/finding-comment/components/finding-comment-body.tsx"],
+      rules: {
+        "anti-slop/require-link-target-size": "off",
+      },
+    },
+    {
+      // -----
+      // A finding opened from a link gets a 3px accent edge, which no elevation token draws.
+      // -----
+      files: ["src/modules/summary/components/summary-findings.tsx"],
+      rules: {
+        "anti-slop/no-off-design-classes": "off",
+      },
+    },
+    {
+      // -----
       // A shadcn primitive: importing the shell's root barrel would make
       // components/ui and the shell import each other.
       // -----
       files: ["src/components/ui/sonner.tsx"],
       rules: {
-        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [SHARED_IMPORT_RULES[0]] }],
+        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [SHARED_IMPORT_RULES[0], FORBID_PROVIDER_IN_CORE] }],
+      },
+    },
+    ...PROVIDER_IDS.map(providerOverride),
+    {
+      files: ["src/providers/registry.ts"],
+      rules: {
+        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: SHARED_IMPORT_RULES }],
       },
     },
     {
@@ -131,7 +203,7 @@ export default defineConfig({
     "typescript/consistent-type-definitions": ["error", "type"],
     "typescript/no-explicit-any": "error",
     "import/no-default-export": "error",
-    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: SHARED_IMPORT_RULES }],
+    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: CORE_IMPORT_RULES }],
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
     "anti-slop/no-deprecated-query-client-calls": "error",

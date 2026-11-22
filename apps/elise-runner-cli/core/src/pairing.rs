@@ -56,20 +56,13 @@ pub async fn status(store: &dyn TokenStore) -> RunnerStatus {
     let Some(token) = store.token() else {
         return RunnerStatus::Unpaired;
     };
-    let answer = client()
-        .get(format!("{}/runners/me", engine_url()))
-        .bearer_auth(&token)
-        .send()
-        .await;
+    let answer = client().get(format!("{}/runners/me", engine_url())).bearer_auth(&token).send().await;
     let Ok(response) = answer else {
         return RunnerStatus::Offline;
     };
     match response.status() {
         StatusCode::OK => match response.json::<Envelope<Identity>>().await {
-            Ok(envelope) => RunnerStatus::Connected {
-                name: envelope.data.name,
-                account_name: envelope.data.account_name,
-            },
+            Ok(envelope) => RunnerStatus::Connected { name: envelope.data.name, account_name: envelope.data.account_name },
             Err(_) => RunnerStatus::Offline,
         },
         StatusCode::UNAUTHORIZED => {
@@ -93,16 +86,8 @@ pub async fn enroll(code: &str) -> Result<Enrolled, RunnerError> {
         StatusCode::FORBIDDEN | StatusCode::BAD_REQUEST => return Err(RunnerError::InvalidCode),
         _ => return Err(RunnerError::Unreachable),
     }
-    let enrolled = response
-        .json::<Envelope<EnrolledAnswer>>()
-        .await
-        .map_err(|_| RunnerError::Unreachable)?
-        .data;
-    Ok(Enrolled {
-        name: enrolled.name,
-        account_name: enrolled.account_name,
-        token: enrolled.token,
-    })
+    let enrolled = response.json::<Envelope<EnrolledAnswer>>().await.map_err(|_| RunnerError::Unreachable)?.data;
+    Ok(Enrolled { name: enrolled.name, account_name: enrolled.account_name, token: enrolled.token })
 }
 
 // Tells Elise to stop trusting a token. True when it did, or already had.
@@ -118,10 +103,7 @@ pub async fn accept(store: &dyn TokenStore, enrolled: Enrolled) -> Result<Runner
         revoke(&enrolled.token).await;
         return Err(RunnerError::KeychainFailed);
     }
-    Ok(RunnerStatus::Connected {
-        name: enrolled.name,
-        account_name: enrolled.account_name,
-    })
+    Ok(RunnerStatus::Connected { name: enrolled.name, account_name: enrolled.account_name })
 }
 
 #[derive(Debug, PartialEq)]
@@ -131,10 +113,7 @@ pub enum Replaced {
     StillLive,
 }
 
-pub async fn accept_replacing(
-    store: &dyn TokenStore,
-    enrolled: Enrolled,
-) -> Result<(RunnerStatus, Replaced), RunnerError> {
+pub async fn accept_replacing(store: &dyn TokenStore, enrolled: Enrolled) -> Result<(RunnerStatus, Replaced), RunnerError> {
     let old = store.token();
     let status = accept(store, enrolled).await?;
     let replaced = match old {

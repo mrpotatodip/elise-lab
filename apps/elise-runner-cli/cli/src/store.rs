@@ -1,5 +1,5 @@
-use elise_runner_core::store::{FileStore, GivenToken, KeychainStore, TokenStore, HEADLESS_KEYCHAIN_SERVICE};
 pub use elise_runner_core::store::TOKEN_VARIABLE;
+use elise_runner_core::store::{FileStore, GivenToken, KeychainStore, TokenStore, HEADLESS_KEYCHAIN_SERVICE};
 use std::path::PathBuf;
 
 const TOKEN_FILE: &str = "token";
@@ -51,6 +51,17 @@ impl Store {
         }
     }
 }
+
+// The Runner's own settings (the GitLab servers it may clone from), beside the token file. Only
+// the person edits it: the server cannot add to it.
+pub fn settings_file() -> PathBuf {
+    if let Some(home) = debug_only_runner_home_override() {
+        return home.join(SETTINGS_FILE);
+    }
+    dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("elise-runner").join(SETTINGS_FILE)
+}
+
+const SETTINGS_FILE: &str = "settings.json";
 
 #[cfg(debug_assertions)]
 pub(crate) fn debug_only_runner_home_override() -> Option<PathBuf> {

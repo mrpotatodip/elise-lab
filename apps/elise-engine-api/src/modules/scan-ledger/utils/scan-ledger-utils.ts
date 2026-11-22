@@ -1,5 +1,5 @@
 import type { scans } from "@repo/db-elise/schema";
-import type { FindingOriginValue, FindingSeverityValue, FindingStatusValue, ScanArtifact, ScanRunner, ScanSummary } from "@repo/contracts/elise";
+import type { FindingOriginValue, FindingSeverityValue, FindingStatusValue, ScanArchiveRef, ScanArtifact, ScanRunner, ScanSummary } from "@repo/contracts/elise";
 import { ScanStatusSchema, type ScanStatus } from "#/schemas";
 
 type ScanRow = typeof scans.$inferSelect;
@@ -9,7 +9,13 @@ type ScanRow = typeof scans.$inferSelect;
 // costUsd is numeric in Neon and arrives as text. A row that
 // fails the schema is a bug in our own writes, so it throws.
 // -----
-export const scanRowToStatus = (row: ScanRow, artifacts: ScanArtifact[], summary: ScanSummary | null = null, runner: ScanRunner | null = null): ScanStatus =>
+export const scanRowToStatus = (
+  row: ScanRow,
+  artifacts: ScanArtifact[],
+  summary: ScanSummary | null = null,
+  runner: ScanRunner | null = null,
+  archive: ScanArchiveRef | null = null,
+): ScanStatus =>
   ScanStatusSchema.parse({
   scanId: row.id,
   accountId: row.tenantId,
@@ -22,6 +28,7 @@ export const scanRowToStatus = (row: ScanRow, artifacts: ScanArtifact[], summary
   branchId: row.branchId,
   untrackedReason: row.untrackedReason,
   profileMet: row.profileMet,
+  signalPairsSkipped: row.signalPairsSkipped,
   skill: row.skill,
   model: row.model,
   effort: row.effort,
@@ -37,6 +44,7 @@ export const scanRowToStatus = (row: ScanRow, artifacts: ScanArtifact[], summary
   artifacts,
   summary,
   runner,
+  archive,
   usage:
     row.costUsd === null
       ? null
@@ -57,13 +65,14 @@ type FindingCount = { status: FindingStatusValue; severity: FindingSeverityValue
 // Counts only for a succeeded scan whose findings are
 // recorded: a lite scan, or a full scan whose partial column
 // is set (every full scan recorded from the profile era on).
-// For any other the findings table is empty because nothing
+// A running scan counts the live rows it holds so far. For any
+// other the findings table is empty because nothing
 // was read, not because nothing was found. A clean scan has
 // all zeros.
 // -----
 export const summaryOf = (row: ScanRow, counts: FindingCount[]): ScanSummary | null => {
   const recorded = row.skill === "lite" || (row.skill === "full" && row.partial !== null);
-  if (row.status !== "succeeded" || !recorded) return null;
+  if (row.status !== "running" && (row.status !== "succeeded" || !recorded)) return null;
   const recheck =
     row.priorsGiven === null
       ? null

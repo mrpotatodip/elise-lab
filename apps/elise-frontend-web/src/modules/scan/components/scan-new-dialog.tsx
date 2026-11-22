@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
 import { Skeleton } from "#/components/ui/skeleton";
-import { githubReposQuery } from "#/modules/github";
 import { scanReposQuery } from "../hooks";
 
 const loadScanNewForm = () => import("./scan-new-form");
@@ -18,20 +17,21 @@ type ScanNewDialogProps = {
   startBranch?: string;
   startRef?: string;
   startOptions?: ComponentProps<typeof ScanNewForm>["startOptions"];
+  provider?: ComponentProps<typeof ScanNewForm>["provider"];
+  repoId?: string;
 };
 
-export function ScanNewDialog({ label = "New scan", size = "sm", variant = "default", repo, startBranch, startRef, startOptions }: ScanNewDialogProps) {
+export function ScanNewDialog({ label = "New scan", size = "sm", variant = "default", repo, startBranch, startRef, startOptions, provider, repoId }: ScanNewDialogProps) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // -----
-  // The form's code and the repositories it lists, scanned and on GitHub, load when the pointer or
+  // The form's code and the repositories it lists load when the pointer or
   // focus reaches the button, so the dialog opens with both already in hand.
   // -----
   const warm = () => {
     void loadScanNewForm();
     void queryClient.query(scanReposQuery()).catch(noop);
-    void queryClient.query(githubReposQuery()).catch(noop);
   };
 
   return (
@@ -45,7 +45,7 @@ export function ScanNewDialog({ label = "New scan", size = "sm", variant = "defa
           <DialogTitle>Start a security audit</DialogTitle>
         </DialogHeader>
         <Suspense fallback={<Skeleton className="h-72 w-full" />}>
-          <ScanNewForm repo={repo} startBranch={startBranch} startRef={startRef} startOptions={startOptions} onDone={() => setOpen(false)} />
+          <ScanNewForm repo={repo} startBranch={startBranch} startRef={startRef} startOptions={startOptions} provider={provider} repoId={repoId} onDone={() => setOpen(false)} />
         </Suspense>
       </DialogContent>
     </Dialog>

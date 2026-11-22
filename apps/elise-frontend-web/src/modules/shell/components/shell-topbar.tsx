@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip
 import { hydratedTimeZone, useHydrated } from "#/lib/use-hydrated";
 import { cn } from "#/lib/utils";
 import { useRouteNames, type RouteNames } from "../hooks";
-type Crumb = { label: string; to?: "/scans" | "/repos" | "/connections" | "/summary"; branch?: { repoId: string; branchId: string }; plain?: boolean };
+type Crumb = { label: string; to?: "/scans" | "/repos" | "/summary"; branch?: { repoId: string; branchId: string }; plain?: boolean };
 
 // -----
 // A scan belongs to the branch it read, so its breadcrumb follows the data:
@@ -38,10 +38,10 @@ const crumbs = (pathname: string, names: RouteNames | null, when: FormatTime): C
   if (pathname.startsWith("/repos/")) return [{ label: "Repositories", to: "/repos" }, { label: names?.name ?? "Repository" }];
   if (pathname.startsWith("/repos")) return [{ label: "Repositories" }];
   if (pathname.startsWith("/files")) return [{ label: "Files" }];
-  if (pathname.startsWith("/github/")) return [{ label: "Connections", to: "/connections" }, { label: "Finish connecting GitHub" }];
-  if (pathname.startsWith("/connections")) return [{ label: "Connections" }];
   if (pathname.startsWith("/team")) return [{ label: "Team" }];
-  if (pathname.startsWith("/settings")) return [{ label: "Settings" }];
+  if (pathname.startsWith("/groups")) return [{ label: "Groups" }];
+  if (pathname.startsWith("/settings/plan")) return [{ label: "Plan and billing" }];
+  if (pathname.startsWith("/settings/providers")) return [{ label: "Runners" }];
   if (pathname.startsWith("/summary/")) return [{ label: "Security status", to: "/summary" }, { label: names?.name ?? "Repository" }];
   if (pathname.startsWith("/summary")) return [{ label: "Security status" }];
   return [{ label: "Overview" }];
@@ -70,7 +70,7 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
                 {index > 0 && <BreadcrumbSeparator />}
                 <BreadcrumbItem className="min-w-0">
                   {crumb.to ? (
-                    <Link to={crumb.to} className="rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Link to={crumb.to} className="inline-flex min-h-6 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {crumb.label}
                     </Link>
                   ) : crumb.branch ? (
@@ -78,7 +78,7 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
                       to="/repos/$repoId/branches/$branchId"
                       params={crumb.branch}
                       title={crumb.label}
-                      className="block truncate rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="block min-h-6 truncate rounded-sm leading-6 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {crumb.label}
                     </Link>
@@ -99,7 +99,7 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger render={<Button variant="outline" size="sm" aria-label="Refresh" onClick={() => queryClient.invalidateQueries()} />}>
-              <RefreshCw className={cn("size-3.5", fetching && "animate-spin")} />
+              <RefreshCw className={cn("size-3.5", hydrated && fetching && "animate-spin")} />
               <span className="hidden sm:inline">Refresh</span>
             </TooltipTrigger>
             <TooltipContent>Reload scans and findings</TooltipContent>

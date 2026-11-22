@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -19,8 +19,18 @@ struct State {
     revoked: Vec<String>,
     revokes_fail: bool,
     jobs: VecDeque<String>,
+    claims: Vec<String>,
+    archives: BTreeMap<String, Vec<u8>>,
+    archive_downloads: Vec<String>,
     results: Vec<(String, String)>,
     remove_after_result: bool,
+    findings: Vec<(String, String)>,
+    findings_answer: Option<u16>,
+    findings_failures: usize,
+    findings_before_result: Vec<usize>,
+    cancelled: BTreeSet<String>,
+    job_checks: Vec<String>,
+    job_checks_fail: Option<u16>,
     claims_held: bool,
     a_claim_was_held: bool,
     no_login_routes: bool,
@@ -87,6 +97,43 @@ impl Engine {
         self.state.lock().unwrap().jobs.push_back(job);
     }
 
+    // The zip an upload Scan's job downloads. A Scan with none answers as Elise does once the zip
+    // was removed.
+    pub fn serve_archive(&self, scan_id: &str, zip: Vec<u8>) {
+        self.state.lock().unwrap().archives.insert(scan_id.to_string(), zip);
+    }
+
+    // The bodies of the claims the Runner sent, as JSON (null for an empty body).
+    pub fn claims(&self) -> Vec<serde_json::Value> {
+        let state = self.state.lock().unwrap();
+        state
+            .claims
+            .iter()
+            .map(|body| if body.is_empty() { serde_json::Value::Null } else { serde_json::from_str(body).expect("a claim is JSON") })
+            .collect()
+    }
+
+    pub fn archive_downloads(&self) -> Vec<String> {
+        self.state.lock().unwrap().archive_downloads.clone()
+    }
+
+    pub fn finding_batches(&self) -> Vec<Vec<serde_json::Value>> {
+        let state = self.state.lock().unwrap();
+        state.findings.iter().map(|(_, body)| batch_of(body)).collect()
+    }
+
+    pub fn batches_before_results(&self) -> Vec<usize> {
+        self.state.lock().unwrap().findings_before_result.clone()
+    }
+
+    pub fn fail_findings_first(&self, times: usize) {
+        self.state.lock().unwrap().findings_failures = times;
+    }
+
+    pub fn answer_findings_with(&self, status: u16) {
+        self.state.lock().unwrap().findings_answer = Some(status);
+    }
+
     pub fn results(&self) -> Vec<(String, serde_json::Value)> {
         let state = self.state.lock().unwrap();
         state.results.iter().map(|(id, body)| (id.clone(), serde_json::from_str(body).expect("a result is JSON"))).collect()
@@ -139,12 +186,33 @@ impl Engine {
         self.state.lock().unwrap().login_refused = true;
     }
 
+    pub fn cancel_job(&self, scan_id: &str) {
+        self.state.lock().unwrap().cancelled.insert(scan_id.to_string());
+    }
+
+    pub fn fail_job_checks(&self, status: u16) {
+        self.state.lock().unwrap().job_checks_fail = Some(status);
+    }
+
+    pub fn job_checks(&self) -> Vec<String> {
+        self.state.lock().unwrap().job_checks.clone()
+    }
+
+    pub fn wait_for_a_job_check(&self) {
+        let asked = until(|| !self.state.lock().unwrap().job_checks.is_empty());
+        assert!(asked, "the Runner never asked for the job state");
+    }
+
     pub fn remove_runners_after_the_next_result(&self) {
         self.state.lock().unwrap().remove_after_result = true;
     }
 }
 
 pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
+    job_at(scan_id, REPO_URL, phase_prompts)
+}
+
+pub fn job_at(scan_id: &str, repo: &str, phase_prompts: [&str; 4]) -> String {
     let phases: Vec<serde_json::Value> = ["recon", "hunt", "check", "report"]
         .iter()
         .zip(phase_prompts)
@@ -152,7 +220,7 @@ pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
         .collect();
     serde_json::json!({
         "scanId": scan_id,
-        "repo": REPO_URL,
+        "repo": repo,
         "ref": null,
         "skill": "full",
         "profile": "standard",
@@ -165,6 +233,23 @@ pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
         "priorsJson": "",
     })
     .to_string()
+}
+
+// An upload Scan's job: the app's name as its repo, and an archive source.
+pub fn archive_job(scan_id: &str, app: &str, phase_prompts: [&str; 4]) -> String {
+    let mut job: serde_json::Value = serde_json::from_str(&job_at(scan_id, app, phase_prompts)).unwrap();
+    job["source"] = serde_json::json!({ "kind": "archive", "archiveId": "7a2e1d0c-3b4f-4a51-8c62-9d03e4f5a6b7" });
+    job.to_string()
+}
+
+// A zip of these files, deflated as zip tools write them.
+pub fn zip_of(files: &[(&str, &str)]) -> Vec<u8> {
+    let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    for (name, text) in files {
+        writer.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+        writer.write_all(text.as_bytes()).unwrap();
+    }
+    writer.finish().unwrap().into_inner()
 }
 
 pub const REPO_URL: &str = "https://github.com/acme/widgets";
@@ -217,7 +302,19 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
     if request.path == "/runners/claim" {
         hold_while_claims_are_held(state);
     }
+    if let Some(zip) = archive_of(&request, &mut state.lock().unwrap()) {
+        let _ = write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: application/zip\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            zip.len()
+        );
+        let _ = stream.write_all(&zip);
+        return;
+    }
     let (status, body) = answer(&request, &mut state.lock().unwrap());
+    if status == 0 {
+        return;
+    }
     let reason = if status == 200 { "OK" } else { "Error" };
     let _ = write!(
         stream,
@@ -234,10 +331,31 @@ fn hold_while_claims_are_held(state: &Mutex<State>) {
     });
 }
 
+// The zip of a job, for a live token, when the engine has one for that Scan.
+fn archive_of(request: &Request, state: &mut State) -> Option<Vec<u8>> {
+    let live = request.bearer.as_ref().is_some_and(|token| state.live.contains(token));
+    let scan_id = request.path.strip_prefix("/runners/jobs/")?.strip_suffix("/archive")?.to_string();
+    if request.method != "GET" || !live {
+        return None;
+    }
+    state.archive_downloads.push(scan_id.clone());
+    state.archives.get(&scan_id).cloned()
+}
+
+fn batch_of(body: &str) -> Vec<serde_json::Value> {
+    let body: serde_json::Value = serde_json::from_str(body).expect("a batch is JSON");
+    body["findings"].as_array().expect("a batch holds findings").clone()
+}
+
+pub const ARCHIVE_REMOVED: &str = "The zip this Scan reads was removed before the Runner could download it, so the Scan did not run.";
+
 const REJECTED: (u16, &str) = (401, r#"{"data":null,"error":{"code":"unauthorized"}}"#);
 
 fn answer(request: &Request, state: &mut State) -> (u16, String) {
     let live = request.bearer.as_ref().is_some_and(|token| state.live.contains(token));
+    if live && request.path == "/runners/claim" {
+        state.claims.push(request.body.clone());
+    }
     if state.no_login_routes && request.path.starts_with("/runners/login/") {
         return (404, r#"{"data":null,"error":{"code":"not_found"}}"#.to_string());
     }
@@ -278,30 +396,50 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             state.issued += 1;
             let token = token_number(state.issued);
             state.live.insert(token.clone());
-            let body = format!(
-                r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}","token":"{token}"}},"error":null}}"#
-            );
+            let body = format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}","token":"{token}"}},"error":null}}"#);
             (200, body)
         }
-        ("GET", "/runners/me") if live => (
-            200,
-            format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#),
-        ),
-        ("DELETE", "/runners/me") if state.revokes_fail => {
-            (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string())
+        ("GET", "/runners/me") if live => {
+            (200, format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#))
         }
+        ("DELETE", "/runners/me") if state.revokes_fail => (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string()),
         ("DELETE", "/runners/me") if live => {
             let token = request.bearer.clone().unwrap();
             state.live.remove(&token);
             state.revoked.push(token);
             (200, r#"{"data":{"ok":true},"error":null}"#.to_string())
         }
+        ("GET", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/archive") => {
+            (404, format!(r#"{{"data":null,"error":{{"code":"NOT_FOUND","message":"{ARCHIVE_REMOVED}"}}}}"#))
+        }
+        ("GET", path) if live && path.starts_with("/runners/jobs/") => {
+            let scan_id = path.trim_start_matches("/runners/jobs/").to_string();
+            state.job_checks.push(scan_id.clone());
+            if let Some(status) = state.job_checks_fail {
+                return (status, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string());
+            }
+            let job_state = if state.cancelled.contains(&scan_id) { "cancelled" } else { "claimed" };
+            (200, format!(r#"{{"data":{{"state":"{job_state}"}},"error":null}}"#))
+        }
         ("POST", "/runners/claim") if live => match state.jobs.pop_front() {
             Some(job) => (200, format!(r#"{{"data":{job},"error":null}}"#)),
             None => (200, r#"{"data":null,"error":null}"#.to_string()),
         },
+        ("POST", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/findings") => {
+            if state.findings_failures > 0 {
+                state.findings_failures -= 1;
+                return (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string());
+            }
+            let scan_id = path.trim_start_matches("/runners/jobs/").trim_end_matches("/findings").to_string();
+            state.findings.push((scan_id, request.body.clone()));
+            match state.findings_answer {
+                Some(status @ (0 | 400..=599)) => (status, r#"{"data":null,"error":{"code":"conflict"}}"#.to_string()),
+                _ => (200, format!(r#"{{"data":{{"accepted":{},"dropped":0}},"error":null}}"#, batch_of(&request.body).len())),
+            }
+        }
         ("POST", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/result") => {
             let scan_id = path.trim_start_matches("/runners/jobs/").trim_end_matches("/result").to_string();
+            state.findings_before_result.push(state.findings.len());
             state.results.push((scan_id, request.body.clone()));
             if state.remove_after_result {
                 state.live.clear();
@@ -314,11 +452,7 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
 
 pub fn temp_home() -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let dir = std::env::temp_dir().join(format!(
-        "elise-runner-test-{}-{}",
-        std::process::id(),
-        NEXT.fetch_add(1, Ordering::SeqCst)
-    ));
+    let dir = std::env::temp_dir().join(format!("elise-runner-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -342,7 +476,7 @@ impl Runner {
         Runner {
             home: temp_home(),
             url: engine.url.clone(),
-            env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string())],
+            env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string()), ("ELISE_JOB_CHECK_MS", "200".to_string())],
             engine: engine.state.clone(),
         }
     }
@@ -429,12 +563,22 @@ impl Runner {
     }
 
     pub fn stub_tools(&mut self, tools: &[&str]) -> Stubs {
+        self.stub_tool_folder(tools, true)
+    }
+
+    pub fn stub_tools_without_git(&mut self, tools: &[&str]) -> Stubs {
+        self.stub_tool_folder(tools, false)
+    }
+
+    fn stub_tool_folder(&mut self, tools: &[&str], with_git: bool) -> Stubs {
         let root = temp_home();
         let (bin, record, tmp) = (root.join("bin"), root.join("record"), root.join("tmp"));
         for dir in [&bin, &record, &tmp] {
             std::fs::create_dir_all(dir).unwrap();
         }
-        executable(&bin.join("git"), STUB_GIT);
+        if with_git {
+            executable(&bin.join("git"), &STUB_GIT.replace("__RECORD__", &record.display().to_string()));
+        }
         for tool in tools {
             let text = match *tool {
                 "claude" => STUB_CLAUDE.replace("__RECORD__", &record.display().to_string()),
@@ -443,7 +587,8 @@ impl Runner {
             };
             executable(&bin.join(tool), &text);
         }
-        self.env.push(("PATH", format!("{}:/usr/bin:/bin", bin.display())));
+        let rest = if with_git { ":/usr/bin:/bin" } else { "" };
+        self.env.push(("PATH", format!("{}{rest}", bin.display())));
         self.env.push(("TMPDIR", tmp.display().to_string()));
         Stubs { record, tmp }
     }
@@ -531,8 +676,38 @@ pub struct Stubs {
 }
 
 impl Stubs {
+    // What git was asked to do, one call per line.
+    pub fn git_calls(&self) -> String {
+        std::fs::read_to_string(self.record.join("git.txt")).unwrap_or_default()
+    }
+
+    pub fn sign_claude_out(&self) {
+        std::fs::write(self.record.join("claude-signed-out"), "").unwrap();
+    }
+
+    pub fn fail_branch_list(&self, stderr: &str) {
+        std::fs::write(self.record.join("ls-remote.stderr"), stderr).unwrap();
+    }
+
+    pub fn git_config(&self) -> String {
+        std::fs::read_to_string(self.record.join("git-config.txt")).unwrap_or_default()
+    }
+
+    pub fn git_helper_answers(&self) -> String {
+        std::fs::read_to_string(self.record.join("git-helper.txt")).unwrap_or_default()
+    }
+
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
+    }
+
+    pub fn waiting_agents(&self, count: usize) -> Vec<u32> {
+        let file = self.record.join("waiting-all.txt");
+        let read =
+            || std::fs::read_to_string(&file).unwrap_or_default().lines().filter_map(|line| line.trim().parse().ok()).collect::<Vec<u32>>();
+        let ready = until(|| read().len() >= count);
+        assert!(ready, "fewer than {count} stub agents started waiting");
+        read()
     }
 
     pub fn waiting_agent(&self) -> u32 {
@@ -550,7 +725,27 @@ fn executable(path: &std::path::Path, text: &str) {
 }
 
 const STUB_GIT: &str = r#"#!/bin/sh
+echo "$@" >> "__RECORD__/git.txt"
+# The credential helper the Runner set for this call, and what it answers for two hosts.
+if [ -n "$GIT_CONFIG_COUNT" ]; then
+  : > "__RECORD__/git-config.txt"
+  : > "__RECORD__/git-helper.txt"
+  i=0
+  while [ "$i" -lt "$GIT_CONFIG_COUNT" ]; do
+    eval "key=\$GIT_CONFIG_KEY_$i; value=\$GIT_CONFIG_VALUE_$i"
+    echo "$key=$value" >> "__RECORD__/git-config.txt"
+    case "$value" in
+      '!'*)
+        for host in github.com gitlab.com evil.example; do
+          printf 'protocol=https\nhost=%s\n\n' "$host" | sh -c "${value#!} get" | sed "s/^/$host /" >> "__RECORD__/git-helper.txt"
+        done ;;
+    esac
+    i=$((i + 1))
+  done
+fi
+if [ -n "$STUB_GIT_FAILS" ] && [ "$1" != ls-remote ]; then echo "fatal: Authentication failed" >&2; exit 128; fi
 case "$1" in
+  ls-remote) if [ -f "__RECORD__/ls-remote.stderr" ]; then cat "__RECORD__/ls-remote.stderr" >&2; exit 128; fi ;;
   clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
   -C) case "$3 $4" in
         "rev-parse HEAD") echo 0123456789abcdef0123456789abcdef01234567 ;;
@@ -560,23 +755,40 @@ esac
 "#;
 
 const STUB_CLAUDE: &str = r#"#!/bin/sh
+if [ "$1 $2" = "auth status" ]; then
+  if [ -f "__RECORD__/claude-signed-out" ]; then echo "Not logged in" >&2; exit 1; fi
+  echo "Logged in"; exit 0
+fi
 for a in "$@"; do prompt="$a"; done
 case "$prompt" in
   *phase=recon*)
     env > "__RECORD__/env.txt"
     cp .claude/settings.json "__RECORD__/settings.json"
-    cp .claude/skills/security-audit/SKILL.md "__RECORD__/SKILL.md" ;;
+    cp .claude/skills/security-audit/SKILL.md "__RECORD__/SKILL.md"
+    (cd repo && find . -type f | sort) > "__RECORD__/repo.txt" ;;
 esac
 case "$prompt" in *stop=crash*) echo "the agent said: boom" >&2; exit 2 ;; esac
+case "$prompt" in *stop=slow*) sleep 2 ;; esac
 case "$prompt" in
   *stop=wait*)
     echo "the agent was half way through"
+    echo $$ >> "__RECORD__/waiting-all.txt"
     echo $$ > "__RECORD__/waiting.tmp"; mv "__RECORD__/waiting.tmp" "__RECORD__/waiting.pid"
     exec sleep 600 ;;
 esac
 case "$prompt" in
   *phase=check*) echo '{"findings":[]}' > out/findings.json; echo '{"units":[]}' > out/coverage-ledger.json ;;
   *phase=report*) echo '# Report' > out/REPORT.md ;;
+esac
+case "$prompt" in
+  *phase=check*live=spread*)
+    echo '{"verdict":"confirmed","fingerprint":"fp-1"}' >> out/live-findings.jsonl
+    echo 'not json' >> out/live-findings.jsonl
+    echo '{"verdict":"rejected","fingerprint":"fp-no"}' >> out/live-findings.jsonl
+    echo '{"verdict":"needs_validation","fingerprint":"fp-2"}' >> out/live-findings.jsonl
+    sleep 3
+    echo '{"verdict":"confirmed","fingerprint":"fp-3"}' >> out/live-findings.jsonl ;;
+  *phase=check*live=late*) echo '{"verdict":"confirmed","fingerprint":"fp-late"}' >> out/live-findings.jsonl ;;
 esac
 cost=$(printf '%s' "$prompt" | sed -n 's/.*cost=\([0-9.]*\).*/\1/p')
 printf '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":%s,"num_turns":1,"duration_ms":10,"usage":{}}\n' "${cost:-0}"

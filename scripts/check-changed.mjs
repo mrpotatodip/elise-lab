@@ -5,6 +5,8 @@
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { findContractCopies } from "./check-contract-copies.mjs";
+import { findRatchetBreaks } from "./check-ratchets.mjs";
+import { findAdrProblems } from "./check-adr.mjs";
 
 const git = (args) => spawnSync("git", args, { encoding: "utf8" }).stdout.trim();
 const all = process.argv.includes("--all");
@@ -25,7 +27,7 @@ const projects = all
 const jsonc = (text) => JSON.parse(text.replace(/("(?:[^"\\]|\\.)*")|\/\/.*$|\/\*[\s\S]*?\*\//gm, (_, string) => string ?? "").replace(/,(\s*[}\]])/g, "$1"));
 const LOCAL_ADDRESS = /localhost|127\.0\.0\.1|0\.0\.0\.0/;
 
-const failures = [...findContractCopies()];
+const failures = [...findContractCopies(), ...findRatchetBreaks(), ...findAdrProblems()];
 for (const dir of folders("apps")) {
   const file = `${dir}/wrangler.jsonc`;
   if (!fs.existsSync(file)) continue;

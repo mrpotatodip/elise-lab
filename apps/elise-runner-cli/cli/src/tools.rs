@@ -44,9 +44,23 @@ impl Skill {
     }
 }
 
+impl Default for Skill {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for Skill {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+pub fn find_claude() -> Option<PathBuf> {
+    if crate::store::debug_only_runner_home_override().is_some() {
+        on_path("claude")
+    } else {
+        Tools::locate(PathBuf::new()).claude
     }
 }
 

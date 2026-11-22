@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNotNull, lt, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, max, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { REPO_LIMIT_PER_TENANT, type DiffEntry, type Repo, type RepoBranch, type RepoFinding, type ScanDiff } from "@repo/contracts/elise";
 import { partyPersons, scanFindings, scanFindingTriage, scanRepoBranches, scanRepoFindings, scanRepos, scans } from "@repo/db-elise/schema";
@@ -6,7 +6,8 @@ import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
-import { canonicalRepo, displayRepoUrl } from "#/modules/scan-ledger";
+import { displayRepoUrlOf, repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import { sourceProviderOf, type SourceProviderId } from "#/providers/registry";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
 import { branchStateOf, openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
 import { weighedScanWhere } from "#/modules/verdict/queries";
@@ -206,6 +207,8 @@ const effectiveDefaultBranch = (pointer: string | null, trackedNames: readonly s
 // -----
 // The account's repos, or one, with how many scans each has,
 // its latest scan and what is still open on its default branch.
+// A removed upload app is not listed, but asked for by id it is
+// still found, so its Scans keep their History.
 // -----
 export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string): Effect.Effect<Repo[], DbError> =>
   Effect.gen(function* () {
@@ -214,7 +217,7 @@ export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string
         db
           .select()
           .from(scanRepos)
-          .where(and(eq(scanRepos.tenantId, tenantId), repoId ? eq(scanRepos.id, repoId) : undefined))
+          .where(and(eq(scanRepos.tenantId, tenantId), repoId ? eq(scanRepos.id, repoId) : isNull(scanRepos.removedAt)))
           .orderBy(asc(scanRepos.canonical)),
       catch: toDbError,
     });
@@ -257,6 +260,8 @@ export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string
       const last = latest.find((row) => row.repoId === repo.id);
       return {
         id: repo.id,
+        provider: repo.provider,
+        host: repo.host,
         url: repo.url,
         canonical: repo.canonical,
         isPrivate: repo.isPrivate,
@@ -428,28 +433,38 @@ export const REPO_LIMIT_MESSAGE = `An account can have at most ${REPO_LIMIT_PER_
 // adding twice changes nothing. In one transaction: the repo
 // (refused past the account's limit), then its branches (refused
 // past the repo's limit), so a refusal leaves nothing behind.
+// A removed upload app does not count toward the limit; adding
+// it again brings it back, with its History and no zips.
 // -----
-export const addRepoEffect = (db: AppTxDbType, tenantId: string, url: string, branches: string[]): Effect.Effect<string, Conflict | NotFound | DbError> =>
+export const addRepoEffect = (
+  db: AppTxDbType,
+  tenantId: string,
+  url: string,
+  branches: string[],
+  provider?: SourceProviderId,
+): Effect.Effect<string, Conflict | NotFound | DbError> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
-        const canonical = canonicalRepo(url);
-        const [existing] = await tx
-          .select({ id: scanRepos.id })
-          .from(scanRepos)
-          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.canonical, canonical)));
+        const identity = repoIdentityOf(url, provider);
+        const [existing] = await tx.select({ id: scanRepos.id, removedAt: scanRepos.removedAt }).from(scanRepos).where(sameRepoIdentity(tenantId, identity));
         let repoId = existing?.id;
+        if (existing?.removedAt) {
+          const [{ total }] = await tx.select({ total: count() }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), isNull(scanRepos.removedAt)));
+          if (total >= REPO_LIMIT_PER_TENANT) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
+          await tx.update(scanRepos).set({ removedAt: null }).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, existing.id)));
+        }
         if (!repoId) {
-          const [{ total }] = await tx.select({ total: count() }).from(scanRepos).where(eq(scanRepos.tenantId, tenantId));
+          const [{ total }] = await tx.select({ total: count() }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), isNull(scanRepos.removedAt)));
           if (total >= REPO_LIMIT_PER_TENANT) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
           const [created] = await tx
             .insert(scanRepos)
-            .values({ tenantId, canonical, url: displayRepoUrl(url) })
+            .values({ tenantId, ...identity, url: displayRepoUrlOf(url, provider), defaultBranch: sourceProviderOf(identity.provider).fixedBranch })
             .onConflictDoNothing()
             .returning({ id: scanRepos.id });
           repoId = created?.id;
           if (!repoId) {
-            const [raced] = await tx.select({ id: scanRepos.id }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.canonical, canonical)));
+            const [raced] = await tx.select({ id: scanRepos.id }).from(scanRepos).where(sameRepoIdentity(tenantId, identity));
             repoId = raced.id;
           }
         }

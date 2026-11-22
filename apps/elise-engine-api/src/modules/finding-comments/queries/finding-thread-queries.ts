@@ -6,7 +6,7 @@ import { accessAuditLog } from "@repo/db-elise";
 import { partyPersons, scanFindingComments, scanFindingTriage, scanRepos } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
-import { canonicalRepo } from "#/modules/scan-ledger";
+import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
 import { findingCommentView } from "./finding-comment-view";
 import { DECISION_ACTIONS, findingDecisionView } from "./finding-decision-view";
 
@@ -14,6 +14,7 @@ const DecisionAfterSchema = z.object({
   status: z.enum(FINDING_TRIAGE_STATUS_VALUES),
   note: z.string().nullish(),
   acceptedUntil: z.iso.datetime().nullish(),
+  duplicateOf: z.string().nullish(),
 });
 
 const oldestFirst = (a: FindingThreadEvent, b: FindingThreadEvent) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
@@ -34,7 +35,7 @@ export const findingThreadEffect = (db: AppDbType, tenantId: string, query: Find
       const repoIds = db
         .select({ id: scanRepos.id })
         .from(scanRepos)
-        .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.canonical, canonicalRepo(query.repo))));
+        .where(sameRepoIdentity(tenantId, repoIdentityOf(query.repo)));
       const commentRows = await db
         .select({ comment: scanFindingComments, person: partyPersons })
         .from(scanFindingComments)

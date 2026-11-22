@@ -14,7 +14,7 @@ type RunnerRemoveDialogProps = {
 // working, a waiting code stops working.
 // -----
 const consequence = (runner: Runner): string => {
-  if (runner.state === "connected") return `${runner.name} stops running scans for this account at once, and its Runner app says it was removed. To use it again, add it again with a new code.`;
+  if (runner.state === "connected") return `${runner.name} stops running scans for this account at once. A scan running on it stops too, with no report and no findings. The Runner says it was removed. To use it again, add it again with a new code.`;
   if (runner.state === "waiting") return "The code you made stops working. You can add the computer again with a new code.";
   return "This clears the expired entry from the list. You can add the computer again with a new code.";
 };

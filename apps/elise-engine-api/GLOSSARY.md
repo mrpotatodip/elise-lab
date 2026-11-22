@@ -1,6 +1,6 @@
 # EliseLAB Engine API Glossary
 
-The words used by the scan service: a Worker that clones a GitHub repo (public, or private through an Install) into a sandbox, runs an AI security review, and keeps the report. Use these words in route text, tickets and lessons.
+The words used by the scan service: a Worker that clones a public GitHub repo into a sandbox, runs an AI security review, and keeps the report. Use these words in route text, tickets and lessons.
 
 ## Parts
 
@@ -58,17 +58,29 @@ _Avoid_: Tier, level, Effort (how hard the agent thinks), Skill
 Where a running Scan is: `cloning`, `auditing` or `saving`. It is null when the Scan has not started or has ended. A full Scan is in the `auditing` Step through all four of its Phases: a Phase is a part of the audit, never a Step.
 _Avoid_: Phase (a Phase is one of recon, hunt, check or report)
 
+**Trace**:
+The ordered list of Trace entries of one Scan, kept for as long as the Scan. It tells a person what kind of work the agent is doing, never what it read or wrote.
+_Avoid_: Activity (the dashboard uses that for the per-day Scan count), log, event stream
+
+**Trace entry**:
+One line of a Trace: a label such as Reasoning, Reading files, Searching, Running a command or Writing, or the start or end of a Phase. Consecutive entries with the same label merge into one with a count and a time span. It holds no text, path, pattern, command or tool result from the agent. A Trace entry is never a Step, and a Phase is never a Trace entry.
+_Avoid_: Event, log line
+
 **Phase**:
 One of the four runs of a full Scan, in order: `recon`, `hunt`, `check` and `report`. In the cloud each is a Detached run; on a Runner each is a run of `claude` that the app starts. A Runner Scan has Phases too, on the Phase prompts the engine puts in its job (`phasePrompts`). They share the one Pool, and no Phase has a share of its own. Each has its own time slot (10, 45, 25 and 10 minutes). The one repair run that a Runner starts when the validators fail after `check` is not a Phase: it has a 5-minute slot of its own and spends from the same Pool. Only a full Scan has Phases; a lite Scan is one run, and so is a Runner Scan whose job carries no Phase prompts (an older engine). ADR 0006 holds the rules.
 _Avoid_: Step (that is cloning, auditing or saving), stage
 
 **Runner**:
-A program on a person's computer (`apps/elise-runner-cli`) that claims a Scan and runs it there: it clones the repo, runs `claude` on the person's own login under its own permission rules, and sends back what the agent wrote. There are two: the desktop app (a window and a tray) and the headless Runner (`elise-runner`, a command line for a server or a terminal, on macOS and Linux). Both run Scans through one shared core (`elise-runner-core`), so a Runner Scan behaves the same whichever runs it. To Elise a headless Runner is a Runner like any other: it shows in the Runners list and is picked in the dashboard the same way. A Runner gets its Runner token one of three ways: a Runner login (the headless Runner's `elise-runner login`, approved on the dashboard), a pairing code (`pair <code>`, and the desktop app's Add a Runner), or `ELISE_RUNNER_TOKEN` set from outside, for CI and containers. On one computer the two are two Runners, each holding its own token (separate keychain entries), and neither reads or changes the other's. A Runner Scan takes no credit. It has no server meter: the Runner holds the Pool itself, through the agent's own `--max-budget-usd`. ADR 0006 holds the rules.
+A program on a person's computer (`apps/elise-runner-cli`) that claims a Scan and runs it there: it clones the repo (or unpacks the Archive of an Upload app, which only a Runner that reports it can read), runs `claude` on the person's own login under its own permission rules, and sends back what the agent wrote. There are two: the desktop app (a window and a tray) and the headless Runner (`elise-runner`, a command line for a server or a terminal, on macOS and Linux). Both run Scans through one shared core (`elise-runner-core`), so a Runner Scan behaves the same whichever runs it. To Elise a headless Runner is a Runner like any other: it shows in the Runners list and is picked in the dashboard the same way. A Runner gets its Runner token one of three ways: a Runner login (the headless Runner's `elise-runner login`, approved on the dashboard), a pairing code (`pair <code>`, and the desktop app's Add a Runner), or `ELISE_RUNNER_TOKEN` set from outside, for CI and containers. On one computer the two are two Runners, each holding its own token (separate keychain entries), and neither reads or changes the other's. A Runner Scan takes no credit. It has no server meter: the Runner holds the Pool itself, through the agent's own `--max-budget-usd`. ADR 0006 holds the rules.
 _Avoid_: Worker (that is the Cloudflare Worker), agent (that is the program it starts), CLI (a headless Runner is a Runner, not a separate kind of thing)
 
 **Runner login**:
 How a headless Runner is connected from the terminal with no code to copy: `elise-runner login` starts a login with the engine (`POST /runners/login/start`), which returns a user code, a link to the dashboard's `/device` page and a device code. A signed-in member opens the link, sees the computer's name, OS, CPU, version and the IP that asked, picks an Account and a Runner name, and approves or denies. The Runner checks (`/runners/login/check`) until it is approved, then collects its own Runner token, once. It never holds a person's session. The user code and the device code are stored as hashes, both work once and both expire after 10 minutes (`RUNNER_LOGIN_TTL_MS`). A check sooner than the interval (5 seconds) is answered `slow_down` and lengthens the interval it must keep, as RFC 8628 says. Starts are limited per IP and in total. A login is in one state: `pending`, `approved`, `denied` or `collected`, and an expired one is read as `expired`. Approving writes an Audit trail entry and the Runners list shows who added the Runner. `pair <code>` and `ELISE_RUNNER_TOKEN` stay for CI and containers. ADR 0007 holds the reason.
 _Avoid_: device login (a login of a person from a device is a different thing, and is not built), session (a Runner never gets one)
+
+**Stopped Scan**:
+A Scan a person ended on purpose before it finished, from the dashboard: by stopping it, or by removing the Runner that runs it. It is not a failure and not a Partial Scan: it keeps no Report and no findings, weighs 0 in a Verdict and adds nothing to a Branch. A cloud Scan is charged what was metered up to the stop; a Runner Scan takes no credit.
+_Avoid_: Cancelled Scan, aborted Scan, killed Scan
 
 **Partial Scan**:
 A profile Scan (any Profile) that ran out of money while the Skill could still write its files, so it ended with a Report that starts `PARTIAL: money ran out;` and a findings file, both naming the units it did not cover. Only money sets the flag: a Scan is partial when the Report's first line is that Skill line, a ledger unit holds `money_exhausted`, or `run-metadata.json` says `incomplete_reason: "money_exhausted"`. Any other first line that starts with `PARTIAL:` (the agent could not verify something, say) does not make a Partial Scan, on a Runner or in the cloud. It is charged only what was metered. It is not a failed Scan. It weighs 0 in a Verdict (whatever its Profile), and its findings still count as open. It is not given a Profile check, so it stores no `profile_met` (null), apart from the `partial` flag, which says only that money ran out. A Scan that spends its whole Budget cap with no Report fails instead.
@@ -90,15 +102,31 @@ A file a Scan saved. Its bytes are in R2; its row in `scan_files` (Neon) holds t
 
 **File**:
 An entry in the Account's Files list (`GET /files`): one of the written Scan files (`REPORT.md`, `FINDINGS-DETAIL.md`, `NEEDS-VALIDATION.md`) with the Repo, Branch and Scan it came from. The machine-readable Scan files are not listed there.
-_Avoid_: Document, upload (no one uploads a File)
+_Avoid_: Document, upload (no one uploads a File; the zips of an Upload app are Archives)
 
 **Report**:
 The `REPORT.md` file the agent writes for people to read.
 _Avoid_: Output, result
 
 **Repo**:
-One repo an Account scans, kept once per Account (`scan_repos`) however its URL was typed: `owner/name` in lowercase, without `.git` or a trailing slash. It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos.
+One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included.
 _Avoid_: Project, target
+
+**Provider**:
+Where the code of a Scan comes from: `github`, `gitlab`, `gitlab-sh` or `upload`. The user picks it first, and each Provider is its own flow with its own address or file rules, contract schemas and dashboard screens. Core knows only the `SourceProvider` port and one registry, and lint fails when core reads a Provider's folder or one Provider reads another. A request with no `provider` means `github`. On a Runner the clone happens on the user's computer with their own git login, so EliseLAB stores no token for any Provider. `gitlab-sh` takes only hosts the user listed in their own Runner settings: a host that only the job names is refused. ADR 0008 (git providers) holds the rules.
+_Avoid_: Source (too loose), host (that is the server inside an address)
+
+**Git login**:
+The credentials the git on a Runner's computer already holds for a host (a credential helper, the keychain, or a token the person sets for a headless Runner). A Runner clones with it, so a private repo or a locked GitLab server works when the person's own git can read it. EliseLAB never sees or stores it. A public repo needs none, though a saved login that the host rejects can still fail a public clone.
+_Avoid_: Connection, token (that is the Runner token)
+
+**Upload app**:
+A named app whose code comes from zips the user uploaded, not from a git host: a Repo with Provider `upload`, the name as its path, no host and one hidden Branch named `upload`. The name is unique inside an Account. All its zips are versions of the same code and share one History, with the Archive's content hash standing in for the commit.
+_Avoid_: Project, upload (as a noun for the zip: that is an Archive)
+
+**Archive**:
+One stored zip of an Upload app: an ID, a label, its R2 key under the Account, size, content hash and upload time. A Scan of an Upload app reads one Archive, chosen by ID, and a link row records which. An Archive can be scanned many times or never. Limits: 50 MB zipped, 250 MB unpacked, 20,000 files, 20 path levels, 20 per app and 500 MB per Account. One no Scan has read is deleted 30 days after upload. Removing an Archive or an app deletes its files and rows, and past Scans stay in the History with a note that the file is gone. The server serves the zip only to the Runner that claimed that job.
+_Avoid_: Upload (the act), bundle, snapshot
 
 **Branch**:
 A line of code of a Repo (`scan_repo_branches`). It is known by its exact name, and case counts, so `main` typed and `main` read from GitHub are one Branch. A Repo tracks at most 25. Any real branch becomes a Branch when a Scan of it succeeds and the Repo has a free slot, or when a person adds it. Its findings are the merge of every succeeded full Scan of the Branch, of any profile and age: one finding per fingerprint, with the words of the newest Scan that saw it, first seen at the oldest Scan and last seen at the newest. An old `lite` Scan adds nothing, because its fingerprints are made another way. A Scan never closes a problem, so one the latest Scan did not see stays open and is "not in the latest Scan" (ADR 0004). The latest Scan is the newest one with a Verdict weight: a Partial Scan, a Scan that met no profile and an older full Scan whose findings were never recorded are never the latest Scan. A Scan never reopens a problem either: one that the History closed stays closed, and a person's decision, `fixed` included, stands, even when a later Scan sees the problem again. The Repo's default branch is a pointer (`default_branch`) to the name git last reported, not a row.
@@ -129,12 +157,20 @@ A Finding that a signed-in `tenant_admin` or `workspace_admin` chose to ship wit
 _Avoid_: Waiver, exception
 
 **Finding**:
-One security problem in `findings.json`, with a status of `confirmed` or `needs_validation`.
+One security problem a Scan's verifier decided, with a status of `confirmed` or `needs_validation`.
 _Avoid_: Bug, issue, vulnerability (until a person checks it)
 
+**Live finding**:
+A Finding of a running Scan, shown before the Scan ends. The Scan's final Findings replace it when the Scan succeeds, and it is dropped when the Scan is stopped or fails. No one can make a decision or write a Comment on it.
+_Avoid_: Candidate, draft finding, preliminary finding
+
 **decision**:
-A triage change to a Finding: its status (`open`, `fixed`, `false_positive` or `accepted_risk`) and its note (`scan_finding_triage`). It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
+A triage change to a Finding: its status (`open`, `fixed`, `false_positive`, `accepted_risk` or `duplicate`) and its note (`scan_finding_triage`). A `duplicate` points to another Finding of the same Branch that is not itself a duplicate, and that Finding carries the problem. It is not the Finding's own `confirmed` or `needs_validation` state, which the Scan wrote.
 _Avoid_: Verdict (that answers a whole commit), status (a Finding has two)
+
+**Signal**:
+A hint about a Finding or a decision from a model other than the Scan's agent, such as "possible duplicate" or "weak reason". It is shown to people and never changes a Finding, a decision or the Verdict; a person acts on it or ignores it. An admin can turn Signals off for the Account, and only people who can make decisions see them.
+_Avoid_: Oracle (in security, a feature that leaks secrets), second opinion, check (the Phase and the Profile check), Jev (the model's name)
 
 **Comment**:
 Plain text a signed-in member wrote about a Finding (`scan_finding_comments`), at most 4,000 characters, kept with its author's Party. It belongs to the Repo and the Finding's fingerprint, so a rescan shows it again. It stays in the database and dashboard, never in the Report, a Scan file or GitHub. Writing one needs the Power `company:findings:comments:create`; the service token cannot.
@@ -151,20 +187,16 @@ _Avoid_: Async run
 ## Safety and cost
 
 **Outbound handler**:
-Worker code that sees every network request the container makes and decides to block it or pass it on. It also adds the credentials the container never holds: the Anthropic key, and for a private Repo a one-hour GitHub token for that Scan's own repo (ADR 0005).
+Worker code that sees every network request the container makes and decides to block it or pass it on. It also adds the credential the container never holds: the Anthropic key. Git may read only that Scan's own public repo, with no credential (the GitHub App token of ADR 0005 is retired).
 _Avoid_: Proxy, firewall
 
 **Allowlist**:
 The short list of hosts the container may reach: `github.com` (only the read steps of git) and `api.anthropic.com`.
 _Avoid_: Whitelist
 
-**Install**:
-One installation of the EliseLAB GitHub App on a GitHub account, connected to one Account by a `tenant_admin` or `workspace_admin` (`tenant_github_installations`). It holds IDs and a status, never a token. Its status is `active`, `suspended` or `removed`, as the last check saw it. The dashboard calls it a connection ("Connections").
-_Avoid_: Integration, token, GitHub login
-
 **Private Scan**:
-A Scan whose Repo GitHub said is private when it was requested (`scans.is_private`), read through an active Install of its own Account. The Repo keeps the last answer for display only.
-_Avoid_: Authenticated scan
+A Scan of a private repo. It runs only on a Runner, which clones with the person's own Git login (ADR 0010); the cloud never reads a private repo, and there are no Installs or GitHub App any more (retired, #277). `scans.is_private` and `scan_repos.is_private` are kept for old rows and nothing writes them.
+_Avoid_: Authenticated scan, Install
 
 **Secret**:
 A value stored in the Worker, not in git, such as `ANTHROPIC_API_KEY` or `SCAN_API_TOKEN`.
@@ -187,8 +219,19 @@ The most an admin may set as the Monthly budget: `tenants.monthly_scan_budget_al
 _Avoid_: Ceiling (the ceiling of a Budget cap is in its own entry), limit
 
 **Plan**:
-What an Account pays for: Pro (`pro`, $49 a month, $49 of Included credit) or Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month), a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap (5). The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
+What an Account pays for. Two Plans are offered, both paid through Stripe: Starter (`starter`, $15 a month or $150 a year, 2 members) and Runner (`runner`, $35 a month or $350 a year, 5 members); the yearly price needs its Stripe yearly price ID on the row before it is offered. Older rows stay because subscriptions still point to them: Pro (`pro`, $49 a month, $49 of Included credit) and Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month). A Plan is a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap. The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
 _Avoid_: Tier, subscription (for the Plan itself)
+
+**Billing interval**:
+How often a Subscription is charged, `month` or `year` (`tenant_subscriptions.billing_interval`). It belongs to the Subscription, not the Plan: a Plan row holds both a monthly and a nullable yearly price, and a Plan with no yearly price is monthly-only. The webhook sets the interval from the Stripe price that Stripe reports; existing Stripe rows read as `month`, and an operator grant has none. Checkout takes an optional `interval` (default `month`). A Plan change keeps the interval; `POST /usage/plan/change` with `interval: "year"` moves the same Plan from monthly to yearly, and yearly to monthly is refused (cancel at the end of the paid period and subscribe again).
+_Avoid_: Annual plan, yearly tier
+
+**Billing portal**:
+Stripe's hosted page, opened through `POST /usage/plan/portal`, where an admin manages the card, the invoices and the cancel. A cancel takes effect at the end of the paid period (a month or a year, by the Billing interval), and the Subscription stays active until then.
+
+**Plan change**:
+Moving an Account with an active Stripe Subscription from one Plan to another through `POST /usage/plan/change`. It keeps the Billing interval, and never changes the Plan and the interval in one step. It is refused when the target Plan holds fewer people than the Account has people plus pending invites (the message names the counts), and refused for an Account whose Plan is an operator `grant`. The call only swaps the price in Stripe: the webhook alone changes the Subscription. A first Checkout for a Plan is refused on the same member cap.
+_Avoid_: Upgrade, downgrade, switch
 
 **Included credit**:
 The dollars a paid period of a Plan adds to the Account's credit balance (`tenant_credit_ledger`, one signed sum of grants, top-ups, holds and charges). A balance may not be pushed past the Plan's carry cap ($100 on Pro) by a grant. A new scan on the platform's key holds its Budget cap times the markup and is refused with `INSUFFICIENT_CREDIT` when the balance is lower; when it ends it is charged its metered cost times the markup. Scans on the Account's own key take no credit.
@@ -219,8 +262,12 @@ Everyone who holds a Role in an Account, plus the invites still waiting. A `tena
 _Avoid_: Members list (when you mean the whole Team), Group
 
 **Team invite**:
-An email, a Role and a one-time link that lets one person join an Account. The Worker emails the link through a queue (`INVITE_EMAIL_QUEUE`, then Cloudflare Email Service), and the create answer also holds the token so the admin can share the link by hand. Only the hash of its token is stored. It lasts 7 days, works once, and a new invite for the same email replaces the old one. It can never give `tenant_admin`.
-_Avoid_: Invitation, invite code (an invite code starts a whole new Account: `platform_invite_codes`)
+An email, a Role and a one-time link that lets one person join an Account. The Worker emails the link through a queue (`EMAIL_QUEUE`, then Cloudflare Email Service), and the create answer also holds the token so the admin can share the link by hand. Only the hash of its token is stored. It lasts 7 days, works once, and a new invite for the same email replaces the old one. It can never give `tenant_admin`.
+_Avoid_: Invitation
+
+**Open sign-up**:
+Anyone can start a new Account at `/sign-up` with a name, Account name, email and password, and no code. A Plan still gates every Scan. The old invite code is retired: the `platform_invite_codes` tables stay in the database as history, and nothing reads or writes them.
+_Avoid_: Invite code
 
 **Group**:
 A named set of people in one Account, for example "Backend". It grants nothing: Powers still come from a Role. Names are unique per Account, ignoring case. Losing the Role in the Account removes the person from its Groups.
@@ -235,7 +282,7 @@ A login whose Role is `workspace_watcher`: it holds only `company:summary:read`.
 _Avoid_: Viewer, guest
 
 **Audit trail**:
-`access_audit_log`. It holds every kind of change an Account makes to itself, each with the actor's Party and the Tenant in `after`: Team invites, Groups, triage decisions (`finding.triage.set`, `finding.risk.accepted`), comment deletes (`finding.comment.deleted`), GitHub installs, the monthly budget and the Anthropic key.
+`access_audit_log`. It holds every kind of change an Account makes to itself, each with the actor's Party and the Tenant in `after`: Team invites, Groups, triage decisions (`finding.triage.set`, `finding.risk.accepted`), comment deletes (`finding.comment.deleted`), the monthly budget and the Anthropic key.
 
 **Party**:
 Any actor that the system knows. Its type is a row in `party_master_types`: a Person or an Organization.

@@ -17,7 +17,7 @@ const operations = (spec: Spec) =>
 // Opened by someone with no login yet: the invitee, and a
 // Runner that pairs with a code.
 // -----
-const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll", "POST /runners/login/start", "POST /runners/login/check"]);
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll", "POST /runners/login/start", "POST /runners/login/check", "POST /stripe/webhook"]);
 
 describe("GET /openapi.json", () => {
   it("lists every route of the API", async () => {
@@ -26,9 +26,10 @@ describe("GET /openapi.json", () => {
     expect(spec.openapi).toBe("3.1.0");
     expect(operations(spec).map(({ route }) => route).toSorted()).toEqual([
       "DELETE /findings/comments/{commentId}",
-      "DELETE /github/installations/{id}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",
+      "DELETE /repos/{repoId}",
+      "DELETE /repos/{repoId}/archives/{archiveId}",
       "DELETE /runners/me",
       "DELETE /runners/{runnerId}",
       "DELETE /team/invites/{inviteId}",
@@ -36,22 +37,24 @@ describe("GET /openapi.json", () => {
       "GET /files",
       "GET /findings",
       "GET /findings/comments",
-      "GET /github/branches",
-      "GET /github/installations",
-      "GET /github/repos",
+      "GET /findings/signals",
       "GET /groups",
       "GET /me",
       "GET /repos",
       "GET /repos/{repoId}",
+      "GET /repos/{repoId}/archives",
       "GET /repos/{repoId}/findings",
       "GET /repos/{repoId}/verdict",
       "GET /runners",
+      "GET /runners/jobs/{scanId}",
+      "GET /runners/jobs/{scanId}/archive",
       "GET /runners/login/lookup",
       "GET /runners/me",
       "GET /scans",
       "GET /scans/{scanId}",
       "GET /scans/{scanId}/diff",
       "GET /scans/{scanId}/files/{file}",
+      "GET /scans/{scanId}/trace",
       "GET /team",
       "GET /team/invites/{token}",
       "GET /team/roles",
@@ -63,30 +66,40 @@ describe("GET /openapi.json", () => {
       "GET /usage/credit/entries",
       "GET /usage/plan",
       "GET /usage/plan/offers",
+      "GET /usage/signals",
       "PATCH /findings/comments/{commentId}",
       "PATCH /groups/{groupId}",
       "PATCH /usage/budget",
       "POST /findings/comments",
-      "POST /github/connect",
-      "POST /github/installations",
+      "POST /findings/signals/weak-reason",
+      "POST /findings/signals/{signalId}/dismiss",
       "POST /groups",
       "POST /repos",
+      "POST /repos/{repoId}/archives",
       "POST /repos/{repoId}/branches",
       "POST /runners",
       "POST /runners/claim",
       "POST /runners/enroll",
+      "POST /runners/jobs/{scanId}/findings",
       "POST /runners/jobs/{scanId}/result",
+      "POST /runners/jobs/{scanId}/trace",
       "POST /runners/login/approve",
       "POST /runners/login/check",
       "POST /runners/login/deny",
       "POST /runners/login/start",
       "POST /scans",
+      "POST /scans/{scanId}/stop",
       "POST /sign-up",
+      "POST /stripe/webhook",
       "POST /team/invites",
       "POST /team/invites/{token}/accept",
+      "POST /usage/plan/change",
+      "POST /usage/plan/checkout",
+      "POST /usage/plan/portal",
       "PUT /findings/triage",
       "PUT /groups/{groupId}/members/{partyId}",
       "PUT /usage/anthropic-key",
+      "PUT /usage/signals",
     ]);
   });
 
@@ -96,7 +109,7 @@ describe("GET /openapi.json", () => {
     for (const { route, operation } of operations(spec)) {
       expect({ route, summary: Boolean(operation.summary) }).toEqual({ route, summary: true });
       expect({ route, description: operation.description?.includes("**Context.**") }).toEqual({ route, description: true });
-      const tag = ["github", "groups", "team", "repos", "scans", "files", "findings", "usage", "runners", "me", "sign-up"].find((name) => route.includes(`/${name}`));
+      const tag = ["groups", "team", "repos", "scans", "files", "runners", "findings", "usage", "me", "sign-up", "stripe"].find((name) => route.includes(`/${name}`));
       expect({ route, tags: operation.tags }).toEqual({ route, tags: [tag] });
       const security = tag === "sign-up" || PUBLIC_ROUTES.has(route) ? undefined : [{ bearerAuth: [] }];
       expect({ route, security: operation.security }).toEqual({ route, security });

@@ -5,6 +5,7 @@ import {
   RunnerDisconnectedSchema,
   RunnerIdentitySchema,
   RunnerJobReportedSchema,
+  RunnerJobStateSchema,
   RunnerJobSchema,
   RunnerRemovedSchema,
   RunnersSchema,
@@ -19,7 +20,7 @@ export const createRunnerDoc = describeRoute({
   summary: "Add a Runner and get its pairing code",
   description: routeText({
     context:
-      "A member of the account adds a computer that will run Scans. The answer holds a pairing code, shown once. The person types it into the EliseLAB Runner app on that computer, within 10 minutes.",
+      "A member of the account adds a computer that will run Scans. The answer holds a pairing code, shown once. The person runs `elise-runner pair` with it on that computer, within 10 minutes.",
     steps: [
       "The Worker checks the session and that the login holds a Role in the account named by `x-account-id`.",
       "The Worker makes a pairing code and saves only its hash, with the name and an expiry 10 minutes away.",
@@ -39,7 +40,7 @@ export const enrollRunnerDoc = describeRoute({
   summary: "Pair a Runner with a pairing code",
   description: routeText({
     context:
-      "The Runner app trades the pairing code for a token. The token is the Runner's login from then on: the app keeps it in the computer's keychain and sends it as a bearer token. No session is needed, because the code is the proof.",
+      "The Runner trades the pairing code for a token. The token is the Runner's login from then on: the Runner keeps it in the computer's keychain and sends it as a bearer token. No session is needed, because the code is the proof.",
     steps: [
       "The Worker rate-limits by IP, then reads the code (any case, with or without the dash).",
       "In one UPDATE it finds a code that is unexpired, unused and not revoked, clears the code and saves the hash of a new token, so a code works once.",
@@ -91,15 +92,50 @@ export const claimJobDoc = describeRoute({
   summary: "Claim the next Scan waiting for this Runner",
   description: routeText({
     context:
-      "A paired Runner asks for work every few seconds. When a Scan was started on this Runner, the answer holds what to clone and the prompt to give the agent. With nothing waiting, `data` is null. Asking also records that the Runner is alive.",
+      "A paired Runner asks for work every few seconds. When a Scan was started on this Runner, the answer holds what to read (a git clone or an uploaded zip) and the prompt to give the agent. With nothing waiting, `data` is null. Asking also records that the Runner is alive. The optional body lists the job sources the Runner reads (`git`, `archive`); no body means `git` only.",
     steps: [
       "The Worker reads the bearer token and finds the Runner. A removed or unknown one is 401.",
-      "In one UPDATE the Worker takes this Runner's oldest queued Scan and marks it claimed, so a Scan is never claimed twice.",
-      "The Worker returns the repository, the ref, the model options, the prompt and the earlier findings, or null.",
+      "The Worker keeps the job sources the Runner listed, so an upload Scan can be refused before it is queued on a Runner that cannot read zips.",
+      "In one UPDATE the Worker takes this Runner's oldest queued Scan it can read and marks it claimed, so a Scan is never claimed twice. A Runner that does not list `archive` never gets an upload Scan.",
+      "An upload Scan whose zip was removed while it waited is failed with that reason, and the next one is taken.",
+      "The Worker returns the repository, the source, the ref, the model options, the prompt and the earlier findings, or null.",
     ],
-    example: ["Claim:", bash(`curl -X POST ${EXAMPLE_BASE_URL}/runners/claim \\`, '  -H "authorization: Bearer $RUNNER_TOKEN"')],
+    example: ["Claim:", bash(`curl -X POST ${EXAMPLE_BASE_URL}/runners/claim \\`, '  -H "authorization: Bearer $RUNNER_TOKEN" \\', '  -H "Content-Type: application/json" \\', `  -d '{"sources":["git","archive"]}'`)],
   }),
-  responses: { 200: jsonResponse("The Scan to run, or null.", envelope(RunnerJobSchema.nullable())), ...errorResponses(401) },
+  responses: { 200: jsonResponse("The Scan to run, or null.", envelope(RunnerJobSchema.nullable())), ...errorResponses(400, 401) },
+});
+
+export const jobArchiveDoc = describeRoute({
+  tags: ["runners"],
+  security: SERVICE_SECURITY,
+  summary: "Download the zip an upload Scan reads",
+  description: routeText({
+    context: "A Runner that claimed an upload Scan (its job's source is `archive`) downloads the zip here, then unpacks it in its own work folder.",
+    steps: [
+      "The Worker reads the bearer token and finds the Runner.",
+      "The Worker checks the Scan's job is claimed by this Runner and reads a zip. Any other Runner, a job not claimed, or a git job is 404.",
+      "A zip removed since the Scan started is 404, with a message that says so.",
+      "The answer is the zip itself (`application/zip`).",
+    ],
+    example: ["Download:", bash(`curl ${EXAMPLE_BASE_URL}/runners/jobs/$SCAN_ID/archive \\`, '  -H "authorization: Bearer $RUNNER_TOKEN" -o archive.zip')],
+  }),
+  responses: { 200: { description: "The zip." }, ...errorResponses(400, 401, 404) },
+});
+
+export const jobStateDoc = describeRoute({
+  tags: ["runners"],
+  security: SERVICE_SECURITY,
+  summary: "Read the state of a job the Runner holds",
+  description: routeText({
+    context: "A Runner that runs a Scan asks every few seconds whether the Scan is still wanted. A `cancelled` job means the Scan was stopped from Elise: the Runner kills its agent and sends nothing.",
+    steps: [
+      "The Worker reads the bearer token and finds the Runner. A removed Runner's token is 401.",
+      "The Worker reads the job. Another Runner's job, or one that does not exist, is 404.",
+      "The answer is the job's state: `queued`, `claimed`, `succeeded`, `failed` or `cancelled`.",
+    ],
+    example: ["Read:", bash(`curl ${EXAMPLE_BASE_URL}/runners/jobs/$SCAN_ID \\`, '  -H "authorization: Bearer $RUNNER_TOKEN"')],
+  }),
+  responses: { 200: jsonResponse("The job's state.", envelope(RunnerJobStateSchema)), ...errorResponses(400, 401, 404) },
 });
 
 export const reportJobDoc = describeRoute({

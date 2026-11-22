@@ -1,6 +1,6 @@
 import { Files } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
-import type { ScanUsage } from "@repo/contracts/elise";
+import type { ScanUsage, TraceEntry } from "@repo/contracts/elise";
 import { SCAN_REPORT_FILES } from "#/constants";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions } from "#/schemas";
@@ -16,17 +16,21 @@ import {
   SCAN_SANDBOX_INACTIVITY_MS,
   SCAN_SANDBOX_INSTANCE_TYPE,
   SCAN_SANDBOX_KIND_FILE,
+  SCAN_SANDBOX_LOG_READ_BYTES,
   SCAN_SANDBOX_LOG_TAIL_CHARS,
   SCAN_SANDBOX_METER_KEY,
   SCAN_SANDBOX_OUT_DIR,
   SCAN_SANDBOX_PHASES_KEY,
   SCAN_SANDBOX_PROMPT_PATH,
   SCAN_SANDBOX_REPO_DIR,
+  SCAN_SANDBOX_TRACE_KEY,
   SCAN_SANDBOX_TRUST_ENV,
   SCAN_SANDBOX_WORK_DIR,
 } from "#/modules/scan-sandbox/constants";
-import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, OutboundGithub, ScanCheckout } from "#/modules/scan-sandbox/types";
+import { drainTrace as drainLog, emptyTraceState, phaseMarker, type TraceState } from "#/modules/scan-trace/utils";
+import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, ScanCheckout } from "#/modules/scan-sandbox/types";
 import {
+  agentErrorText,
   buildAgentPrompt,
   buildAgentScript,
   buildCloneScript,
@@ -44,6 +48,8 @@ import {
 } from "#/modules/scan-sandbox/utils";
 
 type SandboxContext = DurableObjectState & { exports: { Outbound: OutboundExport } };
+
+type StoredTrace = TraceState & { phase: FullPhase; pending: TraceEntry[]; ended: boolean };
 
 // -----
 // The Sandbox of a Scan: one Durable Object and the container it starts
@@ -110,9 +116,9 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   // it was fetched as a branch, nothing for a tag or a commit. A second call after a
   // retry finds the marker and returns the same commit.
   // -----
-  async prepare(repoUrl: string, ref?: string, github?: OutboundGithub, anthropicKey?: OutboundAnthropicKey): Promise<ScanCheckout> {
+  async prepare(repoUrl: string, ref?: string, anthropicKey?: OutboundAnthropicKey): Promise<ScanCheckout> {
     console.log("scan: starting container");
-    await this.#start(canonicalRepo(repoUrl), github, anthropicKey);
+    await this.#start(canonicalRepo(repoUrl), anthropicKey);
     if ((await this.#readText(SCAN_SANDBOX_CLONED_MARKER)) === null) {
       console.log("scan: cloning", repoUrl, ref ?? "");
       await this.#sh(buildCloneScript(), ref ? [repoUrl, ref] : [repoUrl], SCAN_SANDBOX_CLONE_GUARD_MS);
@@ -152,7 +158,10 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async launchPhase(options: ScanOptions, phase: FullPhase): Promise<void> {
     const meter = await this.#openMeter(options.maxBudgetUsd);
     const started = await this.#startedPhases();
-    if (!started.includes(phase)) await this.ctx.storage.put<FullPhase[]>(SCAN_SANDBOX_PHASES_KEY, [...started, phase]);
+    if (!started.includes(phase)) {
+      const trace: StoredTrace = { ...emptyTraceState(), phase, pending: [phaseMarker("phase_started", phase, new Date())], ended: false };
+      await this.ctx.storage.put({ [SCAN_SANDBOX_PHASES_KEY]: [...started, phase], [SCAN_SANDBOX_TRACE_KEY]: trace });
+    }
     const remaining = remainingUsd(meter);
     console.log(`scan: phase ${phase} starts, $${remaining.toFixed(4)} of the $${options.maxBudgetUsd} cap left`);
     // -----
@@ -189,11 +198,24 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     return { state: "failed", error: `claude exited ${exitCode}: ${await this.agentLogTail()}` };
   }
 
+  async drainTrace(ended: boolean): Promise<TraceEntry[]> {
+    const stored = await this.ctx.storage.get<StoredTrace>(SCAN_SANDBOX_TRACE_KEY);
+    if (stored === undefined) return [];
+    const now = new Date();
+    const chunk = stored.ended ? "" : await this.#logFrom(phaseAgentFiles(stored.phase).log, stored.offset);
+    const drained = drainLog({ offset: stored.offset, open: stored.open }, chunk, stored.phase, now);
+    const entries = [...stored.pending, ...drained.entries];
+    if (ended && !stored.ended) entries.push(phaseMarker("phase_ended", stored.phase, now));
+    await this.ctx.storage.put<StoredTrace>(SCAN_SANDBOX_TRACE_KEY, { ...drained.state, phase: stored.phase, pending: [], ended: stored.ended || ended });
+    return entries;
+  }
+
   async agentLogTail(): Promise<string> {
     const files = await this.#currentFiles();
-    const log = (await this.#readText(files.log)) ?? "(no agent log)";
+    const log = (await this.#logEnd(files.log)) ?? "";
     const err = (await this.#readText(files.err))?.trim();
-    return `${err ? `${err.slice(-SCAN_SANDBOX_LOG_TAIL_CHARS)} ` : ""}${log.slice(-SCAN_SANDBOX_LOG_TAIL_CHARS)}`;
+    const text = agentErrorText(log, SCAN_SANDBOX_LOG_TAIL_CHARS) || "(no agent log)";
+    return `${err ? `${err.slice(-SCAN_SANDBOX_LOG_TAIL_CHARS)} ` : ""}${text}`;
   }
 
   // -----
@@ -204,7 +226,7 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async readUsage(): Promise<ScanUsage | null> {
     const meter = await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY);
     const started = await this.#startedPhases();
-    const logs = await Promise.all((started.length > 0 ? started.map((phase) => phaseAgentFiles(phase)) : [DEFAULT_AGENT_FILES]).map((files) => this.#readText(files.log)));
+    const logs = await Promise.all((started.length > 0 ? started.map((phase) => phaseAgentFiles(phase)) : [DEFAULT_AGENT_FILES]).map((files) => this.#logEnd(files.log)));
     const reports = logs.flatMap((log) => (log === null ? [] : [parseAgentUsage(log)])).filter((report) => report !== null);
     const reported = reports.length === 0 ? null : { ...reports[0], turns: sumOrNull(reports.map((report) => report.turns)), durationMs: sumOrNull(reports.map((report) => report.durationMs)) };
     if (meter === undefined) return reported;
@@ -267,6 +289,26 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     return last === undefined ? DEFAULT_AGENT_FILES : phaseAgentFiles(last);
   }
 
+  async #logFrom(path: string, offset: number): Promise<string> {
+    try {
+      const process = await this.#container.exec(["tail", "-c", `+${offset + 1}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });
+      const output = await process.output();
+      return output.exitCode === 0 ? new TextDecoder().decode(output.stdout) : "";
+    } catch {
+      return "";
+    }
+  }
+
+  async #logEnd(path: string): Promise<string | null> {
+    try {
+      const process = await this.#container.exec(["tail", "-c", `${SCAN_SANDBOX_LOG_READ_BYTES}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });
+      const output = await process.output();
+      return output.exitCode === 0 ? new TextDecoder().decode(output.stdout) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async #readText(path: string): Promise<string | null> {
     try {
       return await (await this.#files.readFile(path)).text();
@@ -275,9 +317,9 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     }
   }
 
-  async #start(repo: string, github?: OutboundGithub, anthropicKey?: OutboundAnthropicKey): Promise<void> {
+  async #start(repo: string, anthropicKey?: OutboundAnthropicKey): Promise<void> {
     if (this.#container.running) return;
-    const outbound = this.#context.exports.Outbound({ props: { sandboxId: this.#context.id.toString(), repo, github, anthropicKey } });
+    const outbound = this.#context.exports.Outbound({ props: { sandboxId: this.#context.id.toString(), repo, anthropicKey } });
     this.#container.start({
       image: this.#container.images.sandbox,
       instance: SCAN_SANDBOX_INSTANCE_TYPE,

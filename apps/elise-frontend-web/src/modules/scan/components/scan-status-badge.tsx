@@ -7,6 +7,7 @@ const VARIANT = {
   running: "info",
   succeeded: "success",
   failed: "destructive",
+  stopped: "neutral",
 } as const;
 
 const LABEL = {
@@ -14,6 +15,7 @@ const LABEL = {
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
+  stopped: "Stopped",
 } as const;
 
 // -----

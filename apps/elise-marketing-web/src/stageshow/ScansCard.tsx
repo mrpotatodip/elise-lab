@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, FileT
 import { Collapse, Stage, Swap, Window, type Act } from "./kit";
 import { DASHBOARD_LOOK } from "./look";
 import { Pill, STATUS } from "./Pill";
-import { ConnectScene, FilesScene, OverviewScene, PageHead, ShipScene } from "./scenes";
+import { RunnersScene, FilesScene, OverviewScene, PageHead, ShipScene } from "./scenes";
 import { STILLS, initial, poster, type Page, type S } from "./tour-state";
 import "./daylight.css";
 import "./card.css";
@@ -10,9 +10,9 @@ import "./scenes.css";
 
 // A tour of the dashboard in its Daylight theme, rebuilt from the dashboard's own components
 // (shell-sidebar, shell-topbar, scan-list, repo-detail, scan-verdict-card, scan-overview, the
-// files and connections pages). It plays once when it scrolls into view, as one loop: a scan is
+// files and Runners pages). It plays once when it scrolls into view, as one loop: a scan is
 // started and its finding opens, the Ready to ship? answer, the Overview, the reports in Files,
-// and the GitHub connection. Every repository and finding on it is made up, and the page says so.
+// and the Runners. Every repository and finding on it is made up, and the page says so.
 
 const NAV: { label: string; icon: typeof LayoutDashboard; page: Page; target: string }[] = [
   { label: "Overview", icon: LayoutDashboard, page: "overview", target: "nav-overview" },
@@ -22,7 +22,7 @@ const NAV: { label: string; icon: typeof LayoutDashboard; page: Page; target: st
   { label: "Files", icon: FileText, page: "files", target: "nav-files" },
 ];
 const ACCOUNT: { label: string; icon: typeof Plug; page?: Page; target?: string }[] = [
-  { label: "Connections", icon: Plug, page: "connect", target: "nav-conn" },
+  { label: "Runners", icon: Plug, page: "runners", target: "nav-runners" },
   { label: "Team", icon: Users },
   { label: "Settings", icon: Settings },
 ];
@@ -32,21 +32,21 @@ const CRUMBS: Record<Page, string[]> = {
   ship: ["Repositories", "acme/billing-api", "main"],
   overview: ["Overview"],
   files: ["Files"],
-  connect: ["Connections"],
+  runners: ["Runners"],
 };
 
 type Severity = "high" | "medium" | "low";
 type Found = { total: number; severity: Partial<Record<Severity, number>>; byHand?: number };
 type Scan = { owner: string; name: string; priv?: boolean; branch: string; sha: string; status: keyof typeof STATUS; found: Found | null; review: string; cost: string; started: string };
 
-const FRESH: Scan = { owner: "acme/", name: "billing-api", priv: true, branch: "main", sha: "4f2a9c1", status: "succeeded", found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 }, review: "Quick review", cost: "$0.42", started: "Nov 12, 10:12 AM" };
+const FRESH: Scan = { owner: "acme/", name: "billing-api", priv: true, branch: "main", sha: "4f2a9c1", status: "succeeded", found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 }, review: "Focused", cost: "$0.42", started: "Nov 12, 10:12 AM" };
 
 const OLDER: Scan[] = [
-  { owner: "acme/", name: "web-app", branch: "main", sha: "b81d03e", status: "succeeded", found: { total: 1, severity: { low: 1 } }, review: "Quick review", cost: "$0.31", started: "Nov 11, 4:40 PM" },
-  { owner: "acme/", name: "docs-site", branch: "main", sha: "9c0e5a2", status: "succeeded", found: { total: 0, severity: {} }, review: "Quick review", cost: "$0.12", started: "Nov 11, 11:05 AM" },
-  { owner: "acme/", name: "mobile-api", priv: true, branch: "auth", sha: "e47b1f8", status: "failed", found: null, review: "Full audit", cost: "-", started: "Nov 10, 6:48 PM" },
-  { owner: "acme/", name: "billing-api", priv: true, branch: "rounding", sha: "21ad7c4", status: "succeeded", found: { total: 1, severity: { medium: 1 } }, review: "Quick review", cost: "$0.28", started: "Nov 10, 9:03 AM" },
-  { owner: "acme/", name: "web-app", branch: "main", sha: "03fe8b6", status: "succeeded", found: { total: 2, severity: { low: 2 } }, review: "Full audit", cost: "$1.84", started: "Nov 9, 6:21 PM" },
+  { owner: "acme/", name: "web-app", branch: "main", sha: "b81d03e", status: "succeeded", found: { total: 1, severity: { low: 1 } }, review: "Focused", cost: "$0.31", started: "Nov 11, 4:40 PM" },
+  { owner: "acme/", name: "docs-site", branch: "main", sha: "9c0e5a2", status: "succeeded", found: { total: 0, severity: {} }, review: "Focused", cost: "$0.12", started: "Nov 11, 11:05 AM" },
+  { owner: "acme/", name: "mobile-api", priv: true, branch: "auth", sha: "e47b1f8", status: "failed", found: null, review: "Balanced", cost: "-", started: "Nov 10, 6:48 PM" },
+  { owner: "acme/", name: "billing-api", priv: true, branch: "rounding", sha: "21ad7c4", status: "succeeded", found: { total: 1, severity: { medium: 1 } }, review: "Focused", cost: "$0.28", started: "Nov 10, 9:03 AM" },
+  { owner: "acme/", name: "web-app", branch: "main", sha: "03fe8b6", status: "succeeded", found: { total: 2, severity: { low: 2 } }, review: "Balanced", cost: "$1.84", started: "Nov 9, 6:21 PM" },
 ];
 
 const MODEL = "Claude Opus 5.5";
@@ -98,11 +98,11 @@ async function script(a: Act<S>) {
   await a.set({ tab: "report" });
   await a.wait(2200);
 
-  a.mark("connect");
-  await a.click("nav-conn");
-  await a.set({ page: "connect" });
+  a.mark("runners");
+  await a.click("nav-runners");
+  await a.set({ page: "runners" });
   await a.wait(700);
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 3; i++) {
     await a.set({ repos: i });
     await a.wait(260);
   }
@@ -270,7 +270,7 @@ export default function ScansCard({ still }: { still?: Page }) {
                             <div className="dt-cell dt-cell--repo">Repository</div>
                             <div className="dt-cell dt-cell--status">Status</div>
                             <div className="dt-cell dt-cell--found">Findings</div>
-                            <div className="dt-cell dt-cell--review">Review</div>
+                            <div className="dt-cell dt-cell--review">Coverage</div>
                             <div className="dt-cell dt-cell--cost">Cost</div>
                             <div className="dt-cell dt-cell--time">Started</div>
                             <div className="dt-cell dt-cell--open" />
@@ -314,7 +314,7 @@ export default function ScansCard({ still }: { still?: Page }) {
                       <section className="dash-page dash-page--flush" data-active={s.page === "ship" || undefined}><ShipScene s={s} /></section>
                       <section className="dash-page dash-page--flush" data-active={s.page === "overview" || undefined}><OverviewScene s={s} /></section>
                       <section className="dash-page" data-active={s.page === "files" || undefined}><FilesScene s={s} /></section>
-                      <section className="dash-page" data-active={s.page === "connect" || undefined}><ConnectScene s={s} /></section>
+                      <section className="dash-page" data-active={s.page === "runners" || undefined}><RunnersScene s={s} /></section>
                     </>
                   )}
                 </div>

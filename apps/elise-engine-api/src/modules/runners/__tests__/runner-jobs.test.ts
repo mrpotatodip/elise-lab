@@ -1,13 +1,13 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { authUser, scanRunnerJobs, scans } from "@repo/db-elise";
+import { authUser, scanArchiveLinks, scanRunnerJobs, scans, scanUploadArchives } from "@repo/db-elise";
 import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/elise";
 import { SCAN_PROFILE_CAPS_USD } from "#/constants";
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
-import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
+import { claimJobSvc, jobArchiveSvc, jobStateSvc, reportJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
 import { buildScanRecordSvc, writeScanRecordEffect } from "#/modules/scan-records";
@@ -15,7 +15,7 @@ import { saveScanFilesEffect } from "#/modules/scan-store";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { SCAN_SANDBOX_FULL_PHASES, buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox";
 import { monthSpendEffect } from "#/modules/usage";
-import { claimRunnerJobEffect, createRunnerEffect, claimPairingEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
+import { claimRunnerJobEffect, createRunnerEffect, claimPairingEffect, findConnectedRunnerEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
 
 let test: TestDb;
 let tenantId: string;
@@ -172,6 +172,26 @@ describe("claiming a job", () => {
   });
 });
 
+describe("reading a job's state", () => {
+  it("tells the Runner that holds the job its state, and claimed turns cancelled when the Scan is stopped", async () => {
+    const scanId = await queue(await newScan());
+    await run(claimRunnerJobEffect(test.http, runnerId, NOW));
+    const running = await run(jobStateSvc(test.http, runnerId, scanId));
+    await runnerSandbox(test.http, paramsFor(scanId), runnerId, () => NOW).destroy();
+    const stopped = await run(jobStateSvc(test.http, runnerId, scanId));
+
+    expect([running, stopped]).toEqual([{ state: "claimed" }, { state: "cancelled" }]);
+  });
+
+  it("does not find a job another Runner holds, or one that does not exist", async () => {
+    const scanId = await queue(await newScan());
+    const other = await Effect.runPromise(Effect.flip(jobStateSvc(test.http, otherRunnerId, scanId)));
+    const missing = await Effect.runPromise(Effect.flip(jobStateSvc(test.http, runnerId, "no-such-scan")));
+
+    expect([other._tag, missing._tag]).toEqual(["NotFound", "NotFound"]);
+  });
+});
+
 describe("reporting a job", () => {
   const FILES = { "REPORT.md": "# Report", "findings.json": "{}" };
   const AGENT_LOG = JSON.stringify({ total_cost_usd: 1.5, num_turns: 4, duration_ms: 9000, usage: { input_tokens: 10, output_tokens: 20 } });
@@ -216,6 +236,19 @@ describe("reporting a job", () => {
     await report(scanId, { state: "succeeded", checkout, files: FILES });
 
     expect(await jobOf(scanId)).toMatchObject({ commitSha: "a".repeat(40), branch });
+  });
+
+  it("keeps an upload Scan on its zip's hash and the app's hidden Branch, whatever the runner reports", async () => {
+    const scanId = await claimed();
+    const sha = "c".repeat(64);
+    const [archive] = await test.raw
+      .insert(scanUploadArchives)
+      .values({ tenantId, repoId, label: "app-1.3.zip", r2Key: `accounts/${tenantId}/uploads/${repoId}/${scanId}.zip`, sizeBytes: 10, contentSha256: sha })
+      .returning();
+    await test.raw.insert(scanArchiveLinks).values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: sha });
+    await report(scanId, { state: "succeeded", checkout: { commitSha: "a".repeat(40), headBranch: "main", kind: null }, files: FILES });
+
+    expect(await jobOf(scanId)).toMatchObject({ commitSha: sha, branch: "upload" });
   });
 
   it("refuses a report from a runner that did not claim the scan", async () => {
@@ -271,13 +304,6 @@ describe("the runner as a sandbox", () => {
     expect(await sandbox.readCheckout()).toEqual({ commitSha: "b".repeat(40), branch: "main" });
   });
 
-  it("refuses a private repository before anything is queued", async () => {
-    const github = { installationRowId: crypto.randomUUID(), installationId: 1, repoId: 1, repo: "o/n", isPrivate: true };
-    const sandbox = runnerSandbox(test.http, paramsFor("job-scan-private", { github }), runnerId);
-
-    await expect(sandbox.prepare("https://github.com/o/n")).rejects.toThrow("private repository");
-  });
-
   it("keeps a Runner scan out of the month's scan count and counts a plain one", async () => {
     const monthStart = new Date("2026-11-01T00:00:00Z");
     const before = (await run(monthSpendEffect(test.http, tenantId, monthStart))).scans;
@@ -298,7 +324,93 @@ describe("the runner as a sandbox", () => {
   });
 });
 
-type LedgerUnit = { status: string; agent_id: string | null; unresolved: string[] };
+describe("an upload Scan on a Runner", () => {
+  const BOTH = ["git", "archive"];
+  const ZIP_BYTES = "zip-bytes";
+
+  const uploadScan = async (bucket = fakeBindings().env.REPORTS) => {
+    const scanId = await queue(await newScan());
+    const r2Key = `accounts/${tenantId}/uploads/${repoId}/${scanId}.zip`;
+    const [archive] = await test.raw.insert(scanUploadArchives).values({ tenantId, repoId, label: "app-1.3.zip", r2Key, sizeBytes: 9, contentSha256: "d".repeat(64) }).returning();
+    await test.raw.insert(scanArchiveLinks).values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: archive.contentSha256 });
+    await bucket.put(r2Key, ZIP_BYTES);
+    return { scanId, archiveId: archive.id };
+  };
+
+  const download = (scanId: string, by: string, bucket: R2Bucket) => Effect.runPromise(Effect.either(jobArchiveSvc(test.http, bucket, by, scanId)));
+
+  it("hands the job an archive source with the zip's id, and a git job a git source", async () => {
+    const { scanId, archiveId } = await uploadScan();
+    const gitScan = await queue(await newScan());
+    const first = await run(claimJobSvc(test.http, runnerId, BOTH));
+    const second = await run(claimJobSvc(test.http, runnerId, BOTH));
+
+    expect([first?.scanId, first?.source, second?.scanId, second?.source]).toEqual([scanId, { kind: "archive", archiveId }, gitScan, { kind: "git" }]);
+  });
+
+  it.each([
+    ["reports only git", ["git"]],
+    ["reports nothing", undefined],
+  ])("never hands an archive job to a Runner that %s, and hands it the git job queued after", async (_name, sources) => {
+    const { scanId } = await uploadScan();
+    const gitScan = await queue(await newScan());
+    const claimed = await run(claimJobSvc(test.http, runnerId, sources));
+
+    expect([claimed?.scanId, (await jobOf(scanId)).state]).toEqual([gitScan, "queued"]);
+  });
+
+  it("remembers what the Runner reported, so an upload Scan can be refused before it is queued", async () => {
+    const before = await run(findConnectedRunnerEffect(test.http, tenantId, runnerId));
+    await run(claimJobSvc(test.http, runnerId, ["archive", "git", "svn"]));
+    const after = await run(findConnectedRunnerEffect(test.http, tenantId, runnerId));
+    await run(claimJobSvc(test.http, runnerId));
+    const older = await run(findConnectedRunnerEffect(test.http, tenantId, runnerId));
+
+    expect([before, after, older]).toEqual([["git"], ["git", "archive"], ["git"]]);
+  });
+
+  it("fails a queued upload Scan whose zip was removed, saying so, and hands over the next job", async () => {
+    const { scanId, archiveId } = await uploadScan();
+    await test.raw.delete(scanUploadArchives).where(eq(scanUploadArchives.id, archiveId));
+    const next = await queue(await newScan());
+    const claimed = await run(claimJobSvc(test.http, runnerId, BOTH));
+
+    expect(claimed?.scanId).toBe(next);
+    expect(await jobOf(scanId)).toMatchObject({ state: "failed", error: expect.stringContaining("reads was removed") });
+  });
+
+  it("serves the zip only to the Runner that claimed the job", async () => {
+    const bucket = fakeBindings().env.REPORTS;
+    const { scanId } = await uploadScan(bucket);
+    const unclaimed = await download(scanId, runnerId, bucket);
+    await run(claimJobSvc(test.http, runnerId, BOTH));
+    const mine = await download(scanId, runnerId, bucket);
+    const other = await download(scanId, otherRunnerId, bucket);
+
+    expect(unclaimed).toMatchObject({ _tag: "Left", left: { _tag: "NotFound" } });
+    expect(mine).toMatchObject({ _tag: "Right", right: { body: ZIP_BYTES } });
+    expect(other).toMatchObject({ _tag: "Left", left: { _tag: "NotFound" } });
+  });
+
+  it("refuses the zip once it is removed, saying so", async () => {
+    const bucket = fakeBindings().env.REPORTS;
+    const { scanId, archiveId } = await uploadScan(bucket);
+    await run(claimJobSvc(test.http, runnerId, BOTH));
+    await test.raw.delete(scanUploadArchives).where(eq(scanUploadArchives.id, archiveId));
+
+    expect(await download(scanId, runnerId, bucket)).toMatchObject({ _tag: "Left", left: { _tag: "NotFound", message: expect.stringContaining("reads was removed") } });
+  });
+
+  it("refuses a git job's download", async () => {
+    const bucket = fakeBindings().env.REPORTS;
+    const scanId = await queue(await newScan());
+    await run(claimJobSvc(test.http, runnerId, BOTH));
+
+    expect(await download(scanId, runnerId, bucket)).toMatchObject({ _tag: "Left", left: { _tag: "NotFound" } });
+  });
+});
+
+type LedgerUnit ={ status: string; agent_id: string | null; unresolved: string[] };
 const ledgerUnit = (over: Partial<LedgerUnit>) => ({ status: "covered", agent_id: "hunter-inline", wave: 1, attempts: [], local_checks: [], result_fingerprints: [], unresolved: [], ...over });
 
 describe("the profile met after a Runner's result", () => {

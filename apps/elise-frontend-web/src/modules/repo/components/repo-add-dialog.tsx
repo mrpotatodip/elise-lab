@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { GitBranch, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "#/components/ui/button";
@@ -10,11 +10,11 @@ import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
-import { GithubRepoPicker } from "#/modules/github";
+import { RUNNER_GIT_LOGIN_HINT } from "#/modules/runner";
 import { scanKeys } from "#/modules/scan";
 import { addRepo } from "../api";
 import { repoKeys } from "../hooks";
-import { AddRepoDetailsSchema, AddRepoInputSchema, REPO_BRANCH_LIMIT } from "../schemas";
+import { AddRepoDetailsSchema, AddRepoInputSchema, REPO_BRANCH_LIMIT, REPO_URL_EXAMPLE } from "../schemas";
 
 type BranchRow = { id: string; name: string };
 
@@ -56,19 +56,14 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
       className="flex min-h-0 flex-1 flex-col"
     >
       <DialogBody className="grid content-start gap-6">
-        <GithubRepoPicker onPick={(picked) => form.setFieldValue("repo", picked)} />
         <form.Field name="repo">
           {(field) => (
         <div className="grid gap-2">
           <Label htmlFor="add-repo-url">Link to the GitHub repository</Label>
-          <Input id="add-repo-url" name={field.name} autoComplete="off" placeholder="https://github.com/owner/name" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "add-repo-url", "add-repo-help")} />
+          <Input id="add-repo-url" name={field.name} autoComplete="off" placeholder={REPO_URL_EXAMPLE} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "add-repo-url", "add-repo-help")} />
           <FieldError id="add-repo-url" message={fieldMessage(field)} />
           <p id="add-repo-help" className="text-xs text-muted-foreground">
-            Paste the link to a public GitHub repository, or to a private one you connected. Adding it does not scan it, and nothing is checked on GitHub. Private repository?{" "}
-            <Link to="/connections" className="font-medium text-foreground underline underline-offset-2">
-              Connect GitHub first
-            </Link>
-            .
+            Paste the link to a GitHub repository. Adding it does not scan it, and nothing is checked on GitHub. {RUNNER_GIT_LOGIN_HINT}
           </p>
         </div>
           )}

@@ -9,6 +9,7 @@ import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
+import { CopyCommand } from "#/modules/shared";
 import { createRunner } from "../api";
 import { RUNNER_LOGIN_COMMAND } from "../constants";
 import { runnerKeys } from "../hooks";
@@ -59,20 +60,8 @@ export function RunnerAddDialog() {
         </DialogHeader>
         {created ? null : (
           <div className="grid gap-2 px-6 pb-2">
-            <Label htmlFor="runner-login-command">On the computer, run this in a terminal</Label>
-            <div className="flex gap-2">
-              <Input id="runner-login-command" readOnly value={RUNNER_LOGIN_COMMAND} onFocus={(event) => event.target.select()} className="font-mono" />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  void navigator.clipboard.writeText(RUNNER_LOGIN_COMMAND).then(() => toast.success("Command copied."));
-                }}
-              >
-                <Copy className="size-3.5" />
-                Copy
-              </Button>
-            </div>
+            <p className="text-sm font-medium leading-none">On the computer, run this in a terminal</p>
+            <CopyCommand command={RUNNER_LOGIN_COMMAND} />
             <p className="text-xs text-muted-foreground">It opens this site so you can approve the computer. For CI and containers with no browser, make a pairing code below.</p>
           </div>
         )}
@@ -80,7 +69,7 @@ export function RunnerAddDialog() {
           <>
             <DialogBody className="grid gap-3">
               <p className="text-sm">
-                Open the Elise Runner app on <span className="font-medium">{created.name}</span> and type this code. It works once and expires at {runnerWhen(created.expiresAt)}.
+                On <span className="font-medium">{created.name}</span>, run <span className="font-mono">elise-runner pair</span> followed by this code. It works once and expires at {runnerWhen(created.expiresAt)}.
               </p>
               <Label htmlFor="runner-code">Pairing code</Label>
               <Input id="runner-code" readOnly value={created.pairingCode} onFocus={(event) => event.target.select()} className="h-12 text-center font-mono text-2xl tracking-widest" />

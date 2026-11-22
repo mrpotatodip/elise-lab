@@ -1,27 +1,33 @@
 import { Effect } from "effect";
 import type { AppDeps } from "#/types/variables";
+import { fakeStripe } from "./fake-stripe";
+import { fakeTypeSafe } from "./fake-typesafe";
 import { memoryScanRepo } from "./memory-scan-repo";
-import { noGithubAccess } from "./no-github-access";
-import { noTenantDb } from "./no-tenant-db";
+import { noOwnerDb, noTenantDb } from "./no-tenant-db";
 
 // -----
 // Every AppDeps a route test needs, answered without a database: no
 // session, a caller who holds a role and every Power, a fresh ledger,
-// no GitHub, no tenant database. A test passes only the deps it
+// no tenant database. A test passes only the deps it
 // changes, so a new dep is added here once, not in every test file.
 // -----
 export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   scanRepo: () => memoryScanRepo().repo,
-  githubAccess: noGithubAccess,
   monthSpend: () => Effect.succeed({ spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: true, plan: null }),
   holdCredit: () => Effect.succeed({ held: true, balanceUsd: 0 }),
-  runnerConnected: () => Effect.succeed(true),
+  connectedRunnerSources: () => Effect.succeed(["git", "archive"]),
+  linkArchive: () => Effect.void,
   releaseCredit: () => Effect.succeed({ settled: true, chargeUsd: 0 }),
+  teardownScan: async () => null,
   sessionUserId: async () => undefined,
+  runnerIdentity: async () => null,
   userHasAccount: async () => true,
   userHasPower: async () => true,
-  enqueueInviteEmail: async () => undefined,
-  enqueuePasswordResetEmail: async () => undefined,
+  enqueueEmail: async () => undefined,
+  verifyTurnstile: async () => true,
   withTenant: noTenantDb,
+  withOwner: noOwnerDb,
+  stripe: () => fakeStripe().gateway,
+  typesafe: () => fakeTypeSafe().gateway,
   ...overrides,
 });

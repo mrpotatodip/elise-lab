@@ -4,7 +4,7 @@ import Logo from "../layouts/Logo.astro";
 import ThemeSelect from "../layouts/ThemeSelect.astro";
 import ScansCard from "../stageshow/ScansCard";
 import { AuditStep, ConnectStep, ReportStep } from "../stageshow/Steps";
-import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, PRICING, SHOWCASE_CAPTION, SITE, STEPS, STEPS_NOTE } from "../constants/site";
+import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PICTURE_LABELS, PRICING, RUNNER, SHOWCASE_CAPTION, SITE, SOURCE_URL, STEPS, STEPS_NOTE } from "../constants/site";
 ---
 
 <Base>
@@ -13,11 +13,13 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
     <header class="nav">
       <a class="brand" href="/">
         <Logo class="brand-mark" />
-        {SITE.name}
+        {SITE.logoName}
       </a>
       <nav class="nav-links" aria-label="On this page">
         <a href="#how-it-works">How it works</a>
+        <a href="#get-the-runner">Get the Runner</a>
         <a href="#pricing">Pricing</a>
+        <a href="#open-source">Open source</a>
         <a href="#what-to-know">What to know</a>
       </nav>
       <div class="nav-actions">
@@ -38,6 +40,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
             <p class="hint">{HERO_HINT}</p>
           </div>
         </div>
+        <p class="hint">{OPEN_SOURCE.heroLine} <a href={SOURCE_URL} rel="noopener">{OPEN_SOURCE.heroLink}</a>.</p>
       </div>
 
       <figure class="showcase" aria-labelledby="showcase-caption">
@@ -81,27 +84,75 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         </ol>
       </section>
 
+      <section id="get-the-runner" aria-labelledby="runner-heading">
+        <h2 id="runner-heading">{RUNNER.title}</h2>
+        <p class="section-note">{RUNNER.note}</p>
+        <p class="runner-install__label" id="runner-downloads-label">{RUNNER.downloadsLabel}</p>
+        <div class="runner-downloads" role="group" aria-labelledby="runner-downloads-label">
+          {RUNNER.downloads.map((file) => <a class="button outline lg" href={file.href} rel="noopener">{file.label}</a>)}
+        </div>
+        <p class="section-note">{RUNNER.downloadNote.map((part) => (typeof part === "string" ? part : <code>{part.code}</code>))}</p>
+        <div class="runner-install">
+          <p class="runner-install__label" id="runner-command-label">{RUNNER.commandLabel}</p>
+          <pre class="runner-install__command" tabindex="0" aria-labelledby="runner-command-label"><code>{RUNNER.command}</code></pre>
+        </div>
+        <p class="section-note">{RUNNER.after.map((part) => (typeof part === "string" ? part : <code>{part.code}</code>))}</p>
+        <p class="section-note">{RUNNER.needs}</p>
+        <p class="section-note"><a href={RUNNER.releasesUrl} rel="noopener">{RUNNER.releasesLabel}</a></p>
+      </section>
+
       <section id="pricing" aria-labelledby="pricing-heading">
         <h2 id="pricing-heading">Pricing</h2>
         <p class="section-note">{PRICING.note}</p>
-        <div class="plans">
-          {
-            PRICING.plans.map((plan) => (
-              <article class="plan">
-                <h3>{plan.name}</h3>
-                <p class="plan-price">
-                  {plan.price}
-                  <span>per month</span>
-                </p>
-                <p class="plan-summary">{plan.summary}</p>
-                <ul>{plan.points.map((point) => <li>{point}</li>)}</ul>
-              </article>
-            ))
-          }
+        <div class="billing">
+          <input class="sr-only" type="radio" name="billing" id="billing-month" value="month" checked />
+          <input class="sr-only" type="radio" name="billing" id="billing-year" value="year" />
+          <div class="billing-toggle" role="group" aria-label="Billing interval">
+            <label for="billing-month">{PRICING.intervals.month}</label>
+            <label for="billing-year">{PRICING.intervals.year} <span class="billing-badge">{PRICING.yearlyBadge}</span></label>
+          </div>
+          <div class="plans">
+            {
+              PRICING.plans.map((plan) => (
+                <article class="plan">
+                  <h3>{plan.name}</h3>
+                  <p class="plan-price when-month">
+                    {plan.price}
+                    <span>per month</span>
+                  </p>
+                  <p class="plan-price when-year">
+                    {plan.yearlyPrice}
+                    <span>per year, {plan.yearlyPerMonth} a month</span>
+                  </p>
+                  <p class="plan-summary">{plan.summary}</p>
+                  <ul>{plan.points.map((point) => <li>{point}</li>)}</ul>
+                </article>
+              ))
+            }
+          </div>
         </div>
         <div class="plans-action">
           <a class="button outline" href={SITE.signUpUrl}>{PRICING.action}</a>
           <p class="hint">{PRICING.actionHint}</p>
+        </div>
+      </section>
+
+      <section id="open-source" aria-labelledby="open-source-heading">
+        <h2 id="open-source-heading">{OPEN_SOURCE.title}</h2>
+        <p class="section-note">{OPEN_SOURCE.note}</p>
+        <div class="facts">
+          {
+            OPEN_SOURCE.points.map((point) => (
+              <div>
+                <h3>{point.title}</h3>
+                <p>{point.text}</p>
+              </div>
+            ))
+          }
+        </div>
+        <div class="plans-action">
+          <a class="button outline" href={SOURCE_URL} rel="noopener">{OPEN_SOURCE.repoLabel}</a>
+          <p class="hint"><a href="/open-source">{OPEN_SOURCE.pageLink}</a></p>
         </div>
       </section>
 
@@ -138,7 +189,11 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
         <a href="#how-it-works">How it works</a>
         <a href="#pricing">Pricing</a>
         <a href="#what-to-know">What to know</a>
+        <a href="/open-source">Open source</a>
+        <a href={SOURCE_URL} rel="noopener">GitHub</a>
         <a href={CLOUDFLARE_SKILL_URL} rel="noopener">Cloudflare's open-source security-audit method</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
         <a href={SITE.appUrl}>Sign in</a>
       </nav>
       <ThemeSelect />

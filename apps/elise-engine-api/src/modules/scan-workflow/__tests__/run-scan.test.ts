@@ -5,7 +5,7 @@ import type { ScanUsage } from "@repo/contracts/elise";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { memoryScanRepo } from "#/__tests__/memory-scan-repo";
 import type { ScanParams, ScanState } from "#/schemas";
-import { SCAN_SANDBOX_FULL_PHASES, type FullPhase, type OutboundAnthropicKey, type OutboundGithub } from "#/modules/scan-sandbox";
+import { SCAN_SANDBOX_FULL_PHASES, type FullPhase, type OutboundAnthropicKey } from "#/modules/scan-sandbox";
 import { runScan } from "#/modules/scan-workflow/lib";
 import type { SandboxPort } from "#/modules/scan-workflow/types";
 
@@ -53,15 +53,14 @@ const setup = (options: SetupOptions = {}) => {
   const names: string[] = [];
   const calls: string[] = [];
   const settles: string[] = [];
+  const signalRuns: string[] = [];
   const ledger = memoryScanRepo();
   const bindings = fakeBindings();
   const prepares: { ref?: string }[] = [];
-  const githubs: (OutboundGithub | undefined)[] = [];
   const anthropicKeys: (OutboundAnthropicKey | undefined)[] = [];
   const sandbox: SandboxPort = {
-    prepare: async (_url, ref, github, anthropicKey) => {
+    prepare: async (_url, ref, anthropicKey) => {
       prepares.push({ ref });
-      githubs.push(github);
       anthropicKeys.push(anthropicKey);
       return { commitSha: "abc123", branch: ref && /^v\d/.test(ref) ? null : (ref ?? "main") };
     },
@@ -95,10 +94,14 @@ const setup = (options: SetupOptions = {}) => {
       calls.push(`record:${status}:${ledger.rows.get("scan-1")?.status}`);
       if (options.recordFails === status) throw new Error("database down");
     },
+    saveTrace: async () => ({ accepted: 0, dropped: 0 }),
     settleCredit: async (_params: ScanParams, status: "succeeded" | "failed") => void settles.push(status),
+    detectSignals: async (_params: ScanParams) => void signalRuns.push(ledger.rows.get("scan-1")?.status ?? "none"),
   };
-  return { names, calls, ledger, bindings, prepares, githubs, anthropicKeys, settles, deps };
+  return { names, calls, ledger, bindings, prepares, anthropicKeys, settles, signalRuns, deps };
 };
+
+const failingSaveTrace = async () => Promise.reject(new Error("database down"));
 
 const queue = async (ledger: ReturnType<typeof memoryScanRepo>, input: ScanParams) => {
   await Effect.runPromise(ledger.repo.create(input, REPO_ID, 0));
@@ -157,6 +160,42 @@ describe("runScan, a full scan in phases", () => {
     expect(names.filter((name) => name.startsWith("poll-recon-"))).toHaveLength(60);
   });
 
+  it("never fails the scan when its trace cannot be read or written", async () => {
+    const { names, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES });
+    await queue(ledger, full());
+    const entry = { id: "0190f1a2-b3c4-7d5e-8f60-000000000001", label: "searching", phase: "recon", startedAt: "2026-11-19T09:00:00.000Z", endedAt: "2026-11-19T09:00:00.000Z", count: 1 } as const;
+    const sandbox: SandboxPort = {
+      ...deps.sandbox,
+      drainTrace: async (ended) => {
+        if (ended) throw new Error("container gone");
+        return [entry];
+      },
+    };
+
+    await runScan({ ...deps, sandbox, saveTrace: failingSaveTrace }, full(), fakeStep(names));
+
+    expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded" });
+  });
+
+  it("sends the entries a phase's log gave, and an end marker once the phase is over", async () => {
+    const { names, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES });
+    await queue(ledger, full());
+    const calls: boolean[] = [];
+    const saved: number[] = [];
+    const sandbox: SandboxPort = {
+      ...deps.sandbox,
+      drainTrace: async (ended) => {
+        calls.push(ended);
+        return [{ id: "0190f1a2-b3c4-7d5e-8f60-000000000001", label: "searching", phase: "recon", startedAt: "2026-11-19T09:00:00.000Z", endedAt: "2026-11-19T09:00:00.000Z", count: 1 }];
+      },
+    };
+
+    await runScan({ ...deps, sandbox, saveTrace: async (_params, body) => (saved.push(body.entries.length), { accepted: body.entries.length, dropped: 0 }) }, full(), fakeStep(names));
+
+    expect(calls.filter(Boolean)).toHaveLength(4);
+    expect(saved.length).toBeGreaterThanOrEqual(4);
+  });
+
   it("runs a lite scan as one run, whatever phases a Workflow has", async () => {
     const { names, calls, ledger, deps } = setup();
     await queue(ledger, params());
@@ -187,19 +226,6 @@ describe("runScan", () => {
     expect(calls).toEqual(["record:succeeded:running", "destroy"]);
     expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded", error: null, usage, commitSha: "abc123" });
     expect(names.indexOf("record-scan-succeeded")).toBeLessThan(names.indexOf("status-succeeded"));
-  });
-
-  it("hands the clone the install and repo to sign for, and nothing else of the install", async () => {
-    const github = { installationRowId: "7c1e4a52-9d3b-4f60-8a71-2b3c4d5e6f70", installationId: 42, repoId: 7, repo: "octocat/hello-world", isPrivate: true };
-    const signed = setup();
-    await queue(signed.ledger, params({ github }));
-    await runScan(signed.deps, params({ github }), fakeStep(signed.names));
-    const open = setup();
-    await queue(open.ledger, params());
-    await runScan(open.deps, params(), fakeStep(open.names));
-
-    expect(signed.githubs).toEqual([{ installationId: 42, repoId: 7, repo: "octocat/hello-world" }]);
-    expect(open.githubs).toEqual([undefined]);
   });
 
   it("hands the sandbox the account's sealed Anthropic key, and nothing for an account on the platform key", async () => {
@@ -246,6 +272,28 @@ describe("runScan", () => {
     const broken = { ...deps, settleCredit: async () => Promise.reject(new Error("database down")) };
 
     await expect(runScan(broken, params(), fakeStep(names))).resolves.toEqual({ ok: true });
+  });
+
+  it("looks for possible duplicates once the scan is succeeded, and only then", async () => {
+    const ok = setup();
+    await queue(ok.ledger, params());
+    await runScan(ok.deps, params(), fakeStep(ok.names));
+    const bad = setup({ agent: "failed" });
+    await queue(bad.ledger, params());
+    await expect(runScan(bad.deps, params(), fakeStep(bad.names))).rejects.toThrow("claude exited 1");
+
+    expect(ok.signalRuns).toEqual(["succeeded"]);
+    expect(bad.signalRuns).toEqual([]);
+  });
+
+  it("leaves the scan succeeded when the duplicate signals step fails", async () => {
+    const { names, ledger, deps } = setup();
+    await queue(ledger, params());
+    const broken = { ...deps, detectSignals: async () => Promise.reject(new Error("TypeSafe answered 500")) };
+
+    await expect(runScan(broken, params(), fakeStep(names))).resolves.toEqual({ ok: true });
+
+    expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded" });
   });
 
   it("saves the branch the clone reported, with the commit", async () => {

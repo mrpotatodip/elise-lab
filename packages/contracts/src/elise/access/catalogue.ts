@@ -22,7 +22,7 @@ export const ACCESS_CATALOGUE = [
     children: [
       { key: "dashboard", label: "Dashboard", actions: ["read"] },
       { key: "summary", label: "Summary", actions: ["read"] },
-      { key: "plan", label: "Plan", actions: ["read"] },
+      { key: "plan", label: "Plan", actions: ["read", "manage"] },
       {
         key: "team",
         label: "Team",
@@ -32,12 +32,8 @@ export const ACCESS_CATALOGUE = [
           { key: "groups", label: "Group", actions: ["read", "create", "update", "delete"] },
         ],
       },
-      {
-        key: "github",
-        label: "GitHub",
-        children: [{ key: "installations", label: "GitHub installation", actions: ["create", "delete"] }],
-      },
       { key: "runners", label: "Runner", actions: ["create", "delete"] },
+      { key: "signals", label: "Signals", actions: ["update"] },
       {
         key: "findings",
         label: "Findings",
@@ -168,12 +164,13 @@ const PLATFORM_POWERS = ACCESS_POWERS.filter((power) => power.startsWith("platfo
 const TENANT_READS = TENANT_POWERS.filter((power) => powerAction(power) === "read");
 
 // -----
-// The owner keeps what changes the people already in the account.
-// A Workspace admin invites and revokes, runs groups, connects
-// GitHub and accepts risk; a Workspace member does none of it
-// and sees no part of Team.
+// The owner keeps what changes the people already in the account
+// and what the account pays: the plan and its billing portal.
+// A Workspace admin invites and revokes, runs groups and accepts
+// risk; a Workspace member does none of it and sees no part of
+// Team.
 // -----
-const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete"] as const;
+const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete", "company:plan:manage"] as const;
 const WORKSPACE_ADMIN_POWERS = TENANT_POWERS.filter((power) => !OWNER_ONLY.some((owner) => owner === power));
 const WORKSPACE_MEMBER_READS = TENANT_READS.filter((power) => !power.startsWith("company:team:"));
 
