@@ -46,7 +46,7 @@ import { COMPANY, SUB_PROCESSORS } from "../constants/legal";
     {COMPANY.name}<br />
     {COMPANY.address.map((line) => <Fragment>{line}<br /></Fragment>)}
   </address>
-  <p class="pending">An email address for requests is still to be added.</p>
+  <p>Email <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a> to ask for deletion or to ask about your data.</p>
 
   <h2>Last updated</h2>
   <p class="pending">Date pending approval.</p>

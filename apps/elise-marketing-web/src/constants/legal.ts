@@ -2,6 +2,7 @@
 export const COMPANY = {
   name: "Lynkfire Limited",
   address: ["3 Alana Place", "Mt Wellington", "Auckland", "New Zealand"],
+  email: "admin@eliselab.com",
 } as const;
 
 // The sub-processors named on the privacy page: every company that receives customer data.
