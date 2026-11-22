@@ -28,6 +28,7 @@ export type Bindings = {
   TYPESAFE_API_KEY?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_BRANDING_FILE_ID?: string;
   SCAN_API_TOKEN: string;
   DATABASE_URL: string;
   HYPERDRIVE_TENANT: Hyperdrive;
