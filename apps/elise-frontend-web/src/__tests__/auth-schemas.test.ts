@@ -6,20 +6,25 @@ const messagesOf = (result: { success: boolean; error?: { issues: readonly { pat
 
 describe("SignUpInputSchema", () => {
   it.each([
-    ["inviteCode", "Enter your invite code."],
     ["firstName", "Enter your first name."],
     ["lastName", "Enter your last name."],
     ["accountName", "Enter a name for your account."],
     ["email", "Enter your email address."],
     ["password", "Use at least 8 characters."],
   ])("tells a person what to enter in %s, not which rule failed", (field, message) => {
-    const result = SignUpInputSchema.safeParse({ inviteCode: "", firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: "Europe/Rome" });
+    const result = SignUpInputSchema.safeParse({ firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: "Europe/Rome" });
 
     expect(messagesOf(result)[field]).toBe(message);
   });
 
+  it("does not ask for an invite code", () => {
+    const result = SignUpInputSchema.safeParse({ firstName: "Jo", lastName: "Doe", accountName: "Acme", email: "a@b.co", password: "long-enough", timezone: "Europe/Rome" });
+
+    expect(result.success).toBe(true);
+  });
+
   it("counts a name of only spaces as empty", () => {
-    const result = SignUpInputSchema.safeParse({ inviteCode: "code", firstName: "   ", lastName: "Doe", accountName: "Acme", email: "a@b.co", password: "long-enough", timezone: "Europe/Rome" });
+    const result = SignUpInputSchema.safeParse({ firstName: "   ", lastName: "Doe", accountName: "Acme", email: "a@b.co", password: "long-enough", timezone: "Europe/Rome" });
 
     expect(messagesOf(result).firstName).toBe("Enter your first name.");
   });
