@@ -4,7 +4,7 @@ import Logo from "../layouts/Logo.astro";
 import ThemeSelect from "../layouts/ThemeSelect.astro";
 import ScansCard from "../stageshow/ScansCard";
 import { AuditStep, ConnectStep, ReportStep } from "../stageshow/Steps";
-import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, PRICING, SHOWCASE_CAPTION, SITE, STEPS, STEPS_NOTE } from "../constants/site";
+import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, PRICING, RUNNER, SHOWCASE_CAPTION, SITE, STEPS, STEPS_NOTE } from "../constants/site";
 ---
 
 <Base>
@@ -17,6 +17,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
       </a>
       <nav class="nav-links" aria-label="On this page">
         <a href="#how-it-works">How it works</a>
+        <a href="#get-the-runner">Get the Runner</a>
         <a href="#pricing">Pricing</a>
         <a href="#what-to-know">What to know</a>
       </nav>
@@ -79,6 +80,18 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, PICTURE_LABELS, 
             <div class="step-fig frame frame--report" role="img" aria-label={PICTURE_LABELS.report}><div aria-hidden="true"><ReportStep client:visible /></div></div>
           </li>
         </ol>
+      </section>
+
+      <section id="get-the-runner" aria-labelledby="runner-heading">
+        <h2 id="runner-heading">{RUNNER.title}</h2>
+        <p class="section-note">{RUNNER.note}</p>
+        <div class="runner-install">
+          <p class="runner-install__label" id="runner-command-label">{RUNNER.commandLabel}</p>
+          <pre class="runner-install__command" tabindex="0" aria-labelledby="runner-command-label"><code>{RUNNER.command}</code></pre>
+        </div>
+        <p class="section-note">{RUNNER.after}</p>
+        <p class="section-note">{RUNNER.needs}</p>
+        <p class="section-note">{RUNNER.desktop} <a href={RUNNER.releasesUrl} rel="noopener">{RUNNER.releasesLabel}</a>.</p>
       </section>
 
       <section id="pricing" aria-labelledby="pricing-heading">

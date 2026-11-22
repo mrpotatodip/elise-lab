@@ -67,6 +67,20 @@ export const STEPS = [
   },
 ] as const;
 
+// Under "Get the Runner". The command and the releases page are the ones the dashboard's Getting
+// started guide shows (GETTING_STARTED_INSTALL_COMMAND and GETTING_STARTED_DESKTOP_URL), so keep them equal.
+export const RUNNER = {
+  title: "Get the Runner",
+  note: "The Runner is the program that audits your code on your own computer. Install it, sign it in to your account, then start audits from the dashboard.",
+  commandLabel: "Install the terminal Runner on macOS or Linux",
+  command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh",
+  after: "Then run elise-runner login and elise-runner doctor. The script installs to ~/.local/bin and takes the newest release for your system.",
+  desktop: "Prefer a window? The desktop app is on",
+  releasesUrl: "https://github.com/mrpotatodip/ts-mrpotato-lab/releases",
+  releasesLabel: "the releases page on GitHub",
+  needs: "The computer also needs your own AI tool installed and signed in, because the scan runs on that login.",
+} as const;
+
 // The two plans the live plans table offers (Starter, $15 a month, 2 members; Runner, $35 a month,
 // 5 members). Older plans stay in the table but are not offered, so they are not printed. Both rows are
 // enabled with Stripe prices (checked against the live table 2026-11-22). Update this when the plans table changes.
