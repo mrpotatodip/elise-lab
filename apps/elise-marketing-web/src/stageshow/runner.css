@@ -13,7 +13,8 @@
     width: 520px;
     height: 300px;
     --ss-term-ok: #6ee7a8;
-    --ss-shadow-hero: 0 24px 60px -12px rgb(0 0 0 / 0.45), 0 4px 14px rgb(0 0 0 / 0.25);
+    /* No drop shadow: the kit's terminal keeps its hairline edge. */
+    --ss-shadow-hero: 0 0 0 0 transparent;
   }
   & .rn-log {
     display: flex;
@@ -36,6 +37,8 @@
 
   /* ---- the Scan page ---- */
   & .pg-scroll { height: 100%; }
+  /* Room under the Trace, so the page can scroll it to the top while its tree is still short. */
+  & .sp-stack { padding-bottom: 400px; }
   /* The info notice (Alert, variant info): a spinner, a medium line and a note. */
   & .sp-alert { display: flex; gap: 12px; padding: 14px 16px; border: 1px solid color-mix(in oklch, var(--status-info) 25%, transparent); border-radius: 8px; background: var(--status-info-soft); }
   & .sp-alert > svg { flex: none; margin-top: 2px; color: var(--status-info); }

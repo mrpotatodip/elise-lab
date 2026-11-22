@@ -37,10 +37,10 @@ const LOG = [
 const PACE = [800, 400, 600, 1500, 700, 300, 700, 500, 600, 500, 900];
 
 type Page = "list" | "scan";
-type S = { cmd: string; waiting: boolean; added: boolean; lines: number; found: number; page: Page; open: boolean };
+type S = { cmd: string; waiting: boolean; added: boolean; lines: number; step: number; found: number; page: Page; open: boolean };
 
-const initial: S = { cmd: "", waiting: false, added: false, lines: 0, found: 0, page: "list", open: false };
-const poster: S = { cmd: COMMAND, waiting: true, added: true, lines: LOG.length, found: 4, page: "scan", open: true };
+const initial: S = { cmd: "", waiting: false, added: false, lines: 0, step: 0, found: 0, page: "list", open: false };
+const poster: S = { cmd: COMMAND, waiting: true, added: true, lines: LOG.length, step: 0, found: 4, page: "scan", open: true };
 
 const statusOf = (lines: number) => (lines === 0 ? "queued" : lines >= LOG.length ? "done" : "running");
 
@@ -51,28 +51,41 @@ const ended = (lines: number, i: number) => lines >= 3 + 2 * i;
 const newestPhase = (lines: number) => [3, 2, 1, 0].find((i) => started(lines, i)) ?? -1;
 const SPENT = ["41s", "1m 12s", "49s", "22s"];
 
-// What the Trace shows for the phase that is running: its newest entries, as the dashboard lists them.
-type Leaf = { icon: LucideIcon; label: string; times?: number; ago: string };
-const LEAVES: Leaf[][] = [
-  [
-    { icon: FileText, label: "Reading files", times: 8, ago: "2s ago" },
-    { icon: Search, label: "Searching the code", times: 3, ago: "6s ago" },
-  ],
-  [
-    { icon: Search, label: "Searching the code", times: 9, ago: "2s ago" },
-    { icon: FileText, label: "Reading files", times: 21, ago: "4s ago" },
-    { icon: MessageSquare, label: "Reasoning", ago: "9s ago" },
-  ],
-  [
-    { icon: Terminal, label: "Running a command", times: 4, ago: "2s ago" },
-    { icon: FileText, label: "Reading files", times: 6, ago: "5s ago" },
-    { icon: MessageSquare, label: "Reasoning", ago: "8s ago" },
-  ],
-  [
-    { icon: Pencil, label: "Writing", times: 3, ago: "2s ago" },
-    { icon: MessageSquare, label: "Reasoning", ago: "7s ago" },
-  ],
+// What the agent does in each Phase, one step at a time. The Trace groups a run of the same label
+// into one entry with a count (Reading files ×3), lists the newest first, shows the last five and
+// folds the rest into "N earlier", as scan-trace.tsx does.
+type Doing = "reason" | "read" | "search" | "run" | "write";
+const ACT_LABEL: Record<Doing, { icon: LucideIcon; label: string }> = {
+  reason: { icon: MessageSquare, label: "Reasoning" },
+  read: { icon: FileText, label: "Reading files" },
+  search: { icon: Search, label: "Searching the code" },
+  run: { icon: Terminal, label: "Running a command" },
+  write: { icon: Pencil, label: "Writing" },
+};
+const ACTS: Doing[][] = [
+  ["reason", "read", "read", "search", "read"],
+  ["reason", "read", "read", "read", "search", "read", "read", "search", "search", "read"],
+  ["reason", "read", "run", "run", "read", "reason", "run", "read"],
+  ["reason", "write", "write", "write"],
 ];
+const STEP_MS = [300, 300, 400, 350];
+const VISIBLE = 5;
+const AGO = ["just now", "3s ago", "6s ago", "9s ago", "12s ago"];
+
+// A phase's steps as Trace entries: [first step, end step) of each run of one label.
+type Entry = { act: Doing; from: number; to: number };
+const ENTRIES: Entry[][] = ACTS.map((seq) => {
+  const out: Entry[] = [];
+  seq.forEach((act, n) => {
+    const last = out[out.length - 1];
+    if (last && last.act === act) last.to = n + 1;
+    else out.push({ act, from: n, to: n + 1 });
+  });
+  return out;
+});
+// How many entries exist after `step` steps, and the count on one of them.
+const created = (phase: number, step: number) => ENTRIES[phase].filter((e) => e.from < step).length;
+const countOf = (e: Entry, step: number) => Math.max(0, Math.min(step, e.to) - e.from);
 
 // The findings, in the table's order (worst first). `at` is the order the checks decide them in.
 type Row = { at: number; tone: PillTone; severity: string; title: string; file: string; folder: string; line: number; needsPerson?: boolean };
@@ -116,24 +129,29 @@ async function script(a: Act<S>) {
 
   a.mark("run");
   for (let i = 0; i < LOG.length; i++) {
-    await a.set({ lines: i + 1 });
+    const phase = i % 2 === 1 ? (i - 1) / 2 : -1;
+    await a.set(phase >= 0 ? { lines: i + 1, step: 0 } : { lines: i + 1 });
     if (wide && i === 1) {
       // The row only says "In progress", so the cursor opens the Scan page to watch it.
-      await a.wait(500);
+      await a.wait(400);
       await a.click("fresh");
       await a.set({ page: "scan" });
-      await a.wait(900);
-      await a.scroll("scan", "trace", { duration: 800, offset: 24 });
+      await a.wait(700);
     }
-    if (wide && i === 5) {
-      // The check phase decides findings: back up to the table to watch them arrive.
-      await a.scroll("scan", 0, { duration: 700 });
-      for (const n of [1, 2, 3, 4]) {
-        await a.wait(600);
-        await a.set({ found: n });
+    // The Trace is below the findings: scroll to it for the phases where the tree is the story,
+    // and back to the table for the check, which is where findings are decided.
+    if (wide && (i === 3 || i === 7)) await a.scroll("scan", "trace", { duration: 700, offset: 190 });
+    if (wide && i === 5) await a.scroll("scan", "findings", { duration: 700, offset: 0 });
+    if (wide && phase >= 0) {
+      for (let n = 1; n <= ACTS[phase].length; n++) {
+        await a.wait(STEP_MS[phase]);
+        await a.set({ step: n });
+        // Every second step of the check, one more finding is decided.
+        if (phase === 2 && n % 2 === 0) await a.set({ found: n / 2 });
       }
+    } else {
+      await a.wait(PACE[i]);
     }
-    await a.wait(PACE[i]);
   }
 
   if (!wide) return;
@@ -144,8 +162,12 @@ async function script(a: Act<S>) {
   await a.wait(3200);
 }
 
-function Phase({ i, lines, done }: { i: number; lines: number; done: boolean }) {
+function Phase({ i, lines, step, done }: { i: number; lines: number; step: number; done: boolean }) {
   const running = started(lines, i) && !ended(lines, i);
+  const made = created(i, step);
+  const entries = ENTRIES[i];
+  // The oldest entry still listed ends the tree's rail: the "earlier" row once there is one.
+  const folded = Math.max(0, made - VISIBLE);
   return (
     <Collapse open={started(lines, i)}>
       <li className="sp-node" data-last={i === 0 || undefined}>
@@ -160,16 +182,30 @@ function Phase({ i, lines, done }: { i: number; lines: number; done: boolean }) 
           <ChevronDown className="sp-node__chev" size={16} strokeWidth={1.5} data-open={running || undefined} />
         </span>
         <Collapse open={running && !done}>
-          <ul className="sp-leaves">
-            {LEAVES[i].map((leaf, n) => (
-              <li key={leaf.label} className="sp-leaf" data-last={n === LEAVES[i].length - 1 || undefined}>
-                <leaf.icon size={14} strokeWidth={1.5} />
-                <span>{leaf.label}</span>
-                {leaf.times && <span className="sp-times">×{leaf.times}</span>}
-                <span className="sp-time">{leaf.ago}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="sp-leaves">
+            {[...entries].reverse().map((entry, r) => {
+              const n = entries.length - 1 - r;
+              const shown = n < made && n >= folded;
+              const rank = made - 1 - n;
+              const Icon = ACT_LABEL[entry.act].icon;
+              const count = countOf(entry, step);
+              return (
+                <Collapse key={n} open={running && shown}>
+                  <div className="sp-leaf" data-last={(folded === 0 && n === 0) || undefined}>
+                    <Icon size={14} strokeWidth={1.5} />
+                    <span>{ACT_LABEL[entry.act].label}</span>
+                    {count > 1 && <span className="sp-times">×{count}</span>}
+                    <span className="sp-time">{AGO[Math.min(rank, AGO.length - 1)]}</span>
+                  </div>
+                </Collapse>
+              );
+            })}
+            <Collapse open={running && folded > 0}>
+              <div className="sp-leaf" data-last>
+                <span className="sp-time sp-earlier">{folded} earlier</span>
+              </div>
+            </Collapse>
+          </div>
         </Collapse>
       </li>
     </Collapse>
@@ -200,7 +236,11 @@ export default function RunnerScene() {
         const prefix = compact ? "" : "[acme/billing-api] ";
         const typing = s.cmd.length < COMMAND.length;
         const now = newestPhase(s.lines);
-        const candidates = s.lines >= 5 ? 9 : 5;
+        // Candidates are raised in the hunt, one a step, and stay at nine after it.
+        const candidates = s.lines >= 5 ? 9 : Math.min(9, s.step);
+        const madeNow = now >= 0 ? created(now, s.step) : 0;
+        const newest = now >= 0 && madeNow > 0 ? ENTRIES[now][madeNow - 1] : undefined;
+        const newestCount = newest ? countOf(newest, s.step) : 0;
         return (
           <>
             <Window url="app.eliselab.com" className="ed-window ss-fade-b" body={{ className: "ed-body" }}>
@@ -350,7 +390,7 @@ export default function RunnerScene() {
                     {!compact && (
                       <section className="dash-page dash-page--flush" data-active={page === "scan" || undefined}>
                         <Scroll name="scan" bar="none" className="pg-scroll">
-                          <div className="pg-stack">
+                          <div className="pg-stack sp-stack">
                             <div className="pg-head">
                               <div className="pg-head__text">
                                 <div className="pg-head__title">
@@ -392,6 +432,7 @@ export default function RunnerScene() {
                             </Collapse>
 
                             <Card
+                              data-target="findings"
                               title={done ? "Findings" : "Findings so far"}
                               sub={<Swap id={done ? "done" : "live"}>{done ? "4 findings: 3 confirmed, 1 need a person to check. Open a row for the impact, evidence and fix." : "Found so far, still being checked. They can change before the Report."}</Swap>}
                               flush
@@ -440,16 +481,16 @@ export default function RunnerScene() {
                                   <div className="sp-now">
                                     <span className="sp-ping"><i /><i /></span>
                                     <span className="sp-now__label">
-                                      <Swap id={now}>{now < 0 ? "Waiting for the first entries" : LEAVES[now][0].label}</Swap>
-                                      {now >= 0 && LEAVES[now][0].times && <span className="sp-times">×{LEAVES[now][0].times}</span>}
-                                      {now >= 0 && <span className="sp-time">2s ago</span>}
+                                      <Swap id={newest ? `${now}-${newest.from}` : "none"}>{newest ? ACT_LABEL[newest.act].label : "Waiting for the first entries"}</Swap>
+                                      {newest && newestCount > 1 && <span className="sp-times">×{newestCount}</span>}
+                                      {newest && <span className="sp-time">just now</span>}
                                     </span>
-                                    <Collapse open={s.lines >= 4}>
+                                    <Collapse open={s.lines >= 4 && candidates > 0}>
                                       <span className="sp-cand"><Count value={candidates} format={(n) => `${n} candidates`} duration={500} /></span>
                                     </Collapse>
                                   </div>
                                   <ol className="sp-phases">
-                                    {[3, 2, 1, 0].map((i) => <Phase key={i} i={i} lines={s.lines} done={done} />)}
+                                    {[3, 2, 1, 0].map((i) => <Phase key={i} i={i} lines={s.lines} step={s.step} done={done} />)}
                                   </ol>
                                 </div>
                               </Collapse>
