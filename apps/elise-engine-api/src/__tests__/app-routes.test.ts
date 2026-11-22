@@ -273,14 +273,22 @@ describe("watcher session", () => {
 const limiter = (success: boolean) => ({ limit: async () => ({ success }) });
 
 describe("rate limits", () => {
-  const signUpBody = JSON.stringify({ inviteCode: "x" });
+  const signUpBody = JSON.stringify({ firstName: "x" });
 
-  it("answers a limited sign-up like a wrong invite code", async () => {
+  it("answers 429 with its own message to a limited sign-up", async () => {
     const { env } = fakeBindings({ SIGN_UP_LIMITER: limiter(false) });
     const res = await call(env, "/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: signUpBody });
 
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ data: null, error: { code: "FORBIDDEN", message: "Invalid invite code" } });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ data: null, error: { code: "SIGN_UP_RATE_LIMITED", message: "Too many sign-up attempts. Wait a minute and try again." } });
+  });
+
+  it("answers 429 to a sign-up when the total limit is spent, whatever the IP", async () => {
+    const { env } = fakeBindings({ SIGN_UP_LIMITER: limiter(true), SIGN_UP_TOTAL_LIMITER: limiter(false) });
+    const res = await call(env, "/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: signUpBody });
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ error: { code: "SIGN_UP_RATE_LIMITED" } });
   });
 
   it("answers 429 to a limited sign-in", async () => {
