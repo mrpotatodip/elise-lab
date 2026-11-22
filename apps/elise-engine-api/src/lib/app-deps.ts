@@ -12,6 +12,7 @@ import { userHasAccountEffect, userHasPowerEffect } from "#/modules/me";
 import { tenantScanRepo } from "#/modules/scan-ledger";
 import { InternalServiceError } from "#/lib/errors";
 import { STRIPE_NOT_CONFIGURED_MESSAGE } from "#/modules/stripe/constants";
+import { verifyTurnstileToken } from "#/modules/sign-up/lib";
 import { stripeGateway } from "#/modules/stripe/lib";
 import { typesafeGateway } from "#/modules/typesafe";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
@@ -47,6 +48,7 @@ export const realAppDeps: AppDeps = {
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) => runEffect(userHasPowerEffect(dbConnect(c.env.DATABASE_URL), userId, accountId, power)),
   enqueueEmail,
+  verifyTurnstile: (env, token, ip) => verifyTurnstileToken({ secret: env.TURNSTILE_SECRET_KEY, token, ip }),
   withTenant: (c, accountId, run) => withTenant(c.env.HYPERDRIVE_TENANT.connectionString, (promise) => c.executionCtx.waitUntil(promise), accountId, run),
   withOwner: (c, run) => withPool(c.env.DATABASE_URL, (promise) => c.executionCtx.waitUntil(promise), run),
   stripe: (env) => {

@@ -5,6 +5,7 @@ import {
   SIGN_UP_PASSWORD_MAX,
   SIGN_UP_PASSWORD_MIN,
   SIGN_UP_PERSON_NAME_MAX,
+  SIGN_UP_TURNSTILE_TOKEN_MAX,
 } from "../constants";
 import { TenantSchema } from "../tenant";
 
@@ -24,6 +25,9 @@ const isTimezone = (value: string): boolean => {
 // -----
 // Requests: a visitor starts their account. An old
 // client's stray `inviteCode` key is stripped, not refused.
+// `turnstileToken` is optional here on purpose: the engine
+// answers a missing or bad token with the one generic refusal,
+// so the schema must not give it a message of its own.
 // -----
 export const SignUpBodySchema = z.object({
   firstName: z.string().trim().min(1).max(SIGN_UP_PERSON_NAME_MAX),
@@ -32,6 +36,7 @@ export const SignUpBodySchema = z.object({
   password: z.string().min(SIGN_UP_PASSWORD_MIN).max(SIGN_UP_PASSWORD_MAX),
   accountName: z.string().trim().min(1).max(SIGN_UP_ACCOUNT_NAME_MAX),
   timezone: z.string().refine(isTimezone, "Must be an IANA timezone, e.g. Europe/Rome"),
+  turnstileToken: z.string().max(SIGN_UP_TURNSTILE_TOKEN_MAX).optional(),
 });
 
 // -----

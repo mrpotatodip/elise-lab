@@ -11,6 +11,12 @@ export const SIGN_UP_RATE_LIMITED_CODE = "SIGN_UP_RATE_LIMITED";
 export const SIGN_UP_REFUSED = "We could not create this account. Check your details and try again, or sign in if you already have an account.";
 
 // -----
+// Cloudflare Turnstile: the server-side check of the sign-up token
+// -----
+export const TURNSTILE_SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+export const TURNSTILE_SITEVERIFY_TIMEOUT_MS = 10_000;
+
+// -----
 // Tenant slug: from the account name, up to 40
 // characters. A clash gets -2, -3 ... and a race
 // between two sign-ups is retried up to 5 times.

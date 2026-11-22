@@ -8,5 +8,10 @@ STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 # Optional: TypeSafe's key for Signals (hints about Findings). Without it no Signal is made.
 TYPESAFE_API_KEY=
+# Sign-up checks a Cloudflare Turnstile token. Without this secret every sign-up is refused.
+# This is Cloudflare's published always-pass test secret; the dashboard's matching test site key is 1x00000000000000000000AA.
+# Always-fail pair: secret 2x0000000000000000000000000000000AA, site key 2x00000000000000000000AB.
+# Production: `wrangler secret put TURNSTILE_SECRET_KEY` with the real widget's secret.
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 DATABASE_URL=
 AUTH_SECRET=
