@@ -1,6 +1,6 @@
 // The tour's scene state: which page of the dashboard is showing, and the one thing
 // each page does while it is on screen.
-export type Page = "scans" | "ship" | "overview" | "files" | "connect";
+export type Page = "scans" | "ship" | "overview" | "files" | "runners";
 
 export type S = {
   page: Page;
@@ -14,7 +14,7 @@ export type S = {
   live: boolean;
   // Files: the type tab, which filters the rows.
   tab: "all" | "report";
-  // Connections: how many of the readable repositories have appeared.
+  // Runners: how many computers have appeared.
   repos: number;
 };
 
@@ -30,5 +30,5 @@ export const STILLS: Record<Page, S> = {
   ship: { ...finished, page: "ship", decide: true },
   overview: { ...finished, page: "overview", live: true },
   files: { ...finished, page: "files", tab: "report" },
-  connect: { ...finished, page: "connect", repos: 5 },
+  runners: { ...finished, page: "runners", repos: 3 },
 };

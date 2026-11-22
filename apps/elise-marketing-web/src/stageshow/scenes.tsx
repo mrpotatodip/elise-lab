@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, ChevronDown, ChevronRight, CircleCheck, Download, ExternalLink, GitBranch, Link2, Lock, Search, Settings } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronRight, CircleCheck, Download, ExternalLink, GitBranch, Lock, Search, Settings } from "lucide-react";
 import { Collapse, Scroll, Swap } from "./kit";
 import { Pill } from "./Pill";
 import type { S } from "./tour-state";
 
 // The dashboard's other screens, drawn from their own components (repo-detail,
-// scan-verdict-card, scan-overview, file-list, the Connections page). Every repository,
+// scan-verdict-card, scan-overview, file-list, the Runners page). Every repository,
 // number and file on them is made up; the page's caption says so.
 
 // -----
@@ -80,7 +80,7 @@ export function ShipScene({ s }: { s: S }) {
           <div className="pg-alert">
             <CircleCheck size={20} strokeWidth={1.5} className="pg-alert__icon" />
             <div className="pg-alert__text">
-              <h4 className="pg-alert__title">Passed the scan policy</h4>
+              <h4 className="pg-alert__title">Clear to ship</h4>
               <p>Scanned enough times and nothing open is over the limits. An AI audit can miss problems, so this is advice and not proof that the commit is safe.</p>
             </div>
           </div>
@@ -101,9 +101,9 @@ export function ShipScene({ s }: { s: S }) {
               <div className="pg-checks">
                 <p className="pg-muted">A commit passes when all three are met. The answer uses every scan of this commit and the decisions your team recorded. A new push starts again at zero.</p>
                 {[
-                  ["At least 2 scans of this commit", "This commit has 2 scans."],
+                  ["Scans of this commit that add up to 1", "The scans of this commit add up to 2."],
                   ["Earlier problems re-checked", "The scans checked every problem that was already open."],
-                  ["Nothing open over the limits", "2 open, all within the limits. Allowed: 0 critical, 0 high, up to 5 medium."],
+                  ["Nothing open blocks this commit", "2 open, all within the limits. Allowed: 0 critical, 0 high, up to 3 medium."],
                 ].map(([label, detail]) => (
                   <div key={label} className="pg-check">
                     <CircleCheck size={16} strokeWidth={1.5} />
@@ -318,45 +318,33 @@ export function FilesScene({ s }: { s: S }) {
 }
 
 // -----
-// Connections: GitHub, and the repositories Elise can read through it.
+// Runners: the computers that run this account's scans.
 // -----
-const READABLE = [
-  { name: "billing-api", priv: true },
-  { name: "web-app" },
-  { name: "docs-site" },
-  { name: "mobile-api", priv: true },
-  { name: "status-page" },
+const COMPUTERS = [
+  { name: "Maya's MacBook", note: "macOS · Elise Runner app" },
+  { name: "build-server-1", note: "Linux · headless Runner" },
+  { name: "Dev laptop", note: "macOS · headless Runner" },
 ];
 
-export function ConnectScene({ s }: { s: S }) {
+export function RunnersScene({ s }: { s: S }) {
   return (
     <>
-      <PageHead title="Connections" desc="Where Elise reads your code from. Connect GitHub to scan your private repositories; public ones need no connection." />
-      <Card title="GitHub" sub="Elise reads the repositories you chose. It can read code and cannot change it." right={<span className="pg-obtn pg-obtn--sm"><Link2 size={14} strokeWidth={1.5} />Connect another account</span>} flush>
-        <div className="pg-account">
-          <span className="pg-account__who">
-            <span className="dt-strong">acme-inc</span>
-            <span className="dt-origin">All repositories · connected Nov 4, 2026</span>
-          </span>
-          <span className="pg-account__end">
-            <Pill tone="success">Connected</Pill>
-            <span className="pg-link"><ExternalLink size={14} strokeWidth={1.5} />Manage on GitHub</span>
-            <span className="pg-danger">Disconnect</span>
-          </span>
-        </div>
-      </Card>
+      <PageHead title="Runners" desc="The computers that run this account's scans, on their own Claude and git login. Elise charges nothing per scan." />
       <Card
-        title="Repositories Elise can read"
-        sub="What the connections above let Elise scan. To add or remove one, use Manage on GitHub. Pick one when you add a repository, or when you start a scan."
-        right={<span className="dl-card__count"><Swap id={s.repos}>{s.repos === 1 ? "1 repository" : `${s.repos} repositories`}</Swap></span>}
+        title="All computers"
+        sub="A scan runs on the computer you pick when you start it. Add a Runner to connect another."
+        right={<span className="dl-card__count"><Swap id={s.repos}>{s.repos === 1 ? "1 computer" : `${s.repos} computers`}</Swap></span>}
         flush
       >
         <div className="pg-readable">
-          {READABLE.map((r, i) => (
+          {COMPUTERS.map((r, i) => (
             <Collapse key={r.name} open={s.repos > i}>
               <div className="pg-readable__row">
-                <span className="dt-repo"><span className="dt-owner">acme/</span><span>{r.name}</span></span>
-                {r.priv && <Pill tone="outline"><Lock size={12} strokeWidth={1.5} />Private</Pill>}
+                <span className="pg-account__who">
+                  <span className="dt-strong">{r.name}</span>
+                  <span className="dt-origin">{r.note}</span>
+                </span>
+                <Pill tone="success" dot>Connected</Pill>
               </div>
             </Collapse>
           ))}

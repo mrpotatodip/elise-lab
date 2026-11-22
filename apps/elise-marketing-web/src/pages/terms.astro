@@ -5,32 +5,55 @@ import { COMPANY } from "../constants/legal";
 
 <Legal title="Terms" description="The terms for using EliseLAB.">
   <h1>Terms</h1>
-  <p class="notice" role="note">Draft. The legal wording on this page is still to be written and approved.</p>
-
-  <h2>Payment</h2>
-  <p class="pending">Wording pending approval.</p>
-
-  <h2>Refunds</h2>
-  <p class="pending">Wording pending approval.</p>
-
-  <h2>Acceptable use</h2>
-  <p class="pending">Wording pending approval.</p>
-
-  <h2>Liability</h2>
-  <p class="pending">Wording pending approval.</p>
-
-  <h2>Ending an account</h2>
-  <p class="pending">Wording pending approval.</p>
+  <p>Last updated 22 November 2026.</p>
+  <p>These terms are the agreement between you and Lynkfire Limited for your use of EliseLAB. By creating an account or using EliseLAB you accept them. If you accept for a company, you confirm you may bind it.</p>
 
   <h2>Who you contract with</h2>
-  <p>You contract with Lynkfire Limited, which runs EliseLAB.</p>
+  <p>You contract with Lynkfire Limited, a company in New Zealand, which runs EliseLAB. Its address is under Contact below.</p>
+
+  <h2>The service</h2>
+  <p>EliseLAB is a dashboard and a program called the Runner. The Runner runs a security audit of your code on your own computer, with your own AI account, and sends the report and Findings back to your account. You pay your AI provider directly under your own agreement with it. EliseLAB charges nothing per scan.</p>
+  <p>An audit is advice, not a guarantee. An AI agent can miss a vulnerability or report one that is not real. A Scan that succeeded, or a commit marked as clear to ship, does not mean your code is secure. You decide what to fix and what to ship.</p>
+
+  <h2>Your account</h2>
+  <p>Give us correct details and keep your password and Runner access safe. You are responsible for what happens under your account, including what its members do. An account has the member limit of its plan. Tell us at once if you think someone else has your login.</p>
+
+  <h2>Your code and your content</h2>
+  <p>Your code, reports, Findings and comments stay yours. You give us the right to store and process them only to run EliseLAB for you, as the Privacy page describes. You confirm you have the right to scan the code you point EliseLAB at, including code you did not write.</p>
+
+  <h2>Payment</h2>
+  <p>Paid plans are billed in advance, monthly or yearly, by card through Stripe, and renew each period until you cancel. Prices are in US dollars and shown on the pricing section of our site and in Plan and billing. There is no free trial. If we change a price, the new price applies from your next renewal, and you may cancel before then. Taxes may be added where the law requires.</p>
+  <p>If a payment fails, we may limit your account until it is paid.</p>
+
+  <h2>Refunds</h2>
+  <p>You can cancel at any time in Plan and billing. Your plan then runs to the end of the period you paid for. We do not refund payments for unused time, except where New Zealand law, including the Consumer Guarantees Act 1993, requires it.</p>
+
+  <h2>Acceptable use</h2>
+  <p>Use EliseLAB only to find and fix security problems in code you are allowed to test. Do not:</p>
+  <ul>
+    <li>scan code you have no right to scan, or use EliseLAB to attack anyone;</li>
+    <li>break the law or another person's rights;</li>
+    <li>try to get into another account, or to get round a limit, a plan or a member cap;</li>
+    <li>upload malware, or load our service so heavily that it harms others;</li>
+    <li>resell EliseLAB or share one account's access outside its plan's members.</li>
+  </ul>
+  <p>We may suspend an account that breaks this section, and we try to tell you why when we do.</p>
+
+  <h2>Outside services</h2>
+  <p>EliseLAB relies on other companies, named on the Privacy page. Your AI provider, your Git host and Stripe are under their own terms. We are not responsible for them.</p>
+
+  <h2>Liability</h2>
+  <p>EliseLAB comes as it is. As far as the law allows, we do not promise that it has no errors, that it is always available or that it finds every vulnerability. We are not liable for indirect or consequential loss, lost profit, lost data or a security problem a Scan missed. Our total liability for any claim is limited to what you paid us in the 12 months before it arose.</p>
+  <p>If you use EliseLAB for business, you agree the Consumer Guarantees Act 1993 does not apply, as that Act allows. Nothing here removes a right the law says cannot be removed, or limits liability for fraud or wilful default.</p>
+
+  <h2>Ending an account</h2>
+  <p>You may stop using EliseLAB at any time, and you may ask us to delete your account as the Privacy page explains. We may end or suspend your account if you break these terms, if we must by law, or if we stop the service, in which case we refund the unused part of any period you paid for. Sections that by their nature should continue, such as liability and governing law, continue after an account ends.</p>
 
   <h2>Governing law</h2>
-  <p>These terms follow the law of New Zealand.</p>
-  <p class="pending">Wording pending approval, including which courts hear a dispute.</p>
+  <p>These terms follow the law of New Zealand. The courts of New Zealand decide any dispute about them, and you and we accept that.</p>
 
   <h2>Changes to these terms</h2>
-  <p class="pending">Wording pending approval.</p>
+  <p>We may change these terms. We post the new terms on this page with a new date. A change applies from the date it is posted, or from your next renewal if it is about payment. If you keep using EliseLAB after a change, you accept it. If you do not, you may cancel.</p>
 
   <h2>Contact</h2>
   <address>
@@ -38,7 +61,4 @@ import { COMPANY } from "../constants/legal";
     {COMPANY.address.map((line) => <Fragment>{line}<br /></Fragment>)}
   </address>
   <p>Email <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a> with any question about these terms.</p>
-
-  <h2>Last updated</h2>
-  <p class="pending">Date pending approval.</p>
 </Legal>

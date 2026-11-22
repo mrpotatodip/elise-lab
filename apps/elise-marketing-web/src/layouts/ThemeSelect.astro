@@ -23,7 +23,7 @@ const ICONS = { default: Palette, midnight: MoonStar, daylight: Sun, greenfields
     }
   </span>
   <span class="theme-trigger__label">Theme</span>
-  <span class="theme-trigger__value" aria-hidden="true">
+  <span class="theme-trigger__value">
     {THEMES.map((theme) => <span data-for={theme.id}>{theme.label}</span>)}
   </span>
 </button>
@@ -72,13 +72,12 @@ const ICONS = { default: Palette, midnight: MoonStar, daylight: Sun, greenfields
   const dialog = document.querySelector<HTMLDialogElement>("#theme-dialog");
   const tiles = document.querySelectorAll<HTMLButtonElement>(".theme-tile");
 
-  // The tile for the current theme is pressed, and the button says which theme it is.
+  // The tile for the current theme is pressed. The button's own text says which theme it is.
   const sync = () => {
     const current = document.documentElement.dataset.theme ?? "default";
     tiles.forEach((tile) => {
       const on = tile.dataset.themeValue === current;
       tile.setAttribute("aria-pressed", String(on));
-      if (on && trigger) trigger.setAttribute("aria-label", `Theme: ${tile.dataset.label}. Change theme`);
     });
   };
   sync();
