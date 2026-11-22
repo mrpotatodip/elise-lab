@@ -1,4 +1,18 @@
-# ScansCard: rehearsal notes
+# RunnerScene (hero since 2026-11-22) and ScansCard: rehearsal notes
+
+## RunnerScene: how Elise works with a Runner
+
+`RunnerScene.tsx` and `runner.css` replace `ScansCard` as the hero picture in `index.astro` (`ScansCard` stays: `RunnerScene` imports its row pieces, and the old tour is unmounted, not deleted). Story, about 17s, plays once: `elise-runner run` is typed in a terminal over the Scans list, the cursor clicks New scan, a Queued row arrives, the Runner prints "Scan claimed" and the row turns Running, each of the four Phases (recon, hunt, check, report) starts and ends in the log while the row's Cost rolls up to $0.42, "Scan succeeded." turns the row Succeeded with its findings, and the cursor opens the first finding in the side sheet. The poster is that last frame.
+
+- **Live findings and Phase (added 2026-11-22):** while the Runner works the row shows its progress: under the Running pill, a four-step bar and the current Phase ("Hunt · 2 of 4") follow the log, and findings drip into the Findings cell ("3 findings", severity dots, "found so far, still checking"): three during the hunt, the fourth during the check, ending as the finished row (1 high, 2 medium, 1 low). The run is now about 21s. The row's Cost rolls up as each Phase ends. Checked in a browser: the Running frame with 3 findings and the Check Phase, the Hunt Phase frame with the bar half filled. Not checked frame by frame: the Findings swap as each finding lands, and the compact layout with the taller Running row.
+- **Started from:** `examples/hero-demo` (a terminal satellite over a window) and `fade-crop`, through the existing `ScansCard` frame. The terminal covers only older rows and the sidebar's lower part, stops before the Status column, and sits above the sheet's scrim so the last log line stays readable.
+- **Terminal text** is the headless Runner's own log (`Event` in `apps/elise-runner-cli/cli/src/commands.rs`). The scan id and the pool-left tail are left out of each line. Repository, costs and finding are made up, as the caption says.
+- **Compact (358 by 440):** the list's title is hidden so the new row stays above the terminal; the log drops its `[acme/billing-api]` prefix; no sheet.
+- **Checked:** the opening, the "waiting" beat, the end frame (Succeeded row, then sheet open) at 1280 wide, and the compact opening, in a real browser; console clean; oxlint and tsc clean for the new files.
+- **Not checked:** `film.mjs --gate` (the skill's dependencies are not installed), the Queued and Running frames and the cursor path frame by frame, the other four themes, a real 390px viewport for the finished compact frame. In compact the New scan button is hidden, so the cursor's click lands where that button would be.
+- **Stale copy:** the three "How it works" step pictures and their text still describe the old cloud flow (paste a link, GitHub connection, sandbox). Not touched.
+
+## ScansCard (the previous hero)
 
 The dashboard's Scans screen with one finding open in the side sheet, and three small step pictures (`Steps.tsx`). All four play once when they scroll into view and end on their payoff, which is also their still under reduced motion.
 

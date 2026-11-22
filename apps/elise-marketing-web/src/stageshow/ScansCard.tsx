@@ -36,12 +36,12 @@ const CRUMBS: Record<Page, string[]> = {
 };
 
 type Severity = "high" | "medium" | "low";
-type Found = { total: number; severity: Partial<Record<Severity, number>>; byHand?: number };
-type Scan = { owner: string; name: string; priv?: boolean; branch: string; sha: string; status: keyof typeof STATUS; found: Found | null; review: string; cost: string; started: string };
+export type Found = { total: number; severity: Partial<Record<Severity, number>>; byHand?: number };
+export type Scan = { owner: string; name: string; priv?: boolean; branch: string; sha: string; status: keyof typeof STATUS; found: Found | null; review: string; cost: string; started: string };
 
-const FRESH: Scan = { owner: "acme/", name: "billing-api", priv: true, branch: "main", sha: "4f2a9c1", status: "succeeded", found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 }, review: "Focused", cost: "$0.42", started: "Nov 12, 10:12 AM" };
+export const FRESH: Scan = { owner: "acme/", name: "billing-api", priv: true, branch: "main", sha: "4f2a9c1", status: "succeeded", found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 }, review: "Focused", cost: "$0.42", started: "Nov 12, 10:12 AM" };
 
-const OLDER: Scan[] = [
+export const OLDER: Scan[] = [
   { owner: "acme/", name: "web-app", branch: "main", sha: "b81d03e", status: "succeeded", found: { total: 1, severity: { low: 1 } }, review: "Focused", cost: "$0.31", started: "Nov 11, 4:40 PM" },
   { owner: "acme/", name: "docs-site", branch: "main", sha: "9c0e5a2", status: "succeeded", found: { total: 0, severity: {} }, review: "Focused", cost: "$0.12", started: "Nov 11, 11:05 AM" },
   { owner: "acme/", name: "mobile-api", priv: true, branch: "auth", sha: "e47b1f8", status: "failed", found: null, review: "Balanced", cost: "-", started: "Nov 10, 6:48 PM" },
@@ -49,7 +49,7 @@ const OLDER: Scan[] = [
   { owner: "acme/", name: "web-app", branch: "main", sha: "03fe8b6", status: "succeeded", found: { total: 2, severity: { low: 2 } }, review: "Balanced", cost: "$1.84", started: "Nov 9, 6:21 PM" },
 ];
 
-const MODEL = "Claude Opus 5.5";
+export const MODEL = "Claude Opus 5.5";
 
 async function script(a: Act<S>) {
   // Scans: a scan is started, finishes, and its first finding opens.
@@ -109,7 +109,7 @@ async function script(a: Act<S>) {
   await a.wait(2600);
 }
 
-function Repo({ scan }: { scan: Scan }) {
+export function Repo({ scan }: { scan: Scan }) {
   return (
     <>
       <span className="dt-repo">
@@ -125,7 +125,7 @@ function Repo({ scan }: { scan: Scan }) {
   );
 }
 
-function Findings({ found }: { found: Found | null }) {
+export function Findings({ found }: { found: Found | null }) {
   if (!found) return <span className="dt-muted">No report</span>;
   if (found.total === 0) return <span className="dt-muted">None found</span>;
   return (
@@ -144,7 +144,7 @@ function Findings({ found }: { found: Found | null }) {
   );
 }
 
-function Cells({ scan }: { scan: Scan }) {
+export function Cells({ scan }: { scan: Scan }) {
   return (
     <>
       <div className="dt-cell dt-cell--repo"><Repo scan={scan} /></div>

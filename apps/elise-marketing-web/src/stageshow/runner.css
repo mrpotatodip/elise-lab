@@ -1,0 +1,46 @@
+/* The Runner scene: the dashboard's Scans list (card.css) with the Runner's terminal over its lower
+   left. The terminal straddles the window's left edge and covers only older rows, never the new one. */
+.rn {
+  & .rn-term {
+    position: absolute;
+    z-index: 8;
+    left: 6px;
+    bottom: 22px;
+    width: 556px;
+    height: 244px;
+    --ss-term-ok: #6ee7a8;
+    --ss-shadow-hero: 0 24px 60px -12px rgb(0 0 0 / 0.45), 0 4px 14px rgb(0 0 0 / 0.25);
+  }
+  & .rn-log {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 0;
+    padding: 4px 20px 18px;
+    overflow: hidden;
+    color: #c4c4cc;
+    font: 14px/22px var(--ss-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-variant-ligatures: none;
+    white-space: pre;
+  }
+  & .rn-log .ss-term__line { font-size: 14px; line-height: 22px; }
+  & .rn-log .dim { color: #7c7c86; }
+  & .rn-log .ok { color: var(--ss-term-ok); }
+  /* The Phase under the Running pill: four steps, the finished ones filled, the current one pulsing. */
+  & .rn-phase { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 8px; font-size: 12px; line-height: 16px; color: var(--muted-foreground); white-space: nowrap; }
+  & .rn-steps { display: flex; gap: 3px; }
+  & .rn-steps i { width: 14px; height: 4px; border-radius: 2px; background: color-mix(in oklch, var(--muted-foreground) 25%, transparent); transition: background-color 0.3s ease; }
+  & .rn-steps i[data-state="done"] { background: var(--mark-info); }
+  & .rn-steps i[data-state="now"] { background: var(--mark-info); animation: dl-pulse 1.4s ease-in-out infinite; }
+  & .rn-live { color: var(--muted-foreground); }
+  @media (prefers-reduced-motion: reduce) { & .rn-steps i[data-state="now"] { animation: none; } }
+
+  /* A paired Runner that is running: the dashboard's green mark beside "Runners". */
+  & .rn-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--mark-success); }
+
+  & [data-layout="compact"] .pg-head { display: none; }
+  & [data-layout="compact"] .rn-term { left: 8px; bottom: 12px; width: 342px; height: 188px; }
+  & [data-layout="compact"] .rn-log { padding: 2px 12px 12px; font-size: 11px; line-height: 17px; }
+  & [data-layout="compact"] .rn-log .ss-term__line { font-size: 11px; line-height: 17px; }
+}
