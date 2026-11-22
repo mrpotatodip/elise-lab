@@ -51,7 +51,7 @@ export const realAppDeps: AppDeps = {
   withOwner: (c, run) => withPool(c.env.DATABASE_URL, (promise) => c.executionCtx.waitUntil(promise), run),
   stripe: (env) => {
     if (!env.STRIPE_SECRET_KEY) throw new InternalServiceError(STRIPE_NOT_CONFIGURED_MESSAGE);
-    return stripeGateway(env.STRIPE_SECRET_KEY, env.STRIPE_BRANDING_FILE_ID);
+    return stripeGateway(env.STRIPE_SECRET_KEY, { iconFileId: env.STRIPE_BRANDING_ICON_FILE_ID, logoFileId: env.STRIPE_BRANDING_LOGO_FILE_ID });
   },
   typesafe: (env) => (env.TYPESAFE_API_KEY ? typesafeGateway(env.TYPESAFE_API_KEY) : null),
 };

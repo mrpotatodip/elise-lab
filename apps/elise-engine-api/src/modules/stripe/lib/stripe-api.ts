@@ -14,15 +14,17 @@ const parse = async <S extends z.ZodType>(response: Response, schema: S, what: s
   return schema.parse(await response.json());
 };
 
-const brandingFields = (brandingFileId?: string) => {
+export type StripeBrandingFiles = { iconFileId?: string; logoFileId?: string };
+
+const brandingFields = ({ iconFileId, logoFileId }: StripeBrandingFiles) => {
   const fields = [["branding_settings[display_name]", "EliseLAB"]];
-  if (brandingFileId) {
-    for (const key of ["icon", "logo"]) fields.push([`branding_settings[${key}][type]`, "file"], [`branding_settings[${key}][file]`, brandingFileId]);
+  for (const [key, fileId] of [["icon", iconFileId], ["logo", logoFileId]] as const) {
+    if (fileId) fields.push([`branding_settings[${key}][type]`, "file"], [`branding_settings[${key}][file]`, fileId]);
   }
   return fields;
 };
 
-export const stripeGateway = (secretKey: string, brandingFileId?: string): StripeGateway => {
+export const stripeGateway = (secretKey: string, brandingFiles: StripeBrandingFiles = {}): StripeGateway => {
   const headers = { authorization: `Bearer ${secretKey}`, "stripe-version": STRIPE_API_VERSION };
   const get = async <S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> => parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { headers }), schema, `GET ${path}`);
   const post = async <S extends z.ZodType>(path: string, schema: S, form: URLSearchParams, idempotencyKey?: string): Promise<z.infer<S>> => {
@@ -49,7 +51,7 @@ export const stripeGateway = (secretKey: string, brandingFileId?: string): Strip
         "/checkout/sessions",
         StripeUrlResponseSchema,
         new URLSearchParams([
-          ...brandingFields(brandingFileId),
+          ...brandingFields(brandingFiles),
           ...Object.entries({
         mode: "subscription",
         customer: customerId,
