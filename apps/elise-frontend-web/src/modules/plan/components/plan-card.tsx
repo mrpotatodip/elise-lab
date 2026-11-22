@@ -16,8 +16,9 @@ import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS, PLAN_REFUND_LINE, PLAN_YEA
 import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
 import type { PlanDetails, PlanOffer } from "../schemas";
 import type { PlanCheckoutReturn } from "../types";
-import { PLAN_STATUS_VIEW, planBilledYearlySentence, planBillingAction, planConfirmingPayment, planPeriodSentence, planPriceView, planSourceLabel, planSwitchPending, type PlanSwitchTarget } from "../utils";
+import { PLAN_STATUS_VIEW, planBilledYearlySentence, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel, planSwitchPending, type PlanSwitchTarget } from "../utils";
 import { ComparePlans } from "./compare-plans";
+import { PriceLine } from "./price-line";
 
 function RedirectButton({ label, variant = "default", busy, onClick }: { label: string; variant?: "default" | "outline"; busy: boolean; onClick: () => void }) {
   return (
@@ -115,7 +116,6 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
   const billing = planBillingAction(data);
   const granted = data.source === "grant";
   const yearly = !granted && data.interval === "year";
-  const price = planPriceView(plan, yearly ? "year" : "month") ?? { amount: usageUsd(plan.monthlyPriceUsd), unit: "month" as const, perMonth: null };
   const paired = runners.filter((runner) => runner.state === "connected");
   const running = paired.filter((runner) => runnerShownState(runner, now) === "connected").length;
   const people = data.seats.members + data.seats.pendingInvites;
@@ -166,11 +166,7 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
             </>
           ) : (
             <>
-              <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
-                {price.amount}
-                <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per {price.unit}</span>
-              </p>
-              {price.perMonth !== null && <p className="text-sm tabular-nums text-muted-foreground">{price.perMonth}</p>}
+              <PriceLine terms={plan} interval={yearly ? "year" : "month"} />
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
                 {planSourceLabel(data.source)}
                 {planPeriodSentence(data)}. Elise charges nothing per scan.

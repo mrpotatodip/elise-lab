@@ -9,7 +9,8 @@ import { Segmented } from "#/components/ui/segmented";
 import { PLAN_POINTS, PLAN_REFUND_LINE, PLAN_YEARLY_BACK_LINE } from "../constants";
 import { usePlanActions } from "../hooks";
 import type { PlanDetails, PlanOffer } from "../schemas";
-import { planCardViews, planPriceView, planShownInterval, planYearlyOffered, type PlanInterval, type PlanSwitchTarget } from "../utils";
+import { planCardViews, planPriceView, planShownInterval, planYearlyLocked, planYearlyOffered, type PlanInterval, type PlanSwitchTarget } from "../utils";
+import { PriceLine } from "./price-line";
 
 const BUTTON_CLASS = "h-auto min-h-8 max-w-full justify-self-start whitespace-normal py-1.5 text-left";
 
@@ -123,23 +124,6 @@ function SubscribeButton({ offer, interval, primary, blocked }: { offer: PlanOff
   );
 }
 
-function PriceBlock({ offer, interval }: { offer: PlanOffer; interval: PlanInterval }) {
-  const shownView = planPriceView(offer, interval);
-  const view = shownView ?? planPriceView(offer, "month");
-  if (view === null) return null;
-
-  return (
-    <div className="grid gap-1">
-      <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
-        {view.amount}
-        <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">per {view.unit}</span>
-      </p>
-      {view.perMonth !== null && <p className="text-sm tabular-nums text-muted-foreground">{view.perMonth}</p>}
-      {shownView === null && <p className="text-sm text-muted-foreground">Monthly only.</p>}
-    </div>
-  );
-}
-
 type ComparePlansProps = {
   data: Pick<PlanDetails, "plan" | "source" | "status" | "seats" | "interval">;
   offers: ReadonlyArray<PlanOffer>;
@@ -153,7 +137,7 @@ export function ComparePlans({ data, offers, from, canManage, switching, onSwitc
   const [chosen, setChosen] = useState<PlanInterval>("month");
   const views = planCardViews(data, offers, chosen);
   const shown = planShownInterval(data, chosen);
-  const yearlyLocked = planShownInterval(data, "month") === "year";
+  const yearlyLocked = planYearlyLocked(data);
   const firstSubscribable = views.find((view) => view.action === "subscribe" && view.blocked === null)?.offer.key;
 
   return (
@@ -184,7 +168,7 @@ export function ComparePlans({ data, offers, from, canManage, switching, onSwitc
             </CardHeader>
             <CardContent className="grid content-between gap-6">
               <div className="grid content-start gap-4">
-                <PriceBlock offer={offer} interval={shown} />
+                <PriceLine terms={offer} interval={shown} />
                 <ul className="grid gap-2 text-sm leading-relaxed">
                   <li className="flex gap-2 font-medium">
                     <Check className="mt-0.5 size-4 shrink-0 text-muted-foreground" />

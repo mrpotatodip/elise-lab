@@ -89,7 +89,7 @@ describe("POST /usage/plan/change", () => {
     expect([status, JSON.parse(text), stripe.changes, row.planId]).toEqual([
       200,
       { data: { planKey: "starter" }, error: null },
-      [{ subscriptionId: "sub_1", priceId: STARTER_PRICE }],
+      [{ subscriptionId: "sub_1", priceId: STARTER_PRICE, interval: "month" }],
       runnerPlanId,
     ]);
   });
@@ -140,14 +140,14 @@ describe("POST /usage/plan/change", () => {
     await subscribe(runnerPlanId);
     await setPeople(1);
     const { status } = await planChange("runner", "year");
-    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_YEARLY }]]);
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_YEARLY, interval: "year" }]]);
   });
 
   it("lets an Account over the member cap go from monthly to yearly on its own plan", async () => {
     await subscribe(starterPlanId);
     await setPeople(3);
     const { status } = await planChange("starter", "year");
-    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: STARTER_YEARLY }]]);
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: STARTER_YEARLY, interval: "year" }]]);
   });
 
   it("refuses yearly to monthly on the same plan, telling the admin to cancel at period end", async () => {
@@ -176,7 +176,7 @@ describe("POST /usage/plan/change", () => {
     await subscribe(runnerPlanId, "year");
     await setPeople(1);
     const { status } = await planChange("starter");
-    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: STARTER_YEARLY }]]);
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: STARTER_YEARLY, interval: "year" }]]);
   });
 
   it("refuses a yearly change over the member cap", async () => {
@@ -197,13 +197,13 @@ describe("POST /usage/plan/change", () => {
   it("treats an old Stripe row with no interval as monthly", async () => {
     await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runnerPlanId, status: "active", source: "stripe", stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1" });
     const { status } = await planChange("runner", "year");
-    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_YEARLY }]]);
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_YEARLY, interval: "year" }]]);
   });
 
   it("moves up from Starter to Runner", async () => {
     await subscribe(starterPlanId);
     await setPeople(2);
     const { status } = await planChange("runner");
-    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_PRICE }]]);
+    expect([status, stripe.changes]).toEqual([200, [{ subscriptionId: "sub_1", priceId: RUNNER_PRICE, interval: "month" }]]);
   });
 });

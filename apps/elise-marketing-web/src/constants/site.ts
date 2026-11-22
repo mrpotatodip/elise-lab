@@ -70,18 +70,28 @@ export const STEPS = [
 // The two plans the live plans table offers (Starter, $15 a month, 2 members; Runner, $35 a month,
 // 5 members). Older plans stay in the table but are not offered, so they are not printed. Card checkout is not claimed: the
 // subscription path is not live yet. Update this when the plans table changes.
+// -----
+// The yearly prices below must match the engine's plan rows (platform_master_plans: monthly and
+// yearly price). The per-month figures and the "months free" badge are worked out from them.
+// -----
+const PLAN_USD = { starter: { month: 15, year: 150 }, runner: { month: 35, year: 350 } } as const;
+
+const usd = (amount: number) => `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+const perMonth = (yearly: number) => usd(Math.round((yearly / 12) * 100) / 100);
+const MONTHS_FREE = Math.floor(Math.min(...Object.values(PLAN_USD).map((plan) => 12 - plan.year / plan.month)));
+
 export const PRICING = {
   note: "Two plans, one flat price each. Paid sign-up opens soon. Until then, create an account and set up a Runner. There is no card checkout yet and no free trial.",
   intervals: { month: "Monthly", year: "Yearly" },
-  yearlyBadge: "2 months free",
+  yearlyBadge: `${MONTHS_FREE} months free`,
   action: "Create an account",
   actionHint: "Create an account opens the sign-up page in Elise.",
   plans: [
     {
       name: "Starter",
-      price: "$15",
-      yearlyPrice: "$150",
-      yearlyPerMonth: "$12.50",
+      price: usd(PLAN_USD.starter.month),
+      yearlyPrice: usd(PLAN_USD.starter.year),
+      yearlyPerMonth: perMonth(PLAN_USD.starter.year),
       summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place. For one or two people.",
       points: [
         "Flat price. EliseLAB adds no charge per scan.",
@@ -92,9 +102,9 @@ export const PRICING = {
     },
     {
       name: "Runner",
-      price: "$35",
-      yearlyPrice: "$350",
-      yearlyPerMonth: "$29.17",
+      price: usd(PLAN_USD.runner.month),
+      yearlyPrice: usd(PLAN_USD.runner.year),
+      yearlyPerMonth: perMonth(PLAN_USD.runner.year),
       summary: "Scans run on your own AI subscription through a Runner, and EliseLAB gathers every result in one place.",
       points: [
         "Flat price. EliseLAB adds no charge per scan.",

@@ -38,8 +38,11 @@ export const planPriceView = (offer: Pick<PlanOffer, "monthlyPriceUsd" | "yearly
 
 export const planYearlyOffered = (offers: ReadonlyArray<Pick<PlanOffer, "yearlyPriceUsd">>) => offers.some((offer) => offer.yearlyPriceUsd !== null && offer.yearlyPriceUsd !== undefined);
 
+export const planYearlyLocked = (data: Pick<PlanDetails, "source" | "status" | "interval">) =>
+  data.source === "stripe" && data.interval === "year" && (data.status === "active" || data.status === "past_due");
+
 export const planShownInterval = (data: Pick<PlanDetails, "source" | "status" | "interval">, chosen: PlanInterval): PlanInterval =>
-  data.source === "stripe" && data.interval === "year" && (data.status === "active" || data.status === "past_due") ? "year" : chosen;
+  planYearlyLocked(data) ? "year" : chosen;
 
 export type PlanCardView = { offer: PlanOffer; current: boolean; action: "switch" | "switchInterval" | "subscribe" | "none"; blocked: string | null };
 

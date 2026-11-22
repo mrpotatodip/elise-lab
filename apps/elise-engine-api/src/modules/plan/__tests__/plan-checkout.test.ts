@@ -83,18 +83,18 @@ describe("POST /usage/plan/checkout", () => {
     expect([status, body.data?.url, stripe.checkouts]).toEqual([
       200,
       `https://checkout.stripe.test/${stripe.customers[0].id}`,
-      [{ customerId: stripe.customers[0].id, accountId, priceId: PRICE, successUrl: `${DASHBOARD}/settings/plan?checkout=success`, cancelUrl: `${DASHBOARD}/settings/plan?checkout=cancelled` }],
+      [{ customerId: stripe.customers[0].id, accountId, priceId: PRICE, interval: "month", successUrl: `${DASHBOARD}/settings/plan?checkout=success`, cancelUrl: `${DASHBOARD}/settings/plan?checkout=cancelled` }],
     ]);
     expect(stripe.customers).toMatchObject([{ name: "acme", email: "admin@example.com", accountId }]);
   });
 
   it.each([
-    { name: "year", body: { planKey: "runner", interval: "year" }, priceId: YEARLY_PRICE },
-    { name: "month", body: { planKey: "runner", interval: "month" }, priceId: PRICE },
-    { name: "no interval (an old dashboard)", body: { planKey: "runner" }, priceId: PRICE },
-  ])("checks out the price of the interval: $name", async ({ body, priceId }) => {
+    { name: "year", body: { planKey: "runner", interval: "year" }, priceId: YEARLY_PRICE, interval: "year" },
+    { name: "month", body: { planKey: "runner", interval: "month" }, priceId: PRICE, interval: "month" },
+    { name: "no interval (an old dashboard)", body: { planKey: "runner" }, priceId: PRICE, interval: "month" },
+  ])("checks out the price of the interval: $name", async ({ body, priceId, interval }) => {
     const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body, env: { DASHBOARD_URL: DASHBOARD } });
-    expect([response.status, stripe.checkouts.map((checkout) => checkout.priceId)]).toEqual([200, [priceId]]);
+    expect([response.status, stripe.checkouts.map((checkout) => [checkout.priceId, checkout.interval])]).toEqual([200, [[priceId, interval]]]);
   });
 
   it("refuses a yearly checkout for a plan with no yearly price and asks Stripe for nothing", async () => {
