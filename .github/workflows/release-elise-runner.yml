@@ -13,7 +13,7 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - { runner: macos-14, asset: elise-runner-darwin-arm64 }
+          - { runner: macos-15, asset: elise-runner-darwin-arm64 }
           - { runner: macos-15-intel, asset: elise-runner-darwin-x64 }
           - { runner: ubuntu-24.04, asset: elise-runner-linux-x64 }
           - { runner: ubuntu-24.04-arm, asset: elise-runner-linux-arm64 }
