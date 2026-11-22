@@ -791,33 +791,70 @@ h2 {
   display: block;
 }
 
+/* A legal page is reading text on the sky: the stronger ink and the halo, 52ch lines, 6px from a
+   heading to its text and 24px between groups (DESIGN.md). */
 .legal {
-  max-width: 44rem;
   padding-block: 3rem;
+  text-shadow: var(--halo);
 }
 
-.legal .notice {
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
+.legal h1 {
+  margin-bottom: 1.5rem;
+}
+
+.legal h2 {
+  margin-top: 2rem;
+}
+
+.legal h3 {
+  margin: 0 0 0.375rem;
+  font-size: 1.125rem;
+}
+
+.legal p {
+  max-width: 52ch;
+  margin: 0 0 0.75rem;
   color: var(--lede);
 }
 
-.legal .pending {
-  color: var(--muted-foreground);
+.legal .notice {
+  max-width: 52ch;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+  text-shadow: none;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .processors {
   display: grid;
-  gap: 1rem;
+  gap: 2rem;
+  max-width: 52ch;
+  margin: 1.5rem 0 0;
   padding: 0;
   list-style: none;
 }
 
 .processors li {
-  padding: 1rem 1.25rem;
+  padding: 1.5rem;
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--card-foreground);
+  text-shadow: none;
+  box-shadow: var(--shadow-card);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.processors li p {
+  color: var(--card-foreground);
+}
+
+.processors li p:last-child {
+  margin-bottom: 0;
 }
 
 footer {
