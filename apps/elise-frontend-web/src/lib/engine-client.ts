@@ -32,7 +32,7 @@ const ErrorBodySchema = z.union([
 const ParseFailureSchema = z.object({ issues: z.array(z.object({ path: z.array(z.union([z.string(), z.number()])), message: z.string() })) });
 
 const EXTERNAL_SERVICE_CODE = "EXTERNAL_SERVICE_ERROR";
-const EXTERNAL_SERVICE_MESSAGE = "We could not reach the payment provider. Try again, and contact support if it keeps failing.";
+const EXTERNAL_SERVICE_MESSAGE = "An outside service did not answer. Try again, and contact support if it keeps failing.";
 
 export type EngineAuth = { token?: string; accountId?: string };
 
