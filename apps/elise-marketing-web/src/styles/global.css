@@ -479,9 +479,23 @@ h2 {
   margin-bottom: 1.5rem;
 }
 
+#get-the-runner .section-note code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
+
 .runner-install {
   max-width: 100%;
   margin: 0 0 1.5rem;
+}
+
+/* Four download buttons, 12px apart like the hero buttons, wrapping on a narrow screen. */
+.runner-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
 }
 
 .runner-install__label {
