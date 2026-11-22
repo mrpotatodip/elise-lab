@@ -99,7 +99,7 @@ export function ConnectStep() {
                     <span className="sv-group">Your repositories</span>
                     <RepoRow icon="globe" name="acme/web-app" note="Last scan succeeded" tag="Public" />
                     <RepoRow icon="globe" name="acme/docs-site" note="Not scanned yet" tag="Public" />
-                    <RepoRow icon="lock" name="acme/billing-api" note="Private repository" tag="Private" />
+                    <RepoRow icon="lock" name="acme/example-app" note="Private repository" tag="Private" />
                   </div>
                 )}
               </Swap>

@@ -29,7 +29,7 @@ const ACCOUNT: { label: string; icon: typeof Plug; page?: Page; target?: string 
 
 const CRUMBS: Record<Page, string[]> = {
   scans: ["Scans"],
-  ship: ["Repositories", "acme/billing-api", "main"],
+  ship: ["Repositories", "acme/example-app", "main"],
   overview: ["Overview"],
   files: ["Files"],
   runners: ["Runners"],
@@ -39,13 +39,13 @@ type Severity = "high" | "medium" | "low";
 export type Found = { total: number; severity: Partial<Record<Severity, number>>; byHand?: number };
 export type Scan = { owner: string; name: string; priv?: boolean; branch: string; sha: string; status: keyof typeof STATUS; found: Found | null; review: string; cost: string; started: string };
 
-export const FRESH: Scan = { owner: "acme/", name: "billing-api", priv: true, branch: "main", sha: "4f2a9c1", status: "succeeded", found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 }, review: "Focused", cost: "$0.42", started: "Nov 12, 10:12 AM" };
+export const FRESH: Scan = { owner: "acme/", name: "example-app", priv: true, branch: "main", sha: "4f2a9c1", status: "succeeded", found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 }, review: "Focused", cost: "$0.42", started: "Nov 12, 10:12 AM" };
 
 export const OLDER: Scan[] = [
   { owner: "acme/", name: "web-app", branch: "main", sha: "b81d03e", status: "succeeded", found: { total: 1, severity: { low: 1 } }, review: "Focused", cost: "$0.31", started: "Nov 11, 4:40 PM" },
   { owner: "acme/", name: "docs-site", branch: "main", sha: "9c0e5a2", status: "succeeded", found: { total: 0, severity: {} }, review: "Focused", cost: "$0.12", started: "Nov 11, 11:05 AM" },
   { owner: "acme/", name: "mobile-api", priv: true, branch: "auth", sha: "e47b1f8", status: "failed", found: null, review: "Balanced", cost: "-", started: "Nov 10, 6:48 PM" },
-  { owner: "acme/", name: "billing-api", priv: true, branch: "rounding", sha: "21ad7c4", status: "succeeded", found: { total: 1, severity: { medium: 1 } }, review: "Focused", cost: "$0.28", started: "Nov 10, 9:03 AM" },
+  { owner: "acme/", name: "example-app", priv: true, branch: "rounding", sha: "21ad7c4", status: "succeeded", found: { total: 1, severity: { medium: 1 } }, review: "Focused", cost: "$0.28", started: "Nov 10, 9:03 AM" },
   { owner: "acme/", name: "web-app", branch: "main", sha: "03fe8b6", status: "succeeded", found: { total: 2, severity: { low: 2 } }, review: "Balanced", cost: "$1.84", started: "Nov 9, 6:21 PM" },
 ];
 

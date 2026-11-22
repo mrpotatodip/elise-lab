@@ -23,7 +23,7 @@ import "./runner.css";
 
 const COMMAND = "elise-runner run";
 
-const PREFIX = "[acme/billing-api 0k3f9z2qd-4b2f6c1e-8a3d-4e7b-9c15-2f0a6d8b3e71] ";
+const PREFIX = "[acme/example-app 0k3f9z2qd-4b2f6c1e-8a3d-4e7b-9c15-2f0a6d8b3e71] ";
 
 // What the Runner prints for one Scan, in order. The Phases spent $3.24 of the $6 Pool.
 const LOG = [
@@ -116,7 +116,7 @@ const ACCOUNT = [
 ];
 const CRUMBS: Record<Page, string[]> = {
   list: ["Scans"],
-  scan: ["Repositories", "acme/billing-api", "main", "Scan 4f2a9c1"],
+  scan: ["Repositories", "acme/example-app", "main", "Scan 4f2a9c1"],
 };
 
 async function script(a: Act<S>) {
@@ -399,7 +399,7 @@ export default function RunnerScene() {
                             <div className="pg-head">
                               <div className="pg-head__text">
                                 <div className="pg-head__title">
-                                  <h3 className="dash-title"><span className="dt-owner">acme/</span>billing-api</h3>
+                                  <h3 className="dash-title"><span className="dt-owner">acme/</span>example-app</h3>
                                   <Pill tone="outline"><Lock size={12} strokeWidth={1.5} />Private</Pill>
                                 </div>
                               </div>
