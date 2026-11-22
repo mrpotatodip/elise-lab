@@ -19,7 +19,7 @@ export const signIn = createServerFn({ method: "POST" })
 
 export const fetchTurnstileSiteKey = createServerFn({ method: "GET" }).handler(async (): Promise<string | null> => env.TURNSTILE_SITE_KEY || null);
 
-export const signUp =createServerFn({ method: "POST" })
+export const signUp = createServerFn({ method: "POST" })
   .validator(SignUpInputSchema)
   .handler(async ({ data }) => {
     await engineFetch("/sign-up", jsonPost(JSON.stringify(data)));
