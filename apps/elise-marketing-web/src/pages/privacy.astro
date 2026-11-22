@@ -1,6 +1,6 @@
 ---
 import Legal from "../layouts/Legal.astro";
-import { SUB_PROCESSORS } from "../constants/legal";
+import { COMPANY, SUB_PROCESSORS } from "../constants/legal";
 ---
 
 <Legal title="Privacy" description="Which companies receive your data when you use EliseLAB, and what each one receives.">
@@ -42,7 +42,11 @@ import { SUB_PROCESSORS } from "../constants/legal";
   <p class="pending">Wording pending approval. The owner confirms the list above and how fast a request is handled.</p>
 
   <h2>Contact</h2>
-  <p class="pending">Wording pending approval.</p>
+  <address>
+    {COMPANY.name}<br />
+    {COMPANY.address.map((line) => <Fragment>{line}<br /></Fragment>)}
+  </address>
+  <p class="pending">An email address for requests is still to be added.</p>
 
   <h2>Last updated</h2>
   <p class="pending">Date pending approval.</p>

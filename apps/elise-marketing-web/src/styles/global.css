@@ -817,6 +817,12 @@ h2 {
   color: var(--lede);
 }
 
+.legal address {
+  margin: 0 0 0.75rem;
+  font-style: normal;
+  color: var(--lede);
+}
+
 .legal .notice {
   max-width: 52ch;
   padding: 0.75rem 1rem;

@@ -1,5 +1,6 @@
 ---
 import Legal from "../layouts/Legal.astro";
+import { COMPANY } from "../constants/legal";
 ---
 
 <Legal title="Terms" description="The terms for using EliseLAB.">
@@ -31,7 +32,11 @@ import Legal from "../layouts/Legal.astro";
   <p class="pending">Wording pending approval.</p>
 
   <h2>Contact</h2>
-  <p class="pending">Wording pending approval.</p>
+  <address>
+    {COMPANY.name}<br />
+    {COMPANY.address.map((line) => <Fragment>{line}<br /></Fragment>)}
+  </address>
+  <p class="pending">An email address is still to be added.</p>
 
   <h2>Last updated</h2>
   <p class="pending">Date pending approval.</p>

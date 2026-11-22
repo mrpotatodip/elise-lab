@@ -1,3 +1,9 @@
+// The company behind EliseLAB and its postal address, for the Contact section of both pages.
+export const COMPANY = {
+  name: "Lynkfire Limited",
+  address: ["3 Alana Place", "Mt Wellington", "Auckland", "New Zealand"],
+} as const;
+
 // The sub-processors named on the privacy page: every company that receives customer data.
 // This is the one place site copy names the model providers (see CLAUDE.md). A person approves the wording.
 export const SUB_PROCESSORS = [
