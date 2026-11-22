@@ -28,6 +28,7 @@ export type Bindings = {
   TYPESAFE_API_KEY?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  TURNSTILE_SECRET_KEY?: string;
   STRIPE_BRANDING_ICON_FILE_ID?: string;
   STRIPE_BRANDING_LOGO_FILE_ID?: string;
   SCAN_API_TOKEN: string;
@@ -72,6 +73,7 @@ export type AppDeps = {
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
   enqueueEmail: (env: Bindings, mail: QueuedEmail) => Promise<void>;
+  verifyTurnstile: (env: Bindings, token: string | undefined, ip: string | undefined) => Promise<boolean>;
   withTenant: <T>(c: Context<AppEnv>, accountId: string, run: (db: TenantDbType) => Promise<T>) => Promise<T>;
   withOwner: <T>(c: Context<AppEnv>, run: (db: PoolDbType) => Promise<T>) => Promise<T>;
   stripe: (env: Bindings) => StripeGateway;

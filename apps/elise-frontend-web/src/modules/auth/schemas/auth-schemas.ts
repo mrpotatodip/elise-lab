@@ -5,6 +5,7 @@ import {
   SIGN_UP_PASSWORD_MAX,
   SIGN_UP_PASSWORD_MIN,
   SIGN_UP_PERSON_NAME_MAX,
+  SIGN_UP_TURNSTILE_TOKEN_MAX,
   SignUpBodySchema,
 } from "@repo/contracts/elise";
 import { AUTH_ERRORS } from "../constants";
@@ -42,6 +43,7 @@ export const SignUpInputSchema = SignUpBodySchema.extend({
   email: z.string().trim().min(1, AUTH_ERRORS.emailEmpty).pipe(z.email(AUTH_ERRORS.email).max(SIGN_UP_EMAIL_MAX, AUTH_ERRORS.tooLong(SIGN_UP_EMAIL_MAX)).toLowerCase()),
   password: z.string().min(SIGN_UP_PASSWORD_MIN, AUTH_ERRORS.newPasswordTooShort(SIGN_UP_PASSWORD_MIN)).max(SIGN_UP_PASSWORD_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PASSWORD_MAX)),
   accountName: z.string().trim().min(1, AUTH_ERRORS.accountName).max(SIGN_UP_ACCOUNT_NAME_MAX, AUTH_ERRORS.tooLong(SIGN_UP_ACCOUNT_NAME_MAX)),
+  turnstileToken: z.string().min(1, AUTH_ERRORS.turnstile).max(SIGN_UP_TURNSTILE_TOKEN_MAX),
 });
 
 export type SignUpInput = z.infer<typeof SignUpInputSchema>;

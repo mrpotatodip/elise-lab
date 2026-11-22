@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { EngineError, engineFetch, jsonPost } from "#/lib/engine-client";
 import { AUTH_COPY } from "../constants";
@@ -15,6 +16,8 @@ export const signIn = createServerFn({ method: "POST" })
     const res = await engineFetch("/auth/sign-in/email", jsonPost(JSON.stringify(data)));
     saveSessionToken(SignInResponseSchema.parse(await res.json()).token);
   });
+
+export const fetchTurnstileSiteKey = createServerFn({ method: "GET" }).handler(async (): Promise<string | null> => env.TURNSTILE_SITE_KEY || null);
 
 export const signUp = createServerFn({ method: "POST" })
   .validator(SignUpInputSchema)

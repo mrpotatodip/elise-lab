@@ -7,6 +7,7 @@ interface __BaseEnv_Env {
 	BETTER_AUTH_URL: string;
 	SCAN_API_TOKEN: string;
 	ALLOW_SIGNUP: string;
+	TURNSTILE_SITE_KEY?: string;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_Env {}

@@ -11,14 +11,15 @@ describe("SignUpInputSchema", () => {
     ["accountName", "Enter a name for your account."],
     ["email", "Enter your email address."],
     ["password", "Use at least 8 characters."],
+    ["turnstileToken", "Complete the check above, then try again."],
   ])("tells a person what to enter in %s, not which rule failed", (field, message) => {
-    const result = SignUpInputSchema.safeParse({ firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: "Europe/Rome" });
+    const result = SignUpInputSchema.safeParse({ firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: "Europe/Rome", turnstileToken: "" });
 
     expect(messagesOf(result)[field]).toBe(message);
   });
 
   it("does not ask for an invite code", () => {
-    const result = SignUpInputSchema.safeParse({ firstName: "Jo", lastName: "Doe", accountName: "Acme", email: "a@b.co", password: "long-enough", timezone: "Europe/Rome" });
+    const result = SignUpInputSchema.safeParse({ firstName: "Jo", lastName: "Doe", accountName: "Acme", email: "a@b.co", password: "long-enough", timezone: "Europe/Rome", turnstileToken: "tok" });
 
     expect(result.success).toBe(true);
   });

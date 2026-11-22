@@ -24,6 +24,7 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   userHasAccount: async () => true,
   userHasPower: async () => true,
   enqueueEmail: async () => undefined,
+  verifyTurnstile: async () => true,
   withTenant: noTenantDb,
   withOwner: noOwnerDb,
   stripe: () => fakeStripe().gateway,
