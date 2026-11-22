@@ -1,0 +1,42 @@
+---
+import Base from "./Base.astro";
+import Logo from "./Logo.astro";
+import { SITE } from "../constants/site";
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<Base title={`${title} · ${SITE.name}`} description={description}>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="wrap">
+    <header class="nav">
+      <a class="brand" href="/">
+        <Logo class="brand-mark" />
+        {SITE.name}
+      </a>
+      <div class="nav-actions">
+        <a class="button outline" href={SITE.appUrl}>Sign in</a>
+      </div>
+    </header>
+
+    <main id="main" class="legal">
+      <slot />
+    </main>
+  </div>
+
+  <footer>
+    <div class="wrap footer-row">
+      <span>© {new Date().getFullYear()} {SITE.name}</span>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/">Home</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+      </nav>
+    </div>
+  </footer>
+</Base>

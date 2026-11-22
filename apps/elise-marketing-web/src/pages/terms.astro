@@ -1,0 +1,44 @@
+---
+import Legal from "../layouts/Legal.astro";
+import { COMPANY } from "../constants/legal";
+---
+
+<Legal title="Terms" description="The terms for using EliseLAB.">
+  <h1>Terms</h1>
+  <p class="notice" role="note">Draft. The legal wording on this page is still to be written and approved.</p>
+
+  <h2>Payment</h2>
+  <p class="pending">Wording pending approval.</p>
+
+  <h2>Refunds</h2>
+  <p class="pending">Wording pending approval.</p>
+
+  <h2>Acceptable use</h2>
+  <p class="pending">Wording pending approval.</p>
+
+  <h2>Liability</h2>
+  <p class="pending">Wording pending approval.</p>
+
+  <h2>Ending an account</h2>
+  <p class="pending">Wording pending approval.</p>
+
+  <h2>Who you contract with</h2>
+  <p>You contract with Lynkfire Limited, which runs EliseLAB.</p>
+
+  <h2>Governing law</h2>
+  <p>These terms follow the law of New Zealand.</p>
+  <p class="pending">Wording pending approval, including which courts hear a dispute.</p>
+
+  <h2>Changes to these terms</h2>
+  <p class="pending">Wording pending approval.</p>
+
+  <h2>Contact</h2>
+  <address>
+    {COMPANY.name}<br />
+    {COMPANY.address.map((line) => <Fragment>{line}<br /></Fragment>)}
+  </address>
+  <p>Email <a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a> with any question about these terms.</p>
+
+  <h2>Last updated</h2>
+  <p class="pending">Date pending approval.</p>
+</Legal>
