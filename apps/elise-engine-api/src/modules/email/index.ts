@@ -10,5 +10,8 @@ export type {
   RecordInviteStatus,
   RunnerNoticeEmail,
   TeamInviteEmail,
+  TwoFactorNoticeEmail,
+  TwoFactorRequirementEmail,
+  TwoFactorResetEmail,
   VerifyEmail,
 } from "./types";

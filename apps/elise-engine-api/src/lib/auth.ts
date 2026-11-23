@@ -9,8 +9,8 @@ import { sha256Hex } from "@repo/db-elise";
 import { authAccount, authSession, authTwoFactor, authUser, authVerification } from "@repo/db-elise/schema";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
-import type { QueuedEmail } from "#/modules/email";
-import { accountRequiresTwoFactorEffect } from "#/modules/two-factor";
+import type { QueuedEmail, TwoFactorNoticeEmail } from "#/modules/email";
+import { accountRequiresTwoFactorEffect, auditTwoFactorChange } from "#/modules/two-factor";
 import type { AppEnv } from "#/types/variables";
 
 // -----
@@ -44,6 +44,22 @@ export const TWO_FACTOR_LOCK_SECONDS = 15 * 60;
 const TWO_FACTOR_ISSUER = "EliseLAB";
 
 type CodeProof = { holds: (headers: Headers | undefined, code: string) => Promise<boolean> };
+
+const TWO_FACTOR_COOKIE_NAME = "two_factor";
+const LOCK_FRESH_SECONDS = 10;
+const CODE_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/verify-backup-code"]);
+type AuthHookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
+
+const settle = (work: Promise<unknown>, what: string) => work.catch(() => console.error(`two-factor ${what} failed`));
+
+const challengedUserId = async (ctx: AuthHookContext) => {
+  const session = await getSessionFromCtx(ctx);
+  if (session) return session.user.id;
+  const cookie = ctx.context.createAuthCookie(TWO_FACTOR_COOKIE_NAME);
+  const key = await ctx.getSignedCookie(cookie.name, ctx.context.secret);
+  if (!key) return undefined;
+  return (await ctx.context.internalAdapter.findVerificationValue(key))?.value;
+};
 
 const REVOKING_PATHS = new Set(["/two-factor/disable", "/two-factor/generate-backup-codes", "/two-factor/verify-totp"]);
 
@@ -88,6 +104,14 @@ export const buildAuth = (config: AuthConfig) => {
   const revokeOthers = async (userId: string, keepToken: string | undefined) => {
     const others = keepToken ? and(eq(authSession.userId, userId), ne(authSession.token, keepToken)) : eq(authSession.userId, userId);
     await config.db.delete(authSession).where(others);
+  };
+
+  const notify = (to: string, kind: TwoFactorNoticeEmail["kind"]) =>
+    settle(config.enqueueEmail({ kind, to, at: new Date().toISOString(), link: `${config.dashboardUrl}/settings/security` }), `${kind} notice`);
+
+  const lockJustBegan = async (userId: string) => {
+    const [row] = await config.db.select({ lockedUntil: authTwoFactor.lockedUntil }).from(authTwoFactor).where(eq(authTwoFactor.userId, userId));
+    return row?.lockedUntil ? row.lockedUntil.getTime() - Date.now() > (TWO_FACTOR_LOCK_SECONDS - LOCK_FRESH_SECONDS) * 1000 : false;
   };
 
   const auth = betterAuth({
@@ -177,10 +201,30 @@ export const buildAuth = (config: AuthConfig) => {
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
-        if (!REVOKING_PATHS.has(ctx.path) || ctx.context.returned instanceof Error) return;
+        const returned = ctx.context.returned;
+        if (returned instanceof Error) {
+          if (!CODE_PATHS.has(ctx.path) || (returned instanceof APIError && returned.status === "TOO_MANY_REQUESTS")) return;
+          const userId = await challengedUserId(ctx);
+          if (userId && (await lockJustBegan(userId))) await settle(auditTwoFactorChange(config.db, userId, "two_factor.locked"), "lock audit");
+          return;
+        }
+        if (ctx.path === "/two-factor/verify-backup-code") {
+          const user = ctx.context.newSession?.user ?? (await getSessionFromCtx(ctx))?.user;
+          if (user) await notify(user.email, "backup-code-used");
+          return;
+        }
+        if (!REVOKING_PATHS.has(ctx.path)) return;
         if (ctx.path === "/two-factor/verify-totp" && !(ctx.body && enrolling.has(ctx.body))) return;
         const current = ctx.context.newSession ?? (await getSessionFromCtx(ctx));
-        if (current) await revokeOthers(current.user.id, current.session.token);
+        if (!current) return;
+        await revokeOthers(current.user.id, current.session.token);
+        if (ctx.path === "/two-factor/generate-backup-codes") {
+          await notify(current.user.email, "backup-codes-regenerated");
+          return;
+        }
+        const enabled = ctx.path === "/two-factor/verify-totp";
+        await settle(auditTwoFactorChange(config.db, current.user.id, enabled ? "two_factor.enabled" : "two_factor.disabled"), "audit");
+        await notify(current.user.email, enabled ? "two-factor-enabled" : "two-factor-disabled");
       }),
     },
     disabledPaths: AUTH_DISABLED_PATHS,

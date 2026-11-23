@@ -14,6 +14,8 @@ import {
   type TeamTwoFactorRequirement,
 } from "@repo/contracts/elise";
 import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
+import { dashboardLinkOf, enqueueEmailsQuietly, type QueuedEmail } from "#/modules/email";
+import { listAdminEmailsEffect, noticeNamesEffect } from "#/modules/two-factor";
 import type { TenantEffect } from "#/lib/tenant-effect";
 import { ExternalError, type DbError, type Forbidden } from "#/lib/effect-query";
 import { errorChainForLog } from "#/lib/redact-log";
@@ -30,7 +32,7 @@ import {
   revokeInviteEffect,
   setTwoFactorRequirementEffect,
 } from "#/modules/team/queries";
-import type { InviteMailer, TeamFailure } from "#/modules/team/types";
+import type { InviteMailer, NoticeMailer, TeamFailure } from "#/modules/team/types";
 
 export const listTeamSvc = (db: AppDbType, accountId: string): Effect.Effect<TeamList, DbError> => listTeamEffect(db, accountId, new Date());
 
@@ -99,14 +101,60 @@ export const createInviteSvc = (
 export const revokeInviteSvc = (db: AppTxDbType, accountId: string, userId: string, inviteId: string): Effect.Effect<{ id: string }, TeamFailure> =>
   revokeInviteEffect(db, accountId, inviteId, userId, new Date());
 
-export const resetTwoFactorSvc = (db: PoolDbType, accountId: string, actorUserId: string, memberPartyId: string): Effect.Effect<TeamTwoFactorReset, TeamFailure> =>
-  resetTwoFactorEffect(db, accountId, actorUserId, memberPartyId).pipe(Effect.map(({ partyId }) => ({ partyId })));
+const sendNotices = (mailer: NoticeMailer, mails: QueuedEmail[]) => Effect.promise(() => enqueueEmailsQuietly(mailer.enqueue, mails));
+
+const noticeContext = (db: AppDbType, accountId: string, actorUserId: string) =>
+  noticeNamesEffect(db, accountId, actorUserId).pipe(
+    Effect.catchTag("DbError", (error) =>
+      Effect.sync(() => {
+        console.error("Two-factor notice names not read", errorChainForLog(error));
+        return { accountName: "your account", actorName: "An admin" };
+      }),
+    ),
+  );
+
+export const resetTwoFactorSvc = (
+  db: PoolDbType,
+  accountId: string,
+  actorUserId: string,
+  memberPartyId: string,
+  mailer: NoticeMailer,
+): Effect.Effect<TeamTwoFactorReset, TeamFailure> =>
+  Effect.gen(function* () {
+    const { partyId, email } = yield* resetTwoFactorEffect(db, accountId, actorUserId, memberPartyId);
+    const names = yield* noticeContext(db, accountId, actorUserId);
+    yield* sendNotices(mailer, [{ kind: "two-factor-reset", to: email, ...names, at: new Date().toISOString(), link: dashboardLinkOf(mailer.dashboardUrl, "/signin") }]);
+    return { partyId };
+  });
 
 export const getTwoFactorRequirementSvc = (db: AppDbType, accountId: string): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
   findTwoFactorRequirementEffect(db, accountId);
 
-export const setTwoFactorRequirementSvc = (db: AppDbType, accountId: string, userId: string, required: boolean): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
-  setTwoFactorRequirementEffect(db, accountId, userId, required);
+export const setTwoFactorRequirementSvc = (
+  db: AppDbType,
+  accountId: string,
+  userId: string,
+  required: boolean,
+  mailer: NoticeMailer,
+): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
+  Effect.gen(function* () {
+    const before = yield* findTwoFactorRequirementEffect(db, accountId);
+    const saved = yield* setTwoFactorRequirementEffect(db, accountId, userId, required);
+    if (before.required === saved.required) return saved;
+    const names = yield* noticeContext(db, accountId, userId);
+    const admins = yield* listAdminEmailsEffect(db, accountId).pipe(
+      Effect.catchTag("DbError", (error) =>
+        Effect.sync(() => {
+          console.error("Two-factor notice recipients not read", errorChainForLog(error));
+          return [];
+        }),
+      ),
+    );
+    const at = new Date().toISOString();
+    const link = dashboardLinkOf(mailer.dashboardUrl, "/team");
+    yield* sendNotices(mailer, admins.map((to) => ({ kind: "two-factor-requirement-changed", to, ...names, required: saved.required, at, link })));
+    return saved;
+  });
 
 export const previewInviteSvc = (db: DbConnectType, token: string): Effect.Effect<TeamInvitePreview, Forbidden | DbError> =>
   Effect.gen(function* () {

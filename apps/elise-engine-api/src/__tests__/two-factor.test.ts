@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { ensureTenantRoles, findTenantRole } from "@repo/db-elise";
+import { accessAuditLog, ensureTenantRoles, findTenantRole } from "@repo/db-elise";
 import { authAccount, authSession, authTwoFactor, authUser, partyRoles, tenants } from "@repo/db-elise/schema";
 import { hashPassword } from "better-auth/crypto";
 import { buildAuth } from "#/lib/auth";
@@ -286,6 +286,88 @@ describe("other sessions", () => {
     await auth().api.disableTwoFactor({ body: withCode({ password: PASSWORD, code: backupCodes[0] }), headers: { cookie } });
 
     expect(await flagOf("disable-backup")).toBe(false);
+  });
+});
+
+describe("Security notices and the Audit trail", () => {
+  const joinAccount = async (id: string) => {
+    const [tenant] = await db.raw.select({ id: tenants.id, partyId: tenants.partyId }).from(tenants).where(eq(tenants.slug, `acct-${id}`));
+    await ensureTenantRoles(db.raw, tenant.id);
+    const role = await findTenantRole(db.raw, tenant.id, "workspace_member");
+    if (!role) throw new Error("workspace_member role missing");
+    await db.raw.insert(partyRoles).values({ partyId: tenant.partyId, tenantId: tenant.id, roleId: role.id, roleScope: "tenant" });
+    return tenant;
+  };
+  const noticesTo = (email: string) => queued.filter((mail) => mail.to === email).map((mail) => mail.kind);
+  const auditOf = async (partyId: string) => (await db.raw.select({ action: accessAuditLog.action, actor: accessAuditLog.actorPartyId, after: accessAuditLog.after }).from(accessAuditLog).where(eq(accessAuditLog.subjectId, partyId))).map((row) => [row.action, row.actor]);
+
+  it("tells the Login and writes one Audit row when Two-factor is turned on", async () => {
+    const email = await seedLogin("n-enable");
+    const tenant = await joinAccount("n-enable");
+    queued.length = 0;
+    await enrol(email);
+
+    expect(noticesTo(email)).toEqual(["two-factor-enabled"]);
+    expect(await auditOf(tenant.partyId)).toEqual([["two_factor.enabled", tenant.partyId]]);
+  });
+
+  it("tells the Login and writes one Audit row when Two-factor is turned off", async () => {
+    const email = await seedLogin("n-disable");
+    const tenant = await joinAccount("n-disable");
+    const { cookie, secret } = await enrol(email);
+    queued.length = 0;
+    await auth().api.disableTwoFactor({ body: withCode({ password: PASSWORD, code: await codeNow(secret) }), headers: { cookie } });
+
+    expect(noticesTo(email)).toEqual(["two-factor-disabled"]);
+    expect((await auditOf(tenant.partyId)).map(([action]) => action)).toEqual(["two_factor.enabled", "two_factor.disabled"]);
+  });
+
+  it("tells the Login when Backup codes are regenerated", async () => {
+    const email = await seedLogin("n-regen");
+    const { cookie } = await enrol(email);
+    queued.length = 0;
+    await auth().api.generateBackupCodes({ body: { password: PASSWORD }, headers: { cookie } });
+
+    expect(noticesTo(email)).toEqual(["backup-codes-regenerated"]);
+  });
+
+  it("tells the Login when a Backup code is used, and not when an Authenticator code is", async () => {
+    const email = await seedLogin("n-used");
+    const { secret, backupCodes } = await enrol(email);
+    queued.length = 0;
+    const byCode = await challengeOf(email);
+    await auth().api.verifyTOTP({ body: { code: await codeNow(secret) }, headers: { cookie: byCode.cookie } });
+    expect(noticesTo(email)).toEqual([]);
+
+    const byBackup = await challengeOf(email);
+    await auth().api.verifyBackupCode({ body: { code: backupCodes[0] }, headers: { cookie: byBackup.cookie } });
+    expect(noticesTo(email)).toEqual(["backup-code-used"]);
+  });
+
+  it("sends no notice for a refused attempt", async () => {
+    const email = await seedLogin("n-refused");
+    const { cookie } = await enrol(email);
+    queued.length = 0;
+    await expect(auth().api.generateBackupCodes({ body: { password: "not-the-password" }, headers: { cookie } })).rejects.toBeDefined();
+
+    expect(noticesTo(email)).toEqual([]);
+  });
+
+  it("writes one Audit row when the lock begins, and none for attempts made while it holds", async () => {
+    const email = await seedLogin("n-lock");
+    const tenant = await joinAccount("n-lock");
+    await enrol(email);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const challenge = await challengeOf(email);
+      await expect(auth().api.verifyTOTP({ body: { code: "000000" }, headers: { cookie: challenge.cookie } })).rejects.toMatchObject({ status: "UNAUTHORIZED" });
+    }
+    const locked = await challengeOf(email);
+    await expect(auth().api.verifyTOTP({ body: { code: "000000" }, headers: { cookie: locked.cookie } })).rejects.toMatchObject({ status: "TOO_MANY_REQUESTS" });
+
+    expect(await auditOf(tenant.partyId)).toEqual([
+      ["two_factor.enabled", tenant.partyId],
+      ["two_factor.locked", null],
+    ]);
   });
 });
 
