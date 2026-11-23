@@ -12,7 +12,7 @@ import { TooltipProvider } from "#/components/ui/tooltip";
 import { Label } from "#/components/ui/label";
 import { fieldAria, fieldMessage, focusFirstInvalidField } from "#/lib/form-field";
 import { signIn, signUp } from "../api";
-import { AUTH_COPY } from "../constants";
+import { AUTH_COPY, SIGNED_OUT_COOKIE, SIGNED_OUT_NOTICE } from "../constants";
 import { AuthBrandPanel } from "./auth-brand-panel";
 import { ForgotPasswordFields } from "./forgot-password-fields";
 import { ResetPasswordFields } from "./reset-password-fields";
@@ -26,6 +26,16 @@ import { screenAfterSignIn } from "../utils";
 import { TwoFactorSecondStepFields } from "./two-factor-second-step-fields";
 import { TwoFactorSetupFields } from "./two-factor-setup-fields";
 import { AuthSignOutButton } from "./auth-signout-button";
+
+// -----
+// The sign-in page shows the notice once when the dashboard cleared a rejected
+// session cookie: read the flag cookie on mount, then delete it.
+// -----
+function showSignedOutNotice(element: HTMLOutputElement | null) {
+  if (!element || !document.cookie.split("; ").includes(`${SIGNED_OUT_COOKIE}=1`)) return;
+  document.cookie = `${SIGNED_OUT_COOKIE}=; path=/; max-age=0`;
+  element.textContent = SIGNED_OUT_NOTICE;
+}
 
 function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
   const done = useAuthDone(redirectTo);
@@ -227,6 +237,7 @@ export function AuthForm({ mode, token, email, redirectTo, turnstileSiteKey = nu
           <CardHeader className="gap-1.5 px-8 pb-9 pt-8">
             <h1 className="text-xl font-semibold leading-none tracking-tight">{copy.title}</h1>
             <p className="text-sm leading-relaxed text-muted-foreground">{copy.hint}</p>
+            {mode === "signin" ? <output ref={showSignedOutNotice} className="text-sm leading-relaxed text-foreground empty:hidden" /> : null}
           </CardHeader>
           <CardContent className="p-8">
             <AuthFields mode={mode} token={token} email={email} redirectTo={redirectTo} turnstileSiteKey={turnstileSiteKey} />

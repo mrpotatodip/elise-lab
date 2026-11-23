@@ -5,6 +5,13 @@ export const EMAIL_NOT_VERIFIED_CODE = "EMAIL_NOT_VERIFIED";
 
 export const TWO_FACTOR_REQUIRED_CODE = "TWO_FACTOR_REQUIRED";
 
+// -----
+// A short-lived cookie set when the engine rejects the session cookie. The
+// sign-in page reads it once, shows the notice and deletes it.
+// -----
+export const SIGNED_OUT_COOKIE = "elise_signed_out";
+export const SIGNED_OUT_NOTICE = "You were signed out. This login may be open in another browser.";
+
 export const AUTH_COPY = {
   signin: {
     title: "Sign in",

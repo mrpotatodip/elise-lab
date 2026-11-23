@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { deleteCookie } from "@tanstack/react-start/server";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { ResendVerificationBodySchema } from "@repo/contracts/elise";
@@ -6,7 +7,7 @@ import { EngineError, engineFetch, jsonPost } from "#/lib/engine-client";
 import { tryCatch } from "#/lib/try-catch";
 import { saveChallenge } from "../server/challenge";
 import type { SignInOutcome } from "../utils";
-import { AUTH_COPY, EMAIL_NOT_VERIFIED_CODE } from "../constants";
+import { AUTH_COPY, EMAIL_NOT_VERIFIED_CODE, SIGNED_OUT_COOKIE } from "../constants";
 import { ForgotPasswordSchema, ResetPasswordSchema, SignInSchema, SignUpInputSchema, VerifyEmailSchema } from "../schemas";
 import { clearSessionToken, findSession, saveSessionToken } from "../server/session";
 
@@ -90,4 +91,5 @@ export const signOut = createServerFn({ method: "POST" }).handler(async () => {
   const session = await findSession();
   if (session) await engineFetch("/auth/sign-out", { method: "POST" }, { token: session.token }).catch(() => undefined);
   clearSessionToken();
+  deleteCookie(SIGNED_OUT_COOKIE, { path: "/" });
 });
