@@ -43,7 +43,6 @@
   & .sp-alert__title { font-size: 14px; font-weight: 500; line-height: 20px; color: var(--status-info); }
   & .sp-alert__note { max-width: 62ch; font-size: 14px; line-height: 20px; color: var(--foreground); }
   & .sp-spin { animation: rn-spin 1s linear infinite; }
-  @keyframes rn-spin { to { transform: rotate(360deg); } }
 
   /* "Nothing verified yet": the findings table's empty state. */
   & .sp-empty { display: grid; justify-items: center; gap: 6px; padding: 40px 24px; text-align: center; }
@@ -69,7 +68,6 @@
   & .sp-ping { position: relative; display: block; width: 10px; height: 10px; }
   & .sp-ping i { position: absolute; inset: 0; border-radius: 50%; background: var(--primary); }
   & .sp-ping i:first-child { opacity: 0.6; animation: rn-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
-  @keyframes rn-ping { 75%, 100% { transform: scale(2); opacity: 0; } }
   & .sp-times { margin-left: 6px; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
   & .sp-time { margin-left: 8px; font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
   & .sp-phases { display: grid; margin: 0; padding: 0; list-style: none; }
@@ -95,3 +93,7 @@
   & [data-layout="compact"] .rn-log { padding: 2px 12px 12px; font-size: 11px; line-height: 17px; }
   & [data-layout="compact"] .rn-log .ss-term__line { font-size: 11px; line-height: 17px; }
 }
+
+/* Keyframes sit at the top level: the production CSS minifier rejects an @keyframes nested in .rn. */
+@keyframes rn-spin { to { transform: rotate(360deg); } }
+@keyframes rn-ping { 75%, 100% { transform: scale(2); opacity: 0; } }
