@@ -20,7 +20,11 @@ import {
   TeamDeletedSchema,
   TeamInvitePreviewSchema,
   TeamListSchema,
+  ResetTwoFactorInputSchema,
   TeamRolesSchema,
+  TeamTwoFactorRequirementSchema,
+  TeamTwoFactorResetSchema,
+  UpdateTeamTwoFactorRequirementBodySchema,
 } from "../schemas";
 
 // -----
@@ -29,6 +33,20 @@ import {
 export const fetchTeam = createServerFn({ method: "GET" }).handler(async () => engineJson(TeamListSchema, "/team", {}, await engineAuth()));
 
 export const fetchTeamRoles = createServerFn({ method: "GET" }).handler(async () => engineJson(TeamRolesSchema, "/team/roles", {}, await engineAuth()));
+
+export const fetchTwoFactorRequirement = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(TeamTwoFactorRequirementSchema, "/team/two-factor-requirement", {}, await engineAuth()),
+);
+
+export const setTwoFactorRequirement = createServerFn({ method: "POST" })
+  .validator(UpdateTeamTwoFactorRequirementBodySchema)
+  .handler(async ({ data }) =>
+    engineJson(TeamTwoFactorRequirementSchema, "/team/two-factor-requirement", { ...jsonPost(JSON.stringify(data)), method: "PUT" }, await engineAuth()),
+  );
+
+export const resetMemberTwoFactor = createServerFn({ method: "POST" })
+  .validator(ResetTwoFactorInputSchema)
+  .handler(async ({ data }) => engineJson(TeamTwoFactorResetSchema, `/team/members/${data.partyId}/two-factor/reset`, { method: "POST" }, await engineAuth()));
 
 export const createTeamInvite = createServerFn({ method: "POST" })
   .validator(CreateInviteInputSchema)

@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { fetchGroups, fetchTeam, fetchTeamRoles, previewTeamInvite } from "../api";
+import { fetchGroups, fetchTeam, fetchTeamRoles, fetchTwoFactorRequirement, previewTeamInvite } from "../api";
 
 export const teamKeys = {
   all: ["team"] as const,
@@ -10,6 +10,8 @@ export const teamKeys = {
 };
 
 export const teamQuery = () => queryOptions({ queryKey: teamKeys.members(), queryFn: () => fetchTeam() });
+
+export const twoFactorRequirementQuery = () => queryOptions({ queryKey: [...teamKeys.all, "two-factor-requirement"] as const, queryFn: () => fetchTwoFactorRequirement() });
 
 export const teamRolesQuery = () => queryOptions({ queryKey: teamKeys.roles(), queryFn: () => fetchTeamRoles(), staleTime: Infinity });
 

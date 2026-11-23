@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { EngineError, engineFetch, jsonPost } from "#/lib/engine-client";
 import { tryCatch } from "#/lib/try-catch";
+import { TWO_FACTOR_REQUIRED_CODE } from "../constants";
 import { clearChallenge, readChallenge } from "../server/challenge";
 import { requireSession, saveSessionToken } from "../server/session";
 import { BackupCodesResponseSchema, CodeSchema, DisableSchema, EnableResponseSchema, PasswordSchema } from "../schemas";
@@ -56,10 +57,13 @@ export const confirmTwoFactor = createServerFn({ method: "POST" })
 
 export const disableTwoFactor = createServerFn({ method: "POST" })
   .validator(DisableSchema)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ accountRequires: boolean }> => {
     const { token } = await requireSession();
-    const res = await engineFetch("/auth/two-factor/disable", jsonPost(JSON.stringify({ password: data.password, code: codeInput(data.code).code })), { token });
+    const { data: res, error } = await tryCatch(engineFetch("/auth/two-factor/disable", jsonPost(JSON.stringify({ password: data.password, code: codeInput(data.code).code })), { token }));
+    if (error instanceof EngineError && error.status === 403 && error.code === TWO_FACTOR_REQUIRED_CODE) return { accountRequires: true };
+    if (error) throw error;
     keepRenewedToken(res);
+    return { accountRequires: false };
   });
 
 export const regenerateBackupCodes = createServerFn({ method: "POST" })

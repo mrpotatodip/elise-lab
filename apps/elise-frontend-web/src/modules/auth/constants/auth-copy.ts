@@ -3,6 +3,8 @@
 // -----
 export const EMAIL_NOT_VERIFIED_CODE = "EMAIL_NOT_VERIFIED";
 
+export const TWO_FACTOR_REQUIRED_CODE = "TWO_FACTOR_REQUIRED";
+
 export const AUTH_COPY = {
   signin: {
     title: "Sign in",

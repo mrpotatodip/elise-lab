@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_app/settings/security")({
 
 function SecurityPage() {
   const { user } = Route.useRouteContext();
-  return <SettingsSecurityPage twoFactorEnabled={user?.twoFactorEnabled ?? false} role={user?.role ?? ""} />;
+  return <SettingsSecurityPage twoFactorEnabled={user?.twoFactorEnabled ?? false} role={user?.role ?? ""} powers={user?.powers ?? []} />;
 }

@@ -47,12 +47,17 @@ function RegenerateForm({ onCodes }: { onCodes: (codes: string[]) => void }) {
   );
 }
 
-function DisableForm({ onDone }: { onDone: () => void }) {
+function DisableForm({ onDone, onRequired }: { onDone: () => void; onRequired: () => void }) {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const disable = useMutation({
     mutationFn: () => disableTwoFactor({ data: { password, code } }),
-    onSuccess: () => {
+    onSuccess: ({ accountRequires }) => {
+      if (accountRequires) {
+        toast.error("This account requires Two-factor, so it cannot be turned off.");
+        onRequired();
+        return;
+      }
       toast.success("Two-factor sign-in is off.");
       onDone();
     },
@@ -79,8 +84,10 @@ function DisableForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-export function TwoFactorCard({ enabled, role }: { enabled: boolean; role: string }) {
+export function TwoFactorCard({ enabled, role, accountRequires }: { enabled: boolean; role: string; accountRequires: boolean }) {
   const router = useRouter();
+  const [learnedRequired, setLearnedRequired] = useState(false);
+  const turnOffAllowed = canTurnOff(role) && !accountRequires && !learnedRequired;
   const queryClient = useQueryClient();
   const [panel, setPanel] = useState<Panel>("none");
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -104,7 +111,13 @@ export function TwoFactorCard({ enabled, role }: { enabled: boolean; role: strin
         {codes ? <BackupCodes codes={codes} onDone={() => void refresh()} doneLabel="Done" /> : null}
         {!codes && panel === "setup" ? <TwoFactorSetup onDone={() => void refresh()} /> : null}
         {!codes && panel === "regenerate" ? <RegenerateForm onCodes={setCodes} /> : null}
-        {!codes && panel === "disable" ? <DisableForm onDone={() => void refresh()} /> : null}
+        {!codes && panel === "disable" ? <DisableForm
+            onDone={() => void refresh()}
+            onRequired={() => {
+              setLearnedRequired(true);
+              setPanel("none");
+            }}
+          /> : null}
         {!codes && panel === "none" ? (
           <div className="flex flex-wrap gap-3">
             {enabled ? (
@@ -112,12 +125,12 @@ export function TwoFactorCard({ enabled, role }: { enabled: boolean; role: strin
                 <Button variant="outline" onClick={() => setPanel("regenerate")}>
                   Make new Backup codes
                 </Button>
-                {canTurnOff(role) ? (
+                {turnOffAllowed ? (
                   <Button variant="outline" onClick={() => setPanel("disable")}>
                     Turn off
                   </Button>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Your role needs Two-factor sign-in, so it cannot be turned off.</p>
+                  <p className="text-sm text-muted-foreground">{canTurnOff(role) ? "This account requires Two-factor sign-in, so it cannot be turned off." : "Your role needs Two-factor sign-in, so it cannot be turned off."}</p>
                 )}
               </>
             ) : (

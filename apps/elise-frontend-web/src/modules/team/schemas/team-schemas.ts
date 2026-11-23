@@ -11,6 +11,7 @@ import {
   SIGN_UP_PERSON_NAME_MAX,
   TeamInviteParamSchema,
   TeamInviteTokenParamSchema,
+  TeamMemberParamSchema,
 } from "@repo/contracts/elise";
 
 export {
@@ -26,9 +27,13 @@ export {
   TeamInvitePreviewSchema,
   TeamListSchema,
   TeamRolesSchema,
+  TeamTwoFactorRequirementSchema,
+  TeamTwoFactorResetSchema,
+  UpdateTeamTwoFactorRequirementBodySchema,
 } from "@repo/contracts/elise";
 export type { CreatedTeamInvite, Group, TeamInvite, TeamInvitePreview, TeamList, TeamMember, TeamRole } from "@repo/contracts/elise";
 
+export const ResetTwoFactorInputSchema = TeamMemberParamSchema;
 export const InviteTokenInputSchema = TeamInviteTokenParamSchema;
 export const CreateInviteInputSchema = CreateTeamInviteBodySchema;
 export const RevokeInviteInputSchema = TeamInviteParamSchema;

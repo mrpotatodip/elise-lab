@@ -1,16 +1,17 @@
 import { useMutation, useQueryClient, useSuspenseQueries } from "@tanstack/react-query";
+import { useRouteContext } from "@tanstack/react-router";
 import { useTable } from "@tanstack/react-table";
 import { toast } from "sonner";
-import type { InviteEmailStatusValue } from "@repo/contracts/elise";
+import { hasAccessPower, type InviteEmailStatusValue } from "@repo/contracts/elise";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
 import { dataTableColumns, dataTableFeatures } from "#/lib/data-table";
-import { createTeamInvite, revokeTeamInvite } from "../api";
+import { createTeamInvite, resetMemberTwoFactor, revokeTeamInvite } from "../api";
 import { groupsQuery, teamKeys, teamQuery } from "../hooks";
 import type { CreateInviteInput } from "../schemas";
-import { teamRoleLabel } from "../utils";
+import { canResetTwoFactor, teamRoleLabel } from "../utils";
 import { TeamConfirmDialog } from "./team-confirm-dialog";
 
 const DATE = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -25,9 +26,12 @@ type PersonRow = {
   you: boolean;
   expiresAt: string;
   emailStatus: InviteEmailStatusValue | undefined;
+  twoFactorEnabled: boolean | undefined;
+  canReset: boolean;
   busy: boolean;
   resend: () => void;
   revoke: () => Promise<void>;
+  resetTwoFactor: () => Promise<void>;
 };
 
 const noAction = () => undefined;
@@ -80,12 +84,34 @@ const columns = column.columns([
     ),
   }),
   column.display({
+    id: "twoFactor",
+    header: "Two-factor",
+    cell: ({ row }) => {
+      const person = row.original;
+      if (person.kind === "invite" || person.twoFactorEnabled === undefined) return <span className="text-muted-foreground">-</span>;
+      return person.twoFactorEnabled ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>;
+    },
+  }),
+  column.display({
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
     meta: { head: "w-24", cell: "text-right" },
     cell: ({ row }) => {
       const person = row.original;
-      if (person.kind === "member") return null;
+      if (person.kind === "member") {
+        if (!person.canReset) return null;
+        return (
+          <TeamConfirmDialog
+            triggerLabel="Reset 2FA"
+            triggerAriaLabel={`Reset Two-factor for ${person.name}`}
+            title="Reset Two-factor?"
+            description={`${person.name} will sign in with a password alone until they set Two-factor up again. Use this when they lost their device and Backup codes.`}
+            confirmLabel="Reset Two-factor"
+            pending={person.busy}
+            onConfirm={person.resetTwoFactor}
+          />
+        );
+      }
       return (
         <>
           <Button variant="ghost" size="sm" aria-label={`Send the invite to ${person.email} again`} disabled={person.busy} onClick={person.resend}>
@@ -120,6 +146,17 @@ export function TeamMembersCard({ email }: { email: string }) {
     onError: (error) => toast.error(`We couldn't revoke the invite. ${error.message}`),
   });
 
+  const { user } = useRouteContext({ from: "/_app" });
+  const mayReset = hasAccessPower(user?.powers ?? [], "company:team:two_factor:reset");
+  const resetTwoFactor = useMutation({
+    mutationFn: (partyId: string) => resetMemberTwoFactor({ data: { partyId } }),
+    onSuccess: async () => {
+      toast.success("Two-factor is reset. They set it up again at their next sign-in.");
+      await queryClient.invalidateQueries({ queryKey: teamKeys.members() });
+    },
+    onError: (error) => toast.error(`We couldn't reset Two-factor. ${error.message}`),
+  });
+
   const resend = useMutation({
     mutationFn: (input: CreateInviteInput) => createTeamInvite({ data: input }),
     onSuccess: async (created) => {
@@ -140,9 +177,14 @@ export function TeamMembersCard({ email }: { email: string }) {
       you: member.email.toLowerCase() === email.toLowerCase(),
       expiresAt: "",
       emailStatus: undefined,
-      busy: false,
+      twoFactorEnabled: member.twoFactorEnabled,
+      canReset: mayReset && canResetTwoFactor(user?.role ?? "", member.role, member.email.toLowerCase() === email.toLowerCase()),
+      busy: resetTwoFactor.isPending,
       resend: noAction,
       revoke: async () => undefined,
+      resetTwoFactor: async () => {
+        await resetTwoFactor.mutateAsync(member.partyId);
+      },
     })),
     ...data.invites.map((invite) => ({
       id: `invite-${invite.id}`,
@@ -154,6 +196,9 @@ export function TeamMembersCard({ email }: { email: string }) {
       you: false,
       expiresAt: invite.expiresAt,
       emailStatus: invite.emailStatus,
+      twoFactorEnabled: undefined,
+      canReset: false,
+      resetTwoFactor: async () => undefined,
       busy: resend.isPending || revoke.isPending,
       resend: () => resend.mutate({ email: invite.email, role: invite.role, groupIds: [...invite.groupIds] }),
       revoke: async () => {
