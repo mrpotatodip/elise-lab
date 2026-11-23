@@ -137,7 +137,7 @@ async function script(a: Act<S>) {
 
   a.mark("run");
   for (let i = 0; i < LOG.length; i++) {
-    const phase = i % 2 === 1 ? (i - 1) / 2 : -1;
+    const phase = i % 2 === 1 && i <= 7 ? (i - 1) / 2 : -1;
     await a.set(phase >= 0 ? { lines: i + 1, step: 0 } : { lines: i + 1 });
     if (wide && i === 1) {
       // The row only says "In progress", so the cursor opens the Scan page to watch it.
