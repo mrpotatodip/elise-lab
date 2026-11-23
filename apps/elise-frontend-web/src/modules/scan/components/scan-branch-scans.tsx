@@ -65,7 +65,7 @@ const columnsOf = (zip: boolean) => column.columns([
           </span>
         );
       }
-      if (item.status === "failed") return <span className="text-sm text-status-danger">{scanFailure(item.error).title}</span>;
+      if (item.status === "failed") return <span className="text-sm text-status-danger">{scanFailure(item.error, item.failureCode).title}</span>;
       return <span className="text-muted-foreground">{scanNoSummaryText(item.status)}</span>;
     },
   }),

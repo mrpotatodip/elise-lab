@@ -39,10 +39,10 @@ import {
   freshMeter,
   parseAgentUsage,
   phaseAgentFiles,
-  priceUsage,
   remainingUsd,
   sumOrNull,
   withReserve,
+  withSpend,
   withoutReserve,
   type AgentFiles,
 } from "#/modules/scan-sandbox/utils";
@@ -99,14 +99,7 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async meterRecord(model: string, tokens: MeteredTokens): Promise<void> {
     const meter = await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY);
     if (meter === undefined) return;
-    await this.ctx.storage.put<Meter>(SCAN_SANDBOX_METER_KEY, {
-      ...meter,
-      inputTokens: meter.inputTokens + tokens.inputTokens,
-      outputTokens: meter.outputTokens + tokens.outputTokens,
-      cacheReadTokens: meter.cacheReadTokens + tokens.cacheReadTokens,
-      cacheWriteTokens: meter.cacheWriteTokens + tokens.cacheWriteTokens,
-      spentUsd: meter.spentUsd + priceUsage(model, tokens),
-    });
+    await this.ctx.storage.put<Meter>(SCAN_SANDBOX_METER_KEY, withSpend(meter, model, tokens));
   }
 
   // -----

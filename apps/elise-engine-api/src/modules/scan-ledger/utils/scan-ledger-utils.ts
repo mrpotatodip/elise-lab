@@ -1,6 +1,7 @@
 import type { scans } from "@repo/db-elise/schema";
 import type { FindingOriginValue, FindingSeverityValue, FindingStatusValue, ScanArchiveRef, ScanArtifact, ScanRunner, ScanSummary } from "@repo/contracts/elise";
 import { ScanStatusSchema, type ScanStatus } from "#/schemas";
+import { failureCodeOf } from "./failure-code";
 
 type ScanRow = typeof scans.$inferSelect;
 
@@ -40,6 +41,7 @@ export const scanRowToStatus = (
   updatedAt: row.updatedAt.toISOString(),
   finishedAt: row.finishedAt?.toISOString() ?? null,
   error: row.error,
+  failureCode: row.status === "failed" ? failureCodeOf(row.error) : null,
   files: artifacts.length > 0 ? artifacts.map((artifact) => artifact.name) : null,
   artifacts,
   summary,

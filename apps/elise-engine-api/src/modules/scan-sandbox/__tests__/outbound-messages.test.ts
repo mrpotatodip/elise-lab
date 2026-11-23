@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Outbound } from "#/modules/scan-sandbox";
 import type { Meter, MeteredTokens } from "#/modules/scan-sandbox/types";
-import { messagesBlockedReason, priceUsage, safeBetaHeader, withReserve, withoutReserve, type MessagesBody } from "#/modules/scan-sandbox/utils";
+import { messagesBlockedReason, safeBetaHeader, withReserve, withSpend, withoutReserve, type MessagesBody } from "#/modules/scan-sandbox/utils";
 
 const body = (extra: Partial<MessagesBody> = {}): MessagesBody => ({ model: "claude-haiku-5-5", ...extra });
 
@@ -70,7 +70,7 @@ const meterSandbox = (budgetUsd: number) => {
       meter = withoutReserve(meter, usd);
     },
     meterRecord: async (model: string, tokens: MeteredTokens) => {
-      meter = { ...meter, spentUsd: meter.spentUsd + priceUsage(model, tokens) };
+      meter = withSpend(meter, model, tokens);
     },
   };
 };
