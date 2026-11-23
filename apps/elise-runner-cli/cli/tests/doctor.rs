@@ -27,8 +27,14 @@ fn doctor_with_everything_in_order_prints_a_pass_line_per_check_and_exits_0() {
 
     assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
     let lines: Vec<&str> = output.stdout.lines().collect();
-    assert_eq!(lines.len(), 5, "{}", output.stdout);
-    for (line, check) in lines.iter().zip(["git", "claude", "paired", "github.com", "git.acme.dev"]) {
+    // Windows adds two checks: Git for Windows (right after git) and Node.js (right after claude).
+    let checks: &[&str] = if cfg!(windows) {
+        &["git", "git for windows", "claude", "node", "paired", "github.com", "git.acme.dev"]
+    } else {
+        &["git", "claude", "paired", "github.com", "git.acme.dev"]
+    };
+    assert_eq!(lines.len(), checks.len(), "{}", output.stdout);
+    for (line, check) in lines.iter().zip(checks) {
         assert!(line.starts_with("pass") && line.contains(check), "{check}: {line}");
     }
     let calls = stubs.git_calls();
@@ -110,7 +116,9 @@ fn a_failing_check_prints_its_fix_the_others_still_run_and_the_exit_is_1() {
 
         assert_eq!(output.code, 1, "{broken}: {}{}", output.stdout, output.stderr);
         let failed: Vec<&str> = output.stdout.lines().filter(|line| line.starts_with("FAIL")).collect();
-        assert_eq!(failed.len(), 1, "{broken}: {}", output.stdout);
+        // Without git, Windows also fails Git for Windows (its bash comes with git).
+        let expected_failures = if cfg!(windows) && broken == "git" { 2 } else { 1 };
+        assert_eq!(failed.len(), expected_failures, "{broken}: {}", output.stdout);
         let line = failed[0];
         assert!(line.contains(broken) && line.contains(fix), "{broken}: {line}");
         assert!(output.stdout.lines().any(|line| line.starts_with("pass")), "{broken}: {}", output.stdout);
