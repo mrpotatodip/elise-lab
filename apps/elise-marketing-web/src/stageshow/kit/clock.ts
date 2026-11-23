@@ -260,6 +260,6 @@ export function installVirtualClock(opts: { fps?: number; epoch?: number; onLayo
       await settle()
     },
   }
-  w.__stageshow = { ...(w.__stageshow ?? {}), clock: control }
+  w.__stageshow = { ...w.__stageshow, clock: control }
   return control
 }
