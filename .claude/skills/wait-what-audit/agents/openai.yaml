@@ -1,0 +1,5 @@
+interface:
+  display_name: "Wait What Audit"
+  short_description: "Re-pitch for a junior dev: context, plain words, one tiny example"
+policy:
+  allow_implicit_invocation: true
