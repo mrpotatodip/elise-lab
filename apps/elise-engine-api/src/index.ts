@@ -9,6 +9,7 @@ import { rateLimitByIp } from "#/lib/rate-limit";
 import { openApiDocument, requireOpenApiEnabled, validationErrorResponse } from "#/lib/openapi-document";
 import { errorChainForLog } from "#/lib/redact-log";
 import { requireScanAccess } from "#/lib/require-scan-access";
+import { requireTwoFactor } from "#/lib/require-two-factor";
 import archivesRoutes, { runUploadRetention } from "#/modules/archives";
 import authRoutes from "#/modules/auth";
 import filesRoutes from "#/modules/files";
@@ -44,6 +45,8 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     c.header("strict-transport-security", "max-age=31536000");
     c.header("x-content-type-options", "nosniff");
   });
+
+  app.use("*", requireTwoFactor);
 
   // -----
   // Every /scans route needs the service token or a

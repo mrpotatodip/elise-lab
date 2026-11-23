@@ -15,6 +15,7 @@ import {
 import type { AccessPower, Me, MeAccount } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { twoFactorStatusEffect } from "#/modules/two-factor";
 
 // -----
 // The login, the type of its Party, the Accounts
@@ -89,7 +90,11 @@ export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me
       catch: toDbError,
     });
 
+    const twoFactor = yield* twoFactorStatusEffect(db, userId);
+
     return {
+      twoFactorEnabled: twoFactor.enabled,
+      twoFactorSetupRequired: twoFactor.setupRequired,
       user: { id: login.id, name: login.name, email: login.email, partyId: login.partyId },
       partyType: login.partyType,
       isSuperuser: staff.length > 0,

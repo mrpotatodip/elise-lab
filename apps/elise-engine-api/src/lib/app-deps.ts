@@ -14,6 +14,7 @@ import { InternalServiceError } from "#/lib/errors";
 import { STRIPE_NOT_CONFIGURED_MESSAGE } from "#/modules/stripe/constants";
 import { verifyTurnstileToken } from "#/modules/sign-up/lib";
 import { stripeGateway } from "#/modules/stripe/lib";
+import { twoFactorStatusEffect } from "#/modules/two-factor";
 import { typesafeGateway } from "#/modules/typesafe";
 import { monthSpendEffect, monthStartOf } from "#/modules/usage";
 import type { AppEnv, AppDeps } from "#/types/variables";
@@ -47,6 +48,7 @@ export const realAppDeps: AppDeps = {
   runnerIdentity: (c, token) => runEffect(runnerIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
   userHasAccount: (c, userId, accountId) => runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) => runEffect(userHasPowerEffect(dbConnect(c.env.DATABASE_URL), userId, accountId, power)),
+  twoFactorSetupRequired: async (c, userId) => (await runEffect(twoFactorStatusEffect(dbConnect(c.env.DATABASE_URL), userId))).setupRequired,
   enqueueEmail,
   verifyTurnstile: (env, token, ip) => verifyTurnstileToken({ secret: env.TURNSTILE_SECRET_KEY, token, ip }),
   withTenant: (c, accountId, run) => withTenant(c.env.HYPERDRIVE_TENANT.connectionString, (promise) => c.executionCtx.waitUntil(promise), accountId, run),

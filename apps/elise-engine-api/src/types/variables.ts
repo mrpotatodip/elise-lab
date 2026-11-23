@@ -74,6 +74,7 @@ export type AppDeps = {
   runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
+  twoFactorSetupRequired: (c: Context<AppEnv>, userId: string) => Promise<boolean>;
   enqueueEmail: (env: Bindings, mail: QueuedEmail) => Promise<void>;
   verifyTurnstile: (env: Bindings, token: string | undefined, ip: string | undefined) => Promise<boolean>;
   withTenant: <T>(c: Context<AppEnv>, accountId: string, run: (db: TenantDbType) => Promise<T>) => Promise<T>;
