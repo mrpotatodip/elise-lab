@@ -118,6 +118,8 @@ fn an_engine_without_the_login_routes_gets_the_pair_message() {
     assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
 }
 
+// Unix only: it sends INT.
+#[cfg(unix)]
 #[test]
 fn ctrl_c_cancels_the_wait_with_one_plain_line_and_saves_nothing() {
     let engine = Engine::start();

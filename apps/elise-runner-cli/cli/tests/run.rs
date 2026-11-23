@@ -144,6 +144,8 @@ fn the_agent_gets_the_built_in_skill_and_the_runners_settings_but_never_the_toke
     assert_eq!(read("SKILL.md"), std::fs::read_to_string(skill).unwrap());
 }
 
+// Unix only: it sends INT and TERM, which Windows has no equivalent of.
+#[cfg(unix)]
 #[test]
 fn a_stop_signal_during_a_scan_stops_the_agent_reports_the_scan_failed_and_exits_with_code_1() {
     for signal in ["INT", "TERM"] {
@@ -173,6 +175,8 @@ fn a_stop_signal_during_a_scan_stops_the_agent_reports_the_scan_failed_and_exits
     }
 }
 
+// Unix only: it sends TERM.
+#[cfg(unix)]
 #[test]
 fn a_stop_signal_with_no_scan_running_exits_at_once_with_code_0() {
     for signal in ["INT", "TERM"] {
@@ -385,6 +389,8 @@ fn an_archive_job_with_a_path_that_leaves_its_folder_fails_before_the_agent_star
     assert!(!stubs.record.join("repo.txt").exists(), "the agent never started");
 }
 
+// Unix only: it sends TERM.
+#[cfg(unix)]
 #[test]
 fn run_once_stopped_while_its_claim_is_in_flight_exits_with_code_0() {
     let engine = Engine::start();
@@ -406,6 +412,8 @@ fn run_once_stopped_while_its_claim_is_in_flight_exits_with_code_0() {
 
 const WAITING: [&str; 4] = ["phase=recon cost=1", "phase=hunt stop=wait", "phase=check", "phase=report"];
 
+// Unix only: it sends INT.
+#[cfg(unix)]
 #[test]
 fn parallel_runs_that_many_scans_at_once_claims_no_more_and_one_stop_signal_ends_them_all() {
     let engine = Engine::start();
@@ -437,6 +445,8 @@ fn parallel_runs_that_many_scans_at_once_claims_no_more_and_one_stop_signal_ends
     }
 }
 
+// Unix only: it sends INT.
+#[cfg(unix)]
 #[test]
 fn a_scan_stopped_from_elise_among_parallel_scans_ends_only_that_one() {
     let engine = Engine::start();
@@ -526,6 +536,8 @@ fn a_scan_stopped_from_elise_kills_the_agent_sends_nothing_keeps_the_folder_and_
     assert_eq!(last, format!("[acme/widgets scan_12] Scan stopped from Elise. Work folder kept: {}", work.display()));
 }
 
+// Unix only: it sends TERM.
+#[cfg(unix)]
 #[test]
 fn run_goes_back_to_waiting_after_a_stop_from_elise() {
     let engine = Engine::start();
@@ -602,6 +614,8 @@ fn files_under(folder: &std::path::Path) -> Vec<(std::path::PathBuf, String)> {
     found
 }
 
+// Unix only until the git credential helper stops being a /bin/sh script (core/src/git_token.rs).
+#[cfg(unix)]
 #[test]
 fn a_git_token_reaches_the_clone_for_the_jobs_host_only_and_is_left_nowhere() {
     for (repo, host, git_fails) in [
