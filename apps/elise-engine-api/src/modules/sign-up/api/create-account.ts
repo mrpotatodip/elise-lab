@@ -1,12 +1,11 @@
 import { Hono } from "hono";
 import { SignUpBodySchema } from "@repo/contracts/elise";
-import { withPool } from "#/lib/db-connection";
 import { ConflictError } from "#/lib/errors";
 import { SIGN_UP_REFUSED } from "#/modules/sign-up/constants";
 import { runEffect } from "#/lib/effect-query";
 import { zValidator } from "#/lib/zod-validator";
 import { createAccountSvc } from "#/modules/sign-up/handlers";
-import { requireSignUpLimit, requireSignUpTotalLimit } from "#/modules/sign-up/lib";
+import { requireSignUpLimit, requireSignUpTotalLimit, sendVerificationEmailQuietly } from "#/modules/sign-up/lib";
 import { createAccountDoc } from "#/modules/sign-up/openapi";
 import type { AppEnv } from "#/types/variables";
 
@@ -16,11 +15,11 @@ app.post("/", createAccountDoc, requireSignUpLimit, requireSignUpTotalLimit, zVa
   const body = c.req.valid("json");
   const passed = await c.get("deps").verifyTurnstile(c.env, body.turnstileToken, c.req.header("cf-connecting-ip"));
   if (!passed) throw new ConflictError(SIGN_UP_REFUSED);
-  const data = await withPool(
-    c.env.DATABASE_URL,
-    (promise) => c.executionCtx.waitUntil(promise),
-    (db) => runEffect(createAccountSvc(db, body)),
-  );
+  const data = await c.get("deps").withOwner(c, async (db) => {
+    const created = await runEffect(createAccountSvc(db, body));
+    await runEffect(sendVerificationEmailQuietly(c, db, body.email));
+    return created;
+  });
   return c.json({ data, error: null }, 201);
 });
 

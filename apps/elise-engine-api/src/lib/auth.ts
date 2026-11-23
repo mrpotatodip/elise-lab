@@ -24,7 +24,6 @@ export const AUTH_DISABLED_PATHS = [
   "/get-access-token",
   "/refresh-token",
   "/send-verification-email",
-  "/verify-email",
   "/change-email",
   "/change-password",
   "/update-user",
@@ -44,6 +43,7 @@ export type AuthConfig = {
 };
 
 const RESET_TOKEN_SECONDS = 3600;
+export const VERIFY_TOKEN_SECONDS = 24 * 3600;
 
 // -----
 // Takes plain values, not a Context, so a test
@@ -64,7 +64,7 @@ export const buildAuth = (config: AuthConfig) =>
     emailAndPassword: {
       enabled: true,
       disableSignUp: true,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
       resetPasswordTokenExpiresIn: RESET_TOKEN_SECONDS,
       revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, token }) => {
@@ -91,6 +91,18 @@ export const buildAuth = (config: AuthConfig) =>
           .catch(() => console.error("password-reset-done enqueue failed"));
       },
     },
+    emailVerification: {
+      expiresIn: VERIFY_TOKEN_SECONDS,
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async ({ user, token }) => {
+        await config.enqueueEmail({
+          kind: "verify-email",
+          to: user.email,
+          link: `${config.dashboardUrl}/verify-email?token=${encodeURIComponent(token)}`,
+          expiresAt: new Date(Date.now() + VERIFY_TOKEN_SECONDS * 1000).toISOString(),
+        });
+      },
+    },
     disabledPaths: AUTH_DISABLED_PATHS,
     secret: config.secret,
     // -----
@@ -113,17 +125,19 @@ export const buildAuth = (config: AuthConfig) =>
 // once it has the answer, through waitUntil, so
 // the socket does not outlive the request.
 // -----
+export const authConfigOf = (c: Context<AppEnv>, db: PoolDbType): AuthConfig => ({
+  db,
+  secret: c.env.AUTH_SECRET,
+  baseUrl: c.env.AUTH_BASE_URL,
+  trustedOrigins: c.env.AUTH_TRUSTED_ORIGINS.split(","),
+  dashboardUrl: c.env.DASHBOARD_URL,
+  enqueueEmail: (mail) => c.get("deps").enqueueEmail(c.env, mail),
+  waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+  resetAddressLimiter: c.env.PASSWORD_RESET_ADDRESS_LIMITER,
+});
+
 export const createAuth = (c: Context<AppEnv>) => {
   const { db, close } = poolConnect(c.env.DATABASE_URL);
-  const auth = buildAuth({
-    db,
-    secret: c.env.AUTH_SECRET,
-    baseUrl: c.env.AUTH_BASE_URL,
-    trustedOrigins: c.env.AUTH_TRUSTED_ORIGINS.split(","),
-    dashboardUrl: c.env.DASHBOARD_URL,
-    enqueueEmail: (mail) => c.get("deps").enqueueEmail(c.env, mail),
-    waitUntil: (promise) => c.executionCtx.waitUntil(promise),
-    resetAddressLimiter: c.env.PASSWORD_RESET_ADDRESS_LIMITER,
-  });
+  const auth = buildAuth(authConfigOf(c, db));
   return { auth, close: () => c.executionCtx.waitUntil(close()) };
 };
