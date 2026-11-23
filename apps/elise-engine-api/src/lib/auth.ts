@@ -7,8 +7,10 @@ import { bearer, twoFactor } from "better-auth/plugins";
 import { z } from "zod";
 import { sha256Hex } from "@repo/db-elise";
 import { authAccount, authSession, authTwoFactor, authUser, authVerification } from "@repo/db-elise/schema";
+import { MAX_SESSIONS_PER_LOGIN } from "#/constants";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
+import { trimSessions } from "#/lib/trim-sessions";
 import type { QueuedEmail, TwoFactorNoticeEmail } from "#/modules/email";
 import { accountRequiresTwoFactorEffect, auditTwoFactorChange, loginIsTwoFactorAdminEffect } from "#/modules/two-factor";
 import type { AppEnv } from "#/types/variables";
@@ -291,6 +293,15 @@ export const buildAuth = (config: AuthConfig) => {
         accountLockout: { enabled: true, maxFailedAttempts: TWO_FACTOR_MAX_FAILURES, durationSeconds: TWO_FACTOR_LOCK_SECONDS },
       }),
     ],
+    databaseHooks: {
+      session: {
+        create: {
+          after: async (session) => {
+            await trimSessions(config.db, session.userId, MAX_SESSIONS_PER_LOGIN);
+          },
+        },
+      },
+    },
     advanced: {
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
       backgroundTasks: config.waitUntil ? { handler: config.waitUntil } : undefined,
