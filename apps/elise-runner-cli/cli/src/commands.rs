@@ -256,7 +256,19 @@ pub async fn doctor(store: &Store, named: &[String]) -> Exit {
     let git = git_installed().await;
     let git_found = git.is_ok();
     report("git", git);
+    #[cfg(windows)]
+    {
+        use elise_runner_core::find;
+        report("git for windows", find::git_for_windows_verdict(git_found, &find::WinEnv::from_process(), &|p| p.is_file()));
+    }
     report("claude", claude_signed_in().await);
+    #[cfg(windows)]
+    report(
+        "node",
+        elise_runner_core::find::find_on_windows("node").map(|node| node.display().to_string()).ok_or_else(|| {
+            "`node` (Node.js) was not found on this computer. Install it from https://nodejs.org, then run doctor again.".to_string()
+        }),
+    );
     report("paired", runner_paired(store).await);
 
     let settings = Settings::load(&settings_file());

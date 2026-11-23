@@ -115,6 +115,24 @@ fn git_roots(env: &WinEnv, is_file: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     roots
 }
 
+// What `doctor` says about Git for Windows: git must run and its bash (Claude Code needs
+// `bin\bash.exe`) must be in the install folder. `git_runs` is the result of `git --version`.
+#[cfg(any(windows, test))]
+pub fn git_for_windows_verdict(git_runs: bool, env: &WinEnv, is_file: &dyn Fn(&Path) -> bool) -> Result<String, String> {
+    const INSTALL: &str = "Install Git for Windows from https://gitforwindows.org, then run doctor again.";
+    if !git_runs {
+        return Err(format!("Git for Windows was not found on this computer. {INSTALL}"));
+    }
+    let bash = git_roots(env, is_file)
+        .into_iter()
+        .flat_map(|root| [root.join("bin").join("bash.exe"), root.join("usr").join("bin").join("bash.exe")])
+        .find(|candidate| is_file(candidate));
+    match bash {
+        Some(bash) => Ok(format!("bash found ({})", bash.display())),
+        None => Err(format!("git is installed, but its bash (bin\\bash.exe, which Claude Code needs) was not found. {INSTALL}")),
+    }
+}
+
 // The PATH of the agent: the folder `claude` lives in (claude starts `node` from there), the
 // folder of `node` when it is another one, the tools of Git for Windows, and the system folder.
 #[cfg(any(windows, test))]
@@ -278,6 +296,25 @@ mod tests {
             let exists = |p: &Path| git_installed && with_git(p);
             let folders = windows_agent_folders(Path::new("C:/Users/a/.local/bin"), Some(Path::new(node)), &env(), &exists);
             assert_eq!(folders, paths(&expected), "{node}");
+        }
+    }
+
+    #[test]
+    fn doctor_reports_git_for_windows_by_its_bash() {
+        let files = ["C:/Program Files/Git/cmd/git.exe", "C:/Program Files/Git/bin/bash.exe"];
+        let cases = [
+            (false, vec![], Err("Git for Windows was not found")),
+            (true, files.to_vec(), Ok("bash found (C:/Program Files/Git/bin/bash.exe)")),
+            (true, files[..1].to_vec(), Err("its bash (bin\\bash.exe")),
+        ];
+        for (git_runs, present, expected) in cases {
+            let is_file = |p: &Path| present.iter().any(|f| p == Path::new(f));
+            let got = git_for_windows_verdict(git_runs, &env(), &is_file);
+            match (got, expected) {
+                (Ok(got), Ok(want)) => assert_eq!(got, want),
+                (Err(got), Err(want)) => assert!(got.contains(want) && got.contains("https://gitforwindows.org"), "{got}"),
+                (got, want) => panic!("{got:?} vs {want:?}"),
+            }
         }
     }
 
