@@ -13,7 +13,6 @@ use std::io::{BufRead, Write};
 use std::pin::Pin;
 use std::sync::Mutex;
 use std::task::Poll;
-use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::sleep;
 
 const TOKEN_WARNING: &str = "\
@@ -473,9 +472,20 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
     }
 }
 
+// Interrupt and terminate on unix; Ctrl-C and Ctrl-Break on Windows, which has no terminate signal.
+#[cfg(unix)]
+fn stop_signals() -> Option<(tokio::signal::unix::Signal, tokio::signal::unix::Signal)> {
+    use tokio::signal::unix::{signal, SignalKind};
+    Some((signal(SignalKind::interrupt()).ok()?, signal(SignalKind::terminate()).ok()?))
+}
+
+#[cfg(windows)]
+fn stop_signals() -> Option<(tokio::signal::windows::CtrlC, tokio::signal::windows::CtrlBreak)> {
+    Some((tokio::signal::windows::ctrl_c().ok()?, tokio::signal::windows::ctrl_break().ok()?))
+}
+
 fn stop_on_signal(message: &'static str) -> Option<Stop> {
-    let mut interrupt = signal(SignalKind::interrupt()).ok()?;
-    let mut terminate = signal(SignalKind::terminate()).ok()?;
+    let (mut interrupt, mut terminate) = stop_signals()?;
     let (stopper, stop) = Stopper::new();
     tokio::spawn(async move {
         tokio::select! {

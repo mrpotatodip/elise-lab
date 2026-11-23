@@ -77,5 +77,7 @@ fn make_private_dir(dir: &Path) -> std::io::Result<()> {
 
 fn on_path(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path).map(|dir| dir.join(name)).find(|candidate| candidate.is_file())
+    // Windows tools end in .exe; finding the real `claude` and `node` there is #397.
+    let file = format!("{name}{}", std::env::consts::EXE_SUFFIX);
+    std::env::split_paths(&path).map(|dir| dir.join(&file)).find(|candidate| candidate.is_file())
 }

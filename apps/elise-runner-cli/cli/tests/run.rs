@@ -23,6 +23,8 @@ fn run_once_with_nothing_to_claim_exits_with_code_6() {
 
 const PLAIN: [&str; 4] = ["phase=recon cost=1.5", "phase=hunt cost=4", "phase=check cost=2.5", "phase=report cost=1"];
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn run_once_runs_a_claimed_scan_sends_its_report_logs_each_step_and_removes_the_work_folder() {
     let engine = Engine::start();
@@ -60,6 +62,8 @@ fn run_once_runs_a_claimed_scan_sends_its_report_logs_each_step_and_removes_the_
     assert!(!stubs.work_folder("scan_1").exists());
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn run_once_with_a_failed_scan_reports_it_keeps_the_work_folder_and_exits_with_code_1() {
     let engine = Engine::start();
@@ -121,6 +125,8 @@ fn a_token_elise_rejects_on_claim_is_forgotten_and_the_program_exits_with_code_4
     }
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn the_agent_gets_the_built_in_skill_and_the_runners_settings_but_never_the_token() {
     let engine = Engine::start();
@@ -198,6 +204,8 @@ fn a_stop_signal_with_no_scan_running_exits_at_once_with_code_0() {
 
 // A GitLab job, on gitlab.com or on a server the person listed in this Runner's settings, clones
 // the repository its address names, read up to a pasted branch view.
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn a_gitlab_job_clones_the_repository_its_address_names() {
     for (repo, clone_url, label) in [
@@ -296,6 +304,8 @@ fn a_403_from_the_host_is_not_called_a_rejected_login() {
     assert!(error.contains("no login") && error.contains("gh auth login") && !error.contains("rejected"), "{error}");
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn a_passing_branch_list_prints_nothing_new_and_the_clone_goes_on() {
     let engine = Engine::start();
@@ -471,6 +481,8 @@ fn a_scan_stopped_from_elise_among_parallel_scans_ends_only_that_one() {
     assert_eq!(results[0].0, "scan_b");
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn run_once_with_parallel_runs_the_queued_scans_together_and_exits_0_only_if_every_one_succeeded() {
     let engine = Engine::start();
@@ -515,6 +527,8 @@ fn a_parallel_count_outside_1_to_3_or_on_another_command_is_a_usage_error() {
     }
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn a_scan_stopped_from_elise_kills_the_agent_sends_nothing_keeps_the_folder_and_exits_with_code_7() {
     let engine = Engine::start();
@@ -560,6 +574,8 @@ fn run_goes_back_to_waiting_after_a_stop_from_elise() {
     assert_eq!(results[0].0, "scan_14");
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn a_runner_removed_mid_scan_kills_the_agent_sends_nothing_keeps_the_folder_forgets_the_token_and_exits_with_code_4() {
     for args in [&["run", "--once"][..], &["run"][..]] {
@@ -582,6 +598,8 @@ fn a_runner_removed_mid_scan_kills_the_agent_sends_nothing_keeps_the_folder_forg
     }
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn a_job_state_check_that_fails_does_not_stop_the_scan() {
     for status in [0, 503] {
@@ -660,6 +678,8 @@ fn a_git_token_reaches_the_clone_for_the_jobs_host_only_and_is_left_nowhere() {
     }
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn without_a_git_token_the_clone_gets_no_helper() {
     let engine = Engine::start();
@@ -677,6 +697,8 @@ fn fingerprints(batches: &[Vec<serde_json::Value>]) -> Vec<String> {
     batches.iter().flatten().map(|finding| finding["fingerprint"].as_str().unwrap().to_string()).collect()
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn live_findings_are_sent_in_batches_while_the_agent_runs_and_a_line_that_is_not_a_finding_is_skipped() {
     let engine = Engine::start();
@@ -693,6 +715,8 @@ fn live_findings_are_sent_in_batches_while_the_agent_runs_and_a_line_that_is_not
     assert_eq!(engine.batches_before_results(), [2]);
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn the_last_live_findings_are_sent_before_the_result() {
     let engine = Engine::start();
@@ -708,6 +732,8 @@ fn the_last_live_findings_are_sent_before_the_result() {
     assert!(!engine.results()[0].1["files"].as_object().unwrap().contains_key("live-findings.jsonl"));
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn a_route_that_never_answers_does_not_fail_the_scan() {
     let engine = Engine::start();
@@ -722,6 +748,8 @@ fn a_route_that_never_answers_does_not_fail_the_scan() {
     assert_eq!(engine.results()[0].1["state"], "succeeded");
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn live_findings_an_engine_could_not_take_are_sent_again_in_order() {
     let engine = Engine::start();
@@ -737,6 +765,8 @@ fn live_findings_an_engine_could_not_take_are_sent_again_in_order() {
     assert_eq!(engine.results()[0].1["state"], "succeeded");
 }
 
+// Unix only until #396 (clone without sh).
+#[cfg(unix)]
 #[test]
 fn an_engine_that_answers_conflict_ends_the_push_and_fails_nothing() {
     let engine = Engine::start();

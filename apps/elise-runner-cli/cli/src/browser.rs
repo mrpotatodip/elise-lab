@@ -8,7 +8,9 @@ fn opener() -> Option<&'static str> {
     if set("SSH_CONNECTION") {
         return None;
     }
-    if cfg!(target_os = "macos") {
+    if cfg!(windows) {
+        Some("rundll32")
+    } else if cfg!(target_os = "macos") {
         Some("open")
     } else if set("DISPLAY") || set("WAYLAND_DISPLAY") {
         Some("xdg-open")
@@ -21,5 +23,10 @@ pub fn open(url: &str) -> bool {
     let Some(program) = opener() else {
         return false;
     };
-    Command::new(program).arg(url).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().is_ok()
+    let mut command = Command::new(program);
+    // rundll32 takes the URL as its second argument, and unlike `cmd /C start` leaves & alone.
+    if cfg!(windows) {
+        command.arg("url.dll,FileProtocolHandler");
+    }
+    command.arg(url).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().is_ok()
 }
