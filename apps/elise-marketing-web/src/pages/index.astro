@@ -4,7 +4,7 @@ import Logo from "../layouts/Logo.astro";
 import ThemeSelect from "../layouts/ThemeSelect.astro";
 import RunnerScene from "../stageshow/RunnerScene";
 import { AuditStep, ConnectStep, ReportStep } from "../stageshow/Steps";
-import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PICTURE_LABELS, PRICING, RUNNER, SHOWCASE_CAPTION, SITE, SOURCE_URL, STEPS, STEPS_NOTE } from "../constants/site";
+import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PICTURE_LABELS, PRICING, RUNNER, SITE, SOURCE_URL, STEPS, STEPS_NOTE } from "../constants/site";
 ---
 
 <Base>
@@ -43,14 +43,10 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PIC
         <p class="hint">{OPEN_SOURCE.heroLine} <a href={SOURCE_URL} rel="noopener">{OPEN_SOURCE.heroLink}</a>.</p>
       </div>
 
-      <figure class="showcase" aria-labelledby="showcase-caption">
+      <figure class="showcase">
         <div class="frame frame--tour" role="img" aria-label={PICTURE_LABELS.tour}>
           <div aria-hidden="true"><RunnerScene client:idle /></div>
         </div>
-        <figcaption>
-          <span id="showcase-caption">{SHOWCASE_CAPTION}</span>
-          <button type="button" class="button outline" id="motion-toggle">Pause animations</button>
-        </figcaption>
       </figure>
 
       <section id="how-it-works" aria-labelledby="how-heading">
@@ -212,25 +208,5 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PIC
       if (!island.hasAttribute("ssr")) reveal(island);
       else island.addEventListener("astro:hydrate", () => reveal(island), { once: true });
     });
-  </script>
-
-  <script>
-    // "Pause animations": the pictures play once as they scroll into view. This keeps them still.
-    const KEY = "elise.motion";
-    const toggle = document.querySelector<HTMLButtonElement>("#motion-toggle");
-    if (toggle) {
-      const off = document.documentElement.dataset.motion === "off";
-      toggle.textContent = off ? "Play animations" : "Pause animations";
-      toggle.addEventListener("click", () => {
-        try {
-          if (off) localStorage.removeItem(KEY);
-          else localStorage.setItem(KEY, "off");
-        } catch {
-          // Without storage the choice cannot be kept, so there is nothing to reload.
-          return;
-        }
-        location.reload();
-      });
-    }
   </script>
 </Base>

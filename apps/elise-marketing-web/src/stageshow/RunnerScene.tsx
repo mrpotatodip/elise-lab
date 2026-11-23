@@ -18,12 +18,14 @@ import "./runner.css";
 // `[repo scan_id] line` for each event, and the lines are the ones it builds (`Scan claimed`,
 // `the recon phase started`, `... ended: spent $X, $Y left of the Pool`, `result sent to Elise`,
 // `Scan succeeded.`). The scan id has the engine's shape (`newScanId`: nine base-36 characters, a
-// dash, a UUID). The repository, the id, the costs and the Pool (the Focused profile's $6 cap)
+// dash, a UUID) and is cut after the first part for the picture. The repository, the id, the costs and the Pool (the Focused profile's $6 cap)
 // are made up, and the page says so. The terminal prints plain text, as the Runner does: no colour.
 
 const COMMAND = "elise-runner run";
 
-const PREFIX = "[acme/example-app 0k3f9z2qd-4b2f6c1e-8a3d-4e7b-9c15-2f0a6d8b3e71] ";
+// The real id is nine base-36 characters, a dash and a UUID; the picture shows the first part and
+// an ellipsis so each line fits the small terminal.
+const PREFIX = "[acme/example-app 0k3f9z2qd...] ";
 
 // What the Runner prints for one Scan, in order. The Phases spent $3.24 of the $6 Pool.
 const LOG = [
@@ -61,26 +63,26 @@ const SPENT = ["41s", "1m 12s", "49s", "22s"];
 // into one entry with a count (Reading files ×3), lists the newest first, shows the last five and
 // folds the rest into "N earlier", as scan-trace.tsx does.
 type Doing = "reason" | "read" | "search" | "run" | "write";
-const ACT_LABEL: Record<Doing, { icon: LucideIcon; label: string }> = {
+export const ACT_LABEL: Record<Doing, { icon: LucideIcon; label: string }> = {
   reason: { icon: MessageSquare, label: "Reasoning" },
   read: { icon: FileText, label: "Reading files" },
   search: { icon: Search, label: "Searching the code" },
   run: { icon: Terminal, label: "Running a command" },
   write: { icon: Pencil, label: "Writing" },
 };
-const ACTS: Doing[][] = [
+export const ACTS: Doing[][] = [
   ["reason", "read", "read", "search", "read"],
   ["reason", "read", "read", "read", "search", "read", "read", "search", "search", "read"],
   ["reason", "read", "run", "run", "read", "reason", "run", "read"],
   ["reason", "write", "write", "write"],
 ];
-const STEP_MS = [300, 300, 400, 350];
+export const STEP_MS = [300, 300, 400, 350];
 const VISIBLE = 5;
 const AGO = ["just now", "3s ago", "6s ago", "9s ago", "12s ago"];
 
 // A phase's steps as Trace entries: [first step, end step) of each run of one label.
 type Entry = { act: Doing; from: number; to: number };
-const ENTRIES: Entry[][] = ACTS.map((seq) => {
+export const ENTRIES: Entry[][] = ACTS.map((seq) => {
   const out: Entry[] = [];
   seq.forEach((act, n) => {
     const last = out[out.length - 1];
@@ -90,12 +92,12 @@ const ENTRIES: Entry[][] = ACTS.map((seq) => {
   return out;
 });
 // How many entries exist after `step` steps, and the count on one of them.
-const created = (phase: number, step: number) => ENTRIES[phase].filter((e) => e.from < step).length;
-const countOf = (e: Entry, step: number) => Math.max(0, Math.min(step, e.to) - e.from);
+export const created = (phase: number, step: number) => ENTRIES[phase].filter((e) => e.from < step).length;
+export const countOf = (e: Entry, step: number) => Math.max(0, Math.min(step, e.to) - e.from);
 
 // The findings, in the table's order (worst first). `at` is the order the checks decide them in.
-type Row = { at: number; tone: PillTone; severity: string; title: string; file: string; folder: string; line: number; needsPerson?: boolean };
-const FINDINGS: Row[] = [
+export type Row = { at: number; tone: PillTone; severity: string; title: string; file: string; folder: string; line: number; needsPerson?: boolean };
+export const FINDINGS: Row[] = [
   { at: 3, tone: "high", severity: "High", title: "Open redirect on the login page", file: "login.ts", folder: "src/routes", line: 42 },
   { at: 1, tone: "medium", severity: "Medium", title: "Session cookie is missing the Secure flag", file: "session.ts", folder: "src/auth", line: 58 },
   { at: 4, tone: "medium", severity: "Medium", title: "Webhook signature is not compared in constant time", file: "stripe.ts", folder: "src/webhooks", line: 17, needsPerson: true },
@@ -168,7 +170,7 @@ async function script(a: Act<S>) {
   await a.wait(3200);
 }
 
-function Phase({ i, lines, step, done }: { i: number; lines: number; step: number; done: boolean }) {
+export function Phase({ i, lines, step, done }: { i: number; lines: number; step: number; done: boolean }) {
   const running = started(lines, i) && !ended(lines, i);
   const made = created(i, step);
   const entries = ENTRIES[i];
