@@ -30,6 +30,7 @@ export const ACCESS_CATALOGUE = [
           { key: "members", label: "Member", actions: ["read", "update", "delete"] },
           { key: "invites", label: "Team invite", actions: ["read", "create", "update", "delete"] },
           { key: "groups", label: "Group", actions: ["read", "create", "update", "delete"] },
+          { key: "two_factor", label: "Two-factor", actions: ["reset"] },
         ],
       },
       { key: "runners", label: "Runner", actions: ["create", "delete"] },

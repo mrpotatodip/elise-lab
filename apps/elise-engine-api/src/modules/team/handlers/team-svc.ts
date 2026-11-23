@@ -10,6 +10,7 @@ import {
   type TeamInvitePreview,
   type TeamList,
   type TeamRoles,
+  type TeamTwoFactorReset,
 } from "@repo/contracts/elise";
 import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import type { TenantEffect } from "#/lib/tenant-effect";
@@ -23,6 +24,7 @@ import {
   listAssignableRolesEffect,
   listTeamEffect,
   previewInviteEffect,
+  resetTwoFactorEffect,
   revokeInviteEffect,
 } from "#/modules/team/queries";
 import type { InviteMailer, TeamFailure } from "#/modules/team/types";
@@ -93,6 +95,9 @@ export const createInviteSvc = (
 
 export const revokeInviteSvc = (db: AppTxDbType, accountId: string, userId: string, inviteId: string): Effect.Effect<{ id: string }, TeamFailure> =>
   revokeInviteEffect(db, accountId, inviteId, userId, new Date());
+
+export const resetTwoFactorSvc = (db: PoolDbType, accountId: string, actorUserId: string, memberPartyId: string): Effect.Effect<TeamTwoFactorReset, TeamFailure> =>
+  resetTwoFactorEffect(db, accountId, actorUserId, memberPartyId).pipe(Effect.map(({ partyId }) => ({ partyId })));
 
 export const previewInviteSvc = (db: DbConnectType, token: string): Effect.Effect<TeamInvitePreview, Forbidden | DbError> =>
   Effect.gen(function* () {

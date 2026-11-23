@@ -94,6 +94,7 @@ describe("GET /openapi.json", () => {
       "POST /stripe/webhook",
       "POST /team/invites",
       "POST /team/invites/{token}/accept",
+      "POST /team/members/{partyId}/two-factor/reset",
       "POST /usage/plan/change",
       "POST /usage/plan/checkout",
       "POST /usage/plan/portal",
