@@ -175,26 +175,28 @@ export const findTwoFactorRequirementEffect = (db: AppDbType, tenantId: string):
   });
 
 export const setTwoFactorRequirementEffect = (
-  db: AppDbType,
+  db: AppTxDbType,
   tenantId: string,
   actorUserId: string,
   required: boolean,
-): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
+): Effect.Effect<TeamTwoFactorRequirement & { changed: boolean }, DbError> =>
   Effect.tryPromise({
-    try: async () => {
-      const actorPartyId = await actorPartyOf(db, actorUserId);
-      const [before] = await db.select({ required: tenants.twoFactorRequired }).from(tenants).where(eq(tenants.id, tenantId));
-      await db.update(tenants).set({ twoFactorRequired: required }).where(eq(tenants.id, tenantId));
-      await insertAuditEntry(db, {
-        actorPartyId,
-        action: "team.two_factor_requirement.set",
-        subjectId: tenantId,
-        tenantId,
-        before: { required: before?.required ?? false },
-        after: { required },
-      });
-      return { required };
-    },
+    try: () =>
+      db.transaction(async (tx) => {
+        const actorPartyId = await actorPartyOf(tx, actorUserId);
+        const [before] = await tx.select({ required: tenants.twoFactorRequired }).from(tenants).where(eq(tenants.id, tenantId)).for("update");
+        if (!before) return { required: false, changed: false };
+        const [saved] = await tx.update(tenants).set({ twoFactorRequired: required }).where(eq(tenants.id, tenantId)).returning({ required: tenants.twoFactorRequired });
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "team.two_factor_requirement.set",
+          subjectId: tenantId,
+          tenantId,
+          before: { required: before.required },
+          after: { required: saved?.required ?? required },
+        });
+        return { required: saved?.required ?? required, changed: before.required !== (saved?.required ?? required) };
+      }),
     catch: toDbError,
   });
 

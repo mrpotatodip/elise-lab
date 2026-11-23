@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, gt, isNull, lte, ne, or } from "drizzle-orm";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware, getSessionFromCtx, APIError } from "better-auth/api";
@@ -10,7 +10,7 @@ import { authAccount, authSession, authTwoFactor, authUser, authVerification } f
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import type { QueuedEmail, TwoFactorNoticeEmail } from "#/modules/email";
-import { accountRequiresTwoFactorEffect, auditTwoFactorChange } from "#/modules/two-factor";
+import { accountRequiresTwoFactorEffect, auditTwoFactorChange, loginIsTwoFactorAdminEffect } from "#/modules/two-factor";
 import type { AppEnv } from "#/types/variables";
 
 // -----
@@ -46,6 +46,9 @@ const TWO_FACTOR_ISSUER = "EliseLAB";
 type CodeProof = { holds: (headers: Headers | undefined, code: string) => Promise<boolean> };
 
 const TWO_FACTOR_COOKIE_NAME = "two_factor";
+const PROOF_HEADER = "x-two-factor-proof";
+const SIX_DIGITS = /^\d{6}$/;
+const windowIdentifier = (userId: string) => `two-factor-window:${userId}`;
 const LOCK_FRESH_SECONDS = 10;
 const CODE_PATHS = new Set(["/two-factor/verify-totp", "/two-factor/verify-backup-code"]);
 type AuthHookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
@@ -99,7 +102,34 @@ export const VERIFY_TOKEN_SECONDS = 24 * 3600;
 // -----
 export const buildAuth = (config: AuthConfig) => {
   const proof: CodeProof = { holds: async () => false };
-  const enrolling = new WeakSet<object>();
+  const enrolling = new Set<string>();
+  const proofToken = crypto.randomUUID();
+
+  const expireStaleWindow = async (userId: string) => {
+    const identifier = windowIdentifier(userId);
+    const [live] = await config.db
+      .select({ id: authVerification.id })
+      .from(authVerification)
+      .where(and(eq(authVerification.identifier, identifier), gt(authVerification.expiresAt, new Date())));
+    if (live) return;
+    await config.db.delete(authVerification).where(eq(authVerification.identifier, identifier));
+    await config.db
+      .update(authTwoFactor)
+      .set({ failedVerificationCount: 0 })
+      .where(and(eq(authTwoFactor.userId, userId), or(isNull(authTwoFactor.lockedUntil), lte(authTwoFactor.lockedUntil, new Date()))));
+  };
+
+  const openWindow = async (userId: string) => {
+    const identifier = windowIdentifier(userId);
+    const [live] = await config.db
+      .select({ id: authVerification.id })
+      .from(authVerification)
+      .where(and(eq(authVerification.identifier, identifier), gt(authVerification.expiresAt, new Date())));
+    if (live) return;
+    await config.db.insert(authVerification).values({ id: crypto.randomUUID(), identifier, value: "failures", expiresAt: new Date(Date.now() + TWO_FACTOR_LOCK_SECONDS * 1000) });
+  };
+
+  const closeWindow = (userId: string) => config.db.delete(authVerification).where(eq(authVerification.identifier, windowIdentifier(userId)));
 
   const revokeOthers = async (userId: string, keepToken: string | undefined) => {
     const others = keepToken ? and(eq(authSession.userId, userId), ne(authSession.token, keepToken)) : eq(authSession.userId, userId);
@@ -178,7 +208,7 @@ export const buildAuth = (config: AuthConfig) => {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === "/two-factor/disable") {
           const session = await getSessionFromCtx(ctx);
-          if (session && (await runEffect(accountRequiresTwoFactorEffect(config.db, session.user.id)))) {
+          if (session && ((await runEffect(accountRequiresTwoFactorEffect(config.db, session.user.id))) || (await runEffect(loginIsTwoFactorAdminEffect(config.db, session.user.id))))) {
             throw new APIError("FORBIDDEN", { message: "Your account requires Two-factor", code: "TWO_FACTOR_REQUIRED" });
           }
           const body = z.object({ code: z.string().min(1) }).safeParse(ctx.body);
@@ -186,9 +216,11 @@ export const buildAuth = (config: AuthConfig) => {
           if (!(await proof.holds(ctx.headers, body.data.code))) throw new APIError("UNAUTHORIZED", { message: "Invalid code", code: "INVALID_CODE" });
           return;
         }
-        if (ctx.path === "/two-factor/verify-totp" && ctx.body) {
+        if (CODE_PATHS.has(ctx.path)) {
           const session = await getSessionFromCtx(ctx);
-          if (session && !session.user.twoFactorEnabled) enrolling.add(ctx.body);
+          if (ctx.path === "/two-factor/verify-totp" && session && !session.user.twoFactorEnabled) enrolling.add(session.session.token);
+          const userId = session?.user.id ?? (await challengedUserId(ctx));
+          if (userId) await settle(expireStaleWindow(userId), "window reset");
           return;
         }
         if (ctx.path !== "/verify-email") return;
@@ -202,19 +234,26 @@ export const buildAuth = (config: AuthConfig) => {
       }),
       after: createAuthMiddleware(async (ctx) => {
         const returned = ctx.context.returned;
+        const session = CODE_PATHS.has(ctx.path) ? await getSessionFromCtx(ctx) : null;
+        const wasEnrolling = ctx.path === "/two-factor/verify-totp" && session ? enrolling.delete(session.session.token) : false;
         if (returned instanceof Error) {
           if (!CODE_PATHS.has(ctx.path) || (returned instanceof APIError && returned.status === "TOO_MANY_REQUESTS")) return;
-          const userId = await challengedUserId(ctx);
+          const userId = session?.user.id ?? (await challengedUserId(ctx));
+          if (userId) await settle(openWindow(userId), "window open");
           if (userId && (await lockJustBegan(userId))) await settle(auditTwoFactorChange(config.db, userId, "two_factor.locked"), "lock audit");
           return;
         }
+        if (CODE_PATHS.has(ctx.path)) {
+          const user = ctx.context.newSession?.user ?? session?.user;
+          if (user) await settle(closeWindow(user.id), "window close");
+        }
         if (ctx.path === "/two-factor/verify-backup-code") {
-          const user = ctx.context.newSession?.user ?? (await getSessionFromCtx(ctx))?.user;
-          if (user) await notify(user.email, "backup-code-used");
+          const user = ctx.context.newSession?.user ?? session?.user;
+          if (user && ctx.headers?.get(PROOF_HEADER) !== proofToken) await notify(user.email, "backup-code-used");
           return;
         }
         if (!REVOKING_PATHS.has(ctx.path)) return;
-        if (ctx.path === "/two-factor/verify-totp" && !(ctx.body && enrolling.has(ctx.body))) return;
+        if (ctx.path === "/two-factor/verify-totp" && !wasEnrolling) return;
         const current = ctx.context.newSession ?? (await getSessionFromCtx(ctx));
         if (!current) return;
         await revokeOthers(current.user.id, current.session.token);
@@ -251,12 +290,10 @@ export const buildAuth = (config: AuthConfig) => {
   });
 
   proof.holds = async (headers, code) => {
-    const asTotp = await auth.api.verifyTOTP({ body: { code }, headers }).then(
-      () => true,
-      () => false,
-    );
-    if (asTotp) return true;
-    return auth.api.verifyBackupCode({ body: { code, disableSession: true }, headers }).then(
+    const marked = new Headers(headers);
+    marked.set(PROOF_HEADER, proofToken);
+    const attempt = SIX_DIGITS.test(code) ? auth.api.verifyTOTP({ body: { code }, headers: marked }) : auth.api.verifyBackupCode({ body: { code, disableSession: true }, headers: marked });
+    return attempt.then(
       () => true,
       () => false,
     );

@@ -18,21 +18,31 @@ export const twoFactorStatusEffect = (db: DbConnectType, userId: string): Effect
     if (!login) return { enabled: false, setupRequired: false };
     if (login.enabled) return { enabled: true, setupRequired: false };
 
-    const admin = yield* Effect.tryPromise({
-      try: () =>
-        db
-          .select({ id: partyRoles.id })
-          .from(partyRoles)
-          .innerJoin(partyMasterRoles, eq(partyMasterRoles.id, partyRoles.roleId))
-          .innerJoin(accessMasterRoles, eq(accessMasterRoles.id, partyMasterRoles.masterRoleId))
-          .where(and(eq(partyRoles.partyId, login.partyId), inArray(accessMasterRoles.key, TWO_FACTOR_ADMIN_ROLE_KEYS)))
-          .limit(1),
-      catch: toDbError,
-    });
-    if (admin.length > 0) return { enabled: false, setupRequired: true };
+    if (yield* partyHoldsAdminRoleEffect(db, login.partyId)) return { enabled: false, setupRequired: true };
 
     const required = yield* accountRequiresTwoFactorEffect(db, userId);
     return { enabled: false, setupRequired: required };
+  });
+
+const partyHoldsAdminRoleEffect = (db: AppDbType, partyId: string): Effect.Effect<boolean, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const admin = await db
+        .select({ id: partyRoles.id })
+        .from(partyRoles)
+        .innerJoin(partyMasterRoles, eq(partyMasterRoles.id, partyRoles.roleId))
+        .innerJoin(accessMasterRoles, eq(accessMasterRoles.id, partyMasterRoles.masterRoleId))
+        .where(and(eq(partyRoles.partyId, partyId), inArray(accessMasterRoles.key, TWO_FACTOR_ADMIN_ROLE_KEYS)))
+        .limit(1);
+      return admin.length > 0;
+    },
+    catch: toDbError,
+  });
+
+export const loginIsTwoFactorAdminEffect = (db: AppDbType, userId: string): Effect.Effect<boolean, DbError> =>
+  Effect.gen(function* () {
+    const [login] = yield* Effect.tryPromise({ try: () => db.select({ partyId: authUser.partyId }).from(authUser).where(eq(authUser.id, userId)), catch: toDbError });
+    return login ? yield* partyHoldsAdminRoleEffect(db, login.partyId) : false;
   });
 
 export const accountRequiresTwoFactorEffect = (db: AppDbType, userId: string): Effect.Effect<boolean, DbError> =>

@@ -131,16 +131,15 @@ export const getTwoFactorRequirementSvc = (db: AppDbType, accountId: string): Ef
   findTwoFactorRequirementEffect(db, accountId);
 
 export const setTwoFactorRequirementSvc = (
-  db: AppDbType,
+  db: AppTxDbType,
   accountId: string,
   userId: string,
   required: boolean,
   mailer: NoticeMailer,
 ): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
   Effect.gen(function* () {
-    const before = yield* findTwoFactorRequirementEffect(db, accountId);
-    const saved = yield* setTwoFactorRequirementEffect(db, accountId, userId, required);
-    if (before.required === saved.required) return saved;
+    const { changed, ...saved } = yield* setTwoFactorRequirementEffect(db, accountId, userId, required);
+    if (!changed) return saved;
     const names = yield* noticeContext(db, accountId, userId);
     const admins = yield* listAdminEmailsEffect(db, accountId).pipe(
       Effect.catchTag("DbError", (error) =>

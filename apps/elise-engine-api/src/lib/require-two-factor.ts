@@ -9,7 +9,15 @@ export class TwoFactorSetupRequiredError extends AppError {
   }
 }
 
-const EXEMPT = /^\/(auth|me|sign-up|stripe|openapi\.json|docs)(\/|$)/;
+const EXEMPT = new RegExp(
+  [
+    "^/auth/(sign-in/email|sign-out|get-session|request-password-reset|reset-password(/[^/]+)?|verify-email)$",
+    "^/auth/two-factor/(enable|verify-totp|verify-backup-code|generate-backup-codes)$",
+    "^/(me|sign-up|docs)(/|$)",
+    "^/stripe/webhook$",
+    "^/openapi\\.json$",
+  ].join("|"),
+);
 
 export const requireTwoFactor = createMiddleware<AppEnv>(async (c, next) => {
   if (EXEMPT.test(c.req.path)) return next();

@@ -44,7 +44,15 @@ describe("an admin session with no Two-factor", () => {
     expect(await codeOf(res)).toBe("TWO_FACTOR_SETUP_REQUIRED");
   });
 
-  it.each(["/me", "/auth/two-factor/enable", "/auth/sign-out", "/sign-up"])("may still reach %s", async (path) => {
+  it.each(["/auth/device/approve", "/stripe/checkout", "/stripe/portal", "/auth/two-factor/disable"])("is refused on %s", async (path) => {
+    setupRequired = true;
+    const res = await call(path, SESSION, "POST");
+
+    expect(res.status).toBe(403);
+    expect(await codeOf(res)).toBe("TWO_FACTOR_SETUP_REQUIRED");
+  });
+
+  it.each(["/me", "/auth/two-factor/enable", "/auth/two-factor/verify-totp", "/auth/sign-out", "/sign-up", "/stripe/webhook"])("may still reach %s", async (path) => {
     setupRequired = true;
     const res = await call(path, SESSION, path === "/me" ? "GET" : "POST");
 

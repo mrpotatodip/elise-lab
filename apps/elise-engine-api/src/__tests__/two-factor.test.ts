@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { accessAuditLog, ensureTenantRoles, findTenantRole } from "@repo/db-elise";
-import { authAccount, authSession, authTwoFactor, authUser, partyRoles, tenants } from "@repo/db-elise/schema";
+import { authAccount, authSession, authTwoFactor, authUser, authVerification, partyRoles, tenants } from "@repo/db-elise/schema";
 import { hashPassword } from "better-auth/crypto";
 import { buildAuth } from "#/lib/auth";
 import type { QueuedEmail } from "#/modules/email";
@@ -178,6 +178,25 @@ describe("the lock", () => {
     await expect(auth().api.verifyTOTP({ body: { code: await codeNow(secret) }, headers: { cookie: open.cookie } })).resolves.toBeDefined();
   });
 
+  it("forgets failures older than 15 minutes, so 4 old plus 1 new does not lock", async () => {
+    const email = await seedLogin("lock-window");
+    const { secret } = await enrol(email);
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const challenge = await challengeOf(email);
+      await expect(auth().api.verifyTOTP({ body: { code: "000000" }, headers: { cookie: challenge.cookie } })).rejects.toMatchObject({ status: "UNAUTHORIZED" });
+    }
+    await db.raw.update(authVerification).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(authVerification.identifier, "two-factor-window:lock-window"));
+
+    const late = await challengeOf(email);
+    await expect(auth().api.verifyTOTP({ body: { code: "000000" }, headers: { cookie: late.cookie } })).rejects.toMatchObject({ status: "UNAUTHORIZED" });
+    const [row] = await db.raw.select({ count: authTwoFactor.failedVerificationCount, lockedUntil: authTwoFactor.lockedUntil }).from(authTwoFactor).where(eq(authTwoFactor.userId, "lock-window"));
+    expect(row).toEqual({ count: 1, lockedUntil: null });
+
+    const open = await challengeOf(email);
+    await expect(auth().api.verifyTOTP({ body: { code: await codeNow(secret) }, headers: { cookie: open.cookie } })).resolves.toBeDefined();
+  });
+
   it("locks a Backup code attempt the same way", async () => {
     const email = await seedLogin("lock-backup");
     const { backupCodes } = await enrol(email);
@@ -279,13 +298,28 @@ describe("other sessions", () => {
     expect(await flagOf("disable-required")).toBe(false);
   });
 
-  it("accepts a Backup code in place of an Authenticator code to turn Two-factor off", async () => {
+  it("accepts a Backup code in place of an Authenticator code to turn Two-factor off, without a used-code notice", async () => {
     const email = await seedLogin("disable-backup");
     const { cookie, backupCodes } = await enrol(email);
+    queued.length = 0;
 
     await auth().api.disableTwoFactor({ body: withCode({ password: PASSWORD, code: backupCodes[0] }), headers: { cookie } });
 
     expect(await flagOf("disable-backup")).toBe(false);
+    expect(queued.filter((mail) => mail.to === email).map((mail) => mail.kind)).toEqual(["two-factor-disabled"]);
+  });
+
+  it("never lets an admin turn Two-factor off", async () => {
+    const email = await seedLogin("disable-admin");
+    const { cookie, secret } = await enrol(email);
+    const [tenant] = await db.raw.select({ id: tenants.id, partyId: tenants.partyId }).from(tenants).where(eq(tenants.slug, "acct-disable-admin"));
+    await ensureTenantRoles(db.raw, tenant.id);
+    const role = await findTenantRole(db.raw, tenant.id, "tenant_admin");
+    if (!role) throw new Error("tenant_admin role missing");
+    await db.raw.insert(partyRoles).values({ partyId: tenant.partyId, tenantId: tenant.id, roleId: role.id, roleScope: "tenant" });
+
+    await expect(auth().api.disableTwoFactor({ body: withCode({ password: PASSWORD, code: await codeNow(secret) }), headers: { cookie } })).rejects.toMatchObject({ status: "FORBIDDEN" });
+    expect(await flagOf("disable-admin")).toBe(true);
   });
 });
 
