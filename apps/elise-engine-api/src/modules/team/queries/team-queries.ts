@@ -436,14 +436,17 @@ export const acceptInviteEffect = (
           .where(eq(sql`lower(${authUser.email})`, invite.email));
 
         let partyId: string;
+        let loginId: string;
         if (existing) {
           if (accept.signedInUserId !== existing.id) return refuse(new Forbidden({ message: TEAM_INVITE_SIGN_IN_REQUIRED }));
           partyId = existing.partyId;
+          loginId = existing.id;
         } else {
           if (!accept.newLogin) return refuse(new Invalid({ message: TEAM_INVITE_DETAILS_REQUIRED }));
           const { firstName, lastName, passwordHash } = accept.newLogin;
-          partyId = (await createPersonLogin(tx, { firstName, lastName, email: invite.email, passwordHash })).partyId;
+          ({ partyId, userId: loginId } = await createPersonLogin(tx, { firstName, lastName, email: invite.email, passwordHash }));
         }
+        await tx.update(authUser).set({ emailVerified: true }).where(eq(authUser.id, loginId));
 
         const [held] = await tx
           .select({ id: partyRoles.id })
