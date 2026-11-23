@@ -81,7 +81,7 @@ export const AUTH_COPY = {
   },
   setup: {
     title: "Set up Two-factor sign-in",
-    hint: "Your role needs Two-factor sign-in before you can use Elise. It takes a minute.",
+    hint: "Two-factor sign-in is required before you can use Elise. It takes a minute.",
     swap: "Sign out",
   },
 } as const;
