@@ -58,6 +58,7 @@ describe("GET /openapi.json", () => {
       "GET /team",
       "GET /team/invites/{token}",
       "GET /team/roles",
+      "GET /team/two-factor-requirement",
       "GET /usage",
       "GET /usage/anthropic-key",
       "GET /usage/budget/changes",
@@ -100,6 +101,7 @@ describe("GET /openapi.json", () => {
       "POST /usage/plan/portal",
       "PUT /findings/triage",
       "PUT /groups/{groupId}/members/{partyId}",
+      "PUT /team/two-factor-requirement",
       "PUT /usage/anthropic-key",
       "PUT /usage/signals",
     ]);

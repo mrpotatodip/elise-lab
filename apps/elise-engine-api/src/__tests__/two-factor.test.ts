@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { authAccount, authSession, authTwoFactor, authUser } from "@repo/db-elise/schema";
+import { ensureTenantRoles, findTenantRole } from "@repo/db-elise";
+import { authAccount, authSession, authTwoFactor, authUser, partyRoles, tenants } from "@repo/db-elise/schema";
 import { hashPassword } from "better-auth/crypto";
 import { buildAuth } from "#/lib/auth";
 import type { QueuedEmail } from "#/modules/email";
@@ -257,6 +258,25 @@ describe("other sessions", () => {
     expect(await sessionsOf("disable")).toBe(1);
     expect(backupCodes).toHaveLength(10);
     expect((await challengeOf(email)).redirect).toBe(false);
+  });
+
+  it("refuses to turn Two-factor off while the Account requires it, and allows it once the requirement is lifted", async () => {
+    const email = await seedLogin("disable-required");
+    const { cookie, secret } = await enrol(email);
+    const [tenant] = await db.raw.select({ id: tenants.id, partyId: tenants.partyId }).from(tenants).where(eq(tenants.slug, "acct-disable-required"));
+    await ensureTenantRoles(db.raw, tenant.id);
+    const role = await findTenantRole(db.raw, tenant.id, "workspace_member");
+    if (!role) throw new Error("workspace_member role missing");
+    await db.raw.insert(partyRoles).values({ partyId: tenant.partyId, tenantId: tenant.id, roleId: role.id, roleScope: "tenant" });
+    await db.raw.update(tenants).set({ twoFactorRequired: true }).where(eq(tenants.id, tenant.id));
+
+    await expect(auth().api.disableTwoFactor({ body: withCode({ password: PASSWORD, code: await codeNow(secret) }), headers: { cookie } })).rejects.toMatchObject({ status: "FORBIDDEN" });
+    expect(await flagOf("disable-required")).toBe(true);
+
+    await db.raw.update(tenants).set({ twoFactorRequired: false }).where(eq(tenants.id, tenant.id));
+    await auth().api.disableTwoFactor({ body: withCode({ password: PASSWORD, code: await codeNow(secret) }), headers: { cookie } });
+
+    expect(await flagOf("disable-required")).toBe(false);
   });
 
   it("accepts a Backup code in place of an Authenticator code to turn Two-factor off", async () => {

@@ -26,6 +26,7 @@ import {
   type TeamInvitePreview,
   type TeamList,
   type TeamRoles,
+  type TeamTwoFactorRequirement,
 } from "@repo/contracts/elise";
 import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { Conflict, DbError, Forbidden, Invalid, NotFound, toDbError } from "#/lib/effect-query";
@@ -103,6 +104,7 @@ export const listTeamEffect = (db: AppDbType, tenantId: string, now: Date): Effe
             email: authUser.email,
             role: accessMasterRoles.key,
             roleLabel: accessMasterRoles.label,
+            twoFactorEnabled: authUser.twoFactorEnabled,
           })
           .from(partyRoles)
           .innerJoin(authUser, eq(authUser.partyId, partyRoles.partyId))
@@ -161,6 +163,39 @@ export const listTeamEffect = (db: AppDbType, tenantId: string, now: Date): Effe
         emailStatusAt: invite.emailStatusAt?.toISOString() ?? null,
       })),
     };
+  });
+
+export const findTwoFactorRequirementEffect = (db: AppDbType, tenantId: string): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [row] = await db.select({ required: tenants.twoFactorRequired }).from(tenants).where(eq(tenants.id, tenantId));
+      return { required: row?.required ?? false };
+    },
+    catch: toDbError,
+  });
+
+export const setTwoFactorRequirementEffect = (
+  db: AppDbType,
+  tenantId: string,
+  actorUserId: string,
+  required: boolean,
+): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const actorPartyId = await actorPartyOf(db, actorUserId);
+      const [before] = await db.select({ required: tenants.twoFactorRequired }).from(tenants).where(eq(tenants.id, tenantId));
+      await db.update(tenants).set({ twoFactorRequired: required }).where(eq(tenants.id, tenantId));
+      await insertAuditEntry(db, {
+        actorPartyId,
+        action: "team.two_factor_requirement.set",
+        subjectId: tenantId,
+        tenantId,
+        before: { required: before?.required ?? false },
+        after: { required },
+      });
+      return { required };
+    },
+    catch: toDbError,
   });
 
 // -----

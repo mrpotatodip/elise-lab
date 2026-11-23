@@ -11,6 +11,7 @@ export type AuditAction =
   | "team.invite.revoked"
   | "team.invite.accepted"
   | "team.two_factor.reset"
+  | "team.two_factor_requirement.set"
   | "group.created"
   | "group.renamed"
   | "group.deleted"
@@ -46,6 +47,7 @@ export type AuditDetails = {
   monthlyBudgetUsd?: number | null;
   lastFour?: string;
   enabled?: boolean;
+  required?: boolean;
   requestIp?: string;
   approverIp?: string;
 };

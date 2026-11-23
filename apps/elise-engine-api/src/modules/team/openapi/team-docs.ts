@@ -5,6 +5,7 @@ import {
   TeamInvitePreviewSchema,
   TeamListSchema,
   TeamRolesSchema,
+  TeamTwoFactorRequirementSchema,
   TeamTwoFactorResetSchema,
 } from "@repo/contracts/elise";
 import { z } from "zod";
@@ -102,6 +103,38 @@ export const resetTeamMemberTwoFactorDoc = describeRoute({
     example: ["Reset a member:", bash(`curl -X POST ${EXAMPLE_BASE_URL}/team/members/${INVITE_ID}/two-factor/reset \\`, SESSION, ACCOUNT)],
   }),
   responses: { 200: jsonResponse("The Party whose Two-factor was reset.", envelope(TeamTwoFactorResetSchema)), ...errorResponses(400, 401, 403, 404) },
+});
+
+export const getTwoFactorRequirementDoc = describeRoute({
+  tags: ["team"],
+  security: SERVICE_SECURITY,
+  summary: "Read the Two-factor requirement",
+  description: routeText({
+    context: "An account admin sees whether the account requires Two-factor of every member. The Team list shows who has it.",
+    steps: ["The Worker checks the session and that the login's Role in the account holds `company:team:members:read`.", "The Worker returns `required`."],
+    example: ["Read it:", bash(`curl ${EXAMPLE_BASE_URL}/team/two-factor-requirement \\`, SESSION, ACCOUNT)],
+  }),
+  responses: { 200: jsonResponse("The requirement.", envelope(TeamTwoFactorRequirementSchema)), ...errorResponses(400, 401, 403) },
+});
+
+export const setTwoFactorRequirementDoc = describeRoute({
+  tags: ["team"],
+  security: SERVICE_SECURITY,
+  summary: "Require Two-factor of every member, or stop",
+  description: routeText({
+    context:
+      "With the requirement on, every member of the account who has no Two-factor is held at setup on their next request, and nobody in the account can turn their own Two-factor off. Admins are held at setup whatever this says.",
+    steps: [
+      "The Worker checks the session and that the login's Role in the account holds `company:team:two_factor_requirement:update`, which only a `tenant_admin` does.",
+      "The Worker saves the switch and writes an audit row with the old and new value.",
+      "The Worker returns the switch.",
+    ],
+    example: [
+      "Require it:",
+      bash(`curl -X PUT ${EXAMPLE_BASE_URL}/team/two-factor-requirement \\`, SESSION, `${ACCOUNT} \\`, '  -H "Content-Type: application/json" \\', `  -d '{"required":true}'`),
+    ],
+  }),
+  responses: { 200: jsonResponse("The requirement.", envelope(TeamTwoFactorRequirementSchema)), ...errorResponses(400, 401, 403) },
 });
 
 export const previewTeamInviteDoc = describeRoute({

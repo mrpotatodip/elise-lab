@@ -11,6 +11,7 @@ import {
   type TeamList,
   type TeamRoles,
   type TeamTwoFactorReset,
+  type TeamTwoFactorRequirement,
 } from "@repo/contracts/elise";
 import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import type { TenantEffect } from "#/lib/tenant-effect";
@@ -20,12 +21,14 @@ import { generateInviteToken, hashInviteToken } from "#/modules/team/lib";
 import {
   acceptInviteEffect,
   createInviteEffect,
+  findTwoFactorRequirementEffect,
   inviteEmailContextEffect,
   listAssignableRolesEffect,
   listTeamEffect,
   previewInviteEffect,
   resetTwoFactorEffect,
   revokeInviteEffect,
+  setTwoFactorRequirementEffect,
 } from "#/modules/team/queries";
 import type { InviteMailer, TeamFailure } from "#/modules/team/types";
 
@@ -98,6 +101,12 @@ export const revokeInviteSvc = (db: AppTxDbType, accountId: string, userId: stri
 
 export const resetTwoFactorSvc = (db: PoolDbType, accountId: string, actorUserId: string, memberPartyId: string): Effect.Effect<TeamTwoFactorReset, TeamFailure> =>
   resetTwoFactorEffect(db, accountId, actorUserId, memberPartyId).pipe(Effect.map(({ partyId }) => ({ partyId })));
+
+export const getTwoFactorRequirementSvc = (db: AppDbType, accountId: string): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
+  findTwoFactorRequirementEffect(db, accountId);
+
+export const setTwoFactorRequirementSvc = (db: AppDbType, accountId: string, userId: string, required: boolean): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
+  setTwoFactorRequirementEffect(db, accountId, userId, required);
 
 export const previewInviteSvc = (db: DbConnectType, token: string): Effect.Effect<TeamInvitePreview, Forbidden | DbError> =>
   Effect.gen(function* () {

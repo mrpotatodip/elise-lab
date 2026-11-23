@@ -31,6 +31,7 @@ export const ACCESS_CATALOGUE = [
           { key: "invites", label: "Team invite", actions: ["read", "create", "update", "delete"] },
           { key: "groups", label: "Group", actions: ["read", "create", "update", "delete"] },
           { key: "two_factor", label: "Two-factor", actions: ["reset"] },
+          { key: "two_factor_requirement", label: "Two-factor requirement", actions: ["update"] },
         ],
       },
       { key: "runners", label: "Runner", actions: ["create", "delete"] },
@@ -171,7 +172,7 @@ const TENANT_READS = TENANT_POWERS.filter((power) => powerAction(power) === "rea
 // risk; a Workspace member does none of it and sees no part of
 // Team.
 // -----
-const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete", "company:plan:manage"] as const;
+const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete", "company:plan:manage", "company:team:two_factor_requirement:update"] as const;
 const WORKSPACE_ADMIN_POWERS = TENANT_POWERS.filter((power) => !OWNER_ONLY.some((owner) => owner === power));
 const WORKSPACE_MEMBER_READS = TENANT_READS.filter((power) => !power.startsWith("company:team:"));
 
