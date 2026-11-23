@@ -49,7 +49,7 @@ pnpm --filter elise-runner-cli check       # tsc --noEmit, cargo fmt --check, ca
 On macOS (arm64 or x64) or Linux (x64 or arm64), one command installs the newest release of the headless Runner to `~/.local/bin` (set `ELISE_RUNNER_INSTALL_DIR` to change it):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mrpotatodip/elise-lab/main/apps/elise-runner-cli/install.sh | sh
 ```
 
 Then run `elise-runner login`. The script is `install.sh` in this folder. It takes the newest GitHub Release whose tag starts with `elise-runner-v` and downloads `elise-runner-<darwin|linux>-<arm64|x64>`. Any other system is refused with a message.

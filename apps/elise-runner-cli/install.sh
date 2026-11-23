@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo="mrpotatodip/ts-mrpotato-lab"
+repo="mrpotatodip/elise-lab"
 tag_prefix="elise-runner-v"
 dir="${ELISE_RUNNER_INSTALL_DIR:-$HOME/.local/bin}"
 
