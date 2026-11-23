@@ -103,28 +103,6 @@ const BUDGET_CAP_USD: f64 = 50.0;
 // Files a repository may carry that change how Claude Code behaves or reach outside the clone.
 const AGENT_CONFIG_NAMES: [&str; 4] = [".claude", "CLAUDE.md", "CLAUDE.local.md", ".mcp.json"];
 
-// The same clone the cloud container does: a plain shallow clone, or a fetch of the ref, tried
-// as a branch first. It writes the commit, the branch HEAD was on, and how the ref was fetched.
-const CLONE_SCRIPT: &str = r#"set -e
-rm -rf repo repo.kind
-if [ -z "$2" ]; then
-  git clone --depth 1 -- "$1" repo
-else
-  mkdir repo
-  git -C repo init -q
-  git -C repo remote add origin "$1"
-  if git -C repo fetch --depth 1 origin "refs/heads/$2" 2>/dev/null; then
-    echo branch > repo.kind
-  else
-    git -C repo fetch --depth 1 origin "$2"
-    echo other > repo.kind
-  fi
-  git -C repo checkout -q FETCH_HEAD
-fi
-git -C repo rev-parse HEAD > repo.sha
-git -C repo rev-parse --abbrev-ref HEAD > repo.branch
-"#;
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Job {
@@ -493,7 +471,7 @@ async fn execute(
             if !git_ref.is_empty() && !safe_ref(&git_ref) {
                 return Err("That branch, tag or commit name is not one this runner will fetch.".into());
             }
-            let helper = git_token::Helper::for_host(&job.scan_id, &address.host)?;
+            let helper = git_token::Helper::for_host(&address.host);
             tokio::select! {
                 access = git_access::check(&address, helper.as_ref()) => access?,
                 _ = stop.stopped() => return Err(STOPPED.to_string()),
@@ -810,32 +788,58 @@ fn strip_untrusted(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+// The same clone the cloud container does: a plain shallow clone, or a fetch of the ref, tried
+// as a branch first. It writes the commit (repo.sha), the branch HEAD was on (repo.branch), and
+// how the ref was fetched (repo.kind). The commands are git's own, run without a shell.
 async fn clone_repo(work: &Path, repo: &str, git_ref: &str, helper: Option<&git_token::Helper>, stop: &Stop) -> Result<(), String> {
-    let mut command = Command::new("sh");
-    command
-        .arg("-c")
-        .arg(CLONE_SCRIPT)
-        .arg("sh")
-        .arg(repo)
-        .arg(git_ref)
-        .current_dir(work)
-        .env("GIT_ALLOW_PROTOCOL", "https")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .kill_on_drop(true);
+    let result = tokio::select! {
+        result = timeout(CLONE_TIMEOUT, clone_steps(work, repo, git_ref, helper)) => result,
+        _ = stop.stopped() => return Err(STOPPED.to_string()),
+    };
+    result.map_err(|_| "Cloning took longer than 5 minutes.".to_string())?
+}
+
+// One git call in the work folder. Its output when it succeeded; the error text when it did not.
+async fn run_git(work: &Path, args: &[&str], helper: Option<&git_token::Helper>) -> Result<Result<Vec<u8>, String>, String> {
+    let mut command = Command::new("git");
+    command.args(args).current_dir(work).env("GIT_ALLOW_PROTOCOL", "https").env("GIT_TERMINAL_PROMPT", "0").kill_on_drop(true);
     if let Some(helper) = helper {
         helper.apply(&mut command);
     }
-    let output = tokio::select! {
-        output = timeout(CLONE_TIMEOUT, command.output()) => output,
-        _ = stop.stopped() => return Err(STOPPED.to_string()),
-    };
-    let output = output
-        .map_err(|_| "Cloning took longer than 5 minutes.".to_string())?
-        .map_err(|e| format!("Could not run git: {e}. Is Git installed on this computer?"))?;
+    let output = command.output().await.map_err(|e| format!("Could not run git: {e}. Is Git installed on this computer?"))?;
     if output.status.success() {
-        return Ok(());
+        return Ok(Ok(output.stdout));
     }
-    Err(format!("git could not read the repository: {}", String::from_utf8_lossy(&output.stderr)))
+    Ok(Err(format!("git could not read the repository: {}", String::from_utf8_lossy(&output.stderr))))
+}
+
+async fn git_step(work: &Path, args: &[&str], helper: Option<&git_token::Helper>) -> Result<Vec<u8>, String> {
+    run_git(work, args, helper).await?
+}
+
+async fn clone_steps(work: &Path, repo: &str, git_ref: &str, helper: Option<&git_token::Helper>) -> Result<(), String> {
+    let _ = fs::remove_dir_all(work.join("repo"));
+    let _ = fs::remove_file(work.join("repo.kind"));
+    let write = |name: &str, bytes: &[u8]| fs::write(work.join(name), bytes).map_err(|e| format!("Could not write {name}: {e}"));
+    if git_ref.is_empty() {
+        git_step(work, &["clone", "--depth", "1", "--", repo, "repo"], helper).await?;
+    } else {
+        fs::create_dir(work.join("repo")).map_err(|e| format!("Could not make the clone folder: {e}"))?;
+        git_step(work, &["-C", "repo", "init", "-q"], helper).await?;
+        git_step(work, &["-C", "repo", "remote", "add", "origin", repo], helper).await?;
+        let as_branch = format!("refs/heads/{git_ref}");
+        match run_git(work, &["-C", "repo", "fetch", "--depth", "1", "origin", &as_branch], helper).await? {
+            Ok(_) => write("repo.kind", b"branch\n")?,
+            Err(_) => {
+                git_step(work, &["-C", "repo", "fetch", "--depth", "1", "origin", git_ref], helper).await?;
+                write("repo.kind", b"other\n")?;
+            }
+        }
+        git_step(work, &["-C", "repo", "checkout", "-q", "FETCH_HEAD"], helper).await?;
+    }
+    write("repo.sha", &git_step(work, &["-C", "repo", "rev-parse", "HEAD"], helper).await?)?;
+    write("repo.branch", &git_step(work, &["-C", "repo", "rev-parse", "--abbrev-ref", "HEAD"], helper).await?)?;
+    Ok(())
 }
 
 // -----

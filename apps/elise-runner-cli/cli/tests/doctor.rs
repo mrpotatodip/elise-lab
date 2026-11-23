@@ -130,8 +130,6 @@ fn a_saved_login_a_host_rejects_is_named_as_rejected() {
     assert!(output.stdout.contains("rejected") && output.stdout.contains("gh auth login"), "{}", output.stdout);
 }
 
-// Unix only until the git credential helper stops being a /bin/sh script (core/src/git_token.rs).
-#[cfg(unix)]
 #[test]
 fn a_git_token_is_used_for_the_checked_host_only_and_leaves_no_helper_behind() {
     let engine = Engine::start();

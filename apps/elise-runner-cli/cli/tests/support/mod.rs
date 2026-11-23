@@ -730,12 +730,13 @@ fn install_stub(bin: &std::path::Path, tool: &str) {
     std::fs::copy(env!("CARGO_BIN_EXE_elise-stub-tool"), bin.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX))).unwrap();
 }
 
-// The folders searched after the stubs. On unix, the system tools the git credential helper's shell needs.
+// The folders searched after the stubs: the shell the stub git uses to run the credential helper
+// the way real git does (on Windows, the one Git for Windows ships).
 fn system_path() -> Vec<PathBuf> {
     if cfg!(unix) {
         vec!["/usr/bin".into(), "/bin".into()]
     } else {
-        vec![]
+        vec![r"C:\Program Files\Git\usr\bin".into(), r"C:\Program Files\Git\bin".into()]
     }
 }
 
