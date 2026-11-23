@@ -4,7 +4,7 @@ import type { SignUp, SignUpBody } from "@repo/contracts/elise";
 import type { PoolDbType } from "#/lib/db-connection";
 import { Conflict, type DbError } from "#/lib/effect-query";
 import { SIGN_UP_REFUSED, SIGN_UP_SLUG_MAX_ATTEMPTS } from "#/modules/sign-up/constants";
-import { insertAccountEffect, pickFreeSlugEffect } from "#/modules/sign-up/queries";
+import { insertAccountEffect, pickFreeSlugEffect, replaceUnverifiedLoginEffect } from "#/modules/sign-up/queries";
 import type { NewAccount } from "#/modules/sign-up/types";
 
 type Failure = Conflict | DbError;
@@ -32,6 +32,7 @@ const insertWithFreshSlug = (db: PoolDbType, account: Omit<NewAccount, "slug">, 
 export const createAccountSvc = (db: PoolDbType, body: SignUpBody): Effect.Effect<SignUp, Failure> =>
   Effect.gen(function* () {
     const passwordHash = yield* Effect.promise(() => hashPassword(body.password));
+    yield* replaceUnverifiedLoginEffect(db, body.email);
     return yield* insertWithFreshSlug(
       db,
       {
