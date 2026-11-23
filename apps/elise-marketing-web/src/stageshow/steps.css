@@ -54,8 +54,14 @@
   .sv-dialog__head h4 { margin: 0; font-size: 18px; font-weight: 600; line-height: 28px; letter-spacing: -0.025em; }
   .sv-dialog__x { position: absolute; top: 24px; right: 24px; color: var(--muted-foreground); }
   .sv-dialog__body { position: relative; display: grid; align-content: start; flex: 1; gap: 12px; min-height: 0; margin-top: -16px; overflow: hidden; padding: 24px; border-top: 1px solid var(--border); border-radius: 12px 12px 0 0; background: var(--popover); }
-  .sv-dialog__foot { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); background: color-mix(in oklch, var(--muted) 80%, transparent); }
+  .sv-dialog__foot { display: grid; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); background: color-mix(in oklch, var(--muted) 80%, transparent); }
+  .sv-dialog__hint { font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
+  .sv-dialog__row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
   .sv-dialog__budget { margin-right: auto; max-width: 52ch; font-size: 14px; line-height: 1.6; color: var(--muted-foreground); }
+  /* The closed "Customize" row under Coverage: the Runner, the model and the effort as chips. */
+  .sv-customize { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .sv-pillchip { padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px; background: color-mix(in oklch, var(--muted) 40%, transparent); font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
+  .sv-customize__more { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; color: var(--muted-foreground); }
   /* A Swap sizes itself to its content; in the dialog it must take the dialog's width. */
   .sv-dialog__body > .ss-swap { display: block; width: 100% !important; min-width: 0; }
   .sv-dialog__body { grid-template-columns: minmax(0, 1fr); }
@@ -107,29 +113,42 @@
   .sv-cardtitle svg { color: var(--muted-foreground); }
   .sv-cardsub { max-width: 52ch; font-size: 14px; line-height: 1.6; color: var(--muted-foreground); }
   .sv-cardsub--tight { margin: 0; padding: 0; }
-  .sv-chev { transform: rotate(180deg); transition: transform 0.25s ease; }
-  .sv-chev[data-open] { transform: none; }
+  .sv-chev { transition: transform 0.25s ease; }
+  .sv-chev[data-open] { transform: rotate(180deg); }
   .sv-terms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 32px; margin: 0; padding: 20px; }
   .sv-terms dt { font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
   .sv-terms dd { margin: 2px 0 0; font-weight: 500; }
 
   /* ---- 3. the report ---- */
-  .sv-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .sv-cell { display: grid; align-content: start; gap: 12px; padding: 24px 20px; border-right: 1px solid var(--border); }
+  .sv-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sv-cell { display: grid; align-content: start; gap: 14px; padding: 24px 20px; border-right: 1px solid var(--border); }
   .sv-cell:last-child { border-right: 0; }
   .sv-cell__label { font-size: 14px; font-weight: 500; color: var(--muted-foreground); }
-  .sv-cell__n { font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
-  .sv-cell__n[data-lead] { font-size: 40px; }
+  .sv-cell__n { display: flex; align-items: baseline; font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+  .sv-cell__n[data-lead], .sv-cell__n--word { font-size: 40px; }
+  .sv-cell__unit { margin-left: 6px; font-size: 14px; font-weight: 400; letter-spacing: 0; color: var(--muted-foreground); }
   .sv-cell__note { font-size: 13px; line-height: 1.5; color: var(--muted-foreground); }
+  .sv-dots { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; line-height: 16px; color: var(--muted-foreground); }
+  .sv-dots span { display: inline-flex; align-items: center; gap: 4px; }
+  .sv-dots i { width: 6px; height: 6px; border-radius: 50%; }
+  .sv-dots i[data-tone="high"] { background: var(--mark-high); }
+  .sv-dots i[data-tone="medium"] { background: var(--mark-medium); }
+  .sv-dots i[data-tone="low"] { background: var(--mark-low); }
+  .sv-lines { display: grid; gap: 10px; font-size: 13px; line-height: 18px; }
+  .sv-lines > span { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .sv-lines b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sv-tracebody { padding: 20px; }
+  .sv-sev { display: grid; justify-items: start; gap: 6px; }
   .sv-cardtitleblock { display: grid; gap: 6px; }
   .sv-toolbar { display: flex; justify-content: flex-end; padding: 12px 20px; border-bottom: 1px solid var(--border); }
   .sv-table { display: grid; }
-  .sv-trow { display: grid; grid-template-columns: 104px minmax(0, 1fr) 164px 128px 24px; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .sv-trow { display: grid; grid-template-columns: 150px minmax(0, 1fr) 170px 24px; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
   .sv-trow[data-hover] { background: var(--accent); }
   .sv-trow--head { padding-block: 0; height: 40px; background: color-mix(in oklch, var(--muted) 80%, transparent); font-size: 12px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); }
   .sv-trow svg { color: var(--muted-foreground); }
-  .sv-ftitle { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-  .sv-where { font-size: 12px; color: var(--muted-foreground); }
+  .sv-ftitle { font-weight: 500; }
+  .sv-where { display: grid; gap: 2px; min-width: 0; font-size: 12px; line-height: 16px; }
+  .sv-where__folder { color: var(--muted-foreground); }
 
   /* ---- phone width ---- */
   & [data-layout="compact"] .sv-hide-compact { display: none; }

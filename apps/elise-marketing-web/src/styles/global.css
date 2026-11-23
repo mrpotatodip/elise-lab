@@ -220,20 +220,9 @@ h1 {
   left: 50%;
   /* Wider than the text column, so the picture of the dashboard reads at a useful size. */
   width: min(100vw - 3rem, 88rem);
-  margin: 0;
+  /* 64px more between the picture and "How it works", on top of that section's own padding. */
+  margin: 0 0 4rem;
   transform: translateX(-50%);
-}
-
-.showcase figcaption {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  text-align: center;
-  color: var(--muted-foreground);
 }
 
 /* The "Pause animations" control sets data-motion="off": nothing moves, as under reduced motion. */
@@ -314,9 +303,9 @@ h2 {
 }
 
 .frame--tour { aspect-ratio: 1440 / 760; }
-.frame--connect { aspect-ratio: 760 / 620; }
-.frame--audit { aspect-ratio: 760 / 480; }
-.frame--report { aspect-ratio: 760 / 700; }
+.frame--connect { aspect-ratio: 760 / 740; }
+.frame--audit { aspect-ratio: 760 / 660; }
+.frame--report { aspect-ratio: 760 / 860; }
 
 @media (max-width: 43rem) {
   .frame {

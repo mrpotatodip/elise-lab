@@ -46,14 +46,13 @@ export const LEDE = {
 // Under the hero buttons: where they lead, before anyone clicks.
 export const HERO_HINT = "Audit a repository opens Elise, where you sign in or create an account.";
 
-export const SHOWCASE_CAPTION = "An example account. Every repository and finding is made up.";
 
 // What a screen reader gets for each picture of the dashboard. The pictures themselves are hidden from it.
 export const PICTURE_LABELS = {
   tour: "A terminal running the Elise Runner over the Elise dashboard. The Runner claims a new scan, which goes from Queued to Running on the Scans list. The scan page then shows the findings arriving as they are checked and the trace of each phase. The scan succeeds and its first finding opens. Every name and number is made up.",
   connect: "The Start a security audit dialog. Someone picks where the code lives, pastes a GitHub link, picks a coverage level, then starts the audit.",
-  audit: "A scan page during an audit. It steps through cloning, reading the code and saving the report, then shows Succeeded.",
-  report: "The finished report. Four summary figures sit above four findings, each with a severity, file and status.",
+  audit: "A scan page during an audit. The trace lists the four phases, recon, hunt, check and report, with what the agent is doing in each. The scan then shows Succeeded, and Run details opens on the kind of review, the model and the effort.",
+  report: "The finished report. A summary card gives the number of findings, how they compare with earlier scans and what the scan would have cost. A list of findings follows, each with a severity, a file and a line.",
 } as const;
 
 // Each step is a lead sentence and three short points, in plain technical English: one idea per
@@ -72,18 +71,18 @@ export const STEPS = [
     title: "The Runner audits the code",
     text: "The scan runs on the Runner's computer, with that computer's own AI login. Your code is not uploaded to us.",
     points: [
-      "The scan page shows each step as it runs: cloning, reading the code, saving the report. Succeeded means the scan finished. It does not mean the code is safe.",
+      "The scan page shows each phase as it runs: recon, hunt, check and report. Succeeded means the scan finished. It does not mean the code is safe.",
       "A running scan lists what the agent is doing, by label only, and shows verified findings as they come in. You can stop a scan at any time.",
       "The Runner sends back the report and the findings, not the repository. You pay your own AI subscription directly, and we add no per-scan charge.",
     ],
   },
   {
     title: "Read the report",
-    text: "The report opens with four summary figures. A list of findings follows.",
+    text: "The report opens with a summary of three columns: what it found, how that compares with earlier scans and what the scan would have cost. A list of findings follows.",
     points: [
       "Each finding names its file, explains the issue and gives a fix.",
       "Severity is Critical, High, Medium, Low or Informational. Informational is a note, not a defect.",
-      "If an agent could not confirm a finding, the report marks it as needing validation so a person can check it. Your team can mark a finding fixed, a false positive, an accepted risk or a duplicate, and comment on it. The report stays on the Files page in Elise.",
+      "If an agent could not confirm a finding, the report marks it Needs a person so someone can check it. Your team can mark a finding fixed, a false positive, an accepted risk or a duplicate, and comment on it. The report stays on the Files page in Elise.",
     ],
   },
 ] as const;
