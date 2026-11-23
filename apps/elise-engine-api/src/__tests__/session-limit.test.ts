@@ -18,6 +18,7 @@ beforeAll(async () => {
   db = await openTestDb();
   await seedLogin((await seedTenant(db, "one")).partyId, "u1");
   await seedLogin((await seedTenant(db, "two")).partyId, "u2");
+  await seedLogin((await seedTenant(db, "three")).partyId, "u3");
 });
 
 afterAll(() => db.close());
@@ -51,5 +52,19 @@ describe("Session limit", () => {
     expect(mine).toHaveLength(MAX_SESSIONS_PER_LOGIN);
     expect(mine.map((row) => row.token)).not.toContain(first);
     expect(theirs.map((row) => row.token)).toEqual([other]);
+  });
+
+  it("does not sign out a Session when the password step of a Two-factor Login has not passed its code", async () => {
+    const now = new Date();
+    await db.raw.update(authUser).set({ twoFactorEnabled: true }).where(eq(authUser.id, "u3"));
+    await db.raw.insert(authSession).values(
+      [1, 2, 3].map((n) => ({ id: `s3-${n}`, token: `t3-${n}`, userId: "u3", expiresAt: new Date(now.getTime() + 3_600_000), createdAt: new Date(now.getTime() - n * 1000), updatedAt: now })),
+    );
+
+    const result = await auth().api.signInEmail({ body: { email: "u3@example.com", password: "password-123" } });
+
+    const kept = await db.raw.select().from(authSession).where(eq(authSession.userId, "u3"));
+    expect(result).toMatchObject({ twoFactorRedirect: true });
+    expect(kept.map((row) => row.id).toSorted()).toEqual(["s3-1", "s3-2", "s3-3"]);
   });
 });
