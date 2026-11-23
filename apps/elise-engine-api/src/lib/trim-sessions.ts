@@ -8,13 +8,14 @@ export const isPendingTwoFactorStep = async (db: PoolDbType, userId: string, pat
   return row?.on === true;
 };
 
-export const trimSessions =async (db: PoolDbType, userId: string, keep: number) => {
+export const trimSessions = async (db: PoolDbType, userId: string, keep: number, currentId: string) => {
   const rows = await db
     .select({ id: authSession.id })
     .from(authSession)
     .where(eq(authSession.userId, userId))
     .orderBy(desc(authSession.createdAt), desc(authSession.id));
-  const stale = rows.slice(keep).map((row) => row.id);
+  const ordered = [...rows.filter((row) => row.id === currentId), ...rows.filter((row) => row.id !== currentId)];
+  const stale = ordered.slice(keep).map((row) => row.id);
   if (stale.length === 0) return;
   await db.delete(authSession).where(inArray(authSession.id, stale));
 };

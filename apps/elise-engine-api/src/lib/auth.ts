@@ -298,7 +298,7 @@ export const buildAuth = (config: AuthConfig) => {
         create: {
           after: async (session, context) => {
             if (await isPendingTwoFactorStep(config.db, session.userId, context?.path)) return;
-            await trimSessions(config.db, session.userId, MAX_SESSIONS_PER_LOGIN);
+            await trimSessions(config.db, session.userId, MAX_SESSIONS_PER_LOGIN, session.id).catch(() => console.error("session limit trim failed"));
           },
         },
       },
