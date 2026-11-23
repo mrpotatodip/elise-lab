@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { eq } from "drizzle-orm";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins";
@@ -81,6 +82,7 @@ export const buildAuth = (config: AuthConfig) =>
         });
       },
       onPasswordReset: async ({ user }) => {
+        await config.db.update(authUser).set({ emailVerified: true }).where(eq(authUser.id, user.id));
         await config
           .enqueueEmail({
             kind: "password-reset-done",
