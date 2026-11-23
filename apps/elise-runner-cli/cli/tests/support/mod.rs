@@ -554,7 +554,7 @@ impl Runner {
         let root = temp_home();
         let (bin, record) = (root.join("bin"), root.join("opened"));
         std::fs::create_dir_all(&bin).unwrap();
-        for opener in ["open", "xdg-open", "rundll32"] {
+        for opener in ["open", "xdg-open"] {
             install_stub(&bin, opener);
         }
         self.env.push(("PATH", path_with(&bin, system_path())));

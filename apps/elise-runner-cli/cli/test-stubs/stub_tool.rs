@@ -17,8 +17,7 @@ fn main() {
         "git" => git(&root.join("record"), &args),
         "claude" => claude(&root.join("record"), &args),
         "node" => {}
-        // `rundll32 url.dll,FileProtocolHandler <url>` is how Windows opens the browser: the URL is last.
-        "open" | "xdg-open" | "rundll32" => append(&root.join("opened"), args.last().map_or("", String::as_str)),
+        "open" | "xdg-open" => append(&root.join("opened"), args.first().map_or("", String::as_str)),
         other => panic!("no stub for {other}"),
     }
 }

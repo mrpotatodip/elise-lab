@@ -19,8 +19,15 @@ fn login_prints_the_link_and_code_waits_and_saves_the_token_once_approved() {
     assert!(done.stdout.contains(RUNNER_NAME) && done.stdout.contains(ACCOUNT_NAME), "{}", done.stdout);
     assert_eq!(runner.run(&["status"], "").code, 0);
     assert_eq!(engine.live(), engine.tokens().into_iter().collect());
-    browser.wait_for_a_call();
-    assert_eq!(browser.opened(), vec![VERIFICATION_URL.to_string()]);
+    // Windows opens the browser through the system's own rundll32, which a stub on PATH cannot
+    // stand in for, so the call is only observed on unix.
+    #[cfg(unix)]
+    {
+        browser.wait_for_a_call();
+        assert_eq!(browser.opened(), vec![VERIFICATION_URL.to_string()]);
+    }
+    #[cfg(not(unix))]
+    drop(browser);
 }
 
 #[test]
