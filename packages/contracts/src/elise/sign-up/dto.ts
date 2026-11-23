@@ -47,5 +47,20 @@ export const SignUpSchema = z.object({
   tenant: TenantSchema,
 });
 
+// -----
+// Resend the Verification email: no session needed.
+// The answer is the same for any address, so it never
+// says whether a Login exists, is verified or was limited.
+// -----
+export const ResendVerificationBodySchema = z.object({
+  email: z.email().max(SIGN_UP_EMAIL_MAX).trim().toLowerCase(),
+});
+
+export const ResendVerificationSchema = z.object({
+  requested: z.literal(true),
+});
+
 export type SignUpBody = z.infer<typeof SignUpBodySchema>;
 export type SignUp = z.infer<typeof SignUpSchema>;
+export type ResendVerificationBody = z.infer<typeof ResendVerificationBodySchema>;
+export type ResendVerification = z.infer<typeof ResendVerificationSchema>;
