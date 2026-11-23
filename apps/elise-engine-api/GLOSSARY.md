@@ -78,6 +78,10 @@ _Avoid_: Worker (that is the Cloudflare Worker), agent (that is the program it s
 How a headless Runner is connected from the terminal with no code to copy: `elise-runner login` starts a login with the engine (`POST /runners/login/start`), which returns a user code, a link to the dashboard's `/device` page and a device code. A signed-in member opens the link, sees the computer's name, OS, CPU, version and the IP that asked, picks an Account and a Runner name, and approves or denies. The Runner checks (`/runners/login/check`) until it is approved, then collects its own Runner token, once. It never holds a person's session. The user code and the device code are stored as hashes, both work once and both expire after 10 minutes (`RUNNER_LOGIN_TTL_MS`). A check sooner than the interval (5 seconds) is answered `slow_down` and lengthens the interval it must keep, as RFC 8628 says. Starts are limited per IP and in total. A login is in one state: `pending`, `approved`, `denied` or `collected`, and an expired one is read as `expired`. Approving writes an Audit trail entry and the Runners list shows who added the Runner. `pair <code>` and `ELISE_RUNNER_TOKEN` stay for CI and containers. ADR 0007 holds the reason.
 _Avoid_: device login (a login of a person from a device is a different thing, and is not built), session (a Runner never gets one)
 
+**Getting started**:
+The checklist that takes an Account from no Runner to its first Report, made of setup tasks: install the Runner, log it in, check git access (private repos only), run a first Scan, read the Report. Its progress comes from the Account's own Runners and Scans, so it is the same for every member, and it is done once the Account has a Report.
+_Avoid_: onboarding, tutorial, steps (a Step is the agent's)
+
 **Stopped Scan**:
 A Scan a person ended on purpose before it finished, from the dashboard: by stopping it, or by removing the Runner that runs it. It is not a failure and not a Partial Scan: it keeps no Report and no findings, weighs 0 in a Verdict and adds nothing to a Branch. A cloud Scan is charged what was metered up to the stop; a Runner Scan takes no credit.
 _Avoid_: Cancelled Scan, aborted Scan, killed Scan
@@ -222,6 +226,10 @@ _Avoid_: Ceiling (the ceiling of a Budget cap is in its own entry), limit
 What an Account pays for. Two Plans are offered, both paid through Stripe: Starter (`starter`, $15 a month or $150 a year, 2 members) and Runner (`runner`, $35 a month or $350 a year, 5 members); the yearly price needs its Stripe yearly price ID on the row before it is offered. Older rows stay because subscriptions still point to them: Pro (`pro`, $49 a month, $49 of Included credit) and Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month). A Plan is a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap. The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
 _Avoid_: Tier, subscription (for the Plan itself)
 
+**Subscription**:
+An Account's hold on a Plan: its one `tenant_subscriptions` row, with a status (active, past due, canceled and so on). No row means no Plan. A `stripe` Subscription is paid by card and changes only when Stripe tells the engine so, never when the person comes back from paying. A `grant` Subscription is one the operator gave, never charged; paying by card replaces it.
+_Avoid_: Plan (for the hold itself), membership
+
 **Billing interval**:
 How often a Subscription is charged, `month` or `year` (`tenant_subscriptions.billing_interval`). It belongs to the Subscription, not the Plan: a Plan row holds both a monthly and a nullable yearly price, and a Plan with no yearly price is monthly-only. The webhook sets the interval from the Stripe price that Stripe reports; existing Stripe rows read as `month`, and an operator grant has none. Checkout takes an optional `interval` (default `month`). A Plan change keeps the interval; `POST /usage/plan/change` with `interval: "year"` moves the same Plan from monthly to yearly, and yearly to monthly is refused (cancel at the end of the paid period and subscribe again).
 _Avoid_: Annual plan, yearly tier
@@ -283,6 +291,14 @@ _Avoid_: Viewer, guest
 
 **Audit trail**:
 `access_audit_log`. It holds every kind of change an Account makes to itself, each with the actor's Party and the Tenant in `after`: Team invites, Groups, triage decisions (`finding.triage.set`, `finding.risk.accepted`), comment deletes (`finding.comment.deleted`), the monthly budget and the Anthropic key.
+
+**Security notice**:
+An email that tells people about a change to a Login or an Account that they did not undo, for example a password reset, a new Runner, a changed Anthropic key or a changed Monthly budget. It is always sent and has no unsubscribe link. It goes to every Login that holds the Power behind the change, the person who made it included; a password notice goes only to that Login.
+_Avoid_: alert, security email
+
+**Notification**:
+An email about activity in an Account, for example a finished Scan or an accepted Team invite. A person can turn it off.
+_Avoid_: alert, digest (a digest groups many events and is not built)
 
 **Party**:
 Any actor that the system knows. Its type is a row in `party_master_types`: a Person or an Organization.
