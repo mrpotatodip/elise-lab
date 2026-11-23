@@ -312,6 +312,41 @@ A Party of the type `organization`. It has one name (`party_organizations`).
 **Login**:
 A way to sign in (`auth_user`). It belongs to one Party. Its `name` column always has a value; first and last name exist only for a Person.
 
+**Session**:
+One signed-in browser of one Login (`auth_session`): created by a sign-in, ended by sign-out, expiry, a password reset or a Two-factor reset. A Runner never has one.
+_Avoid_: instance, device login
+
+**Session limit**:
+The most Sessions one Login may hold at once: 3, the same for every Plan and Role. A sign-in over the limit signs out that Login's oldest Session (the newest wins); it is never refused. It counts only Sessions, so Runners are untouched. It makes sharing one Login awkward and does not stop it: people who work together are meant to join the Team by invite.
+
+**Verified Login**:
+A Login whose email has been confirmed. Only a Verified Login can sign in. A person confirms by opening the link in a Verification email, by accepting a Team invite sent to that address, or by completing a password reset. A new sign-up for an email held by an unverified Login replaces that Login.
+_Avoid_: confirmed email, activated user
+
+**Verification email**:
+The email that holds the one-time link that makes a Login a Verified Login. The link lasts 24 hours and works once. It is always sent, has no unsubscribe link, and is neither a Security notice nor an Activity email.
+_Avoid_: confirmation email, welcome email
+
+**Two-factor**:
+A second step at sign-in: after the password, a Login types a code from its Authenticator, or a Backup code. A Login has Two-factor only once it has typed one valid code at enrolment; an abandoned setup leaves it off. A Login with `tenant_admin` or `workspace_admin` in any Account must have it and is sent to set it up at its next sign-in, with no skip. Every other Login chooses, unless its Account has a Two-factor requirement. A Runner token never passes through it.
+_Avoid_: MFA, 2FA (in text people read), device login
+
+**Authenticator**:
+The app on a person's phone or computer (a TOTP app) that holds a Login's Two-factor secret and shows the six-digit code. Emailed codes are not a second factor here.
+_Avoid_: token, OTP app
+
+**Backup code**:
+One of ten single-use codes shown once when a Login enrols in Two-factor, each good in place of an Authenticator code. A Login can regenerate them with its password, which voids the old ten.
+_Avoid_: recovery code, reset code
+
+**Two-factor requirement**:
+An Account setting a `tenant_admin` turns on so that every Login in the Account must have Two-factor. A member without it is sent to set it up at the next sign-in.
+_Avoid_: enforce MFA, mandatory 2FA
+
+**2FA reset**:
+An admin clearing another member's Two-factor because the Login lost both its Authenticator and its Backup codes. A `tenant_admin` can reset any other member, a `workspace_admin` only a non-admin, and nobody their own. It writes an Audit trail entry, sends a Security notice and signs the Login out everywhere.
+_Avoid_: unlock, disable (for an admin's action)
+
 **Service token**:
 The secret `SCAN_API_TOKEN`. Only a server holds it, and every `/scans` route needs it as a bearer token.
 _Avoid_: API key, password
