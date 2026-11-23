@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
@@ -21,6 +21,7 @@ const failureMessage = (failure: SecondStepFailure): string => {
 
 export function TwoFactorSecondStepFields({ redirectTo }: { redirectTo: string | undefined }) {
   const done = useAuthDone(redirectTo);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const check = useMutation({
@@ -28,6 +29,7 @@ export function TwoFactorSecondStepFields({ redirectTo }: { redirectTo: string |
     onSuccess: (result) => {
       if (result.ok) return done.onSuccess();
       setMessage(failureMessage(result.failure));
+      inputRef.current?.focus();
       return undefined;
     },
     onError: done.onError,
@@ -44,7 +46,7 @@ export function TwoFactorSecondStepFields({ redirectTo }: { redirectTo: string |
     >
       <div className="grid gap-2">
         <Label htmlFor="code">{AUTH_COPY.twoFactor.label}</Label>
-        <Input id="code" name="code" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} aria-invalid={message ? true : undefined} aria-describedby={message ? "code-error" : undefined} />
+        <Input ref={inputRef} id="code" name="code" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} aria-invalid={message ? true : undefined} aria-describedby={message ? "code-error" : undefined} />
         {message ? (
           <p id="code-error" role="alert" className="text-xs text-status-danger">
             {message}

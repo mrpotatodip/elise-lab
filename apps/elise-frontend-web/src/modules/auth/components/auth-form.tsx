@@ -226,7 +226,7 @@ export function AuthForm({ mode, token, email, redirectTo, turnstileSiteKey = nu
         <Card className="shadow-raised">
           <CardHeader className="gap-1.5 px-8 pb-9 pt-8">
             <h1 className="text-xl font-semibold leading-none tracking-tight">{copy.title}</h1>
-            <p className="text-sm text-muted-foreground">{copy.hint}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{copy.hint}</p>
           </CardHeader>
           <CardContent className="p-8">
             <AuthFields mode={mode} token={token} email={email} redirectTo={redirectTo} turnstileSiteKey={turnstileSiteKey} />

@@ -103,7 +103,7 @@ const columns = column.columns([
         return (
           <TeamConfirmDialog
             triggerLabel="Reset 2FA"
-            triggerAriaLabel={`Reset Two-factor for ${person.name}`}
+            triggerAriaLabel={`Reset 2FA for ${person.name}`}
             title="Reset Two-factor?"
             description={`${person.name} will sign in with a password alone until they set Two-factor up again. Use this when they lost their device and Backup codes.`}
             confirmLabel="Reset Two-factor"
@@ -178,7 +178,7 @@ export function TeamMembersCard({ email }: { email: string }) {
       expiresAt: "",
       emailStatus: undefined,
       twoFactorEnabled: member.twoFactorEnabled,
-      canReset: mayReset && canResetTwoFactor(user?.role ?? "", member.role, member.email.toLowerCase() === email.toLowerCase()),
+      canReset: mayReset && member.twoFactorEnabled !== false && canResetTwoFactor(user?.role ?? "", member.role, member.email.toLowerCase() === email.toLowerCase()),
       busy: resetTwoFactor.isPending,
       resend: noAction,
       revoke: async () => undefined,

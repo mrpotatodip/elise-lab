@@ -27,3 +27,5 @@ export const codeInput = (typed: string): CodeInput => {
 const ADMIN_ROLES = new Set(["tenant_admin", "workspace_admin"]);
 
 export const canTurnOff = (role: string): boolean => !ADMIN_ROLES.has(role);
+
+export const spacedKey = (key: string): string => key.match(/.{1,4}/g)?.join(" ") ?? key;

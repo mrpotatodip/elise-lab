@@ -76,6 +76,7 @@ export const AUTH_COPY = {
     wrong: "That code did not work. Check the code and try again.",
     expired: "This sign-in took too long. Sign in again with your password.",
     other: "We could not check the code. Try again.",
+    wrongPassword: "That password is not right. Check it and try again.",
     locked: (lockLasts: string, until: string) => `Too many wrong codes. Codes are locked for ${lockLasts}; try again after ${until} at the latest.`,
   },
   setup: {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canTurnOff, codeInput, screenAfterSignIn, secondStepFailure } from "#/modules/auth/utils";
+import { canTurnOff, codeInput, screenAfterSignIn, secondStepFailure, spacedKey } from "#/modules/auth/utils";
 
 describe("which screen follows a sign-in response", () => {
   it.each([
@@ -35,6 +35,15 @@ describe("which endpoint a typed code goes to", () => {
     { typed: "12345", expected: { kind: "backup", code: "12345" } },
   ])("$typed", ({ typed, expected }) => {
     expect(codeInput(typed)).toEqual(expected);
+  });
+});
+
+describe("the typed key", () => {
+  it.each([
+    { key: "ABCDEFGHIJ", spaced: "ABCD EFGH IJ" },
+    { key: "", spaced: "" },
+  ])("groups $key in fours", ({ key, spaced }) => {
+    expect(spacedKey(key)).toBe(spaced);
   });
 });
 

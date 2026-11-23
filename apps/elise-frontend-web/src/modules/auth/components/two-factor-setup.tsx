@@ -7,6 +7,7 @@ import { Checkbox } from "#/components/ui/checkbox";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { confirmTwoFactor, startTwoFactor } from "../api";
+import { spacedKey } from "../utils";
 
 function QrCode({ value }: { value: string }) {
   const source = `data:image/svg+xml;utf8,${encodeURIComponent(renderSVG(value, { border: 2 }))}`;
@@ -84,8 +85,8 @@ export function TwoFactorSetup({ onDone }: { onDone: () => void }) {
         <p className="text-sm leading-relaxed">Scan this with an Authenticator app, then type the 6-digit code it shows.</p>
         <div className="grid justify-items-center gap-2">
           <QrCode value={started.totpURI} />
-          <p className="text-xs text-muted-foreground">
-            Cannot scan? Type this key: <span className="font-mono">{secretOf(started.totpURI)}</span>
+          <p className="max-w-copy text-center text-sm leading-relaxed text-muted-foreground">
+            Cannot scan? Type this key: <span className="font-mono">{spacedKey(secretOf(started.totpURI))}</span>
           </p>
         </div>
         <div className="grid gap-2">
