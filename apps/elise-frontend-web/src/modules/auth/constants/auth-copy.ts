@@ -64,7 +64,26 @@ export const AUTH_COPY = {
     failed: "Something went wrong",
     unverified: "Verify your email first. We just sent you a new link.",
   },
+  twoFactor: {
+    title: "Two-factor sign-in",
+    hint: "Type the 6-digit code from your Authenticator app, or one of your Backup codes.",
+    label: "Code",
+    submit: "Continue",
+    swap: "Back to sign in",
+    to: "/signin",
+    wrong: "That code did not work. Check the code and try again.",
+    expired: "This sign-in took too long. Sign in again with your password.",
+    other: "We could not check the code. Try again.",
+    locked: (lockLasts: string, until: string) => `Too many wrong codes. Codes are locked for ${lockLasts}; try again after ${until} at the latest.`,
+  },
+  setup: {
+    title: "Set up Two-factor sign-in",
+    hint: "Your role needs Two-factor sign-in before you can use Elise. It takes a minute.",
+    swap: "Sign out",
+  },
 } as const;
+
+export const TWO_FACTOR_LOCK_MINUTES = 15;
 
 // -----
 // The panel beside the form on wide screens: what Elise does, in plain words.

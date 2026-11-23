@@ -9,6 +9,7 @@ export const Route = createFileRoute("/device")({
   head: () => ({ meta: [{ title: "Connect a Runner · Elise" }] }),
   validateSearch: SearchSchema,
   beforeLoad: ({ context, search }) => {
+    if (context.user?.twoFactorSetupRequired) throw redirect({ to: "/two-factor-setup" });
     if (context.user) return;
     const back = search.code ? `/device?code=${encodeURIComponent(search.code)}` : "/device";
     throw redirect({ to: "/signin", search: { redirect: back } });
