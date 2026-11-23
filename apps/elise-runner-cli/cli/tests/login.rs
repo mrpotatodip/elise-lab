@@ -19,8 +19,6 @@ fn login_prints_the_link_and_code_waits_and_saves_the_token_once_approved() {
     assert!(done.stdout.contains(RUNNER_NAME) && done.stdout.contains(ACCOUNT_NAME), "{}", done.stdout);
     assert_eq!(runner.run(&["status"], "").code, 0);
     assert_eq!(engine.live(), engine.tokens().into_iter().collect());
-    // Windows opens the browser through the system's own rundll32, which a stub on PATH cannot
-    // stand in for, so the call is only observed on unix.
     #[cfg(unix)]
     {
         browser.wait_for_a_call();
@@ -125,7 +123,6 @@ fn an_engine_without_the_login_routes_gets_the_pair_message() {
     assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
 }
 
-// Unix only: it sends INT.
 #[cfg(unix)]
 #[test]
 fn ctrl_c_cancels_the_wait_with_one_plain_line_and_saves_nothing() {

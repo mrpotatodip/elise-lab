@@ -1,15 +1,9 @@
-// Where `claude` and `node` are looked for, and the PATH the agent and the validators get.
-// A program started from an app does not get the shell's PATH. On Windows the lookup is PATH,
-// then the usual folders; the folder lists are plain functions of the environment, so a test
-// on any computer can check the Windows ones. The unix lookup stays in scan.rs.
-
 #[cfg(windows)]
 use std::ffi::OsString;
 #[cfg(any(windows, test))]
 use std::path::Path;
 use std::path::PathBuf;
 
-// The variables the Windows lookup reads, copied out of the process so a test can set them.
 #[cfg(any(windows, test))]
 #[derive(Default, Clone)]
 pub struct WinEnv {
@@ -40,13 +34,11 @@ impl WinEnv {
     }
 }
 
-// PATH on Windows is split on `;` whatever computer the test runs on.
 #[cfg(any(windows, test))]
 fn split_windows_path(path: &str) -> Vec<PathBuf> {
     path.split(';').map(|part| part.trim().trim_matches('"')).filter(|part| !part.is_empty()).map(PathBuf::from).collect()
 }
 
-// The file endings tried, in PATHEXT's order, narrowed to the two a tool is installed as.
 #[cfg(any(windows, test))]
 fn extensions(pathext: Option<&str>) -> Vec<String> {
     let listed: Vec<String> =
@@ -58,7 +50,6 @@ fn extensions(pathext: Option<&str>) -> Vec<String> {
     }
 }
 
-// The folders after PATH, in the order they are tried.
 #[cfg(any(windows, test))]
 fn usual_folders(env: &WinEnv) -> Vec<PathBuf> {
     let mut folders = Vec::new();
@@ -77,8 +68,6 @@ fn usual_folders(env: &WinEnv) -> Vec<PathBuf> {
     folders
 }
 
-// Every file `name` could be, best first: each folder of PATH, then the usual ones, each with
-// each file ending.
 #[cfg(any(windows, test))]
 pub fn windows_candidates(name: &str, env: &WinEnv) -> Vec<PathBuf> {
     let exts = extensions(env.pathext.as_deref());
@@ -87,8 +76,6 @@ pub fn windows_candidates(name: &str, env: &WinEnv) -> Vec<PathBuf> {
     folders.iter().flat_map(|dir| exts.iter().map(move |ext| dir.join(format!("{name}{ext}")))).collect()
 }
 
-// The folder Git for Windows is installed in, taken from where `git` is on PATH (its `cmd`,
-// `bin` or `mingw64\bin` folder), else from %ProgramFiles%\Git.
 #[cfg(any(windows, test))]
 fn git_roots(env: &WinEnv, is_file: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     let mut roots = Vec::new();
@@ -115,8 +102,6 @@ fn git_roots(env: &WinEnv, is_file: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     roots
 }
 
-// What `doctor` says about Git for Windows: git must run and its bash (Claude Code needs
-// `bin\bash.exe`) must be in the install folder. `git_runs` is the result of `git --version`.
 #[cfg(any(windows, test))]
 pub fn git_for_windows_verdict(git_runs: bool, env: &WinEnv, is_file: &dyn Fn(&Path) -> bool) -> Result<String, String> {
     const INSTALL: &str = "Install Git for Windows from https://gitforwindows.org, then run doctor again.";
@@ -133,8 +118,6 @@ pub fn git_for_windows_verdict(git_runs: bool, env: &WinEnv, is_file: &dyn Fn(&P
     }
 }
 
-// The PATH of the agent: the folder `claude` lives in (claude starts `node` from there), the
-// folder of `node` when it is another one, the tools of Git for Windows, and the system folder.
 #[cfg(any(windows, test))]
 pub fn windows_agent_folders(claude_dir: &Path, node: Option<&Path>, env: &WinEnv, exists: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     let mut folders = vec![claude_dir.to_path_buf()];
@@ -156,7 +139,6 @@ pub fn windows_agent_folders(claude_dir: &Path, node: Option<&Path>, env: &WinEn
     folders
 }
 
-// The PATH of the validator scripts: node's folder and the system folder.
 #[cfg(any(windows, test))]
 pub fn windows_validator_folders(node: &Path, env: &WinEnv) -> Vec<PathBuf> {
     let mut folders: Vec<PathBuf> = node.parent().map(Path::to_path_buf).into_iter().collect();
@@ -184,8 +166,6 @@ pub fn windows_validator_path(node: &Path) -> OsString {
     joined(windows_validator_folders(node, &WinEnv::from_process()))
 }
 
-// `name` as a file on PATH, then in the usual folders and the version folders of nvm-windows
-// (newest last name first).
 #[cfg(windows)]
 pub fn find_on_windows(name: &str) -> Option<PathBuf> {
     let env = WinEnv::from_process();
@@ -204,7 +184,6 @@ pub fn find_on_windows(name: &str) -> Option<PathBuf> {
     versions.iter().flat_map(|dir| exts.iter().map(move |ext| dir.join(format!("{name}{ext}")))).find(|p| p.is_file())
 }
 
-// `name` as a file in a folder of PATH; on Windows with `.exe` or `.cmd` and PATHEXT honoured.
 pub fn on_path(name: &str) -> Option<PathBuf> {
     #[cfg(windows)]
     {
@@ -227,7 +206,6 @@ pub fn on_path(name: &str) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
-    // Forward slashes: `Path` only splits a Windows path on Windows, and these run everywhere.
     fn env() -> WinEnv {
         WinEnv {
             path: Some("C:/tools;;C:/Program Files/Git/cmd".to_string()),

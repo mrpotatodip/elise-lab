@@ -1,8 +1,3 @@
-// The one program the integration tests copy under the names of the tools the Runner starts
-// (`git`, `claude`, `node`, `open`, `xdg-open`), so no stub needs a unix shell. It picks what to be
-// from the name it was started under and keeps its records in the `record` folder next to the
-// `bin` folder it sits in (`opened` for the browser openers). Built for the tests only.
-
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -29,7 +24,6 @@ fn append(path: &Path, line: &str) {
 
 fn git(record: &Path, args: &[String]) {
     append(&record.join("git.txt"), &args.join(" "));
-    // The credential helper the Runner set for this call, and what it answers for three hosts.
     if let Ok(count) = std::env::var("GIT_CONFIG_COUNT") {
         fs::write(record.join("git-config.txt"), "").unwrap();
         fs::write(record.join("git-helper.txt"), "").unwrap();
@@ -72,7 +66,6 @@ fn git(record: &Path, args: &[String]) {
     }
 }
 
-// Git runs a `!` helper through a shell; so does the stub (the helper itself is a shell script).
 fn ask_helper(helper: &str, host: &str) -> String {
     let mut child = Command::new("sh")
         .arg("-c")
@@ -150,7 +143,6 @@ fn claude(record: &Path, args: &[String]) {
     );
 }
 
-// What `find <dir> -type f` lists, with Unix separators.
 fn list(dir: &Path, prefix: &str, files: &mut Vec<String>) {
     let shown = |name: &str| format!("{prefix}{name}");
     let Ok(entries) = fs::read_dir(dir) else { return };

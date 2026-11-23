@@ -788,9 +788,6 @@ fn strip_untrusted(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-// The same clone the cloud container does: a plain shallow clone, or a fetch of the ref, tried
-// as a branch first. It writes the commit (repo.sha), the branch HEAD was on (repo.branch), and
-// how the ref was fetched (repo.kind). The commands are git's own, run without a shell.
 async fn clone_repo(work: &Path, repo: &str, git_ref: &str, helper: Option<&git_token::Helper>, stop: &Stop) -> Result<(), String> {
     let result = tokio::select! {
         result = timeout(CLONE_TIMEOUT, clone_steps(work, repo, git_ref, helper)) => result,
@@ -799,7 +796,6 @@ async fn clone_repo(work: &Path, repo: &str, git_ref: &str, helper: Option<&git_
     result.map_err(|_| "Cloning took longer than 5 minutes.".to_string())?
 }
 
-// One git call in the work folder. Its output when it succeeded; the error text when it did not.
 async fn run_git(work: &Path, args: &[&str], helper: Option<&git_token::Helper>) -> Result<Result<Vec<u8>, String>, String> {
     let mut command = Command::new("git");
     command.args(args).current_dir(work).env("GIT_ALLOW_PROTOCOL", "https").env("GIT_TERMINAL_PROMPT", "0").kill_on_drop(true);
@@ -965,7 +961,6 @@ fn find_node() -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
-// The PATH of the agent and of the validator scripts. Unix: fixed folders after claude's own.
 #[cfg(not(windows))]
 fn agent_path(bin_dir: &Path, _node: Option<&Path>) -> std::ffi::OsString {
     format!("{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", bin_dir.display()).into()

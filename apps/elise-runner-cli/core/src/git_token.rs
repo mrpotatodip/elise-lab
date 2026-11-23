@@ -2,9 +2,6 @@ pub const VARIABLE: &str = "ELISE_GIT_TOKEN";
 
 const CLONE_VARIABLE: &str = "ELISE_CLONE_GIT_TOKEN";
 
-// What git needs to use the person's token for one host: an inline credential helper, given
-// through git's own config environment. Git runs it with the shell it ships with, so no file
-// is written and no `sh` has to be on the PATH. The token itself stays in an environment variable.
 pub struct Helper {
     token: String,
     config: Vec<(String, String)>,
@@ -26,8 +23,6 @@ impl Helper {
     }
 }
 
-// Git appends ` get` (or `store`, `erase`) and runs the line with its shell. Only `get` for the one
-// host is answered; the shell builtins are all it uses.
 fn helper_command(host: &str) -> String {
     format!(
         "!f() {{ [ \"$1\" = get ] || exit 0; while read -r line; do case \"$line\" in host=*) asked=\"${{line#host=}}\" ;; esac; done; \

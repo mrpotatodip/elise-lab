@@ -610,7 +610,6 @@ impl Running {
         assert!(ready, "no {text:?} in the error output: {}", self.stderr.lock().unwrap());
     }
 
-    // Unix only: Windows has no INT and TERM to send to a process.
     #[cfg(unix)]
     pub fn signal(&self, name: &str) {
         let sent = Command::new("kill").args(["-s", name, &self.child.id().to_string()]).status().unwrap();
@@ -725,13 +724,10 @@ impl Stubs {
     }
 }
 
-// Puts the stub program (cli/test-stubs/stub_tool.rs) in `bin` under the name of the tool it stands for.
 fn install_stub(bin: &std::path::Path, tool: &str) {
     std::fs::copy(env!("CARGO_BIN_EXE_elise-stub-tool"), bin.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX))).unwrap();
 }
 
-// The folders searched after the stubs: the shell the stub git uses to run the credential helper
-// the way real git does (on Windows, the one Git for Windows ships).
 fn system_path() -> Vec<PathBuf> {
     if cfg!(unix) {
         vec!["/usr/bin".into(), "/bin".into()]

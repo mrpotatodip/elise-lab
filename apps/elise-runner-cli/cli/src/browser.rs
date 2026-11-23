@@ -24,7 +24,6 @@ pub fn open(url: &str) -> bool {
         return false;
     };
     let mut command = Command::new(program);
-    // rundll32 takes the URL as its second argument, and unlike `cmd /C start` leaves & alone.
     if cfg!(windows) {
         command.arg("url.dll,FileProtocolHandler");
     }

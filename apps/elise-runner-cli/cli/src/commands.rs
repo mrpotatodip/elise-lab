@@ -484,7 +484,6 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
     }
 }
 
-// Interrupt and terminate on unix; Ctrl-C and Ctrl-Break on Windows, which has no terminate signal.
 #[cfg(unix)]
 fn stop_signals() -> Option<(tokio::signal::unix::Signal, tokio::signal::unix::Signal)> {
     use tokio::signal::unix::{signal, SignalKind};
