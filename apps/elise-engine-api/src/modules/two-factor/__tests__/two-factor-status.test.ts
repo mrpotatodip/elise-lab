@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authUser, ensureTenantRoles, findTenantRole, partyRoles } from "@repo/db-elise";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { authUser, ensureTenantRoles, findTenantRole, partyRoles, tenants } from "@repo/db-elise";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { getMeEffect } from "#/modules/me/queries";
 import { twoFactorStatusEffect } from "#/modules/two-factor";
@@ -70,6 +70,33 @@ describe("twoFactorStatusEffect", () => {
     await test.raw.update(partyRoles).set({ roleId: role.id }).where(eq(partyRoles.partyId, login.partyId));
 
     expect((await statusOf("promoted")).setupRequired).toBe(true);
+  });
+});
+
+describe("the Account's Two-factor requirement", () => {
+  const setRequired = (id: string, required: boolean) => test.raw.update(tenants).set({ twoFactorRequired: required }).where(eq(tenants.id, id));
+
+  afterEach(async () => {
+    await setRequired(tenantId, false);
+    await setRequired(otherTenantId, false);
+  });
+
+  it("requires setup of a plain member while the requirement is on, and stops when it is off", async () => {
+    await setRequired(tenantId, true);
+    const on = await statusOf("member-plain");
+    await setRequired(tenantId, false);
+
+    expect([on, await statusOf("member-plain")]).toEqual([
+      { enabled: false, setupRequired: true },
+      { enabled: false, setupRequired: false },
+    ]);
+  });
+
+  it("leaves a member with Two-factor and a member of another Account alone", async () => {
+    await setRequired(otherTenantId, true);
+
+    expect(await statusOf("owner-enrolled")).toEqual({ enabled: true, setupRequired: false });
+    expect(await statusOf("member-plain")).toEqual({ enabled: false, setupRequired: false });
   });
 });
 

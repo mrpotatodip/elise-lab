@@ -8,7 +8,9 @@ import { z } from "zod";
 import { sha256Hex } from "@repo/db-elise";
 import { authAccount, authSession, authTwoFactor, authUser, authVerification } from "@repo/db-elise/schema";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
+import { runEffect } from "#/lib/effect-query";
 import type { QueuedEmail } from "#/modules/email";
+import { accountRequiresTwoFactorEffect } from "#/modules/two-factor";
 import type { AppEnv } from "#/types/variables";
 
 // -----
@@ -151,6 +153,10 @@ export const buildAuth = (config: AuthConfig) => {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === "/two-factor/disable") {
+          const session = await getSessionFromCtx(ctx);
+          if (session && (await runEffect(accountRequiresTwoFactorEffect(config.db, session.user.id)))) {
+            throw new APIError("FORBIDDEN", { message: "Your account requires Two-factor", code: "TWO_FACTOR_REQUIRED" });
+          }
           const body = z.object({ code: z.string().min(1) }).safeParse(ctx.body);
           if (!body.success) throw new APIError("BAD_REQUEST", { message: "A code is required", code: "TWO_FACTOR_CODE_REQUIRED" });
           if (!(await proof.holds(ctx.headers, body.data.code))) throw new APIError("UNAUTHORIZED", { message: "Invalid code", code: "INVALID_CODE" });

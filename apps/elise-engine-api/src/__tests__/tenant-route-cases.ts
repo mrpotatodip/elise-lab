@@ -161,6 +161,8 @@ export const CROSS_ACCOUNT_CASES = {
   },
   "DELETE /team/invites/:inviteId": { kind: "run", path: `/team/invites/${OTHER_INVITE_ID}`, method: "DELETE", expect: "not-found" },
   "POST /team/members/:partyId/two-factor/reset": { kind: "run", path: `/team/members/${OTHER_PARTY_ID}/two-factor/reset`, method: "POST", expect: "not-found" },
+  "GET /team/two-factor-requirement": serviceTest("modules/team/__tests__/two-factor-requirement.test.ts"),
+  "PUT /team/two-factor-requirement": serviceTest("modules/team/__tests__/two-factor-requirement.test.ts"),
   "GET /groups": { kind: "run", path: "/groups", expect: "empty" },
   "POST /groups": { kind: "run", path: "/groups", method: "POST", body: { name: OTHER_GROUP_NAME }, expect: "created" },
   "PATCH /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "PATCH", body: { name: "Not mine to rename" }, expect: "not-found" },

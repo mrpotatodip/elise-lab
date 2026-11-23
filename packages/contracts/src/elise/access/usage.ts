@@ -12,12 +12,13 @@ export type AccessPowerUsage = {
 // engine tests with UPDATE_POWER_USAGE=1 to rewrite it.
 // -----
 export const ACCESS_POWER_USAGE: Readonly<Partial<Record<AccessPower, AccessPowerUsage>>> = {
-  "company:team:members:read": { guard: "plain", routes: ["GET /team", "GET /team/roles"], tools: [] },
+  "company:team:members:read": { guard: "plain", routes: ["GET /team", "GET /team/roles", "GET /team/two-factor-requirement"], tools: [] },
   "company:team:members:update": { guard: "plain", routes: ["PATCH /team/members/:partyId"], tools: [] },
   "company:team:members:delete": { guard: "plain", routes: ["DELETE /team/members/:partyId"], tools: [] },
   "company:team:invites:create": { guard: "plain", routes: ["POST /team/invites"], tools: [] },
   "company:team:invites:update": { guard: "plain", routes: ["PATCH /team/invites/:inviteId"], tools: [] },
   "company:team:invites:delete": { guard: "plain", routes: ["DELETE /team/invites/:inviteId"], tools: [] },
+  "company:team:two_factor_requirement:update": { guard: "plain", routes: ["PUT /team/two-factor-requirement"], tools: [] },
   "company:team:two_factor:reset": { guard: "plain", routes: ["POST /team/members/:partyId/two-factor/reset"], tools: [] },
   "company:chats:threads:read": { guard: "plain", routes: ["GET /customer-threads", "GET /customer-threads/:threadId"], tools: [] },
   "company:unanswered:questions:read": { guard: "plain", routes: ["GET /unanswered-questions"], tools: [] },

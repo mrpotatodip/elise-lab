@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
-import { accessMasterRoles, authUser, partyMasterRoles, partyRoles } from "@repo/db-elise";
-import type { DbConnectType } from "#/lib/db-connection";
+import { accessMasterRoles, authUser, partyMasterRoles, partyRoles, tenants } from "@repo/db-elise";
+import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 
 export const TWO_FACTOR_ADMIN_ROLE_KEYS = ["tenant_admin", "workspace_admin"];
@@ -28,5 +28,23 @@ export const twoFactorStatusEffect = (db: DbConnectType, userId: string): Effect
           .limit(1),
       catch: toDbError,
     });
-    return { enabled: false, setupRequired: admin.length > 0 };
+    if (admin.length > 0) return { enabled: false, setupRequired: true };
+
+    const required = yield* accountRequiresTwoFactorEffect(db, userId);
+    return { enabled: false, setupRequired: required };
+  });
+
+export const accountRequiresTwoFactorEffect = (db: AppDbType, userId: string): Effect.Effect<boolean, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const rows = await db
+        .select({ id: partyRoles.id })
+        .from(authUser)
+        .innerJoin(partyRoles, eq(partyRoles.partyId, authUser.partyId))
+        .innerJoin(tenants, eq(tenants.id, partyRoles.tenantId))
+        .where(and(eq(authUser.id, userId), eq(tenants.twoFactorRequired, true)))
+        .limit(1);
+      return rows.length > 0;
+    },
+    catch: toDbError,
   });
