@@ -41,13 +41,26 @@ fn split_windows_path(path: &str) -> Vec<PathBuf> {
 
 #[cfg(any(windows, test))]
 fn extensions(pathext: Option<&str>) -> Vec<String> {
-    let listed: Vec<String> =
-        pathext.unwrap_or("").split(';').map(|ext| ext.trim().to_lowercase()).filter(|ext| ext == ".exe" || ext == ".cmd").collect();
-    if listed.is_empty() {
+    let listed: Vec<String> = pathext.unwrap_or("").split(';').map(|ext| ext.trim().to_lowercase()).collect();
+    let wanted: Vec<String> = [".exe", ".cmd"].iter().filter(|ext| listed.iter().any(|l| l == *ext)).map(|ext| ext.to_string()).collect();
+    if wanted.is_empty() {
         vec![".exe".to_string(), ".cmd".to_string()]
     } else {
-        listed
+        wanted
     }
+}
+
+#[cfg(any(windows, test))]
+fn version_key(dir: &Path) -> (u64, u64, u64) {
+    let name = dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let mut parts = name.trim_start_matches('v').split('.').map(|part| part.parse::<u64>().unwrap_or(0));
+    (parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0))
+}
+
+#[cfg(any(windows, test))]
+fn newest_first(mut versions: Vec<PathBuf>) -> Vec<PathBuf> {
+    versions.sort_by(|a, b| version_key(b).cmp(&version_key(a)).then_with(|| b.cmp(a)));
+    versions
 }
 
 #[cfg(any(windows, test))]
@@ -73,7 +86,7 @@ pub fn windows_candidates(name: &str, env: &WinEnv) -> Vec<PathBuf> {
     let exts = extensions(env.pathext.as_deref());
     let mut folders = split_windows_path(env.path.as_deref().unwrap_or(""));
     folders.extend(usual_folders(env));
-    folders.iter().flat_map(|dir| exts.iter().map(move |ext| dir.join(format!("{name}{ext}")))).collect()
+    exts.iter().flat_map(|ext| folders.iter().map(move |dir| dir.join(format!("{name}{ext}")))).collect()
 }
 
 #[cfg(any(windows, test))]
@@ -173,15 +186,14 @@ pub fn find_on_windows(name: &str) -> Option<PathBuf> {
         return Some(found);
     }
     let exts = extensions(env.pathext.as_deref());
-    let mut versions: Vec<PathBuf> = env
+    let versions: Vec<PathBuf> = env
         .nvm_home
         .iter()
         .filter_map(|home| std::fs::read_dir(home).ok())
         .flat_map(|entries| entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()))
         .collect();
-    versions.sort();
-    versions.reverse();
-    versions.iter().flat_map(|dir| exts.iter().map(move |ext| dir.join(format!("{name}{ext}")))).find(|p| p.is_file())
+    let versions = newest_first(versions);
+    exts.iter().flat_map(|ext| versions.iter().map(move |dir| dir.join(format!("{name}{ext}")))).find(|p| p.is_file())
 }
 
 pub fn on_path(name: &str) -> Option<PathBuf> {
@@ -189,10 +201,8 @@ pub fn on_path(name: &str) -> Option<PathBuf> {
     {
         let env = WinEnv::from_process();
         let exts = extensions(env.pathext.as_deref());
-        split_windows_path(env.path.as_deref()?)
-            .iter()
-            .flat_map(|dir| exts.iter().map(move |ext| dir.join(format!("{name}{ext}"))))
-            .find(|p| p.is_file())
+        let folders = split_windows_path(env.path.as_deref()?);
+        exts.iter().flat_map(|ext| folders.iter().map(move |dir| dir.join(format!("{name}{ext}")))).find(|p| p.is_file())
     }
     #[cfg(not(windows))]
     {
@@ -226,7 +236,7 @@ mod tests {
     #[test]
     fn the_windows_lookup_tries_path_then_the_usual_folders_with_exe_before_cmd() {
         let found = windows_candidates("claude", &env());
-        let folders: Vec<PathBuf> = found.iter().step_by(2).map(|p| p.parent().unwrap().to_path_buf()).collect();
+        let folders: Vec<PathBuf> = found[..8].iter().map(|p| p.parent().unwrap().to_path_buf()).collect();
         assert_eq!(
             folders,
             paths(&[
@@ -240,15 +250,22 @@ mod tests {
                 "C:/Program Files/nodejs",
             ])
         );
-        assert_eq!(found[..2], paths(&["C:/tools/claude.exe", "C:/tools/claude.cmd"]));
+        assert_eq!(found[8..10], paths(&["C:/tools/claude.cmd", "C:/Program Files/Git/cmd/claude.cmd"]));
+        assert_eq!(found[0], PathBuf::from("C:/tools/claude.exe"));
     }
 
     #[test]
-    fn pathext_decides_the_order_of_file_endings_and_only_exe_and_cmd_count() {
-        let cases = [(Some(".CMD;.EXE"), vec![".cmd", ".exe"]), (Some(".COM;.BAT"), vec![".exe", ".cmd"]), (None, vec![".exe", ".cmd"])];
+    fn exe_always_comes_before_cmd_and_only_those_two_count() {
+        let cases = [(Some(".CMD;.EXE"), vec![".exe", ".cmd"]), (Some(".COM;.BAT"), vec![".exe", ".cmd"]), (None, vec![".exe", ".cmd"])];
         for (pathext, expected) in cases {
             assert_eq!(extensions(pathext), expected, "{pathext:?}");
         }
+    }
+
+    #[test]
+    fn nvm_version_folders_sort_by_number_newest_first() {
+        let sorted = newest_first(paths(&["C:/nvm/v20.11.0", "C:/nvm/v9.11.2", "C:/nvm/v18.2.0", "C:/nvm/v20.9.0"]));
+        assert_eq!(sorted, paths(&["C:/nvm/v20.11.0", "C:/nvm/v20.9.0", "C:/nvm/v18.2.0", "C:/nvm/v9.11.2"]));
     }
 
     #[test]
