@@ -35,7 +35,25 @@ export const AUTH_COPY = {
     to: "/signin",
     accountNameHelp: "The name of the new Elise account you are creating, for example your company or team.",
     checkUnavailable: "Sign-up is not available right now. Try again later.",
-    consequence: "You will own this new account, and we will sign you in.",
+    consequence: "You will own this new account. We will email you a link to confirm your address first.",
+  },
+  checkEmail: {
+    title: "Check your email",
+    hint: "We sent a link to confirm your address. Open it to finish creating your account.",
+    swap: "Back to sign in",
+    to: "/signin",
+  },
+  verifyFailed: {
+    title: "This link did not work",
+    hint: "It has expired or was already used. Enter your email and we will send a new one.",
+    swap: "Back to sign in",
+    to: "/signin",
+  },
+  verify: {
+    resend: "Send the email again",
+    sent: "Sent. It can take a minute; check the spam folder too.",
+    wait: "Wait a minute before asking again.",
+    unverified: "Verify your email first. We just sent you a new link.",
   },
 } as const;
 
