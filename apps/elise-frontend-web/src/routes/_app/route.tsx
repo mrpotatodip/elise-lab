@@ -6,6 +6,7 @@ import { runnerShownState, runnersQuery } from "#/modules/runner";
 import { ScanNewDialog, scansQuery, scanSidebarItems } from "#/modules/scan";
 import { hasAccessPower, isWatcher } from "@repo/contracts/elise";
 import { ShellFrame } from "#/modules/shell";
+import { groupsQuery, teamQuery } from "#/modules/team";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: ({ context, location }) => {
@@ -29,6 +30,9 @@ function AppLayout() {
   const showDashboard = !isWatcher(user?.powers ?? []);
   const { data } = useQuery({ ...scansQuery(), enabled: showDashboard });
   const { repos, repoCount, running, total } = scanSidebarItems(data?.scans ?? []);
+  const showTeam = hasAccessPower(user?.powers ?? [], "company:team:members:read");
+  const { data: team } = useQuery({ ...teamQuery(), enabled: showTeam });
+  const { data: groups } = useQuery({ ...groupsQuery(), enabled: showTeam });
   const showRunners = showDashboard && hasAccessPower(user?.powers ?? [], "company:runners:create");
   const { data: runners } = useQuery({ ...runnersQuery(), enabled: showRunners });
   const now = useNow();
@@ -48,7 +52,9 @@ function AppLayout() {
       running={running}
       repos={repos}
       repoCount={repoCount}
-      showTeam={hasAccessPower(user?.powers ?? [], "company:team:members:read")}
+      showTeam={showTeam}
+      memberCount={team?.members.length ?? null}
+      groupCount={groups?.length ?? null}
       showRunners={showRunners}
       showPlan={showDashboard && hasAccessPower(user?.powers ?? [], "company:plan:read")}
       showSignals={showDashboard && hasAccessPower(user?.powers ?? [], "company:signals:update")}
