@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, Radio, ScanSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, Radio, ScanSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -8,10 +8,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip
 import { AuthSignOutButton } from "#/modules/auth";
 import { cn } from "#/lib/utils";
 import { ShellBrand } from "./shell-brand";
-import { useSidebarReposOpen } from "../hooks";
+import { useSidebarSectionOpen } from "../hooks";
 import { NAV_ACTIVE as ACTIVE, NAV_CHEVRON as CHEVRON, NAV_ICON as ICON, NAV_ROW as ROW, NAV_TOGGLE as TOGGLE, NavHint as Hint } from "./shell-nav";
 import { ShellRepoTree } from "./shell-repo-tree";
+import { ShellTeamTree } from "./shell-team-tree";
 import { ShellThemeSwitch } from "./shell-theme-switch";
+
+const SECTION_LABEL = "px-3 pb-0.5 pt-1.5 text-xs text-muted-foreground/80";
 
 export type ShellRepo = {
   id: string;
@@ -30,6 +33,8 @@ type ShellSidebarProps = {
   repos: readonly ShellRepo[];
   repoCount: number;
   showTeam: boolean;
+  memberCount: number | null;
+  groupCount: number | null;
   showRunners: boolean;
   showPlan: boolean;
   showSignals: boolean;
@@ -51,8 +56,10 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, showRunners, showPlan, showSignals, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onReopenGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
-  const { open: reposOpen, setOpen: setReposOpen } = useSidebarReposOpen();
+export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, memberCount, groupCount, showRunners, showPlan, showSignals, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onReopenGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
+  const { open: reposOpen, setOpen: setReposOpen } = useSidebarSectionOpen("repos");
+  const { open: teamOpen, setOpen: setTeamOpen } = useSidebarSectionOpen("team");
+  const showWorkspace = showRunners || showTeam || showSignals;
   const scansLabel = running > 0 ? `Scans, ${running} in progress` : "Scans";
   const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
   const runnersLabel = runnersPaired === 0 ? "Runners" : runnersRunning > 0 ? `Runners, ${runnersRunning} running` : "Runners, none running";
@@ -65,7 +72,7 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
     <aside className={cn("sticky top-0 flex h-svh flex-col gap-6 overflow-y-auto overflow-x-hidden border-r bg-sidebar pb-4 pt-6", collapsed ? "px-2.5" : "px-3")}>
       <div className={cn("flex items-center", collapsed ? "flex-col gap-3" : "justify-between pl-2 pr-1")}>
         <Link to={showDashboard ? "/overview" : "/summary"} aria-label={collapsed ? "Elise home" : undefined} className="min-h-6 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          {collapsed ? <span className="text-xl font-semibold tracking-tight">E</span> : <ShellBrand />}
+          {collapsed ? <span className="text-base font-semibold tracking-tight">E</span> : <ShellBrand />}
         </Link>
         {canToggle && (
           <Tooltip>
@@ -166,6 +173,7 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
       </nav>
 
       <nav aria-label="Account" className="grid grid-cols-[minmax(0,1fr)] gap-1 border-t pt-3 empty:hidden">
+        {showWorkspace && !collapsed && <div className={SECTION_LABEL}>Workspace</div>}
         {showRunners && (
           <Hint label={runnersLabel} collapsed={collapsed}>
             <Link to="/settings/providers" aria-label={collapsed ? runnersLabel : undefined} className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
@@ -187,38 +195,45 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
           </Hint>
         )}
 
-        {showTeam && (
-          <Hint label="Team" collapsed={collapsed}>
-            <Link to="/team" aria-label="Team" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
-              <Users className={ICON} strokeWidth={1.5} />
-              {!collapsed && "Team"}
-            </Link>
-          </Hint>
-        )}
-
-        {showTeam && (
-          <Hint label="Groups" collapsed={collapsed}>
-            <Link to="/groups" aria-label="Groups" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
-              <Layers className={ICON} strokeWidth={1.5} />
-              {!collapsed && "Groups"}
-            </Link>
-          </Hint>
-        )}
-
-        {showPlan && (
-          <Hint label="Plan and billing" collapsed={collapsed}>
-            <Link to="/settings/plan" aria-label="Plan and billing" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
-              <CreditCard className={ICON} strokeWidth={1.5} />
-              {!collapsed && "Plan and billing"}
-            </Link>
-          </Hint>
-        )}
+        {showTeam &&
+          (collapsed ? (
+            <Hint label="Team" collapsed={collapsed}>
+              <Link to="/team" aria-label="Team" className={cn(ROW, "justify-center px-0")} activeProps={ACTIVE}>
+                <Users className={ICON} strokeWidth={1.5} />
+              </Link>
+            </Hint>
+          ) : (
+            <Collapsible open={teamOpen} onOpenChange={setTeamOpen}>
+              <div className="relative">
+                <Link to="/team" activeOptions={{ exact: true }} className={cn(ROW, "pr-10")} activeProps={ACTIVE}>
+                  <Users className={ICON} strokeWidth={1.5} />
+                  Team
+                </Link>
+                <CollapsibleTrigger aria-label={teamOpen ? "Hide team pages" : "Show team pages"} className={TOGGLE}>
+                  <ChevronUp className={CHEVRON} strokeWidth={1.5} />
+                </CollapsibleTrigger>
+              </div>
+              <CollapsiblePanel>
+                <ShellTeamTree memberCount={memberCount} groupCount={groupCount} />
+              </CollapsiblePanel>
+            </Collapsible>
+          ))}
 
         {showSignals && (
           <Hint label="Signals" collapsed={collapsed}>
             <Link to="/settings/signals" aria-label="Signals" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <Radio className={ICON} strokeWidth={1.5} />
               {!collapsed && "Signals"}
+            </Link>
+          </Hint>
+        )}
+
+        {showPlan && !collapsed && showWorkspace && <div className={SECTION_LABEL}>Billing</div>}
+        {showPlan && (
+          <Hint label="Plan and billing" collapsed={collapsed}>
+            <Link to="/settings/plan" aria-label="Plan and billing" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <CreditCard className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Plan and billing"}
             </Link>
           </Hint>
         )}
