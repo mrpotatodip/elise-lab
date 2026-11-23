@@ -1,12 +1,12 @@
 import type { Context } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { createAuthMiddleware, APIError } from "better-auth/api";
-import { bearer } from "better-auth/plugins";
+import { createAuthMiddleware, getSessionFromCtx, APIError } from "better-auth/api";
+import { bearer, twoFactor } from "better-auth/plugins";
 import { z } from "zod";
 import { sha256Hex } from "@repo/db-elise";
-import { authAccount, authSession, authUser, authVerification } from "@repo/db-elise/schema";
+import { authAccount, authSession, authTwoFactor, authUser, authVerification } from "@repo/db-elise/schema";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
 import type { QueuedEmail } from "#/modules/email";
 import type { AppEnv } from "#/types/variables";
@@ -32,7 +32,18 @@ export const AUTH_DISABLED_PATHS = [
   "/update-user",
   "/delete-user",
   "/delete-user/callback",
+  "/two-factor/send-otp",
+  "/two-factor/verify-otp",
+  "/two-factor/get-totp-uri",
 ];
+
+export const TWO_FACTOR_MAX_FAILURES = 5;
+export const TWO_FACTOR_LOCK_SECONDS = 15 * 60;
+const TWO_FACTOR_ISSUER = "EliseLAB";
+
+type CodeProof = { holds: (headers: Headers | undefined, code: string) => Promise<boolean> };
+
+const REVOKING_PATHS = new Set(["/two-factor/disable", "/two-factor/generate-backup-codes", "/two-factor/verify-totp"]);
 
 export type AuthConfig = {
   db: PoolDbType;
@@ -68,12 +79,20 @@ export const VERIFY_TOKEN_SECONDS = 24 * 3600;
 // Takes plain values, not a Context, so a test
 // can sign in against an in-memory database.
 // -----
-export const buildAuth = (config: AuthConfig) =>
-  betterAuth({
+export const buildAuth = (config: AuthConfig) => {
+  const proof: CodeProof = { holds: async () => false };
+  const enrolling = new WeakSet<object>();
+
+  const revokeOthers = async (userId: string, keepToken: string | undefined) => {
+    const others = keepToken ? and(eq(authSession.userId, userId), ne(authSession.token, keepToken)) : eq(authSession.userId, userId);
+    await config.db.delete(authSession).where(others);
+  };
+
+  const auth = betterAuth({
     database: drizzleAdapter(config.db, {
       provider: "pg",
       usePlural: false,
-      schema: { user: authUser, session: authSession, account: authAccount, verification: authVerification },
+      schema: { user: authUser, session: authSession, account: authAccount, verification: authVerification, twoFactor: authTwoFactor },
     }),
     // -----
     // The reset link opens the dashboard's page, which
@@ -131,6 +150,17 @@ export const buildAuth = (config: AuthConfig) =>
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/two-factor/disable") {
+          const body = z.object({ code: z.string().min(1) }).safeParse(ctx.body);
+          if (!body.success) throw new APIError("BAD_REQUEST", { message: "A code is required", code: "TWO_FACTOR_CODE_REQUIRED" });
+          if (!(await proof.holds(ctx.headers, body.data.code))) throw new APIError("UNAUTHORIZED", { message: "Invalid code", code: "INVALID_CODE" });
+          return;
+        }
+        if (ctx.path === "/two-factor/verify-totp" && ctx.body) {
+          const session = await getSessionFromCtx(ctx);
+          if (session && !session.user.twoFactorEnabled) enrolling.add(ctx.body);
+          return;
+        }
         if (ctx.path !== "/verify-email") return;
         const token = z.string().safeParse(ctx.query?.token);
         const issued = token.success ? tokenIssued(token.data) : undefined;
@@ -139,6 +169,12 @@ export const buildAuth = (config: AuthConfig) =>
         if (login && (issued.iat + 1) * 1000 <= login.createdAt.getTime()) {
           throw new APIError("UNAUTHORIZED", { message: "Invalid token", code: "INVALID_TOKEN" });
         }
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        if (!REVOKING_PATHS.has(ctx.path) || ctx.context.returned instanceof Error) return;
+        if (ctx.path === "/two-factor/verify-totp" && !(ctx.body && enrolling.has(ctx.body))) return;
+        const current = ctx.context.newSession ?? (await getSessionFromCtx(ctx));
+        if (current) await revokeOthers(current.user.id, current.session.token);
       }),
     },
     disabledPaths: AUTH_DISABLED_PATHS,
@@ -151,12 +187,33 @@ export const buildAuth = (config: AuthConfig) =>
     baseURL: config.baseUrl,
     basePath: "/auth",
     trustedOrigins: config.trustedOrigins,
-    plugins: [bearer()],
+    plugins: [
+      bearer(),
+      twoFactor({
+        issuer: TWO_FACTOR_ISSUER,
+        accountLockout: { enabled: true, maxFailedAttempts: TWO_FACTOR_MAX_FAILURES, durationSeconds: TWO_FACTOR_LOCK_SECONDS },
+      }),
+    ],
     advanced: {
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
       backgroundTasks: config.waitUntil ? { handler: config.waitUntil } : undefined,
     },
   });
+
+  proof.holds = async (headers, code) => {
+    const asTotp = await auth.api.verifyTOTP({ body: { code }, headers }).then(
+      () => true,
+      () => false,
+    );
+    if (asTotp) return true;
+    return auth.api.verifyBackupCode({ body: { code, disableSession: true }, headers }).then(
+      () => true,
+      () => false,
+    );
+  };
+
+  return auth;
+};
 
 // -----
 // A pool per request. The caller runs close()
