@@ -47,7 +47,7 @@ function ScanFileViewer({ scanId, file }: { scanId: string; file: string }) {
 
 function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
   if (scan.status === "failed") {
-    const failure = scanFailure(scan.error);
+    const failure = scanFailure(scan.error, scan.failureCode);
     return (
       <Alert variant="destructive">
         <OctagonX />

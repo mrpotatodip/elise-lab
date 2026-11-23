@@ -272,7 +272,7 @@ const recentScanColumnsOf = (zip: boolean) => scanColumn.columns([
           </span>
         );
       }
-      if (scan.status === "failed") return <span className="text-sm text-status-danger">{scanFailure(scan.error).title}</span>;
+      if (scan.status === "failed") return <span className="text-sm text-status-danger">{scanFailure(scan.error, scan.failureCode).title}</span>;
       return <span className="text-muted-foreground">{scanNoSummaryText(scan.status)}</span>;
     },
   }),

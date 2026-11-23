@@ -1,45 +1,26 @@
+import { SCAN_FAILURE_CODE_VALUES } from "@repo/contracts/elise";
 import { describe, expect, it } from "vitest";
 import { scanFailure } from "#/modules/scan/utils/scan-format";
 
-// -----
-// The error text is what `scan-sandbox` throws: "command exited N: " and the
-// last of git's output. The git lines are copied from a real run with no terminal.
-// -----
 const NOT_FOUND = "command exited 128: Cloning into '/workspace/repo'...\nremote: Repository not found.\nfatal: repository 'https://github.com/o/n/' not found";
-const NO_USERNAME = "command exited 128: fatal: could not read Username for 'https://github.com': No such device or address";
-const NO_REF = "command exited 128: fatal: couldn't find remote ref nope-branch";
-const TIMEOUT = "command exited 124: Cloning into '/workspace/repo'...";
 
 describe("scanFailure", () => {
-  it.each([
-    ["a repository that is missing or private", NOT_FOUND, "Elise could not read this repository."],
-    ["a clone git would prompt for a login on", NO_USERNAME, "Elise could not read this repository."],
-    ["a branch, tag or commit that does not exist", NO_REF, "That branch, tag or commit was not found in the repository."],
-    ["a clone the timeout killed", TIMEOUT, "Cloning the repository took too long and was stopped."],
-    ["an agent that ran out of memory", "claude exited 1: RangeError: Out of memory", "The agent ran out of memory while it read the repository."],
-    [
-      "a plan that hit its usage limit, in the agent's own words",
-      "The check phase failed: claude exited 1: You've hit your 5-hour limit · resets 5:40pm (Pacific/Auckland)\n\nThe end of the agent's output:\n {\"type\":\"result\"}",
-      "Your Claude plan is out of usage.",
-    ],
-    [
-      "a review that ended with no report, whose text mentions budget",
-      "The audit finished without writing REPORT.md. The agent may have been stopped by a permission, or run out of budget.",
-      "The agent stopped before it wrote the report.",
-    ],
-    ["a scan that reached its spend limit", "claude exited 1: Error: Exceeded USD budget (2)", "The scan reached its spend limit before it finished."],
-    ["a scan the engine stopped at its limit", "the scan's budget is spent", "The scan reached its spend limit before it finished."],
-    ["an error that only mentions a budget", "the agent said its budget plan was unclear", "the agent said its budget plan was unclear"],
-  ])("names the cause of %s", (_name, error, title) => {
-    expect(scanFailure(error).title).toBe(title);
+  it.each(SCAN_FAILURE_CODE_VALUES)("has its own copy for the code %s", (code) => {
+    const failure = scanFailure("the agent stopped", code);
+    expect(failure.title).not.toBe("the agent stopped");
+    expect(failure.advice).not.toBe("");
   });
 
-  it("points a missing repository at `elise-runner doctor`, since a private one looks the same", () => {
-    expect(scanFailure(NOT_FOUND).advice).toContain("elise-runner doctor");
+  it("points an unreadable repository at `elise-runner doctor`, since a private one looks the same", () => {
+    expect(scanFailure(NOT_FOUND, "repo_unreadable").advice).toContain("elise-runner doctor");
   });
 
   it("keeps git's own text as the detail", () => {
-    expect(scanFailure(NOT_FOUND).detail).toContain("fatal: repository");
+    expect(scanFailure(NOT_FOUND, "repo_unreadable").detail).toContain("fatal: repository");
+  });
+
+  it("does not read the words of the error when it has no code", () => {
+    expect(scanFailure("Exceeded USD budget (2)", null).title).toBe("Exceeded USD budget (2)");
   });
 
   it("falls back to the first line when it knows no cause", () => {

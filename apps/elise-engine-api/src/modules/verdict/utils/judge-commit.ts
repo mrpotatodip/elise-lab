@@ -2,7 +2,7 @@ import { FINDING_SEVERITY_VALUES, VERDICT_MIN_SCANS, type FindingSeverityValue, 
 import { SCAN_RECORDS_PRIOR_LIMIT } from "#/modules/scan-records";
 import { VERDICT_LIMITS } from "#/modules/verdict/constants";
 import type { JudgedFinding, JudgedScan, JudgeInput } from "#/modules/verdict/types";
-import { scanWeight } from "./scan-weight";
+import { scanWasRead, scanWeight } from "./scan-weight";
 
 type Reason = Verdict["reasons"][number];
 
@@ -102,7 +102,7 @@ export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput
   const weighted = weights.filter(({ weight }) => weight > 0);
   const counted = weighted.reduce((sum, { weight }) => sum + weight, 0);
   const window = windowOf(weighted);
-  const read = weights.filter(({ weight, scan }) => weight > 0 || scan.partial === true || scan.profileMet === "none").map(({ scan }) => scan);
+  const read = newestFirst.filter(scanWasRead);
   const decisions = new Map(triage.map((row) => [row.fingerprint, row]));
 
   const open: Verdict["open"] = [];
