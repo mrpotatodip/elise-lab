@@ -1,4 +1,28 @@
-# ScansCard: rehearsal notes
+# RunnerScene (hero since 2026-11-22) and ScansCard: rehearsal notes
+
+## RunnerScene: how Elise works with a Runner
+
+`RunnerScene.tsx` and `runner.css` replace `ScansCard` as the hero picture in `index.astro` (`ScansCard` stays: `RunnerScene` imports its row pieces, and the old tour is unmounted, not deleted). Story, about 21s, plays once. It shows only what the dashboard does today (checked against `scan-list.tsx`, `scan-detail.tsx`, `scan-findings-table.tsx`, `scan-trace.tsx` on main, 2026-11-22):
+
+1. `elise-runner run` is typed in a terminal at the lower left. New scan is clicked and a Queued row arrives on the Scans list.
+2. The Runner prints "Scan claimed" and the row turns Running. The list row says only "In progress" and Cost stays "-", as the real list does: no phase and no live findings there.
+3. The cursor opens the Scan page. It shows the info notice ("Scanning."), "Findings so far" (empty state "Nothing verified yet") and the Trace, newest Phase first, the running one open with its entries (Reading files ×8, Searching the code ×9 and so on) and a candidates count.
+4. The page scrolls to the Trace during recon and hunt, then back up to the table: findings are decided in the check phase, so they arrive then, worst first, one marked "Needs a person".
+5. "Scan succeeded." The notice goes, the card becomes "Findings" with its real description and copy button, the Trace folds, and the cursor opens the High finding in the side sheet. The poster is that frame.
+
+- **Agent activity tree (2026-11-22):** each Phase runs a short script of agent steps (Reasoning, Reading files, Searching the code, Running a command, Writing). The Trace groups a run of one label into one entry with a count (×2, ×3), lists the newest first, shows the last five and folds the rest into "N earlier", and the tinted bar at the top follows the newest entry with the candidates count (raised in the hunt). A finished Phase folds to its time. The page scrolls to the Trace from the hunt, back to the findings table for the check (where the table and the Trace's top share the view), and to the Trace again for the report. Checked in a browser: Recon open with ×2, Hunt open with ×3 and Recon folded, the check with one finding in the table and the tree under it. Not checked: "N earlier" (it needs more than five entries in one Phase, and no Phase has), the report scroll.
+- **Terminal chrome:** no drop shadow, only the kit's hairline edge.
+- **Layout (changed 2026-11-22, on request):** the dashboard window fills the stage (1440 by 760) and the terminal is a small overlay, 560 by 250, at its lower right. It covers part of the Scan page (the right of the Trace and the findings' Where column) on purpose: the owner prefers a small terminal over a wide strip. An earlier version had a full-width strip above the window (stage 1440 by 900); that is gone.
+- **Started from:** `examples/hero-demo` (a terminal over a window), through the existing `ScansCard` frame.
+- **Terminal text is the Runner's own output, word for word** (the user asked for it to be truthful, 2026-11-22). `ScanLog::tell` in `apps/elise-runner-cli/cli/src/commands.rs` prints `[repo scan_id] line`, and the lines are the ones it builds: `Scan claimed`, `the recon phase started`, `the recon phase ended: spent $X, $Y left of the Pool`, `result sent to Elise`, `Scan succeeded.`, after `Waiting for Scans from Elise. Stop with Ctrl-C.`. The scan id has the engine's shape (`newScanId`: nine base-36 characters, a dash, a UUID), which makes each line about 120 characters; in the small overlay each wraps to two rows, the prefix first. Plain text, no colour: the Runner prints none. The window's dots and title, and the `~/code ❯` prompt, are the stage kit's generic terminal; the prompt stands for the person's own shell. The repository, the id, the costs and the Pool are made up. The Pool is the Focused profile's cap, $6 (`SCAN_PROFILE_CAPS_USD.quick` in the engine); the Runner may hold a lower ceiling (`budget_for`), not checked. The costs ($3.24 in all) are not measured from a real Scan.
+- **A wrapping terminal:** the log wraps (`pre-wrap`) as a real terminal does, so the repository and scan id are kept whole rather than shortened. The overlay shows the last ten or so rows; older rows scroll off the top. In the phone design, where the terminal is 342 wide, lines wrap to three rows.
+- **Simplified:** the finished Scan page has no summary tiles above Findings. The Trace's times for the running Phase and "Running for" are fixed text, not live.
+- **Compact (358 by 440):** the Scans list only, the terminal under it, no Scan page and no sheet. The list's title is hidden so the new row stays above the terminal. The log keeps the real prefix, so its lines wrap to several rows at that width; this design was not looked at after the change.
+- **Checked:** in a real browser at 1280 wide: the opening, the Scan page with the empty state, the Trace with Recon done, the findings table filling during the check phase, and the finished log with the sheet open; oxlint and tsc clean.
+- **Not checked:** `film.mjs --gate` (the skill's dependencies are not installed), the Succeeded Scan page before the sheet opens, the frames between (cursor path, scroll, crossfades), the other four themes, the phone-width frames of this version. In compact the New scan button is hidden, so the cursor's click lands where that button would be.
+- **Stale copy:** the three "How it works" step pictures and their text still describe the old cloud flow (paste a link, GitHub connection, sandbox). Not touched.
+
+## ScansCard (the previous hero)
 
 The dashboard's Scans screen with one finding open in the side sheet, and three small step pictures (`Steps.tsx`). All four play once when they scroll into view and end on their payoff, which is also their still under reduced motion.
 

@@ -2,7 +2,7 @@
 import Base from "../layouts/Base.astro";
 import Logo from "../layouts/Logo.astro";
 import ThemeSelect from "../layouts/ThemeSelect.astro";
-import ScansCard from "../stageshow/ScansCard";
+import RunnerScene from "../stageshow/RunnerScene";
 import { AuditStep, ConnectStep, ReportStep } from "../stageshow/Steps";
 import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PICTURE_LABELS, PRICING, RUNNER, SHOWCASE_CAPTION, SITE, SOURCE_URL, STEPS, STEPS_NOTE } from "../constants/site";
 ---
@@ -45,7 +45,7 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PIC
 
       <figure class="showcase" aria-labelledby="showcase-caption">
         <div class="frame frame--tour" role="img" aria-label={PICTURE_LABELS.tour}>
-          <div aria-hidden="true"><ScansCard client:idle /></div>
+          <div aria-hidden="true"><RunnerScene client:idle /></div>
         </div>
         <figcaption>
           <span id="showcase-caption">{SHOWCASE_CAPTION}</span>

@@ -50,7 +50,7 @@ export const SHOWCASE_CAPTION = "An example account. Every repository and findin
 
 // What a screen reader gets for each picture of the dashboard. The pictures themselves are hidden from it.
 export const PICTURE_LABELS = {
-  tour: "A tour of the Elise dashboard. A scan finishes and opens its first finding. A commit gets its answer. Then the overview, the reports and the Runners. Every name and number is made up.",
+  tour: "A terminal running the Elise Runner over the Elise dashboard. The Runner claims a new scan, which goes from Queued to Running on the Scans list. The scan page then shows the findings arriving as they are checked and the trace of each phase. The scan succeeds and its first finding opens. Every name and number is made up.",
   connect: "The Start a security audit dialog. Someone picks where the code lives, pastes a GitHub link, picks a coverage level, then starts the audit.",
   audit: "A scan page during an audit. It steps through cloning, reading the code and saving the report, then shows Succeeded.",
   report: "The finished report. Four summary figures sit above four findings, each with a severity, file and status.",
