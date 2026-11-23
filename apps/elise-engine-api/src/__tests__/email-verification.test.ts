@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { eq } from "drizzle-orm";
 import { authAccount, authSession, authUser } from "@repo/db-elise/schema";
 import { hashPassword } from "better-auth/crypto";
-import { buildAuth } from "#/lib/auth";
+import { buildAuth, verifiedUserId } from "#/lib/auth";
 import type { QueuedEmail } from "#/modules/email";
 import { openTestDb, seedTenant, type TestDb } from "./test-db";
 
@@ -81,12 +81,23 @@ describe("the sign-in gate", () => {
   });
 });
 
+describe("a session of an unverified Login", () => {
+  it.each([
+    { session: { user: { id: "u1", emailVerified: false } }, userId: undefined },
+    { session: { user: { id: "u1", emailVerified: true } }, userId: "u1" },
+    { session: null, userId: undefined },
+  ])("resolves to $userId", ({ session, userId }) => {
+    expect(verifiedUserId(session)).toBe(userId);
+  });
+});
+
 describe("the Verification link", () => {
   it("verifies the Login and signs it in, once", async () => {
     const token = await verificationToken("once@example.com");
 
     const first = await verify(token);
     expect(first.headers.get("set-cookie")).toContain("session_token");
+    expect(first.headers.get("set-auth-token")).toBeTruthy();
     expect((await db.raw.select().from(authUser).where(eq(authUser.id, "u-once")))[0]?.emailVerified).toBe(true);
     expect(await sessionsOf("u-once")).toBe(1);
 

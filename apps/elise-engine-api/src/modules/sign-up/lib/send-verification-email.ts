@@ -1,13 +1,11 @@
-import type { Context } from "hono";
 import { Effect } from "effect";
-import { authConfigOf, buildAuth } from "#/lib/auth";
-import type { PoolDbType } from "#/lib/db-connection";
-import type { AppEnv } from "#/types/variables";
+import { buildAuth, type AuthConfig } from "#/lib/auth";
+import { VERIFICATION_EMAIL_NOT_QUEUED_LOG } from "#/modules/sign-up/constants";
 
-export const sendVerificationEmailQuietly = (c: Context<AppEnv>, db: PoolDbType, email: string): Effect.Effect<void> =>
+export const sendVerificationEmailQuietly = (config: AuthConfig, email: string): Effect.Effect<void> =>
   Effect.tryPromise({
-    try: () => buildAuth(authConfigOf(c, db)).api.sendVerificationEmail({ body: { email } }),
+    try: () => buildAuth(config).api.sendVerificationEmail({ body: { email } }),
     catch: (cause) => cause,
   }).pipe(
-    Effect.match({ onSuccess: () => undefined, onFailure: () => console.error("Verification email not queued") }),
+    Effect.match({ onSuccess: () => undefined, onFailure: (cause) => console.error(VERIFICATION_EMAIL_NOT_QUEUED_LOG, cause) }),
   );

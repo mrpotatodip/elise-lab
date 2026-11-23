@@ -1,7 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { authUser, parties, partyPersons, partyRoles, platformMasterPlans, scanRepos, scans, tenants, tenantSubscriptions } from "@repo/db-elise/schema";
 import { buildApp } from "#/index";
+import { buildAuth } from "#/lib/auth";
 import { fakeBindings, testExecutionContext } from "#/__tests__/fake-bindings";
 import { testDeps } from "#/__tests__/test-deps";
 import { openTestDb, scanValues, seedRepo, type TestDb } from "#/__tests__/test-db";
@@ -95,6 +96,30 @@ describe("POST /sign-up for an email held by an unverified Login", () => {
     expect(await test.raw.select().from(parties).where(eq(parties.id, old.partyId))).toHaveLength(0);
     expect((await accountOf(fresh.partyId)).name).toBe("New Co");
     expect(queued.filter((mail) => mail.kind === "verify-email")).toHaveLength(2);
+  });
+
+  it("kills the old link: only the replacing Login's link verifies", async () => {
+    queued = [];
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - 10_000 });
+    await signUp("swap@example.com", "First Co");
+    vi.useRealTimers();
+    await signUp("swap@example.com", "Second Co");
+    const [oldLink, newLink] = queued.flatMap((mail) => (mail.kind === "verify-email" ? [mail.link] : []));
+    const auth = buildAuth({
+      db: test.pool,
+      secret: fakeBindings().env.AUTH_SECRET,
+      baseUrl: "http://localhost",
+      trustedOrigins: ["http://localhost"],
+      dashboardUrl: "https://app.example.com",
+      enqueueEmail: async () => undefined,
+    });
+    const verify = (link: string | undefined) =>
+      auth.handler(new Request(`http://localhost/auth/verify-email?token=${new URL(link ?? "http://none").searchParams.get("token")}`));
+
+    expect((await verify(oldLink)).status).toBe(401);
+    expect((await loginOf("swap@example.com")).emailVerified).toBe(false);
+    expect((await verify(newLink)).status).toBe(200);
+    expect((await loginOf("swap@example.com")).emailVerified).toBe(true);
   });
 
   it.each(["a Plan", "a Stripe customer", "a Scan", "another member"] as const)("is refused when the Account has %s, and keeps everything", async (reason) => {

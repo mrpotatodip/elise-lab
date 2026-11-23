@@ -2,7 +2,9 @@ import type { Context } from "hono";
 import { eq } from "drizzle-orm";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware, APIError } from "better-auth/api";
 import { bearer } from "better-auth/plugins";
+import { z } from "zod";
 import { sha256Hex } from "@repo/db-elise";
 import { authAccount, authSession, authUser, authVerification } from "@repo/db-elise/schema";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
@@ -43,6 +45,21 @@ export type AuthConfig = {
   resetAddressLimiter?: RateLimit;
   verificationAddressLimiter?: RateLimit;
 };
+
+const TokenClaimsSchema = z.object({ email: z.string(), iat: z.number() });
+
+const tokenIssued = (token: string) => {
+  try {
+    const payload = token.split(".")[1] ?? "";
+    const parsed = TokenClaimsSchema.safeParse(JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const verifiedUserId = (session: { user: { id: string; emailVerified: boolean } } | null): string | undefined =>
+  session?.user.emailVerified ? session.user.id : undefined;
 
 const RESET_TOKEN_SECONDS = 3600;
 export const VERIFY_TOKEN_SECONDS = 24 * 3600;
@@ -111,6 +128,18 @@ export const buildAuth = (config: AuthConfig) =>
           expiresAt: new Date(Date.now() + VERIFY_TOKEN_SECONDS * 1000).toISOString(),
         });
       },
+    },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/verify-email") return;
+        const token = z.string().safeParse(ctx.query?.token);
+        const issued = token.success ? tokenIssued(token.data) : undefined;
+        if (!issued) return;
+        const [login] = await config.db.select({ createdAt: authUser.createdAt }).from(authUser).where(eq(authUser.email, issued.email));
+        if (login && (issued.iat + 1) * 1000 <= login.createdAt.getTime()) {
+          throw new APIError("UNAUTHORIZED", { message: "Invalid token", code: "INVALID_TOKEN" });
+        }
+      }),
     },
     disabledPaths: AUTH_DISABLED_PATHS,
     secret: config.secret,

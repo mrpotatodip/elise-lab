@@ -1,7 +1,9 @@
 import { Effect } from "effect";
 import { hashPassword } from "better-auth/crypto";
 import type { SignUp, SignUpBody } from "@repo/contracts/elise";
+import type { AuthConfig } from "#/lib/auth";
 import type { PoolDbType } from "#/lib/db-connection";
+import { sendVerificationEmailQuietly } from "#/modules/sign-up/lib";
 import { Conflict, type DbError } from "#/lib/effect-query";
 import { SIGN_UP_REFUSED, SIGN_UP_SLUG_MAX_ATTEMPTS } from "#/modules/sign-up/constants";
 import { insertAccountEffect, pickFreeSlugEffect, replaceUnverifiedLoginEffect } from "#/modules/sign-up/queries";
@@ -29,11 +31,11 @@ const insertWithFreshSlug = (db: PoolDbType, account: Omit<NewAccount, "slug">, 
 // A visitor starts their account: no code, a plan
 // is what gates a Scan.
 // -----
-export const createAccountSvc = (db: PoolDbType, body: SignUpBody): Effect.Effect<SignUp, Failure> =>
+export const createAccountSvc = (db: PoolDbType, body: SignUpBody, auth: AuthConfig): Effect.Effect<SignUp, Failure> =>
   Effect.gen(function* () {
     const passwordHash = yield* Effect.promise(() => hashPassword(body.password));
     yield* replaceUnverifiedLoginEffect(db, body.email);
-    return yield* insertWithFreshSlug(
+    const created = yield* insertWithFreshSlug(
       db,
       {
         firstName: body.firstName,
@@ -45,4 +47,8 @@ export const createAccountSvc = (db: PoolDbType, body: SignUpBody): Effect.Effec
       },
       1,
     );
+    yield* sendVerificationEmailQuietly(auth, body.email);
+    return created;
   });
+
+export const resendVerificationSvc = (auth: AuthConfig, email: string): Effect.Effect<void> => sendVerificationEmailQuietly(auth, email);

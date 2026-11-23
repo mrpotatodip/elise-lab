@@ -3,6 +3,9 @@
 // -----
 export const SIGN_UP_RATE_LIMITED = "Too many sign-up attempts. Wait a minute and try again.";
 export const SIGN_UP_RATE_LIMITED_CODE = "SIGN_UP_RATE_LIMITED";
+export const VERIFICATION_RESEND_RATE_LIMITED = "Too many requests. Wait a minute and try again.";
+export const VERIFICATION_RESEND_RATE_LIMITED_CODE = "VERIFICATION_RESEND_RATE_LIMITED";
+export const VERIFICATION_EMAIL_NOT_QUEUED_LOG = "Verification email not queued";
 // -----
 // One answer for every refusal that is not a
 // limit or bad input, so a caller cannot tell a

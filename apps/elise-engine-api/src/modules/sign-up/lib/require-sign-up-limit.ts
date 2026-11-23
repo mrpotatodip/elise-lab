@@ -1,6 +1,11 @@
 import { TooManyRequestsError } from "#/lib/errors";
 import { rateLimitByIp, rateLimitTotal } from "#/lib/rate-limit";
-import { SIGN_UP_RATE_LIMITED, SIGN_UP_RATE_LIMITED_CODE } from "#/modules/sign-up/constants";
+import {
+  SIGN_UP_RATE_LIMITED,
+  SIGN_UP_RATE_LIMITED_CODE,
+  VERIFICATION_RESEND_RATE_LIMITED,
+  VERIFICATION_RESEND_RATE_LIMITED_CODE,
+} from "#/modules/sign-up/constants";
 
 const refuse = () => new TooManyRequestsError(SIGN_UP_RATE_LIMITED, SIGN_UP_RATE_LIMITED_CODE);
 
@@ -11,4 +16,7 @@ const refuse = () => new TooManyRequestsError(SIGN_UP_RATE_LIMITED, SIGN_UP_RATE
 export const requireSignUpLimit = rateLimitByIp("SIGN_UP_LIMITER", refuse);
 export const requireSignUpTotalLimit = rateLimitTotal("SIGN_UP_TOTAL_LIMITER", refuse);
 
-export const requireResendLimit = rateLimitByIp("VERIFICATION_RESEND_LIMITER", () => new TooManyRequestsError("Too many requests. Wait a minute and try again.", "VERIFICATION_RESEND_RATE_LIMITED"));
+export const requireResendLimit = rateLimitByIp(
+  "VERIFICATION_RESEND_LIMITER",
+  () => new TooManyRequestsError(VERIFICATION_RESEND_RATE_LIMITED, VERIFICATION_RESEND_RATE_LIMITED_CODE),
+);

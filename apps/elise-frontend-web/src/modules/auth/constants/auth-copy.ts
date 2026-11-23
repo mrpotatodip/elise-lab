@@ -1,3 +1,8 @@
+// -----
+// The code the engine's sign-in answers with for a Login that is not verified.
+// -----
+export const EMAIL_NOT_VERIFIED_CODE = "EMAIL_NOT_VERIFIED";
+
 export const AUTH_COPY = {
   signin: {
     title: "Sign in",
@@ -42,10 +47,13 @@ export const AUTH_COPY = {
     hint: "We sent a link to confirm your address. Open it to finish creating your account.",
     swap: "Back to sign in",
     to: "/signin",
+    noAddress: "Open the link in the email we sent you.",
+    sentTo: "We sent it to",
+    delay: "It can take a minute; check the spam folder too.",
   },
   verifyFailed: {
     title: "This link did not work",
-    hint: "It has expired or was already used. Enter your email and we will send a new one.",
+    hint: "This link was already used or has expired. Sign in, or enter your email and we will send a new one.",
     swap: "Back to sign in",
     to: "/signin",
   },
@@ -53,6 +61,7 @@ export const AUTH_COPY = {
     resend: "Send the email again",
     sent: "Sent. It can take a minute; check the spam folder too.",
     wait: "Wait a minute before asking again.",
+    failed: "Something went wrong",
     unverified: "Verify your email first. We just sent you a new link.",
   },
 } as const;

@@ -1,1 +1,1 @@
-export { createAccountSvc } from "./create-account-svc";
+export { createAccountSvc, resendVerificationSvc } from "./create-account-svc";
