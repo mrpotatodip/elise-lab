@@ -30,6 +30,7 @@ const MANAGER_ROUTES: Array<[string, string, string | undefined]> = [
   ["GET", "/team/roles", undefined],
   ["POST", "/team/invites", JSON.stringify({ email: "bo@example.com", role: "workspace_member" })],
   ["DELETE", `/team/invites/${ID}`, undefined],
+  ["POST", `/team/members/${ID}/two-factor/reset`, undefined],
   ["GET", "/groups", undefined],
   ["POST", "/groups", JSON.stringify({ name: "Backend" })],
   ["PATCH", `/groups/${ID}`, JSON.stringify({ name: "Platform" })],

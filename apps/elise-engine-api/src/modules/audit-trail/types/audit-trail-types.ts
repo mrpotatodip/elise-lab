@@ -10,6 +10,7 @@ export type AuditAction =
   | "team.invite.created"
   | "team.invite.revoked"
   | "team.invite.accepted"
+  | "team.two_factor.reset"
   | "group.created"
   | "group.renamed"
   | "group.deleted"

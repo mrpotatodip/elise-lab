@@ -37,7 +37,11 @@ export const TeamRoleSchema = z.object({
   description: z.string().nullable(),
 });
 
-export const TeamRolesSchema = z.array(TeamRoleSchema);
+export const TeamTwoFactorResetSchema = z.object({
+  partyId: TeamPartyIdSchema,
+});
+
+export const TeamRolesSchema =z.array(TeamRoleSchema);
 
 export const CreateTeamInviteBodySchema = TeamRoleBodySchema.extend({
   email: z.email().max(SIGN_UP_EMAIL_MAX).trim().toLowerCase(),
@@ -97,7 +101,8 @@ export const AcceptedTeamInviteSchema = z.object({
 export type TeamInviteParam = z.infer<typeof TeamInviteParamSchema>;
 export type TeamMemberParam = z.infer<typeof TeamMemberParamSchema>;
 export type TeamInviteTokenParam = z.infer<typeof TeamInviteTokenParamSchema>;
-export type TeamRole = z.infer<typeof TeamRoleSchema>;
+export type TeamTwoFactorReset = z.infer<typeof TeamTwoFactorResetSchema>;
+export type TeamRole =z.infer<typeof TeamRoleSchema>;
 export type TeamRoles = z.infer<typeof TeamRolesSchema>;
 export type UpdateTeamMemberBody = z.infer<typeof UpdateTeamMemberBodySchema>;
 export type TeamRoleBody = z.infer<typeof TeamRoleBodySchema>;

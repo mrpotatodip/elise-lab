@@ -18,6 +18,7 @@ export const ACCESS_POWER_USAGE: Readonly<Partial<Record<AccessPower, AccessPowe
   "company:team:invites:create": { guard: "plain", routes: ["POST /team/invites"], tools: [] },
   "company:team:invites:update": { guard: "plain", routes: ["PATCH /team/invites/:inviteId"], tools: [] },
   "company:team:invites:delete": { guard: "plain", routes: ["DELETE /team/invites/:inviteId"], tools: [] },
+  "company:team:two_factor:reset": { guard: "plain", routes: ["POST /team/members/:partyId/two-factor/reset"], tools: [] },
   "company:chats:threads:read": { guard: "plain", routes: ["GET /customer-threads", "GET /customer-threads/:threadId"], tools: [] },
   "company:unanswered:questions:read": { guard: "plain", routes: ["GET /unanswered-questions"], tools: [] },
   "company:unanswered:questions:dismiss": { guard: "plain", routes: ["POST /unanswered-questions/:messageId/dismiss"], tools: [] },

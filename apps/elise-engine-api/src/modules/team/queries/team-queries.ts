@@ -4,6 +4,7 @@ import {
   accessMasterRoles,
   authAccount,
   authSession,
+  authTwoFactor,
   authUser,
   findTenantRole,
   partyMasterRoles,
@@ -40,6 +41,10 @@ import {
   TEAM_INVITE_NOT_FOUND,
   TEAM_INVITE_RACE,
   TEAM_INVITE_SIGN_IN_REQUIRED,
+  TEAM_MEMBER_NOT_FOUND,
+  TEAM_RESET_ADMIN_FORBIDDEN,
+  TEAM_RESET_SELF,
+  TEAM_WORKSPACE_ADMIN_ROLE_KEY,
   TEAM_PENDING_EMAIL_CONSTRAINT,
   TEAM_ROLE_UNKNOWN,
   TEAM_TOO_MANY_INVITES,
@@ -488,4 +493,46 @@ export const acceptInviteEffect = (
         return { tenantId: invite.tenantId };
       }),
     catch: classify,
+  });
+
+const roleKeyOf = (tx: Pick<AppDbType, "select">, tenantId: string, partyId: string) =>
+  tx
+    .select({ role: accessMasterRoles.key })
+    .from(partyRoles)
+    .innerJoin(partyMasterRoles, eq(partyMasterRoles.id, partyRoles.roleId))
+    .innerJoin(accessMasterRoles, eq(accessMasterRoles.id, partyMasterRoles.masterRoleId))
+    .where(and(eq(partyRoles.tenantId, tenantId), eq(partyRoles.partyId, partyId)))
+    .then(([row]) => row?.role ?? null);
+
+export const resetTwoFactorEffect = (
+  db: PoolDbType,
+  tenantId: string,
+  actorUserId: string,
+  memberPartyId: string,
+): Effect.Effect<{ partyId: string; userId: string; email: string; name: string }, NotFound | Forbidden | DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db.transaction(async (tx) => {
+        const actorPartyId = await actorPartyOf(tx, actorUserId);
+        if (!actorPartyId) return refuse(new Forbidden({ message: "Forbidden" }));
+        const memberRole = await roleKeyOf(tx, tenantId, memberPartyId);
+        const [login] = await tx
+          .select({ id: authUser.id, email: authUser.email, name: authUser.name })
+          .from(authUser)
+          .where(eq(authUser.partyId, memberPartyId));
+        if (!memberRole || !login) return refuse(new NotFound({ message: TEAM_MEMBER_NOT_FOUND }));
+        if (memberPartyId === actorPartyId) return refuse(new Forbidden({ message: TEAM_RESET_SELF }));
+        const actorRole = await roleKeyOf(tx, tenantId, actorPartyId);
+        const memberIsAdmin = memberRole === TENANT_ADMIN_ROLE_KEY || memberRole === TEAM_WORKSPACE_ADMIN_ROLE_KEY;
+        if (actorRole !== TENANT_ADMIN_ROLE_KEY && memberIsAdmin) return refuse(new Forbidden({ message: TEAM_RESET_ADMIN_FORBIDDEN }));
+        await tx.delete(authTwoFactor).where(eq(authTwoFactor.userId, login.id));
+        await tx.update(authUser).set({ twoFactorEnabled: false }).where(eq(authUser.id, login.id));
+        await tx.delete(authSession).where(eq(authSession.userId, login.id));
+        await insertAuditEntry(tx, { actorPartyId, action: "team.two_factor.reset", subjectId: memberPartyId, tenantId, after: { role: memberRole } });
+        return { partyId: memberPartyId, userId: login.id, email: login.email, name: login.name };
+      }),
+    catch: (cause) => {
+      const failure = classify(cause);
+      return failure._tag === "Conflict" || failure._tag === "Invalid" ? toDbError(cause) : failure;
+    },
   });
