@@ -22,7 +22,8 @@
     "db:query": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/query.ts",
     "db:rehearse": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/rehearse.ts",
     "db:exec": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/exec.ts",
-    "db:set-password": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/set-password.ts"
+    "db:set-password": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/set-password.ts",
+    "db:pool-check": "NODE_NO_WARNINGS=1 tsx --env-file=.env src/pool-check.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
