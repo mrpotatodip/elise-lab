@@ -1,8 +1,14 @@
 import { desc, eq, inArray } from "drizzle-orm";
-import { authSession } from "@repo/db-elise/schema";
+import { authSession, authUser } from "@repo/db-elise/schema";
 import type { PoolDbType } from "#/lib/db-connection";
 
-export const trimSessions = async (db: PoolDbType, userId: string, keep: number) => {
+export const isPendingTwoFactorStep = async (db: PoolDbType, userId: string, path: string | undefined) => {
+  if (path !== "/sign-in/email") return false;
+  const [row] = await db.select({ on: authUser.twoFactorEnabled }).from(authUser).where(eq(authUser.id, userId));
+  return row?.on === true;
+};
+
+export const trimSessions =async (db: PoolDbType, userId: string, keep: number) => {
   const rows = await db
     .select({ id: authSession.id })
     .from(authSession)

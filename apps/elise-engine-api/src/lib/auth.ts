@@ -10,7 +10,7 @@ import { authAccount, authSession, authTwoFactor, authUser, authVerification } f
 import { MAX_SESSIONS_PER_LOGIN } from "#/constants";
 import { poolConnect, type PoolDbType } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
-import { trimSessions } from "#/lib/trim-sessions";
+import { isPendingTwoFactorStep, trimSessions } from "#/lib/trim-sessions";
 import type { QueuedEmail, TwoFactorNoticeEmail } from "#/modules/email";
 import { accountRequiresTwoFactorEffect, auditTwoFactorChange, loginIsTwoFactorAdminEffect } from "#/modules/two-factor";
 import type { AppEnv } from "#/types/variables";
@@ -296,7 +296,8 @@ export const buildAuth = (config: AuthConfig) => {
     databaseHooks: {
       session: {
         create: {
-          after: async (session) => {
+          after: async (session, context) => {
+            if (await isPendingTwoFactorStep(config.db, session.userId, context?.path)) return;
             await trimSessions(config.db, session.userId, MAX_SESSIONS_PER_LOGIN);
           },
         },
