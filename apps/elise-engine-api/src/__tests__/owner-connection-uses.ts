@@ -47,7 +47,6 @@ export const OWNER_CONNECTION_USES = {
       "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, write its Trace entries, store the possible-duplicate Signals, each filtered by the Scan's Account",
   },
   "modules/scan-workflow/lib/settle-scan-credit.ts": { uses: 4, reason: "A Workflow step with no request: reads the Plan and settles the Scan's credit hold for the Scan's Account" },
-  "modules/sign-up/api/create-account.ts": { uses: 2, reason: "Creates the Account, so none exists to run as yet" },
   "modules/team/api/accept-team-invite.ts": { uses: 2, reason: "An invite token is looked up before its Account is known" },
   "modules/team/api/preview-team-invite.ts": { uses: 2, reason: "An invite token is looked up before its Account is known" },
   "types/variables.ts": { uses: 1, reason: "Declares the DATABASE_URL binding" },

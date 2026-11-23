@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:8787
 
-# Start an account. Sign-up is open: no code, but a Turnstile token (the dummy one passes with the test secret).
+# Start an account. Sign-up is open: no code, but a Turnstile token (the dummy one passes with the test secret). It answers 201 with no session and queues a Verification email.
 POST {{baseUrl}}/sign-up
 Content-Type: application/json
 
@@ -8,7 +8,20 @@ Content-Type: application/json
 
 ###
 
-# Sign in. The answer holds a session token; send it as: Authorization: Bearer <token>
+# Send the Verification email again. No session needed; the answer is the same for any address.
+POST {{baseUrl}}/sign-up/resend-verification
+Content-Type: application/json
+
+{ "email": "ada@example.com" }
+
+###
+
+# Open the link from the Verification email: the token verifies the Login and the answer holds the session token in the set-auth-token header.
+GET {{baseUrl}}/auth/verify-email?token=<token-from-the-email>
+
+###
+
+# Sign in. Sign-up creates no session and an unverified Login is refused with 403 EMAIL_NOT_VERIFIED. The answer holds a session token; send it as: Authorization: Bearer <token>
 POST {{baseUrl}}/auth/sign-in/email
 Content-Type: application/json
 

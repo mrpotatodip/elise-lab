@@ -13,7 +13,8 @@ export const createAccountDoc = describeRoute({
       "The server checks that the email has no login yet. If it has, the answer is 409.",
       "The server makes the Tenant slug from the account name, for example `Acme Labs` becomes `acme-labs`. If it is taken, it adds `-2`, `-3` and so on.",
       "The server saves everything in one transaction. If any step fails, nothing is saved.",
-      "The server returns the login ID and the new Tenant. The login is not signed in yet: call `POST /auth/sign-in/email` next.",
+      "The server queues one Verification email, valid for 24 hours. If the queue fails, the account is kept.",
+      "The server returns the login ID and the new Tenant. The login is not signed in and cannot sign in until it opens the link in the email.",
     ],
     example: [
       "A new owner signs up:",

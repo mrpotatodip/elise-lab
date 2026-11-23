@@ -23,6 +23,8 @@ export const SignInSchema = z.object({
 
 export const ForgotPasswordSchema = z.object({ email: emailField });
 
+export const VerifyEmailSchema = z.object({ token: z.string().min(1) });
+
 // -----
 // The same length rules as sign-up, so a password that signs an account up can
 // also reset one.

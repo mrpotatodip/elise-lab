@@ -1,4 +1,4 @@
-export { fetchTurnstileSiteKey } from "./api";
+export { fetchTurnstileSiteKey, verifyEmail } from "./api";
 export * from "./components";
 export * from "./constants";
 export * from "./hooks";

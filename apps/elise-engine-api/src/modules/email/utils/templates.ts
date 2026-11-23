@@ -1,4 +1,4 @@
-import type { AnthropicKeyChangedEmail, BudgetChangedEmail, PasswordResetDoneEmail, PasswordResetEmail, TeamInviteEmail } from "#/modules/email/types";
+import type { AnthropicKeyChangedEmail, BudgetChangedEmail, PasswordResetDoneEmail, PasswordResetEmail, TeamInviteEmail, VerifyEmail } from "#/modules/email/types";
 import { renderEmailLayout } from "./layout";
 
 export const renderTeamInvite = (mail: TeamInviteEmail) => {
@@ -31,6 +31,19 @@ export const renderPasswordResetDone = (mail: PasswordResetDoneEmail) => {
     facts: [{ label: "Changed", value: `${when} (UTC)` }],
     button: { label: "Reset your password again", url: mail.link },
     footer: "If this was not you, reset your password again now with the button above, then check your Account's Runners and Anthropic key.",
+  });
+};
+
+export const renderVerifyEmail = (mail: VerifyEmail) => {
+  const expires = new Date(mail.expiresAt).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" });
+  return renderEmailLayout({
+    subject: "Verify your email for EliseLAB",
+    preheader: "Confirm this address to finish creating your EliseLAB account.",
+    heading: "Verify your email",
+    intro: [{ text: "Confirm that this address is yours to finish creating your EliseLAB account. The link signs you in." }],
+    facts: [],
+    button: { label: "Verify email", url: mail.link },
+    footer: `The link works once and expires on ${expires} (UTC). If you did not sign up, ignore this email: nothing happens until the link is opened.`,
   });
 };
 

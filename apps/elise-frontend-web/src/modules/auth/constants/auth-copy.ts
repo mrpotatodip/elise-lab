@@ -1,3 +1,8 @@
+// -----
+// The code the engine's sign-in answers with for a Login that is not verified.
+// -----
+export const EMAIL_NOT_VERIFIED_CODE = "EMAIL_NOT_VERIFIED";
+
 export const AUTH_COPY = {
   signin: {
     title: "Sign in",
@@ -35,7 +40,29 @@ export const AUTH_COPY = {
     to: "/signin",
     accountNameHelp: "The name of the new Elise account you are creating, for example your company or team.",
     checkUnavailable: "Sign-up is not available right now. Try again later.",
-    consequence: "You will own this new account, and we will sign you in.",
+    consequence: "You will own this new account. We will email you a link to confirm your address first.",
+  },
+  checkEmail: {
+    title: "Check your email",
+    hint: "We sent a link to confirm your address. Open it to finish creating your account.",
+    swap: "Back to sign in",
+    to: "/signin",
+    noAddress: "Open the link in the email we sent you.",
+    sentTo: "We sent it to",
+    delay: "It can take a minute; check the spam folder too.",
+  },
+  verifyFailed: {
+    title: "This link did not work",
+    hint: "This link was already used or has expired. Sign in, or enter your email and we will send a new one.",
+    swap: "Back to sign in",
+    to: "/signin",
+  },
+  verify: {
+    resend: "Send the email again",
+    sent: "Sent. It can take a minute; check the spam folder too.",
+    wait: "Wait a minute before asking again.",
+    failed: "Something went wrong",
+    unverified: "Verify your email first. We just sent you a new link.",
   },
 } as const;
 

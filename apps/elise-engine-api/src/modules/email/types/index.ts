@@ -26,6 +26,18 @@ export type PasswordResetEmail = {
 };
 
 // -----
+// The Verification email: always sent, outside the Security
+// notices and Activity emails, so it carries no unsubscribe
+// link. The link holds the signed token.
+// -----
+export type VerifyEmail = {
+  kind: "verify-email";
+  to: string;
+  link: string;
+  expiresAt: string;
+};
+
+// -----
 // Security notice: the Account's Anthropic key was set or
 // removed. It never holds any part of the key.
 // -----
@@ -88,7 +100,7 @@ export type RunnerNames = { runnerName: string; actorName: string; accountName: 
 // email, told apart by `kind`. A kind with no
 // template does not compile (render-email.ts).
 // -----
-export type QueuedEmail = TeamInviteEmail | PasswordResetEmail | PasswordResetDoneEmail | AnthropicKeyChangedEmail | BudgetChangedEmail | RunnerNoticeEmail;
+export type QueuedEmail = TeamInviteEmail | VerifyEmail | PasswordResetEmail | PasswordResetDoneEmail | AnthropicKeyChangedEmail | BudgetChangedEmail | RunnerNoticeEmail;
 
 // -----
 // The shape queued before `kind` existed: always a

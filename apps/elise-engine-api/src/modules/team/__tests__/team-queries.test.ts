@@ -50,7 +50,7 @@ beforeAll(async () => {
   const adminRole = await findTenantRole(test.raw, tenantId, TENANT_ADMIN_ROLE_KEY);
   if (!adminRole) throw new Error("tenant_admin role missing");
   adminUserId = "admin-user";
-  await test.raw.insert(authUser).values({ id: adminUserId, name: "Ada Rossi", email: "ada@example.com", partyId: adminPartyId });
+  await test.raw.insert(authUser).values({ id: adminUserId, name: "Ada Rossi", email: "ada@example.com", emailVerified: true, partyId: adminPartyId });
   await test.raw.insert(partyRoles).values({ partyId: adminPartyId, tenantId, roleId: adminRole.id, roleScope: "tenant" });
   [{ id: groupId }] = await test.raw.insert(tenantGroups).values({ tenantId, name: "Backend" }).returning();
   const other = await seedTenant(test, "other");
@@ -201,7 +201,7 @@ describe("acceptInviteEffect", () => {
 
   it("makes an existing login sign in as the invited email first", async () => {
     const otherTenant = await seedTenant(test, "joiner");
-    await test.raw.insert(authUser).values({ id: "joiner", name: "Jo", email: "jo@example.com", partyId: otherTenant.partyId });
+    await test.raw.insert(authUser).values({ id: "joiner", name: "Jo", email: "jo@example.com", emailVerified: true, partyId: otherTenant.partyId });
     const pending = invite({ email: "jo@example.com" });
     await run(createInviteEffect(test.pool, pending));
 

@@ -17,6 +17,9 @@ import { AuthBrandPanel } from "./auth-brand-panel";
 import { ForgotPasswordFields } from "./forgot-password-fields";
 import { ResetPasswordFields } from "./reset-password-fields";
 import { TurnstileWidget } from "./turnstile-widget";
+import { CheckEmailFields } from "./check-email-fields";
+import { ResendVerificationButton } from "./resend-verification-button";
+import { VerifyFailedFields } from "./verify-failed-fields";
 import { authKeys } from "../hooks";
 import { SignInSchema, SignUpInputSchema } from "../schemas";
 
@@ -41,7 +44,11 @@ function useAuthDone(redirectTo?: string) {
 
 function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
   const done = useAuthDone(redirectTo);
-  const signInMutation = useMutation({ mutationFn: (input: typeof SignInSchema._output) => signIn({ data: input }), ...done });
+  const signInMutation = useMutation({
+    mutationFn: (input: typeof SignInSchema._output) => signIn({ data: input }),
+    onSuccess: (result) => (result.verified ? done.onSuccess() : undefined),
+    onError: done.onError,
+  });
   const form = useForm({
     defaultValues: { email: "", password: "" },
     validators: { onSubmit: SignInSchema },
@@ -77,6 +84,14 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
           </div>
         )}
       </form.Field>
+      {signInMutation.data?.verified === false && signInMutation.variables ? (
+        <div className="grid gap-3">
+          <p role="alert" className="text-sm leading-relaxed">
+            {AUTH_COPY.verify.unverified}
+          </p>
+          <ResendVerificationButton email={signInMutation.variables.email} />
+        </div>
+      ) : null}
       <Button type="submit" size="lg" className="mt-1 w-full" disabled={signInMutation.isPending}>
         {signInMutation.isPending ? "Please wait…" : AUTH_COPY.signin.submit}
       </Button>
@@ -91,10 +106,11 @@ const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null }) {
   const done = useAuthDone();
+  const navigate = useNavigate();
   const [attempt, setAttempt] = useState(0);
   const signUpMutation = useMutation({
     mutationFn: (input: typeof SignUpInputSchema._output) => signUp({ data: input }),
-    onSuccess: done.onSuccess,
+    onSuccess: (_result, input) => navigate({ to: "/check-email", search: { email: input.email } }),
     onError: (error: Error) => {
       setAttempt((count) => count + 1);
       form.setFieldValue("turnstileToken", "");
@@ -188,9 +204,11 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
   );
 }
 
-type AuthMode = "signin" | "signup" | "forgot" | "reset";
+type AuthMode = "signin" | "signup" | "forgot" | "reset" | "checkEmail" | "verifyFailed";
 
-function AuthFields({ mode, token, redirectTo, turnstileSiteKey }: { mode: AuthMode; token: string | undefined; redirectTo: string | undefined; turnstileSiteKey: string | null }) {
+function AuthFields({ mode, token, email, redirectTo, turnstileSiteKey }: { mode: AuthMode; token: string | undefined; email: string | undefined; redirectTo: string | undefined; turnstileSiteKey: string | null }) {
+  if (mode === "checkEmail") return <CheckEmailFields email={email} />;
+  if (mode === "verifyFailed") return <VerifyFailedFields />;
   if (mode === "signup") return <SignUpFields turnstileSiteKey={turnstileSiteKey} />;
   if (mode === "forgot") return <ForgotPasswordFields />;
   if (mode === "reset") return <ResetPasswordFields token={token} />;
@@ -201,7 +219,7 @@ function AuthFields({ mode, token, redirectTo, turnstileSiteKey }: { mode: AuthM
 // `token` is only read by the reset page: the one from the emailed link.
 // `redirectTo` is only read by sign-in: the page to open once signed in.
 // -----
-export function AuthForm({ mode, token, redirectTo, turnstileSiteKey = null }: { mode: AuthMode; token?: string; redirectTo?: string; turnstileSiteKey?: string | null }) {
+export function AuthForm({ mode, token, email, redirectTo, turnstileSiteKey = null }: { mode: AuthMode; token?: string; email?: string; redirectTo?: string; turnstileSiteKey?: string | null }) {
   const copy = AUTH_COPY[mode];
 
   return (
@@ -218,7 +236,7 @@ export function AuthForm({ mode, token, redirectTo, turnstileSiteKey = null }: {
             <p className="text-sm text-muted-foreground">{copy.hint}</p>
           </CardHeader>
           <CardContent className="p-8">
-            <AuthFields mode={mode} token={token} redirectTo={redirectTo} turnstileSiteKey={turnstileSiteKey} />
+            <AuthFields mode={mode} token={token} email={email} redirectTo={redirectTo} turnstileSiteKey={turnstileSiteKey} />
           </CardContent>
         </Card>
         <Link to={copy.to} className="inline-flex min-h-6 items-center justify-self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { ScanUsageSchema } from "@repo/contracts/elise";
-import { createAuth } from "#/lib/auth";
+import { createAuth, verifiedUserId } from "#/lib/auth";
 import { dbConnect, withPool, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { linkScanArchiveEffect } from "#/modules/archives/queries";
@@ -21,7 +21,7 @@ import type { AppEnv, AppDeps } from "#/types/variables";
 const sessionUserId = async (c: Context<AppEnv>): Promise<string | undefined> => {
   const { auth, close } = createAuth(c);
   try {
-    return (await auth.api.getSession({ headers: c.req.raw.headers }))?.user.id;
+    return verifiedUserId(await auth.api.getSession({ headers: c.req.raw.headers }));
   } finally {
     close();
   }
