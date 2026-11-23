@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, Radio, ScanSearch, Sparkles, Users } from "lucide-react";
+import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, Layers, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, Radio, ScanSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -219,6 +219,15 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
             <Link to="/settings/signals" aria-label="Signals" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
               <Radio className={ICON} strokeWidth={1.5} />
               {!collapsed && "Signals"}
+            </Link>
+          </Hint>
+        )}
+
+        {showDashboard && (
+          <Hint label="Security" collapsed={collapsed}>
+            <Link to="/settings/security" aria-label="Security" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <ShieldCheck className={ICON} strokeWidth={1.5} />
+              {!collapsed && "Security"}
             </Link>
           </Hint>
         )}

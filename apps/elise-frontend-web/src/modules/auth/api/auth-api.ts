@@ -4,24 +4,31 @@ import { z } from "zod";
 import { ResendVerificationBodySchema } from "@repo/contracts/elise";
 import { EngineError, engineFetch, jsonPost } from "#/lib/engine-client";
 import { tryCatch } from "#/lib/try-catch";
+import { saveChallenge } from "../server/challenge";
+import type { SignInOutcome } from "../utils";
 import { AUTH_COPY, EMAIL_NOT_VERIFIED_CODE } from "../constants";
 import { ForgotPasswordSchema, ResetPasswordSchema, SignInSchema, SignUpInputSchema, VerifyEmailSchema } from "../schemas";
 import { clearSessionToken, findSession, saveSessionToken } from "../server/session";
 
 export const fetchSession = createServerFn({ method: "GET" }).handler(async () => (await findSession())?.user ?? null);
 
-const SignInResponseSchema = z.object({ token: z.string() });
+const SignInResponseSchema = z.union([z.object({ twoFactorRedirect: z.literal(true) }), z.object({ token: z.string() })]);
 
 export const signIn = createServerFn({ method: "POST" })
   .validator(SignInSchema)
-  .handler(async ({ data }): Promise<{ verified: boolean }> => {
+  .handler(async ({ data }): Promise<{ outcome: SignInOutcome; setupRequired: boolean }> => {
     const { data: res, error } = await tryCatch(engineFetch("/auth/sign-in/email", jsonPost(JSON.stringify(data))));
     if (error) {
-      if (error instanceof EngineError && error.code === EMAIL_NOT_VERIFIED_CODE) return { verified: false };
+      if (error instanceof EngineError && error.code === EMAIL_NOT_VERIFIED_CODE) return { outcome: "unverified", setupRequired: false };
       throw error;
     }
-    saveSessionToken(SignInResponseSchema.parse(await res.json()).token);
-    return { verified: true };
+    const body = SignInResponseSchema.parse(await res.json());
+    if ("twoFactorRedirect" in body) {
+      saveChallenge(res.headers.getSetCookie());
+      return { outcome: "challenge", setupRequired: false };
+    }
+    saveSessionToken(body.token);
+    return { outcome: "session", setupRequired: (await findSession())?.user.twoFactorSetupRequired ?? false };
   });
 
 export const fetchTurnstileSiteKey = createServerFn({ method: "GET" }).handler(async (): Promise<string | null> => env.TURNSTILE_SITE_KEY || null);

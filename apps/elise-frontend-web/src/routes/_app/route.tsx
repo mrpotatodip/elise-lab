@@ -10,6 +10,7 @@ import { ShellFrame } from "#/modules/shell";
 export const Route = createFileRoute("/_app")({
   beforeLoad: ({ context, location }) => {
     if (!context.user) throw redirect({ to: "/signin" });
+    if (context.user.twoFactorSetupRequired) throw redirect({ to: "/two-factor-setup" });
     if (isWatcher(context.user.powers) && !location.pathname.startsWith("/summary")) throw redirect({ to: "/summary" });
   },
   loader: ({ context }) => {

@@ -23,6 +23,7 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   runnerIdentity: async () => null,
   userHasAccount: async () => true,
   userHasPower: async () => true,
+  twoFactorSetupRequired: async () => false,
   enqueueEmail: async () => undefined,
   verifyTurnstile: async () => true,
   withTenant: noTenantDb,

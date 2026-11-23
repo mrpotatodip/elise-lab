@@ -736,6 +736,27 @@
       "when": 1795400387772,
       "tag": "0104_grandfather_verified_logins",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1795414168685,
+      "tag": "0105_two_factor",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1795414743436,
+      "tag": "0106_two_factor_reset_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1795415860853,
+      "tag": "0107_two_factor_requirement",
+      "breakpoints": true
     }
   ]
 }

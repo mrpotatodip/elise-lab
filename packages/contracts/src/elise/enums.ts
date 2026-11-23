@@ -26,6 +26,7 @@ export const ACCESS_ACTION_VALUES = [
   "publish",
   "dismiss",
   "manage",
+  "reset",
 ] as const;
 
 export type AccessActionValue = (typeof ACCESS_ACTION_VALUES)[number];

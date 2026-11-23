@@ -39,6 +39,11 @@ export const tenants = pgTable(
     monthlyScanBudgetUsd: numeric("monthly_scan_budget_usd", { precision: 10, scale: 2 }),
     monthlyScanBudgetAllowanceUsd: numeric("monthly_scan_budget_allowance_usd", { precision: 10, scale: 2 }),
     signalsEnabled: boolean("signals_enabled").default(true).notNull(),
+    // -----
+    // The Two-factor requirement: when true, every member
+    // of this Account needs Two-factor (ADR 0014).
+    // -----
+    twoFactorRequired: boolean("two_factor_required").default(false).notNull(),
     ...timestamps(),
   },
   (t) => ({

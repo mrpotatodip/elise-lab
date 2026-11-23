@@ -1,14 +1,14 @@
 import { useCallback, useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { SIGN_UP_PASSWORD_MIN } from "@repo/contracts/elise";
-import { toast } from "sonner";
 import { ShellPublicBrand, ShellPublicThemeSwitch } from "#/modules/shell";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader } from "#/components/ui/card";
 import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
+import { TooltipProvider } from "#/components/ui/tooltip";
 import { Label } from "#/components/ui/label";
 import { fieldAria, fieldMessage, focusFirstInvalidField } from "#/lib/form-field";
 import { signIn, signUp } from "../api";
@@ -20,33 +20,24 @@ import { TurnstileWidget } from "./turnstile-widget";
 import { CheckEmailFields } from "./check-email-fields";
 import { ResendVerificationButton } from "./resend-verification-button";
 import { VerifyFailedFields } from "./verify-failed-fields";
-import { authKeys } from "../hooks";
+import { useAuthDone } from "../hooks";
 import { SignInSchema, SignUpInputSchema } from "../schemas";
-
-// -----
-// After a sign-in or sign-up: forget the old session and go to the app.
-// A failure from the server is a toast; a bad field is an inline error.
-// -----
-function useAuthDone(redirectTo?: string) {
-  const router = useRouter();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  return {
-    onSuccess: async () => {
-      queryClient.removeQueries({ queryKey: authKeys.session() });
-      await router.invalidate();
-      if (redirectTo) await navigate({ href: redirectTo });
-      else await navigate({ to: "/overview" });
-    },
-    onError: (error: Error) => toast.error(error.message || "Something went wrong"),
-  };
-}
+import { screenAfterSignIn } from "../utils";
+import { TwoFactorSecondStepFields } from "./two-factor-second-step-fields";
+import { TwoFactorSetupFields } from "./two-factor-setup-fields";
+import { AuthSignOutButton } from "./auth-signout-button";
 
 function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
   const done = useAuthDone(redirectTo);
+  const navigate = useNavigate();
   const signInMutation = useMutation({
     mutationFn: (input: typeof SignInSchema._output) => signIn({ data: input }),
-    onSuccess: (result) => (result.verified ? done.onSuccess() : undefined),
+    onSuccess: (result) => {
+      const screen = screenAfterSignIn(result.outcome, result.setupRequired);
+      if (screen === "second-step") return navigate({ to: "/two-factor", search: { redirect: redirectTo } });
+      if (screen === "setup") return done.onSuccess("/two-factor-setup");
+      return screen === "app" ? done.onSuccess() : undefined;
+    },
     onError: done.onError,
   });
   const form = useForm({
@@ -84,7 +75,7 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
           </div>
         )}
       </form.Field>
-      {signInMutation.data?.verified === false && signInMutation.variables ? (
+      {signInMutation.data?.outcome === "unverified" && signInMutation.variables ? (
         <div className="grid gap-3">
           <p role="alert" className="text-sm leading-relaxed">
             {AUTH_COPY.verify.unverified}
@@ -204,9 +195,11 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
   );
 }
 
-type AuthMode = "signin" | "signup" | "forgot" | "reset" | "checkEmail" | "verifyFailed";
+type AuthMode = "signin" | "signup" | "forgot" | "reset" | "checkEmail" | "verifyFailed" | "twoFactor" | "setup";
 
 function AuthFields({ mode, token, email, redirectTo, turnstileSiteKey }: { mode: AuthMode; token: string | undefined; email: string | undefined; redirectTo: string | undefined; turnstileSiteKey: string | null }) {
+  if (mode === "twoFactor") return <TwoFactorSecondStepFields redirectTo={redirectTo} />;
+  if (mode === "setup") return <TwoFactorSetupFields />;
   if (mode === "checkEmail") return <CheckEmailFields email={email} />;
   if (mode === "verifyFailed") return <VerifyFailedFields />;
   if (mode === "signup") return <SignUpFields turnstileSiteKey={turnstileSiteKey} />;
@@ -233,15 +226,24 @@ export function AuthForm({ mode, token, email, redirectTo, turnstileSiteKey = nu
         <Card className="shadow-raised">
           <CardHeader className="gap-1.5 px-8 pb-9 pt-8">
             <h1 className="text-xl font-semibold leading-none tracking-tight">{copy.title}</h1>
-            <p className="text-sm text-muted-foreground">{copy.hint}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{copy.hint}</p>
           </CardHeader>
           <CardContent className="p-8">
             <AuthFields mode={mode} token={token} email={email} redirectTo={redirectTo} turnstileSiteKey={turnstileSiteKey} />
           </CardContent>
         </Card>
-        <Link to={copy.to} className="inline-flex min-h-6 items-center justify-self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          {copy.swap}
-        </Link>
+        {mode === "setup" ? (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            {AUTH_COPY.setup.swap}
+            <TooltipProvider>
+              <AuthSignOutButton />
+            </TooltipProvider>
+          </div>
+        ) : (
+          <Link to={AUTH_COPY[mode].to} className="inline-flex min-h-6 items-center justify-self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {AUTH_COPY[mode].swap}
+          </Link>
+        )}
       </div>
     </main>
   );
