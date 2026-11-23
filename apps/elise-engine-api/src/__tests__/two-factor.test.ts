@@ -345,6 +345,19 @@ describe("Security notices and the Audit trail", () => {
     expect(await auditOf(tenant.partyId)).toEqual([["two_factor.enabled", tenant.partyId]]);
   });
 
+  it("does the same when the dashboard enrols with a bearer token and no cookie", async () => {
+    const email = await seedLogin("n-bearer");
+    const tenant = await joinAccount("n-bearer");
+    queued.length = 0;
+    const { headers } = await auth().api.signInEmail({ body: { email, password: PASSWORD }, returnHeaders: true });
+    const authorization = `Bearer ${headers.get("set-auth-token")}`;
+    const enabled = await auth().api.enableTwoFactor({ body: { password: PASSWORD }, headers: { authorization } });
+    await auth().api.verifyTOTP({ body: { code: await codeNow(secretOf(enabled.totpURI)) }, headers: { authorization } });
+
+    expect(noticesTo(email)).toEqual(["two-factor-enabled"]);
+    expect(await auditOf(tenant.partyId)).toEqual([["two_factor.enabled", tenant.partyId]]);
+  });
+
   it("tells the Login and writes one Audit row when Two-factor is turned off", async () => {
     const email = await seedLogin("n-disable");
     const tenant = await joinAccount("n-disable");

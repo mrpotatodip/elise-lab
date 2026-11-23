@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestUrl } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { EngineError, engineFetch, jsonPost } from "#/lib/engine-client";
 import { tryCatch } from "#/lib/try-catch";
@@ -27,7 +28,8 @@ export const verifySecondStep = createServerFn({ method: "POST" })
     if (!challenge) return { ok: false, failure: "expired" };
     const { kind, code } = codeInput(data.code);
     const path = kind === "totp" ? "/auth/two-factor/verify-totp" : "/auth/two-factor/verify-backup-code";
-    const init = { ...jsonPost(JSON.stringify({ code })), headers: { "Content-Type": "application/json", Cookie: challenge } };
+    const headers = { "Content-Type": "application/json", Cookie: challenge, Origin: getRequestUrl().origin };
+    const init = { ...jsonPost(JSON.stringify({ code })), headers };
     const { data: res, error } = await tryCatch(engineFetch(path, init));
     if (error) return failureOf(error);
     const token = res.headers.get("set-auth-token");

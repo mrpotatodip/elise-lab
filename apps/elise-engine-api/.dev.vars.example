@@ -13,5 +13,7 @@ TYPESAFE_API_KEY=
 # Always-fail pair: secret 2x0000000000000000000000000000000AA, site key 2x00000000000000000000AB.
 # Production: `wrangler secret put TURNSTILE_SECRET_KEY` with the real widget's secret.
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+# The dashboard sends its own origin on the Two-factor second step (the engine refuses a cookie call with none). The deployed list lacks the local dashboard port.
+AUTH_TRUSTED_ORIGINS=https://api.eliselab.com,https://app.eliselab.com,http://localhost:3000,http://localhost:3100
 DATABASE_URL=
 AUTH_SECRET=

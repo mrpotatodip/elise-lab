@@ -55,6 +55,14 @@ type AuthHookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0]
 
 const settle = (work: Promise<unknown>, what: string) => work.catch(() => console.error(`two-factor ${what} failed`));
 
+const sessionBeforeBearer = async (ctx: AuthHookContext) => {
+  const direct = await getSessionFromCtx(ctx);
+  if (direct) return direct;
+  const header = ctx.headers?.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const token = header ? decodeURIComponent(header).split(".")[0] : undefined;
+  return token ? await ctx.context.internalAdapter.findSession(token) : null;
+};
+
 const challengedUserId = async (ctx: AuthHookContext) => {
   const session = await getSessionFromCtx(ctx);
   if (session) return session.user.id;
@@ -207,7 +215,7 @@ export const buildAuth = (config: AuthConfig) => {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === "/two-factor/disable") {
-          const session = await getSessionFromCtx(ctx);
+          const session = await sessionBeforeBearer(ctx);
           if (session && ((await runEffect(accountRequiresTwoFactorEffect(config.db, session.user.id))) || (await runEffect(loginIsTwoFactorAdminEffect(config.db, session.user.id))))) {
             throw new APIError("FORBIDDEN", { message: "Your account requires Two-factor", code: "TWO_FACTOR_REQUIRED" });
           }
@@ -217,7 +225,7 @@ export const buildAuth = (config: AuthConfig) => {
           return;
         }
         if (CODE_PATHS.has(ctx.path)) {
-          const session = await getSessionFromCtx(ctx);
+          const session = await sessionBeforeBearer(ctx);
           if (ctx.path === "/two-factor/verify-totp" && session && !session.user.twoFactorEnabled) enrolling.add(session.session.token);
           const userId = session?.user.id ?? (await challengedUserId(ctx));
           if (userId) await settle(expireStaleWindow(userId), "window reset");
