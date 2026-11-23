@@ -16,7 +16,7 @@ export const CLOUDFLARE_SKILL_URL = "https://github.com/cloudflare/security-audi
 
 // The public repository holds the dashboard, the engine, the Runner and this site, under the MIT license
 // (LICENSE at its root). Secrets and customer data are not in it.
-export const SOURCE_URL = "https://github.com/mrpotatodip/ts-mrpotato-lab";
+export const SOURCE_URL = "https://github.com/mrpotatodip/elise-lab";
 
 export const OPEN_SOURCE = {
   title: "Open source",
@@ -93,7 +93,7 @@ export const STEPS = [
 // The download buttons point at one pinned release. When a new elise-runner-v* release is published,
 // change `version` (the file names come from .github/workflows/release-elise-runner.yml).
 const RUNNER_VERSION = "0.3.0";
-const RUNNER_RELEASES = "https://github.com/mrpotatodip/ts-mrpotato-lab/releases";
+const RUNNER_RELEASES = "https://github.com/mrpotatodip/elise-lab/releases";
 const runnerFile = (asset: string) => `${RUNNER_RELEASES}/download/elise-runner-v${RUNNER_VERSION}/${asset}`;
 
 export const RUNNER = {
@@ -110,7 +110,7 @@ export const RUNNER = {
   // A note is a list of parts: a string is plain text, { code } is set in the mono font.
   downloadNote: ["A downloaded file is not marked as runnable. Run ", { code: "chmod +x" }, " on it, and if macOS refuses to open it, run ", { code: "xattr -d com.apple.quarantine" }, " on it. Then move it onto your PATH as ", { code: "elise-runner" }, "."],
   commandLabel: "Or install from a terminal, which does all of that for you",
-  command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh",
+  command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/elise-lab/main/apps/elise-runner-cli/install.sh | sh",
   after: ["With either option, run ", { code: "elise-runner login" }, " and then ", { code: "elise-runner doctor" }, ". The terminal install puts the Runner in ", { code: "~/.local/bin" }, " and takes the newest release for your system."],
   releasesUrl: RUNNER_RELEASES,
   releasesLabel: "All Runner releases on GitHub",

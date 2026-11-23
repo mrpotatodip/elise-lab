@@ -2,7 +2,7 @@
 
 The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
 
-All five labels exist on `github.com/mrpotatodip/ts-elise` (created during setup; `wontfix` was already a GitHub default). Apply with `gh issue edit <n> --add-label "<label>"`.
+All five labels exist on `github.com/mrpotatodip/elise-lab` (created during setup; `wontfix` was already a GitHub default). Apply with `gh issue edit <n> --add-label "<label>"`.
 
 **Local-markdown fallback** (used when `gh` isn't available — see `issue-tracker.md`): the label is written as a `Status:` line near the top of the ticket file.
 

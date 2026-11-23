@@ -1,6 +1,6 @@
 # Issue tracker
 
-Issues live on GitHub: `origin` is `mrpotatodip/ts-elise-lab`, which redirects to `mrpotatodip/ts-mrpotato-lab`. That repo is **public**, so a spec or ticket holds behaviour and decisions only: no exploit detail, no secrets, no customer data.
+Issues live on GitHub: `origin` is `mrpotatodip/elise-lab` (renamed from `ts-mrpotato-lab` on 2026-11-24; the old name redirects). That repo is **public**, so a spec or ticket holds behaviour and decisions only: no exploit detail, no secrets, no customer data.
 
 ## Specs and tickets
 
