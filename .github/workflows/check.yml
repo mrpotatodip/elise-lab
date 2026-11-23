@@ -18,3 +18,15 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
       - run: pnpm install --frozen-lockfile
       - run: node scripts/check-changed.mjs --all
+
+  runner-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/elise-runner-cli
+    steps:
+      - uses: actions/checkout@v4
+      # rustup reads apps/elise-runner-cli/rust-toolchain.toml and installs that channel on first use.
+      - run: cargo build --locked -p elise-runner-cli
+      - run: cargo test --locked -p elise-runner-cli

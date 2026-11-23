@@ -103,28 +103,6 @@ const BUDGET_CAP_USD: f64 = 50.0;
 // Files a repository may carry that change how Claude Code behaves or reach outside the clone.
 const AGENT_CONFIG_NAMES: [&str; 4] = [".claude", "CLAUDE.md", "CLAUDE.local.md", ".mcp.json"];
 
-// The same clone the cloud container does: a plain shallow clone, or a fetch of the ref, tried
-// as a branch first. It writes the commit, the branch HEAD was on, and how the ref was fetched.
-const CLONE_SCRIPT: &str = r#"set -e
-rm -rf repo repo.kind
-if [ -z "$2" ]; then
-  git clone --depth 1 -- "$1" repo
-else
-  mkdir repo
-  git -C repo init -q
-  git -C repo remote add origin "$1"
-  if git -C repo fetch --depth 1 origin "refs/heads/$2" 2>/dev/null; then
-    echo branch > repo.kind
-  else
-    git -C repo fetch --depth 1 origin "$2"
-    echo other > repo.kind
-  fi
-  git -C repo checkout -q FETCH_HEAD
-fi
-git -C repo rev-parse HEAD > repo.sha
-git -C repo rev-parse --abbrev-ref HEAD > repo.branch
-"#;
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Job {
@@ -493,7 +471,7 @@ async fn execute(
             if !git_ref.is_empty() && !safe_ref(&git_ref) {
                 return Err("That branch, tag or commit name is not one this runner will fetch.".into());
             }
-            let helper = git_token::Helper::for_host(&job.scan_id, &address.host)?;
+            let helper = git_token::Helper::for_host(&address.host);
             tokio::select! {
                 access = git_access::check(&address, helper.as_ref()) => access?,
                 _ = stop.stopped() => return Err(STOPPED.to_string()),
@@ -811,31 +789,54 @@ fn strip_untrusted(dir: &Path) -> std::io::Result<()> {
 }
 
 async fn clone_repo(work: &Path, repo: &str, git_ref: &str, helper: Option<&git_token::Helper>, stop: &Stop) -> Result<(), String> {
-    let mut command = Command::new("sh");
-    command
-        .arg("-c")
-        .arg(CLONE_SCRIPT)
-        .arg("sh")
-        .arg(repo)
-        .arg(git_ref)
-        .current_dir(work)
-        .env("GIT_ALLOW_PROTOCOL", "https")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .kill_on_drop(true);
+    let result = tokio::select! {
+        result = timeout(CLONE_TIMEOUT, clone_steps(work, repo, git_ref, helper)) => result,
+        _ = stop.stopped() => return Err(STOPPED.to_string()),
+    };
+    result.map_err(|_| "Cloning took longer than 5 minutes.".to_string())?
+}
+
+async fn run_git(work: &Path, args: &[&str], helper: Option<&git_token::Helper>) -> Result<Result<Vec<u8>, String>, String> {
+    let mut command = Command::new("git");
+    command.args(args).current_dir(work).env("GIT_ALLOW_PROTOCOL", "https").env("GIT_TERMINAL_PROMPT", "0").kill_on_drop(true);
     if let Some(helper) = helper {
         helper.apply(&mut command);
     }
-    let output = tokio::select! {
-        output = timeout(CLONE_TIMEOUT, command.output()) => output,
-        _ = stop.stopped() => return Err(STOPPED.to_string()),
-    };
-    let output = output
-        .map_err(|_| "Cloning took longer than 5 minutes.".to_string())?
-        .map_err(|e| format!("Could not run git: {e}. Is Git installed on this computer?"))?;
+    let output = command.output().await.map_err(|e| format!("Could not run git: {e}. Is Git installed on this computer?"))?;
     if output.status.success() {
-        return Ok(());
+        return Ok(Ok(output.stdout));
     }
-    Err(format!("git could not read the repository: {}", String::from_utf8_lossy(&output.stderr)))
+    Ok(Err(format!("git could not read the repository: {}", String::from_utf8_lossy(&output.stderr))))
+}
+
+async fn git_step(work: &Path, args: &[&str], helper: Option<&git_token::Helper>) -> Result<Vec<u8>, String> {
+    run_git(work, args, helper).await?
+}
+
+async fn clone_steps(work: &Path, repo: &str, git_ref: &str, helper: Option<&git_token::Helper>) -> Result<(), String> {
+    let _ = fs::remove_dir_all(work.join("repo"));
+    let _ = fs::remove_file(work.join("repo.kind"));
+    let write = |name: &str, bytes: &[u8]| fs::write(work.join(name), bytes).map_err(|e| format!("Could not write {name}: {e}"));
+    if git_ref.is_empty() {
+        git_step(work, &["clone", "--depth", "1", "--", repo, "repo"], helper).await?;
+    } else {
+        fs::create_dir(work.join("repo")).map_err(|e| format!("Could not make the clone folder: {e}"))?;
+        git_step(work, &["-C", "repo", "init", "-q"], helper).await?;
+        git_step(work, &["-C", "repo", "remote", "add", "origin", repo], helper).await?;
+        let as_branch = format!("refs/heads/{git_ref}");
+        match run_git(work, &["-C", "repo", "fetch", "--depth", "1", "origin", &as_branch], helper).await? {
+            Ok(_) => write("repo.kind", b"branch\n")?,
+            Err(said) if said.contains("couldn't find remote ref") => {
+                git_step(work, &["-C", "repo", "fetch", "--depth", "1", "origin", git_ref], helper).await?;
+                write("repo.kind", b"other\n")?;
+            }
+            Err(said) => return Err(said),
+        }
+        git_step(work, &["-C", "repo", "checkout", "-q", "FETCH_HEAD"], helper).await?;
+    }
+    write("repo.sha", &git_step(work, &["-C", "repo", "rev-parse", "HEAD"], helper).await?)?;
+    write("repo.branch", &git_step(work, &["-C", "repo", "rev-parse", "--abbrev-ref", "HEAD"], helper).await?)?;
+    Ok(())
 }
 
 // -----
@@ -884,6 +885,10 @@ fn agent_args(job: &Job, prompt: &str, budget_usd: f64) -> Vec<String> {
     args
 }
 
+fn is_batch_file(program: &Path) -> bool {
+    program.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat"))
+}
+
 fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
     fs::create_dir_all(to)?;
     for entry in fs::read_dir(from)? {
@@ -903,6 +908,12 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 // the usual places and then asked of a login shell. The child gets the folder `claude` lives
 // in on its PATH, because claude itself starts `node` from there.
 // -----
+#[cfg(windows)]
+fn find_claude() -> Option<PathBuf> {
+    crate::find::find_on_windows("claude")
+}
+
+#[cfg(not(windows))]
 fn find_claude() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
     let mut candidates: Vec<PathBuf> = vec![
@@ -929,6 +940,12 @@ fn find_claude() -> Option<PathBuf> {
 // `node` is found the way `claude` is: in the usual places, nvm's folders last version first,
 // then asked of a login shell.
 // -----
+#[cfg(windows)]
+fn find_node() -> Option<PathBuf> {
+    crate::find::find_on_windows("node")
+}
+
+#[cfg(not(windows))]
 fn find_node() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
     let mut candidates: Vec<PathBuf> = Vec::new();
@@ -947,6 +964,26 @@ fn find_node() -> Option<PathBuf> {
     let line = String::from_utf8_lossy(&output.stdout).lines().last()?.trim().to_string();
     let path = PathBuf::from(line);
     path.is_file().then_some(path)
+}
+
+#[cfg(not(windows))]
+fn agent_path(bin_dir: &Path, _node: Option<&Path>) -> std::ffi::OsString {
+    format!("{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", bin_dir.display()).into()
+}
+
+#[cfg(windows)]
+fn agent_path(bin_dir: &Path, node: Option<&Path>) -> std::ffi::OsString {
+    crate::find::windows_agent_path(bin_dir, node)
+}
+
+#[cfg(not(windows))]
+fn validator_path(_node: &Path) -> &'static str {
+    "/usr/bin:/bin"
+}
+
+#[cfg(windows)]
+fn validator_path(node: &Path) -> std::ffi::OsString {
+    crate::find::windows_validator_path(node)
 }
 
 // -----
@@ -979,9 +1016,15 @@ async fn validate_full(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), Ch
             .arg(&path)
             .current_dir(work)
             .env_clear()
-            .env("PATH", "/usr/bin:/bin")
+            .env("PATH", validator_path(node))
             .stdin(Stdio::null())
             .kill_on_drop(true);
+        #[cfg(windows)]
+        for name in ["SystemRoot", "windir", "TEMP", "TMP"] {
+            if let Some(value) = std::env::var_os(name) {
+                command.env(name, value);
+            }
+        }
         let ran = tokio::select! {
             ran = timeout(VALIDATE_TIMEOUT, command.output()) => ran,
             _ = stop.stopped() => return Err(Environment(STOPPED.to_string())),
@@ -1047,7 +1090,7 @@ async fn run_agent(
     };
     let claude = tools.claude.as_ref().ok_or("Claude Code is not installed on this computer, or this app cannot find it. Install it from https://claude.com/claude-code and sign in, then start the scan again.")?;
     let bin_dir = claude.parent().map(Path::to_path_buf).unwrap_or_default();
-    let path = format!("{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", bin_dir.display());
+    let path = agent_path(&bin_dir, tools.node.as_deref());
 
     let (log_name, err_name) = match phase {
         Some(phase) => (format!("agent-{phase}.log"), format!("agent-{phase}.err")),
@@ -1055,9 +1098,14 @@ async fn run_agent(
     };
     let log = fs::File::create(work.join(&log_name)).map_err(|e| format!("Could not open the agent log: {e}"))?;
     let err = fs::File::create(work.join(&err_name)).map_err(|e| format!("Could not open the agent log: {e}"))?;
+    let mut args = agent_args(job, prompt, budget_usd);
+    let prompt_on_stdin = is_batch_file(claude);
+    if prompt_on_stdin {
+        args.truncate(args.len() - 2);
+    }
     let mut command = Command::new(claude);
     command
-        .args(agent_args(job, prompt, budget_usd))
+        .args(args)
         .current_dir(work)
         .env("PATH", path)
         // The person's own login does the work. A key in the environment would be used instead.
@@ -1065,11 +1113,15 @@ async fn run_agent(
         .env_remove("ANTHROPIC_AUTH_TOKEN")
         .env_remove(TOKEN_VARIABLE)
         .env_remove(git_token::VARIABLE)
-        .stdin(Stdio::null())
+        .stdin(if prompt_on_stdin { Stdio::piped() } else { Stdio::null() })
         .stdout(Stdio::from(log))
         .stderr(Stdio::from(err))
         .kill_on_drop(true);
     let mut child = command.spawn().map_err(|e| format!("Could not start Claude Code: {e}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        use tokio::io::AsyncWriteExt;
+        stdin.write_all(prompt.as_bytes()).await.map_err(|e| format!("Could not give Claude Code the prompt: {e}"))?;
+    }
 
     let following = trace::follow(&work.join(&log_name), phase);
     let pushing = live::follow(&work.join("out").join(LIVE_FINDINGS_FILE));

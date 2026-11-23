@@ -13,7 +13,6 @@ use std::io::{BufRead, Write};
 use std::pin::Pin;
 use std::sync::Mutex;
 use std::task::Poll;
-use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::sleep;
 
 const TOKEN_WARNING: &str = "\
@@ -257,7 +256,19 @@ pub async fn doctor(store: &Store, named: &[String]) -> Exit {
     let git = git_installed().await;
     let git_found = git.is_ok();
     report("git", git);
+    #[cfg(windows)]
+    {
+        use elise_runner_core::find;
+        report("git for windows", find::git_for_windows_verdict(git_found, &find::WinEnv::from_process(), &|p| p.is_file()));
+    }
     report("claude", claude_signed_in().await);
+    #[cfg(windows)]
+    report(
+        "node",
+        elise_runner_core::find::find_on_windows("node").map(|node| node.display().to_string()).ok_or_else(|| {
+            "`node` (Node.js) was not found on this computer. Install it from https://nodejs.org, then run doctor again.".to_string()
+        }),
+    );
     report("paired", runner_paired(store).await);
 
     let settings = Settings::load(&settings_file());
@@ -473,9 +484,19 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
     }
 }
 
+#[cfg(unix)]
+fn stop_signals() -> Option<(tokio::signal::unix::Signal, tokio::signal::unix::Signal)> {
+    use tokio::signal::unix::{signal, SignalKind};
+    Some((signal(SignalKind::interrupt()).ok()?, signal(SignalKind::terminate()).ok()?))
+}
+
+#[cfg(windows)]
+fn stop_signals() -> Option<(tokio::signal::windows::CtrlC, tokio::signal::windows::CtrlBreak)> {
+    Some((tokio::signal::windows::ctrl_c().ok()?, tokio::signal::windows::ctrl_break().ok()?))
+}
+
 fn stop_on_signal(message: &'static str) -> Option<Stop> {
-    let mut interrupt = signal(SignalKind::interrupt()).ok()?;
-    let mut terminate = signal(SignalKind::terminate()).ok()?;
+    let (mut interrupt, mut terminate) = stop_signals()?;
     let (stopper, stop) = Stopper::new();
     tokio::spawn(async move {
         tokio::select! {

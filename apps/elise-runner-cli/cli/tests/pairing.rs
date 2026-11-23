@@ -213,6 +213,7 @@ fn a_token_from_the_environment_is_used_but_never_managed() {
     assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
 }
 
+#[cfg(unix)]
 #[test]
 fn with_elise_runner_home_the_token_is_in_an_owner_only_file_there() {
     use std::os::unix::fs::PermissionsExt;
