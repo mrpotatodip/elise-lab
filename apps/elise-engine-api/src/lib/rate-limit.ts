@@ -11,7 +11,8 @@ type LimiterName =
   | "RUNNER_ENROLL_TOTAL_LIMITER"
   | "RUNNER_LOGIN_START_LIMITER"
   | "RUNNER_LOGIN_START_TOTAL_LIMITER"
-  | "PASSWORD_RESET_LIMITER";
+  | "PASSWORD_RESET_LIMITER"
+  | "VERIFICATION_RESEND_LIMITER";
 
 // -----
 // Before the body is read. No binding (local dev,

@@ -1,10 +1,21 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { Data, Effect } from "effect";
-import { accessMasterPowers, accessRolePowers, ensureTenantRoles, findTenantRole, partyRoles, tenants } from "@repo/db-elise";
+import {
+  accessMasterPowers,
+  accessRolePowers,
+  authUser,
+  ensureTenantRoles,
+  findTenantRole,
+  parties,
+  partyRoles,
+  scans,
+  tenants,
+  tenantSubscriptions,
+} from "@repo/db-elise";
 import { TENANT_ADMIN_ROLE_KEY, TenantSchema, type Tenant } from "@repo/contracts/elise";
 import type { PoolDbType } from "#/lib/db-connection";
 import { Conflict, DbError, toDbError } from "#/lib/effect-query";
-import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
+import { PG_FOREIGN_KEY_VIOLATION, PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
 import { SIGN_UP_REFUSED, SIGN_UP_SLUG_CANDIDATE_COUNT, SIGN_UP_SLUG_CONSTRAINT } from "#/modules/sign-up/constants";
 import { createPersonLogin } from "#/modules/person-logins";
 import { slugCandidates } from "#/modules/sign-up/lib";
@@ -15,6 +26,42 @@ import type { NewAccount } from "#/modules/sign-up/types";
 // it by tag to pick a new slug and try again.
 // -----
 export class SlugTaken extends Data.TaggedError("SlugTaken")<{ cause: unknown }> {}
+
+class ReplaceBlocked extends Error {}
+
+export const replaceUnverifiedLoginEffect = (db: PoolDbType, email: string): Effect.Effect<void, Conflict | DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db.transaction(async (tx) => {
+        const [login] = await tx
+          .select({ id: authUser.id, partyId: authUser.partyId })
+          .from(authUser)
+          .where(and(eq(authUser.email, email), eq(authUser.emailVerified, false)))
+          .for("update");
+        if (!login) return;
+
+        const owned = await tx.select({ id: tenants.id }).from(tenants).where(eq(tenants.partyId, login.partyId));
+        const ownedIds = owned.map((row) => row.id);
+        if (ownedIds.length === 0) throw new ReplaceBlocked();
+        const roles = await tx.select({ tenantId: partyRoles.tenantId }).from(partyRoles).where(eq(partyRoles.partyId, login.partyId));
+        if (roles.some((role) => !role.tenantId || !ownedIds.includes(role.tenantId))) throw new ReplaceBlocked();
+
+        const [plan] = await tx.select({ tenantId: tenantSubscriptions.tenantId }).from(tenantSubscriptions).where(inArray(tenantSubscriptions.tenantId, ownedIds)).limit(1);
+        const [scan] = await tx.select({ id: scans.id }).from(scans).where(inArray(scans.tenantId, ownedIds)).limit(1);
+        const [member] = await tx
+          .select({ id: partyRoles.id })
+          .from(partyRoles)
+          .where(and(inArray(partyRoles.tenantId, ownedIds), ne(partyRoles.partyId, login.partyId)))
+          .limit(1);
+        if (plan || scan || member) throw new ReplaceBlocked();
+
+        await tx.delete(authUser).where(eq(authUser.id, login.id));
+        await tx.delete(tenants).where(inArray(tenants.id, ownedIds));
+        await tx.delete(parties).where(eq(parties.id, login.partyId));
+      }),
+    catch: (cause) =>
+      cause instanceof ReplaceBlocked || pgErrorCode(cause) === PG_FOREIGN_KEY_VIOLATION ? new Conflict({ message: SIGN_UP_REFUSED }) : toDbError(cause),
+  });
 
 // -----
 // The first address from the name that no

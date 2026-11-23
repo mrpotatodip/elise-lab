@@ -9,17 +9,18 @@ import { openTestDb, seedTenant, type TestDb } from "./test-db";
 let db: TestDb;
 const queued: QueuedEmail[] = [];
 
-const auth = () =>
-  buildAuth({
-    db: db.pool,
-    secret: "s".repeat(32),
-    baseUrl: "http://localhost:8787",
-    trustedOrigins: ["http://localhost:3100"],
-    dashboardUrl: "http://localhost:3100",
-    enqueueEmail: async (mail) => {
-      queued.push(mail);
-    },
-  });
+const authConfig = () => ({
+  db: db.pool,
+  secret: "s".repeat(32),
+  baseUrl: "http://localhost:8787",
+  trustedOrigins: ["http://localhost:3100"],
+  dashboardUrl: "http://localhost:3100",
+  enqueueEmail: async (mail: QueuedEmail) => {
+    queued.push(mail);
+  },
+});
+
+const auth = () => buildAuth(authConfig());
 
 const seedLogin = async (id: string, email: string, emailVerified: boolean) => {
   const { partyId } = await seedTenant(db, `acct-${id}`);
@@ -53,6 +54,24 @@ describe("the sign-in gate", () => {
   it("refuses a Login that is not a Verified Login, with the password right", async () => {
     await expect(auth().api.signInEmail({ body: { email: "new@example.com", password: "old-password-1" } })).rejects.toMatchObject({ status: "FORBIDDEN" });
     expect(await sessionsOf("u-unverified")).toBe(0);
+  });
+
+  it("re-sends the Verification email on each refused attempt, up to the address limit", async () => {
+    queued.length = 0;
+    const counts = new Map<string, number>();
+    const limiter: RateLimit = {
+      limit: async ({ key }) => {
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+        return { success: (counts.get(key) ?? 0) <= 2 };
+      },
+    };
+    const limited = buildAuth({ ...authConfig(), verificationAddressLimiter: limiter });
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await expect(limited.api.signInEmail({ body: { email: "New@example.com", password: "old-password-1" } })).rejects.toMatchObject({ status: "FORBIDDEN" });
+    }
+
+    expect(queued.filter((mail) => mail.kind === "verify-email")).toHaveLength(2);
   });
 
   it("lets a Verified Login in", async () => {

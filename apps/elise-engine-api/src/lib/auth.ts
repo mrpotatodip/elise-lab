@@ -41,6 +41,7 @@ export type AuthConfig = {
   enqueueEmail: (mail: QueuedEmail) => Promise<void>;
   waitUntil?: (promise: Promise<unknown>) => void;
   resetAddressLimiter?: RateLimit;
+  verificationAddressLimiter?: RateLimit;
 };
 
 const RESET_TOKEN_SECONDS = 3600;
@@ -96,7 +97,13 @@ export const buildAuth = (config: AuthConfig) =>
     emailVerification: {
       expiresIn: VERIFY_TOKEN_SECONDS,
       autoSignInAfterVerification: true,
+      sendOnSignIn: true,
       sendVerificationEmail: async ({ user, token }) => {
+        if (config.verificationAddressLimiter) {
+          const key = await sha256Hex(user.email.toLowerCase());
+          const { success } = await config.verificationAddressLimiter.limit({ key });
+          if (!success) return;
+        }
         await config.enqueueEmail({
           kind: "verify-email",
           to: user.email,
@@ -136,6 +143,7 @@ export const authConfigOf = (c: Context<AppEnv>, db: PoolDbType): AuthConfig => 
   enqueueEmail: (mail) => c.get("deps").enqueueEmail(c.env, mail),
   waitUntil: (promise) => c.executionCtx.waitUntil(promise),
   resetAddressLimiter: c.env.PASSWORD_RESET_ADDRESS_LIMITER,
+  verificationAddressLimiter: c.env.VERIFICATION_RESEND_ADDRESS_LIMITER,
 });
 
 export const createAuth = (c: Context<AppEnv>) => {

@@ -52,6 +52,7 @@ export const NOT_TENANT_ROUTES: readonly string[] = [
   "GET /auth/*",
   "POST /auth/*",
   "POST /sign-up",
+  "POST /sign-up/resend-verification",
   "GET /me",
   "GET /team/invites/:token",
   "POST /team/invites/:token/accept",
