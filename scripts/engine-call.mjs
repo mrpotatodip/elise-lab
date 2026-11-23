@@ -42,7 +42,7 @@ export function engineUrl(flags) {
   return flags.local ? "http://localhost:8787" : (process.env.ELISE_ENGINE_URL ?? DEPLOYED);
 }
 
-function accountId(flags) {
+export function accountId(flags) {
   const given = flags.account ?? process.env.ELISE_ACCOUNT_ID;
   if (typeof given === "string") return given;
   const out = spawnSync("pnpm", ["-s", "--filter", "@repo/db-elise", "db:query", "select distinct tenant_id from scans"], { cwd: root, encoding: "utf8" });
