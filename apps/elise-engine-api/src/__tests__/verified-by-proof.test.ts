@@ -66,11 +66,11 @@ const verifiedOf = async (email: string) => (await db.raw.select().from(authUser
 describe("a proof of ownership verifies the Login", () => {
   it.each([
     {
-      proof: "accepting an invite sent to its address, signed in",
+      proof: "accepting an invite sent to its address, as a new Login over an unverified one",
       email: "signed-in@example.com",
       run: async (email: string) => {
         await seedUnverified("u-invited", email);
-        await acceptInvite(await invite(email), { signedInUserId: "u-invited" });
+        await acceptInvite(await invite(email), { newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: await hashPassword("invitee-password-1") } });
       },
     },
     {
@@ -92,5 +92,23 @@ describe("a proof of ownership verifies the Login", () => {
     await run(email);
 
     expect(await verifiedOf(email)).toBe(true);
+  });
+});
+
+describe("an invite to an address held by an unverified Login", () => {
+  it("replaces the old password with the invitee's", async () => {
+    await seedUnverified("u-squat", "squat@example.com");
+    const newHash = await hashPassword("invitee-password-1");
+
+    await acceptInvite(await invite("squat@example.com"), { newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: newHash } });
+
+    const [credential] = await db.raw.select().from(authAccount).where(eq(authAccount.userId, "u-squat"));
+    expect(credential?.password).toBe(newHash);
+  });
+
+  it("asks for details when none are sent", async () => {
+    await seedUnverified("u-nodetails", "nodetails@example.com");
+
+    await expect(acceptInvite(await invite("nodetails@example.com"), {})).rejects.toThrow(/required to accept/);
   });
 });

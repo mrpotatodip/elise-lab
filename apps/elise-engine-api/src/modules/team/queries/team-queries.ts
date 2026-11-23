@@ -2,6 +2,8 @@ import { and, asc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import {
   accessMasterRoles,
+  authAccount,
+  authSession,
   authUser,
   findTenantRole,
   partyMasterRoles,
@@ -378,14 +380,14 @@ export const previewInviteEffect = (db: DbConnectType, tokenHash: string, now: D
     });
     if (!invite) return yield* new Forbidden({ message: TEAM_INVITE_INVALID });
     const login = yield* Effect.tryPromise({
-      try: () => db.select({ id: authUser.id }).from(authUser).where(eq(sql`lower(${authUser.email})`, invite.email)).limit(1),
+      try: () => db.select({ id: authUser.id, emailVerified: authUser.emailVerified }).from(authUser).where(eq(sql`lower(${authUser.email})`, invite.email)).limit(1),
       catch: toDbError,
     });
     return {
       accountName: invite.accountName,
       role: invite.role,
       roleLabel: invite.roleLabel,
-      hasAccount: login.length > 0,
+      hasAccount: login.some((row) => row.emailVerified),
     };
   });
 
@@ -399,6 +401,11 @@ export const previewInviteEffect = (db: DbConnectType, tokenHash: string, now: D
 //     signed in as it.
 //   - It has none: the caller gives a name and a
 //     password, and a login is made.
+//   - It has an unverified login: that login cannot
+//     sign in and its password may be a stranger's.
+//     The invite proves the address, so the caller
+//     gives a name and a password, which replace the
+//     old one, and the login is verified.
 // The Role is checked again, in case it was
 // disabled since the invite was made.
 // -----
@@ -431,13 +438,22 @@ export const acceptInviteEffect = (
         if (!role) return refuse(new Forbidden({ message: TEAM_INVITE_INVALID }));
 
         const [existing] = await tx
-          .select({ id: authUser.id, partyId: authUser.partyId })
+          .select({ id: authUser.id, partyId: authUser.partyId, emailVerified: authUser.emailVerified })
           .from(authUser)
           .where(eq(sql`lower(${authUser.email})`, invite.email));
 
         let partyId: string;
         let loginId: string;
-        if (existing) {
+        if (existing && !existing.emailVerified) {
+          if (!accept.newLogin) return refuse(new Invalid({ message: TEAM_INVITE_DETAILS_REQUIRED }));
+          partyId = existing.partyId;
+          loginId = existing.id;
+          await tx
+            .update(authAccount)
+            .set({ password: accept.newLogin.passwordHash, updatedAt: accept.now })
+            .where(and(eq(authAccount.userId, existing.id), eq(authAccount.providerId, "credential")));
+          await tx.delete(authSession).where(eq(authSession.userId, existing.id));
+        } else if (existing) {
           if (accept.signedInUserId !== existing.id) return refuse(new Forbidden({ message: TEAM_INVITE_SIGN_IN_REQUIRED }));
           partyId = existing.partyId;
           loginId = existing.id;

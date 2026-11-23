@@ -3,7 +3,8 @@ import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { ResendVerificationBodySchema } from "@repo/contracts/elise";
 import { EngineError, engineFetch, jsonPost } from "#/lib/engine-client";
-import { AUTH_COPY } from "../constants";
+import { tryCatch } from "#/lib/try-catch";
+import { AUTH_COPY, EMAIL_NOT_VERIFIED_CODE } from "../constants";
 import { ForgotPasswordSchema, ResetPasswordSchema, SignInSchema, SignUpInputSchema, VerifyEmailSchema } from "../schemas";
 import { clearSessionToken, findSession, saveSessionToken } from "../server/session";
 
@@ -14,14 +15,13 @@ const SignInResponseSchema = z.object({ token: z.string() });
 export const signIn = createServerFn({ method: "POST" })
   .validator(SignInSchema)
   .handler(async ({ data }): Promise<{ verified: boolean }> => {
-    try {
-      const res = await engineFetch("/auth/sign-in/email", jsonPost(JSON.stringify(data)));
-      saveSessionToken(SignInResponseSchema.parse(await res.json()).token);
-      return { verified: true };
-    } catch (error) {
-      if (error instanceof EngineError && error.status === 403) return { verified: false };
+    const { data: res, error } = await tryCatch(engineFetch("/auth/sign-in/email", jsonPost(JSON.stringify(data))));
+    if (error) {
+      if (error instanceof EngineError && error.code === EMAIL_NOT_VERIFIED_CODE) return { verified: false };
       throw error;
     }
+    saveSessionToken(SignInResponseSchema.parse(await res.json()).token);
+    return { verified: true };
   });
 
 export const fetchTurnstileSiteKey = createServerFn({ method: "GET" }).handler(async (): Promise<string | null> => env.TURNSTILE_SITE_KEY || null);
@@ -35,28 +35,23 @@ export const signUp = createServerFn({ method: "POST" })
 export const resendVerification = createServerFn({ method: "POST" })
   .validator(ResendVerificationBodySchema)
   .handler(async ({ data }) => {
-    try {
-      await engineFetch("/sign-up/resend-verification", jsonPost(JSON.stringify(data)));
-    } catch (error) {
-      if (error instanceof EngineError && error.status === 429) throw new Error(AUTH_COPY.verify.wait, { cause: error });
-      throw error;
-    }
+    const { error } = await tryCatch(engineFetch("/sign-up/resend-verification", jsonPost(JSON.stringify(data))));
+    if (error instanceof EngineError && error.status === 429) throw new Error(AUTH_COPY.verify.wait, { cause: error });
+    if (error) throw error;
   });
-
-const SESSION_COOKIE_PATTERN = /better-auth\.session_token=([^;]+)/;
 
 export const verifyEmail = createServerFn({ method: "POST" })
   .validator(VerifyEmailSchema)
   .handler(async ({ data }): Promise<{ verified: boolean }> => {
-    try {
-      const res = await engineFetch(`/auth/verify-email?token=${encodeURIComponent(data.token)}`);
-      const token = res.headers.get("set-auth-token") ?? decodeURIComponent(SESSION_COOKIE_PATTERN.exec(res.headers.get("set-cookie") ?? "")?.[1] ?? "");
-      if (token) saveSessionToken(token);
-      return { verified: true };
-    } catch (error) {
+    const { data: res, error } = await tryCatch(engineFetch(`/auth/verify-email?token=${encodeURIComponent(data.token)}`));
+    if (error) {
       if (error instanceof EngineError && error.status < 500) return { verified: false };
       throw error;
     }
+    const token = res.headers.get("set-auth-token");
+    if (!token) return { verified: false };
+    saveSessionToken(token);
+    return { verified: true };
   });
 
 // -----

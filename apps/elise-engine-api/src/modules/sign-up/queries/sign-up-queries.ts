@@ -27,7 +27,7 @@ import type { NewAccount } from "#/modules/sign-up/types";
 // -----
 export class SlugTaken extends Data.TaggedError("SlugTaken")<{ cause: unknown }> {}
 
-class ReplaceBlocked extends Error {}
+class ReplaceBlocked extends Data.TaggedError("ReplaceBlocked")<{}> {}
 
 export const replaceUnverifiedLoginEffect = (db: PoolDbType, email: string): Effect.Effect<void, Conflict | DbError> =>
   Effect.tryPromise({

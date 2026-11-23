@@ -17,7 +17,9 @@ import { AuthBrandPanel } from "./auth-brand-panel";
 import { ForgotPasswordFields } from "./forgot-password-fields";
 import { ResetPasswordFields } from "./reset-password-fields";
 import { TurnstileWidget } from "./turnstile-widget";
-import { CheckEmailFields, ResendVerificationButton, VerifyFailedFields } from "./verification-fields";
+import { CheckEmailFields } from "./check-email-fields";
+import { ResendVerificationButton } from "./resend-verification-button";
+import { VerifyFailedFields } from "./verify-failed-fields";
 import { authKeys } from "../hooks";
 import { SignInSchema, SignUpInputSchema } from "../schemas";
 
