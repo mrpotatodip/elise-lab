@@ -7,7 +7,7 @@ import { FIRST_THEME, SKY_DIR, THEMES, THEME_SKIES, THEME_STORAGE_KEY } from "..
 // It also picks one sky at random for each picture theme on every load.
 const skyLists = Object.fromEntries(Object.entries(THEME_SKIES).map(([theme, files]) => [theme, files.map((file) => SKY_DIR + file)]));
 const themeIds = THEMES.map((theme) => theme.id);
-const themeInit = `try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})||${JSON.stringify(FIRST_THEME)},d=document.documentElement;if(${JSON.stringify(themeIds)}.indexOf(t)>-1){if(t==="default")delete d.dataset.theme;else d.dataset.theme=t}}catch(e){}try{if(localStorage.getItem("elise.motion")==="off")document.documentElement.dataset.motion="off"}catch(e){}try{var L=${JSON.stringify(skyLists)},d=document.documentElement;Object.keys(L).forEach(function(k){var s=L[k];d.style.setProperty("--"+k+"-sky","url("+s[Math.floor(Math.random()*s.length)]+")")})}catch(e){}`;
+const themeInit = `try{var t=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})||${JSON.stringify(FIRST_THEME)},d=document.documentElement;if(${JSON.stringify(themeIds)}.indexOf(t)>-1){if(t==="default")delete d.dataset.theme;else d.dataset.theme=t}}catch(e){}try{var L=${JSON.stringify(skyLists)},d=document.documentElement;Object.keys(L).forEach(function(k){var s=L[k];d.style.setProperty("--"+k+"-sky","url("+s[Math.floor(Math.random()*s.length)]+")")})}catch(e){}`;
 
 interface Props {
   title?: string;

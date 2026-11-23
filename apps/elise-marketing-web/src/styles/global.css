@@ -225,14 +225,6 @@ h1 {
   transform: translateX(-50%);
 }
 
-/* The "Pause animations" control sets data-motion="off": nothing moves, as under reduced motion. */
-:root[data-motion="off"] *,
-:root[data-motion="off"] *::before,
-:root[data-motion="off"] *::after {
-  animation: none !important;
-  transition-duration: 0s !important;
-}
-
 section {
   padding-block: clamp(2.5rem, 6vw, 4rem);
 }
