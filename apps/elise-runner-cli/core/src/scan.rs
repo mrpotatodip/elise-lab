@@ -907,6 +907,12 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 // the usual places and then asked of a login shell. The child gets the folder `claude` lives
 // in on its PATH, because claude itself starts `node` from there.
 // -----
+#[cfg(windows)]
+fn find_claude() -> Option<PathBuf> {
+    crate::find::find_on_windows("claude")
+}
+
+#[cfg(not(windows))]
 fn find_claude() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
     let mut candidates: Vec<PathBuf> = vec![
@@ -933,6 +939,12 @@ fn find_claude() -> Option<PathBuf> {
 // `node` is found the way `claude` is: in the usual places, nvm's folders last version first,
 // then asked of a login shell.
 // -----
+#[cfg(windows)]
+fn find_node() -> Option<PathBuf> {
+    crate::find::find_on_windows("node")
+}
+
+#[cfg(not(windows))]
 fn find_node() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
     let mut candidates: Vec<PathBuf> = Vec::new();
@@ -951,6 +963,27 @@ fn find_node() -> Option<PathBuf> {
     let line = String::from_utf8_lossy(&output.stdout).lines().last()?.trim().to_string();
     let path = PathBuf::from(line);
     path.is_file().then_some(path)
+}
+
+// The PATH of the agent and of the validator scripts. Unix: fixed folders after claude's own.
+#[cfg(not(windows))]
+fn agent_path(bin_dir: &Path, _node: Option<&Path>) -> std::ffi::OsString {
+    format!("{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", bin_dir.display()).into()
+}
+
+#[cfg(windows)]
+fn agent_path(bin_dir: &Path, node: Option<&Path>) -> std::ffi::OsString {
+    crate::find::windows_agent_path(bin_dir, node)
+}
+
+#[cfg(not(windows))]
+fn validator_path(_node: &Path) -> &'static str {
+    "/usr/bin:/bin"
+}
+
+#[cfg(windows)]
+fn validator_path(node: &Path) -> std::ffi::OsString {
+    crate::find::windows_validator_path(node)
 }
 
 // -----
@@ -983,7 +1016,7 @@ async fn validate_full(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), Ch
             .arg(&path)
             .current_dir(work)
             .env_clear()
-            .env("PATH", "/usr/bin:/bin")
+            .env("PATH", validator_path(node))
             .stdin(Stdio::null())
             .kill_on_drop(true);
         let ran = tokio::select! {
@@ -1051,7 +1084,7 @@ async fn run_agent(
     };
     let claude = tools.claude.as_ref().ok_or("Claude Code is not installed on this computer, or this app cannot find it. Install it from https://claude.com/claude-code and sign in, then start the scan again.")?;
     let bin_dir = claude.parent().map(Path::to_path_buf).unwrap_or_default();
-    let path = format!("{}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", bin_dir.display());
+    let path = agent_path(&bin_dir, tools.node.as_deref());
 
     let (log_name, err_name) = match phase {
         Some(phase) => (format!("agent-{phase}.log"), format!("agent-{phase}.err")),
