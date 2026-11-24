@@ -119,10 +119,12 @@ pub struct Job {
     skill: String,
     model: String,
     effort: String,
-    // The cap the server gives the Scan's profile. An older Worker sends none. The profile's name
-    // is also in the job, and in the prompt; the app has no use for it, so it is not read.
+    // The cap the server gives the Scan's profile. An older Worker sends none.
     #[serde(default)]
     profile_cap_usd: Option<f64>,
+    // The profile's name (quick, standard or deep): it sets the granularity of the ledger this app builds.
+    #[serde(default)]
+    profile: Option<String>,
     max_budget_usd: f64,
     prompt: String,
     // The four Phase prompts in order, when the engine builds them. An older engine sends none and
@@ -628,15 +630,59 @@ async fn run_each_phase(
         on_event(Event::PhaseStarted { phase: phase.to_string() });
         let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32), stop).await?;
         settle_told(run, spent, phase, cap, on_event)?;
-        if phase == VALIDATED_AFTER {
-            match validate_full(tools, work, stop).await {
-                Ok(()) => {}
-                Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, &error, on_event, stop).await?,
-                Err(CheckFailure::Environment(error)) => return Err(error.into()),
-            }
+        match check_after(tools, job, work, phase, stop).await {
+            Ok(()) => {}
+            Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, phase, &error, on_event, stop).await?,
+            Err(CheckFailure::Environment(error)) => return Err(error.into()),
         }
     }
     Ok(())
+}
+
+async fn check_after(tools: &Tools, job: &Job, work: &Path, phase: &str, stop: &Stop) -> Result<(), CheckFailure> {
+    let out = work.join("out");
+    let ledger = out.join("coverage-ledger.json");
+    let mut changed = false;
+    if phase == "recon" {
+        changed = apply_ledger_file(tools, work, stop, "recon-list.json", "recon-list.applied.json", "build-coverage-ledger.cjs", |list| {
+            vec![PathBuf::from("build"), list.to_path_buf(), ledger.clone(), PathBuf::from(job.profile.as_deref().unwrap_or("standard"))]
+        })
+        .await?;
+    } else if phase == "hunt" || phase == VALIDATED_AFTER {
+        let applied = format!("ledger-updates-{phase}.applied.json");
+        changed = apply_ledger_file(tools, work, stop, "ledger-updates.json", &applied, "build-coverage-ledger.cjs", |updates| {
+            vec![PathBuf::from("merge"), ledger.clone(), updates.to_path_buf()]
+        })
+        .await?;
+    }
+    if phase == VALIDATED_AFTER {
+        return validate_full(tools, work, stop).await;
+    }
+    if changed {
+        let failed = "coverage-ledger.json, built by this app from what the agent wrote, did not pass the audit skill's own check (validate-coverage-ledger.cjs)";
+        run_skill_script(tools, work, stop, "validate-coverage-ledger.cjs", &[ledger], "coverage-ledger.json", failed).await?;
+    }
+    Ok(())
+}
+
+async fn apply_ledger_file(
+    tools: &Tools,
+    work: &Path,
+    stop: &Stop,
+    name: &str,
+    applied: &str,
+    script: &str,
+    args: impl FnOnce(&Path) -> Vec<PathBuf>,
+) -> Result<bool, CheckFailure> {
+    let out = work.join("out");
+    let file = out.join(name);
+    if !file.is_file() {
+        return Ok(false);
+    }
+    run_skill_script(tools, work, stop, script, &args(&file), name, &format!("{name} did not pass the ledger builder ({script})")).await?;
+    fs::rename(&file, out.join(applied))
+        .map_err(|e| CheckFailure::Environment(format!("Could not set {name} aside after the ledger was built from it: {e}")))?;
+    Ok(true)
 }
 
 // What a run of the agent leaves in the pool and whether the Scan may go on: the cost its result
@@ -691,26 +737,28 @@ async fn repair(
     work: &Path,
     spent: &mut Spent,
     minute: Duration,
+    phase: &str,
     error: &str,
     on_event: OnEvent<'_>,
     stop: &Stop,
 ) -> Result<(), String> {
+    let failed = format!("The {phase} phase left files that did not pass the check. {error}");
+    if spent.repaired {
+        return Err(format!("{failed} The Scan's one repair run was already used."));
+    }
     let cap = budget_for(job);
     let left = money(cap - spent.cost);
     if left <= 0.0 {
         return Err(phase_cap_message(REPAIR, cap));
     }
-    let failed = format!("The {VALIDATED_AFTER} phase left files that did not pass the check. {error}");
+    spent.repaired = true;
     on_event(Event::RepairStarted);
     let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32), stop)
         .await
         .map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
     settle_told(run, spent, REPAIR, cap, on_event).map_err(|halt| format!("{failed} The repair run did not fix it: {}", halt.message()))?;
-    validate_full(tools, work, stop).await.map_err(|again| {
-        format!(
-            "The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}",
-            again.message()
-        )
+    check_after(tools, job, work, phase, stop).await.map_err(|again| {
+        format!("The {phase} phase left files that did not pass the check, and a repair run did not fix them. {}", again.message())
     })
 }
 
@@ -761,6 +809,7 @@ struct Spent {
     cache_read: u64,
     cache_write: u64,
     last: Option<serde_json::Value>,
+    repaired: bool,
 }
 
 impl Spent {
@@ -1039,47 +1088,61 @@ fn validator_path(node: &Path) -> std::ffi::OsString {
 // by now and could have changed a copy there.
 // -----
 async fn validate_full(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), CheckFailure> {
+    for (script, file) in [("validate-findings.cjs", "findings.json"), ("validate-coverage-ledger.cjs", "coverage-ledger.json")] {
+        let path = work.join("out").join(file);
+        if !path.is_file() {
+            return Err(CheckFailure::Environment(format!("The audit finished without writing {file}, which a full audit must have.")));
+        }
+        run_skill_script(tools, work, stop, script, &[path], file, &format!("{file} did not pass the audit skill's own check ({script})"))
+            .await?;
+    }
+    Ok(())
+}
+
+async fn run_skill_script(
+    tools: &Tools,
+    work: &Path,
+    stop: &Stop,
+    script: &str,
+    args: &[PathBuf],
+    file: &str,
+    failed: &str,
+) -> Result<(), CheckFailure> {
     use CheckFailure::{Content, Environment};
     let node = tools.node.as_ref().ok_or_else(|| Environment("Node.js is not installed on this computer, or this app cannot find it. A full audit is checked with Node.js: install it from https://nodejs.org, then start the scan again.".to_string()))?;
     let skill = tools.skills.join("security-audit");
-    for (script, file) in [("validate-findings.cjs", "findings.json"), ("validate-coverage-ledger.cjs", "coverage-ledger.json")] {
-        let path = work.join("out").join(file);
-        if !skill.join(script).is_file() {
-            return Err(Environment(format!(
-                "The audit skill's check ({script}) was not found in {}. Reinstall the Elise Runner app.",
-                skill.display()
-            )));
+    if !skill.join(script).is_file() {
+        return Err(Environment(format!(
+            "The audit skill's check ({script}) was not found in {}. Reinstall the Elise Runner app.",
+            skill.display()
+        )));
+    }
+    let mut command = Command::new(node);
+    command
+        .arg(skill.join(script))
+        .args(args)
+        .current_dir(work)
+        .env_clear()
+        .env("PATH", validator_path(node))
+        .stdin(Stdio::null())
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    for name in ["SystemRoot", "windir", "TEMP", "TMP"] {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
         }
-        if !path.is_file() {
-            return Err(Environment(format!("The audit finished without writing {file}, which a full audit must have.")));
-        }
-        let mut command = Command::new(node);
-        command
-            .arg(skill.join(script))
-            .arg(&path)
-            .current_dir(work)
-            .env_clear()
-            .env("PATH", validator_path(node))
-            .stdin(Stdio::null())
-            .kill_on_drop(true);
-        #[cfg(windows)]
-        for name in ["SystemRoot", "windir", "TEMP", "TMP"] {
-            if let Some(value) = std::env::var_os(name) {
-                command.env(name, value);
-            }
-        }
-        let ran = tokio::select! {
-            ran = timeout(VALIDATE_TIMEOUT, command.output()) => ran,
-            _ = stop.stopped() => return Err(Environment(STOPPED.to_string())),
-        };
-        let output = match ran {
-            Ok(result) => result.map_err(|e| Environment(format!("Could not run the check on {file}: {e}")))?,
-            Err(_) => return Err(Environment(format!("The check on {file} did not finish in a minute, so this runner stopped it."))),
-        };
-        if !output.status.success() {
-            let said = format!("{} {}", String::from_utf8_lossy(&output.stdout).trim(), String::from_utf8_lossy(&output.stderr).trim());
-            return Err(Content(format!("{file} did not pass the audit skill's own check ({script}). {}", tail(said.trim(), 1500))));
-        }
+    }
+    let ran = tokio::select! {
+        ran = timeout(VALIDATE_TIMEOUT, command.output()) => ran,
+        _ = stop.stopped() => return Err(Environment(STOPPED.to_string())),
+    };
+    let output = match ran {
+        Ok(result) => result.map_err(|e| Environment(format!("Could not run the check on {file}: {e}")))?,
+        Err(_) => return Err(Environment(format!("The check on {file} did not finish in a minute, so this runner stopped it."))),
+    };
+    if !output.status.success() {
+        let said = format!("{} {}", String::from_utf8_lossy(&output.stdout).trim(), String::from_utf8_lossy(&output.stderr).trim());
+        return Err(Content(format!("{failed}. {}", tail(said.trim(), 1500))));
     }
     Ok(())
 }
@@ -1424,6 +1487,7 @@ mod tests {
             model: "claude-haiku-5-5".into(),
             effort: "low".into(),
             profile_cap_usd: None,
+            profile: None,
             max_budget_usd: 1.0,
             prompt: "Use the security-audit-lite skill".into(),
             phase_prompts: Vec::new(),
