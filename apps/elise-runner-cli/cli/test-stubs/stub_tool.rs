@@ -41,6 +41,27 @@ fn invalid_update() -> String {
 
 const MALFORMED_NEW_UNIT: &str = r#"[{"coverage_id":"new","canonical_refs":{"surface":"src/a.ts#GET /a","boundary":"src/a.ts#guard","subsystem":"packages/api","attack_class":"ATTACK-CLASSES.md#Injection","lifecycle":5,"extra":"x"},"starting_paths":["src/a.ts"]}]"#;
 
+const ACCESS_ID: &str =
+    "src%2Fapi.ts%23POST%20%2Fusers::src%2Fauthz.ts%23requireOwner::packages%2Fapi::ATTACK-CLASSES.md%23Access%20control";
+
+const WRONG_PATHS_UPDATE: &str = r#"[{"coverage_id":"src%2Fupload.ts%23POST%20%2Fupload::src%2Fupload.ts%23checkType::packages%2Fapi::ATTACK-CLASSES.md%23Resource%20and%20file%20handling","status":"covered","agent_id":"hunter-1","wave":1,"reviewed_paths":["src/upload.ts","src/typed-by-hand.ts"],"local_checks":[{"agent_id":"hunter-1","reviewed_paths":["src/upload.ts","src/second.ts"],"invariant":"only images are stored","method":"source","result":"the type is checked","artifact":null}]}]
+"#;
+
+fn half_bad_update() -> String {
+    let access = format!(
+        r#"{{"coverage_id":"{ACCESS_ID}","status":"covered","agent_id":"hunter-2","wave":1,"reviewed_paths":["src/api.ts"],"local_checks":[]}}"#
+    );
+    format!("[{},{}]", COVERED_UPDATE.trim().trim_start_matches('[').trim_end_matches(']'), access)
+}
+
+fn one_bad_update() -> String {
+    let access = format!(r#"{{"coverage_id":"{ACCESS_ID}","status":"in_progress","agent_id":"hunter-2","wave":0}}"#);
+    format!("[{},{}]", COVERED_UPDATE.trim().trim_start_matches('[').trim_end_matches(']'), access)
+}
+
+const NEW_UNIT_UPDATE: &str = r#"[{"coverage_id":"src%2Fnew.ts%23GET%20%2Fnew::src%2Fnew.ts%23guard::packages%2Fapi::ATTACK-CLASSES.md%23Injection","canonical_refs":{"surface":"src/new.ts#GET /new","boundary":"src/new.ts#guard","subsystem":"packages/api","attack_class":"ATTACK-CLASSES.md#Injection"},"starting_paths":["src/new.ts"],"status":"covered","agent_id":"hunter-1","wave":1,"reviewed_paths":["src/typed-by-hand.ts"],"local_checks":[{"agent_id":"hunter-1","reviewed_paths":["src/new.ts","src/second.ts"],"invariant":"input is escaped","method":"source","result":"it is","artifact":null}]}]
+"#;
+
 fn append(path: &Path, line: &str) {
     let mut file = OpenOptions::new().create(true).append(true).open(path).unwrap();
     writeln!(file, "{line}").unwrap();
@@ -163,6 +184,18 @@ fn claude(record: &Path, args: &[String]) {
     if prompt.contains("phase=hunt") && prompt.contains("update=malformed") {
         fs::write("out/ledger-updates.json", MALFORMED_NEW_UNIT).unwrap();
     }
+    if prompt.contains("phase=hunt") && prompt.contains("update=wrongpaths") {
+        fs::write("out/ledger-updates.json", WRONG_PATHS_UPDATE).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=halfbad") {
+        fs::write("out/ledger-updates.json", half_bad_update()).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=onebad") {
+        fs::write("out/ledger-updates.json", one_bad_update()).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=newunit") {
+        fs::write("out/ledger-updates.json", NEW_UNIT_UPDATE).unwrap();
+    }
     if prompt.contains("phase=check") && prompt.contains("real=1") {
         fs::write("out/findings.json", "[]\n").unwrap();
     } else if prompt.contains("phase=check") {
@@ -190,9 +223,14 @@ fn claude(record: &Path, args: &[String]) {
         &rest[..end]
     });
     let cost = if cost.is_empty() { "0" } else { cost };
+    let limit = prompt.contains("stop=limit");
+    let subtype = if limit { "error_max_budget_usd" } else { "success" };
     println!(
-        r#"{{"type":"result","subtype":"success","is_error":false,"total_cost_usd":{cost},"num_turns":1,"duration_ms":10,"usage":{{}}}}"#
+        r#"{{"type":"result","subtype":"{subtype}","is_error":{limit},"total_cost_usd":{cost},"num_turns":1,"duration_ms":10,"usage":{{}}}}"#
     );
+    if limit {
+        std::process::exit(1);
+    }
 }
 
 fn list(dir: &Path, prefix: &str, files: &mut Vec<String>) {
