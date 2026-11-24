@@ -38,7 +38,16 @@ export function VerifyFailedFields() {
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name={field.name} type="email" autoComplete="email" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "email")} />
+            <Input
+              id="email"
+              name={field.name}
+              type="email"
+              autoComplete="email"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "email")}
+            />
             <FieldError id="email" message={fieldMessage(field)} />
           </div>
         )}

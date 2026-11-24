@@ -18,7 +18,14 @@ export function scanActivity(scans: readonly ScanActivityInput[], days: number, 
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const buckets = Array.from({ length: days }, (_, index) => {
     const start = today - (days - 1 - index) * DAY_MS;
-    return { key: new Date(start).toISOString().slice(0, 10), label: LABEL.format(start), succeeded: 0, failed: 0, active: 0, total: 0 };
+    return {
+      key: new Date(start).toISOString().slice(0, 10),
+      label: LABEL.format(start),
+      succeeded: 0,
+      failed: 0,
+      active: 0,
+      total: 0,
+    };
   });
   const byKey = new Map(buckets.map((bucket) => [bucket.key, bucket]));
 

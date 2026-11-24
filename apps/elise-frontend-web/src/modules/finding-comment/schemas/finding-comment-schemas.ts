@@ -1,8 +1,22 @@
 import { z } from "zod";
 import { FINDING_COMMENT_BODY_MAX, FindingCommentParamSchema, FindingCommentTextSchema } from "@repo/contracts/elise";
 
-export { CreateFindingCommentBodySchema, FindingCommentParamSchema, FindingCommentSchema, FindingCommentsQuerySchema, FindingCommentTextSchema, FindingThreadSchema } from "@repo/contracts/elise";
-export type { CreateFindingCommentBody, FindingComment, FindingCommentsQuery, FindingDecision, FindingThread, FindingThreadEvent } from "@repo/contracts/elise";
+export {
+  CreateFindingCommentBodySchema,
+  FindingCommentParamSchema,
+  FindingCommentSchema,
+  FindingCommentsQuerySchema,
+  FindingCommentTextSchema,
+  FindingThreadSchema,
+} from "@repo/contracts/elise";
+export type {
+  CreateFindingCommentBody,
+  FindingComment,
+  FindingCommentsQuery,
+  FindingDecision,
+  FindingThread,
+  FindingThreadEvent,
+} from "@repo/contracts/elise";
 
 export const EditFindingCommentInputSchema = FindingCommentParamSchema.extend({ body: FindingCommentTextSchema });
 

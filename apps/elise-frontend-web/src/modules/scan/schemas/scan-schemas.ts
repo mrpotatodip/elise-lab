@@ -1,9 +1,36 @@
 import { z } from "zod";
-import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SourceProviderSchema, VerdictQuerySchema } from "@repo/contracts/elise";
+import {
+  SCAN_EFFORTS,
+  SCAN_MODELS,
+  SCAN_PROFILES,
+  SourceProviderSchema,
+  VerdictQuerySchema,
+} from "@repo/contracts/elise";
 import { DEFAULT_SOURCE_PROVIDER_ID, isGitSourceProvider, sourceProviderOf } from "#/providers/registry";
 
-export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS, RepoDetailSchema, RepoListSchema, RepoParamSchema, ScanListSchema, ScanQueuedSchema, ScanStateSchema, ScanStatusSchema, TraceSchema } from "@repo/contracts/elise";
-export type { Repo, RepoBranch, ScanState, ScanStatus, SourceProviderValue, Trace, TraceEntry } from "@repo/contracts/elise";
+export {
+  SCAN_EFFORTS,
+  SCAN_MODELS,
+  SCAN_PROFILES,
+  SCAN_SKILLS,
+  RepoDetailSchema,
+  RepoListSchema,
+  RepoParamSchema,
+  ScanListSchema,
+  ScanQueuedSchema,
+  ScanStateSchema,
+  ScanStatusSchema,
+  TraceSchema,
+} from "@repo/contracts/elise";
+export type {
+  Repo,
+  RepoBranch,
+  ScanState,
+  ScanStatus,
+  SourceProviderValue,
+  Trace,
+  TraceEntry,
+} from "@repo/contracts/elise";
 
 // -----
 // The repo is checked by the parser of the provider the plan
@@ -30,12 +57,16 @@ export const CreateScanInputSchema = z
       return;
     }
     if (provider.capabilities.isArchive) {
-      if (input.archiveId === undefined) ctx.addIssue({ code: "custom", path: ["archiveId"], message: "Pick the zip to scan." });
-      if (input.ref !== undefined) ctx.addIssue({ code: "custom", path: ["ref"], message: "An upload app has no branches: pick a zip instead." });
+      if (input.archiveId === undefined)
+        ctx.addIssue({ code: "custom", path: ["archiveId"], message: "Pick the zip to scan." });
+      if (input.ref !== undefined)
+        ctx.addIssue({ code: "custom", path: ["ref"], message: "An upload app has no branches: pick a zip instead." });
       return;
     }
-    if (input.archiveId !== undefined) ctx.addIssue({ code: "custom", path: ["archiveId"], message: "Only an upload app takes a zip." });
-    if (isGitSourceProvider(provider) && !provider.address.pattern.test(input.repo)) ctx.addIssue({ code: "custom", path: ["repo"], message: provider.address.message });
+    if (input.archiveId !== undefined)
+      ctx.addIssue({ code: "custom", path: ["archiveId"], message: "Only an upload app takes a zip." });
+    if (isGitSourceProvider(provider) && !provider.address.pattern.test(input.repo))
+      ctx.addIssue({ code: "custom", path: ["repo"], message: provider.address.message });
   });
 
 export const ScanIdInputSchema = z.object({ scanId: z.string().regex(/^[\w-]+$/) });

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 
 type FindingCommentDeleteDialogProps = {
   onConfirm: () => void;
@@ -17,11 +26,20 @@ export function FindingCommentDeleteDialog({ onConfirm }: FindingCommentDeleteDi
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-status-danger hover:text-status-danger" />}>Delete</DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-status-danger hover:text-status-danger" />
+        }
+      >
+        Delete
+      </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Delete this comment?</DialogTitle>
-          <DialogDescription>The text is removed for good. The discussion keeps a note that a comment was deleted, and the account's audit trail records who deleted it.</DialogDescription>
+          <DialogDescription>
+            The text is removed for good. The discussion keeps a note that a comment was deleted, and the account's
+            audit trail records who deleted it.
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Keep it</DialogClose>

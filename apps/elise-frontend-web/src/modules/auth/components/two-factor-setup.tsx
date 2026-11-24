@@ -11,10 +11,26 @@ import { spacedKey } from "../utils";
 
 function QrCode({ value }: { value: string }) {
   const source = `data:image/svg+xml;utf8,${encodeURIComponent(renderSVG(value, { border: 2 }))}`;
-  return <img src={source} alt="QR code for your Authenticator app" width={192} height={192} className="size-48 rounded-lg border" />;
+  return (
+    <img
+      src={source}
+      alt="QR code for your Authenticator app"
+      width={192}
+      height={192}
+      className="size-48 rounded-lg border"
+    />
+  );
 }
 
-export function BackupCodes({ codes, onDone, doneLabel }: { codes: readonly string[]; onDone: () => void; doneLabel: string }) {
+export function BackupCodes({
+  codes,
+  onDone,
+  doneLabel,
+}: {
+  codes: readonly string[];
+  onDone: () => void;
+  doneLabel: string;
+}) {
   const [saved, setSaved] = useState(false);
   const copy = async () => {
     await navigator.clipboard.writeText(codes.join("\n"));
@@ -22,8 +38,14 @@ export function BackupCodes({ codes, onDone, doneLabel }: { codes: readonly stri
   };
   return (
     <div className="grid gap-5">
-      <p className="text-sm leading-relaxed">Keep these 10 Backup codes somewhere safe. Each works once if you lose your Authenticator app. They are shown only now.</p>
-      <ul className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/40 p-4 font-mono text-sm" aria-label="Backup codes">
+      <p className="text-sm leading-relaxed">
+        Keep these 10 Backup codes somewhere safe. Each works once if you lose your Authenticator app. They are shown
+        only now.
+      </p>
+      <ul
+        className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/40 p-4 font-mono text-sm"
+        aria-label="Backup codes"
+      >
         {codes.map((code) => (
           <li key={code}>{code}</li>
         ))}
@@ -64,7 +86,12 @@ export function TwoFactorSetup({ onDone }: { onDone: () => void }) {
     mutationFn: (typed: string) => confirmTwoFactor({ data: { code: typed } }),
     onSuccess: (result) => {
       if (result.ok) setConfirmed(true);
-      else setMessage(result.failure === "wrong" ? "That code did not work. Check your Authenticator app and try again." : "We could not check the code. Try again.");
+      else
+        setMessage(
+          result.failure === "wrong"
+            ? "That code did not work. Check your Authenticator app and try again."
+            : "We could not check the code. Try again.",
+        );
     },
     onError: (error: Error) => setMessage(error.message),
   });
@@ -82,7 +109,9 @@ export function TwoFactorSetup({ onDone }: { onDone: () => void }) {
         }}
         className="grid gap-5"
       >
-        <p className="text-sm leading-relaxed">Scan this with an Authenticator app, then type the 6-digit code it shows.</p>
+        <p className="text-sm leading-relaxed">
+          Scan this with an Authenticator app, then type the 6-digit code it shows.
+        </p>
         <div className="grid justify-items-center gap-2">
           <QrCode value={started.totpURI} />
           <p className="max-w-copy text-center text-sm leading-relaxed text-muted-foreground">
@@ -91,7 +120,15 @@ export function TwoFactorSetup({ onDone }: { onDone: () => void }) {
         </div>
         <div className="grid gap-2">
           <Label htmlFor="setup-code">Code from the app</Label>
-          <Input id="setup-code" autoComplete="one-time-code" inputMode="numeric" value={code} onChange={(event) => setCode(event.target.value)} aria-invalid={message ? true : undefined} aria-describedby={message ? "setup-code-error" : undefined} />
+          <Input
+            id="setup-code"
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            aria-invalid={message ? true : undefined}
+            aria-describedby={message ? "setup-code-error" : undefined}
+          />
           {message ? (
             <p id="setup-code-error" role="alert" className="text-xs text-status-danger">
               {message}
@@ -117,7 +154,15 @@ export function TwoFactorSetup({ onDone }: { onDone: () => void }) {
     >
       <div className="grid gap-2">
         <Label htmlFor="setup-password">Your password</Label>
-        <Input id="setup-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} aria-invalid={message ? true : undefined} aria-describedby={message ? "setup-password-error" : undefined} />
+        <Input
+          id="setup-password"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          aria-invalid={message ? true : undefined}
+          aria-describedby={message ? "setup-password-error" : undefined}
+        />
         {message ? (
           <p id="setup-password-error" role="alert" className="text-xs text-status-danger">
             {message}

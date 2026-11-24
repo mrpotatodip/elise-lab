@@ -2,7 +2,8 @@ import { SCAN_FAILURE_CODE_VALUES } from "@repo/contracts/elise";
 import { describe, expect, it } from "vitest";
 import { scanFailure } from "#/modules/scan/utils/scan-format";
 
-const NOT_FOUND = "command exited 128: Cloning into '/workspace/repo'...\nremote: Repository not found.\nfatal: repository 'https://github.com/o/n/' not found";
+const NOT_FOUND =
+  "command exited 128: Cloning into '/workspace/repo'...\nremote: Repository not found.\nfatal: repository 'https://github.com/o/n/' not found";
 
 describe("scanFailure", () => {
   it.each(SCAN_FAILURE_CODE_VALUES)("has its own copy for the code %s", (code) => {

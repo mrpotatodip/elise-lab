@@ -14,11 +14,29 @@ import { BackupCodes, TwoFactorSetup } from "./two-factor-setup";
 
 type Panel = "none" | "setup" | "regenerate" | "disable";
 
-function PasswordField({ id, value, onChange, error }: { id: string; value: string; onChange: (value: string) => void; error?: string | null }) {
+function PasswordField({
+  id,
+  value,
+  onChange,
+  error,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string | null;
+}) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>Your password</Label>
-      <Input id={id} type="password" autoComplete="current-password" value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined} />
+      <Input
+        id={id}
+        type="password"
+        autoComplete="current-password"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+      />
       {error ? (
         <p id={`${id}-error`} role="alert" className="text-xs text-status-danger">
           {error}
@@ -46,7 +64,9 @@ function RegenerateForm({ onCodes }: { onCodes: (codes: string[]) => void }) {
       }}
       className="grid max-w-sm gap-4"
     >
-      <p className="text-sm leading-relaxed text-muted-foreground">New Backup codes replace the old ten: the old ones stop working.</p>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        New Backup codes replace the old ten: the old ones stop working.
+      </p>
       <PasswordField id="regenerate-password" value={password} onChange={setPassword} error={message} />
       <Button type="submit" disabled={regenerate.isPending || password === ""}>
         {regenerate.isPending ? "Please wait…" : "Make new Backup codes"}
@@ -83,10 +103,22 @@ function DisableForm({ onDone, onRequired }: { onDone: () => void; onRequired: (
       }}
       className="grid max-w-sm gap-4"
     >
-      <PasswordField id="disable-password" value={password} onChange={setPassword} error={wrongPassword ? message : null} />
+      <PasswordField
+        id="disable-password"
+        value={password}
+        onChange={setPassword}
+        error={wrongPassword ? message : null}
+      />
       <div className="grid gap-2">
         <Label htmlFor="disable-code">Code from your Authenticator app, or a Backup code</Label>
-        <Input id="disable-code" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} aria-invalid={message && !wrongPassword ? true : undefined} aria-describedby={message && !wrongPassword ? "disable-code-error" : undefined} />
+        <Input
+          id="disable-code"
+          autoComplete="one-time-code"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          aria-invalid={message && !wrongPassword ? true : undefined}
+          aria-describedby={message && !wrongPassword ? "disable-code-error" : undefined}
+        />
         {message && !wrongPassword ? (
           <p id="disable-code-error" role="alert" className="text-xs text-status-danger">
             {message}
@@ -100,7 +132,15 @@ function DisableForm({ onDone, onRequired }: { onDone: () => void; onRequired: (
   );
 }
 
-export function TwoFactorCard({ enabled, role, accountRequires }: { enabled: boolean; role: string; accountRequires: boolean }) {
+export function TwoFactorCard({
+  enabled,
+  role,
+  accountRequires,
+}: {
+  enabled: boolean;
+  role: string;
+  accountRequires: boolean;
+}) {
   const router = useRouter();
   const [learnedRequired, setLearnedRequired] = useState(false);
   const turnOffAllowed = canTurnOff(role) && !accountRequires && !learnedRequired;
@@ -120,20 +160,24 @@ export function TwoFactorCard({ enabled, role, accountRequires }: { enabled: boo
       <CardHeader>
         <CardTitle>Two-factor sign-in</CardTitle>
         <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-          {enabled ? "On. Signing in asks for a code from your Authenticator app after your password." : "Off. Turn it on so a stolen password is not enough to sign in as you."}
+          {enabled
+            ? "On. Signing in asks for a code from your Authenticator app after your password."
+            : "Off. Turn it on so a stolen password is not enough to sign in as you."}
         </p>
       </CardHeader>
       <CardContent className="grid gap-5">
         {codes ? <BackupCodes codes={codes} onDone={() => void refresh()} doneLabel="Done" /> : null}
         {!codes && panel === "setup" ? <TwoFactorSetup onDone={() => void refresh()} /> : null}
         {!codes && panel === "regenerate" ? <RegenerateForm onCodes={setCodes} /> : null}
-        {!codes && panel === "disable" ? <DisableForm
+        {!codes && panel === "disable" ? (
+          <DisableForm
             onDone={() => void refresh()}
             onRequired={() => {
               setLearnedRequired(true);
               setPanel("none");
             }}
-          /> : null}
+          />
+        ) : null}
         {!codes && panel === "none" ? (
           <div className="flex flex-wrap gap-3">
             {enabled ? (
@@ -146,7 +190,11 @@ export function TwoFactorCard({ enabled, role, accountRequires }: { enabled: boo
                     Turn off
                   </Button>
                 ) : (
-                  <p className="text-sm leading-relaxed text-muted-foreground">{canTurnOff(role) ? "This account requires Two-factor sign-in, so it cannot be turned off." : "Your role needs Two-factor sign-in, so it cannot be turned off."}</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {canTurnOff(role)
+                      ? "This account requires Two-factor sign-in, so it cannot be turned off."
+                      : "Your role needs Two-factor sign-in, so it cannot be turned off."}
+                  </p>
                 )}
               </>
             ) : (

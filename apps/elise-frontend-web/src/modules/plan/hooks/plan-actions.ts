@@ -10,7 +10,10 @@ const redirect = {
 };
 
 export const usePlanActions = () => ({
-  checkout: useMutation({ mutationFn: (body: PlanCheckoutBody) => startPlanCheckout({ data: body }), onSuccess: redirect.onSuccess }),
+  checkout: useMutation({
+    mutationFn: (body: PlanCheckoutBody) => startPlanCheckout({ data: body }),
+    onSuccess: redirect.onSuccess,
+  }),
   portal: useMutation({ mutationFn: () => openBillingPortal(), ...redirect }),
   change: useMutation({ mutationFn: (body: PlanChangeBody) => changePlan({ data: body }) }),
 });

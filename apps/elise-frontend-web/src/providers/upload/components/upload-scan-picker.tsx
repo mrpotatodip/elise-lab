@@ -60,8 +60,8 @@ export function UploadScanPicker({ startRepoId, onPick }: SourceArchivePickerPro
   return (
     <div className="grid gap-4">
       <p className="px-1 text-sm leading-relaxed text-muted-foreground">
-        Upload a zip of your source code under an app, and pick one zip for each audit. All the zips of an app share one History, so you can follow a problem from one version to the next. An
-        upload audit runs on one of your Runners.
+        Upload a zip of your source code under an app, and pick one zip for each audit. All the zips of an app share one
+        History, so you can follow a problem from one version to the next. An upload audit runs on one of your Runners.
       </p>
 
       {apps !== undefined && apps.length > 0 && (
@@ -130,7 +130,14 @@ export function UploadScanPicker({ startRepoId, onPick }: SourceArchivePickerPro
                 type="button"
                 disabled={zip === null}
                 onClick={() => {
-                  if (zip !== null) onPick({ repo: current.url, repoId: current.id, appName: current.url, archiveId: zip.id, archiveLabel: zip.label });
+                  if (zip !== null)
+                    onPick({
+                      repo: current.url,
+                      repoId: current.id,
+                      appName: current.url,
+                      archiveId: zip.id,
+                      archiveLabel: zip.label,
+                    });
                 }}
               >
                 {zip === null ? "Pick a zip to scan" : `Scan ${zip.label}`}

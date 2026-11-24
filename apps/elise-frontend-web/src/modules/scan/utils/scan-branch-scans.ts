@@ -8,9 +8,15 @@ type BranchScanInput = Pick<ScanStatus, "scanId" | "branchId" | "createdAt">;
 // no branch to list, so it gets none. `more` counts the scans that did not
 // fit, for the line under the table.
 // -----
-export function scanBranchScans<T extends BranchScanInput>(history: readonly T[], scan: BranchScanInput, limit: number) {
+export function scanBranchScans<T extends BranchScanInput>(
+  history: readonly T[],
+  scan: BranchScanInput,
+  limit: number,
+) {
   const ofBranch: T[] = scan.branchId
-    ? history.filter((item) => item.branchId === scan.branchId).toSorted((a, b) => b.createdAt.localeCompare(a.createdAt) || b.scanId.localeCompare(a.scanId))
+    ? history
+        .filter((item) => item.branchId === scan.branchId)
+        .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt) || b.scanId.localeCompare(a.scanId))
     : [];
   return { scans: ofBranch.slice(0, limit), more: Math.max(0, ofBranch.length - limit) };
 }

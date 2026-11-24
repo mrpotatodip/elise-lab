@@ -13,7 +13,8 @@ function ChangeText({ change }: { change: SettingsChange }) {
   if (change.kind === "budget") {
     return (
       <span>
-        {by} changed the monthly budget from {usageBudgetLabel(change.fromUsd)} to <span className="font-medium tabular-nums">{usageBudgetLabel(change.toUsd)}</span>
+        {by} changed the monthly budget from {usageBudgetLabel(change.fromUsd)} to{" "}
+        <span className="font-medium tabular-nums">{usageBudgetLabel(change.toUsd)}</span>
       </span>
     );
   }
@@ -33,7 +34,9 @@ export function SettingsChangesCard() {
     <Card>
       <CardHeader>
         <CardTitle>Recent changes</CardTitle>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Who changed the monthly budget or the Anthropic key, and when. The last 20 are shown.</p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          Who changed the monthly budget or the Anthropic key, and when. The last 20 are shown.
+        </p>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
@@ -43,13 +46,18 @@ export function SettingsChangesCard() {
                 <History aria-hidden="true" />
               </EmptyMedia>
               <EmptyTitle>No changes yet</EmptyTitle>
-              <EmptyDescription>The budget is the default and scans use the Elise key. A change to either shows up here.</EmptyDescription>
+              <EmptyDescription>
+                The budget is the default and scans use the Elise key. A change to either shows up here.
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
           <ul className="grid gap-3 text-sm">
             {data.map((change) => (
-              <li key={`${change.at}-${change.kind}`} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <li
+                key={`${change.at}-${change.kind}`}
+                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"
+              >
                 <ChangeText change={change} />
                 <time dateTime={change.at} className="text-muted-foreground tabular-nums">
                   {usageChangedAt(change.at)}

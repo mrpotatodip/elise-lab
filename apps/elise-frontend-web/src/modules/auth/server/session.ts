@@ -38,12 +38,28 @@ export async function findSession(): Promise<ServerSession | null> {
     return {
       token,
       accountId: account.id,
-      user: { id: me.user.id, accountId: account.id, partyId: me.user.partyId, email: me.user.email, name: me.user.name, accountName: account.name, role: account.role, powers: account.powers ?? [], twoFactorEnabled: me.twoFactorEnabled ?? false, twoFactorSetupRequired: me.twoFactorSetupRequired ?? false },
+      user: {
+        id: me.user.id,
+        accountId: account.id,
+        partyId: me.user.partyId,
+        email: me.user.email,
+        name: me.user.name,
+        accountName: account.name,
+        role: account.role,
+        powers: account.powers ?? [],
+        twoFactorEnabled: me.twoFactorEnabled ?? false,
+        twoFactorSetupRequired: me.twoFactorSetupRequired ?? false,
+      },
     };
   } catch (error) {
     if (error instanceof EngineError && error.status === 401) {
       clearSessionToken();
-      setCookie(SIGNED_OUT_COOKIE, "1", { secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 300 });
+      setCookie(SIGNED_OUT_COOKIE, "1", {
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 300,
+      });
     } else throw error;
     return null;
   }

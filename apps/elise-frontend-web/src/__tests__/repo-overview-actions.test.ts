@@ -18,7 +18,12 @@ const repo = (name: string, open: Partial<Repo["open"]> = {}, extra: Partial<Rep
   ...extra,
 });
 
-const budget = (spentUsd: number, reservedUsd = 0, budgetApplies = true) => ({ budgetApplies, budgetUsd: 100, spentUsd, reservedUsd });
+const budget = (spentUsd: number, reservedUsd = 0, budgetApplies = true) => ({
+  budgetApplies,
+  budgetUsd: 100,
+  spentUsd,
+  reservedUsd,
+});
 const oldEngineBudget = { budgetUsd: 100, spentUsd: 100, reservedUsd: 0 };
 
 describe("overviewActions", () => {
@@ -27,7 +32,16 @@ describe("overviewActions", () => {
   });
 
   it("lists the most urgent first and points the first button at the worst repository", () => {
-    const repos = [repo("a", { total: 1, regressed: 1 }), repo("b", { total: 6, regressed: 3, needsValidation: 2, unchecked: 1, severity: { ...none, high: 2, medium: 1, low: 1 } })];
+    const repos = [
+      repo("a", { total: 1, regressed: 1 }),
+      repo("b", {
+        total: 6,
+        regressed: 3,
+        needsValidation: 2,
+        unchecked: 1,
+        severity: { ...none, high: 2, medium: 1, low: 1 },
+      }),
+    ];
     const actions = overviewActions(repos, budget(10));
     expect(actions.map((a) => a.key)).toEqual(["back", "serious", "check", "stale", "lower"]);
     expect(actions[0]?.title).toBe("4 fixed problems have come back");
@@ -47,7 +61,10 @@ describe("overviewActions", () => {
   });
 
   it("flags a failed latest scan and a repository never scanned, once each", () => {
-    const repos = [repo("a", {}, { lastScanStatus: "failed" }), repo("b", {}, { defaultBranch: null, lastScanStatus: null })];
+    const repos = [
+      repo("a", {}, { lastScanStatus: "failed" }),
+      repo("b", {}, { defaultBranch: null, lastScanStatus: null }),
+    ];
     expect(overviewActions(repos).map((a) => a.key)).toEqual(["failed", "unscanned"]);
   });
 });
@@ -56,7 +73,12 @@ describe("overviewVerdict", () => {
   it.each([
     ["urgent items block shipping", [repo("a", { total: 1, regressed: 1 })], "danger", "Not ready to ship"],
     ["only warnings are almost there", [repo("a", { total: 1, needsValidation: 1 })], "warning", "Almost there"],
-    ["lower-risk problems alone still ship", [repo("a", { total: 1, severity: { ...none, low: 1 } })], "success", "Ready to ship"],
+    [
+      "lower-risk problems alone still ship",
+      [repo("a", { total: 1, severity: { ...none, low: 1 } })],
+      "success",
+      "Ready to ship",
+    ],
     ["nothing open is ready", [repo("a")], "success", "Ready to ship"],
   ] as const)("%s", (_case, repos, tone, word) => {
     expect(overviewVerdict(overviewActions(repos))).toMatchObject({ tone, word });
@@ -64,18 +86,27 @@ describe("overviewVerdict", () => {
 
   it("names the repository of the urgent items and the failed scan", () => {
     const repos = [repo("api", { total: 1, regressed: 1 }), repo("worker", {}, { lastScanStatus: "failed" })];
-    expect(overviewVerdict(overviewActions(repos)).line).toBe("Fix 1 urgent item in acme/api. The latest scan failed on worker.");
+    expect(overviewVerdict(overviewActions(repos)).line).toBe(
+      "Fix 1 urgent item in acme/api. The latest scan failed on worker.",
+    );
   });
 });
 
 describe("overviewLatestScanAt", () => {
   it("is the newest scan time, or null when nothing was scanned", () => {
-    expect(overviewLatestScanAt([repo("a", {}, { lastScanAt: "2026-11-18T10:00:00Z" }), repo("b", {}, { lastScanAt: "2026-11-19T09:00:00Z" })])).toBe("2026-11-19T09:00:00Z");
+    expect(
+      overviewLatestScanAt([
+        repo("a", {}, { lastScanAt: "2026-11-18T10:00:00Z" }),
+        repo("b", {}, { lastScanAt: "2026-11-19T09:00:00Z" }),
+      ]),
+    ).toBe("2026-11-19T09:00:00Z");
     expect(overviewLatestScanAt([repo("a", {}, { lastScanAt: null })])).toBeNull();
   });
 
   it("skips a scan that was stopped or failed, because it read nothing", () => {
     const stopped = repo("a", {}, { lastScanStatus: "stopped", lastScanAt: "2026-11-19T09:00:00Z" });
-    expect(overviewLatestScanAt([repo("b", {}, { lastScanAt: "2026-11-18T10:00:00Z" }), stopped])).toBe("2026-11-18T10:00:00Z");
+    expect(overviewLatestScanAt([repo("b", {}, { lastScanAt: "2026-11-18T10:00:00Z" }), stopped])).toBe(
+      "2026-11-18T10:00:00Z",
+    );
   });
 });

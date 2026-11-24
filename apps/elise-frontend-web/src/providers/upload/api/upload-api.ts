@@ -29,15 +29,26 @@ export const fetchUploadApps = createServerFn({ method: "GET" }).handler(async (
 // -----
 export const createUploadApp = createServerFn({ method: "POST" })
   .validator(CreateUploadAppInputSchema)
-  .handler(async ({ data }) => engineJson(RepoDetailSchema, "/repos", jsonPost(JSON.stringify({ provider: "upload", repo: data.name })), await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(
+      RepoDetailSchema,
+      "/repos",
+      jsonPost(JSON.stringify({ provider: "upload", repo: data.name })),
+      await engineAuth(),
+    ),
+  );
 
 export const removeUploadApp = createServerFn({ method: "POST" })
   .validator(RepoParamSchema)
-  .handler(async ({ data }) => engineJson(UploadArchiveRemovedSchema, `/repos/${data.repoId}`, { method: "DELETE" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(UploadArchiveRemovedSchema, `/repos/${data.repoId}`, { method: "DELETE" }, await engineAuth()),
+  );
 
 export const fetchUploadArchives = createServerFn({ method: "GET" })
   .validator(RepoParamSchema)
-  .handler(async ({ data }) => engineJson(UploadArchiveListSchema, `/repos/${data.repoId}/archives`, {}, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(UploadArchiveListSchema, `/repos/${data.repoId}/archives`, {}, await engineAuth()),
+  );
 
 // -----
 // The zip goes to the engine as its raw bytes, with the file's
@@ -56,4 +67,11 @@ export const uploadArchive = createServerFn({ method: "POST" })
 
 export const removeUploadArchive = createServerFn({ method: "POST" })
   .validator(UploadArchiveParamSchema)
-  .handler(async ({ data }) => engineJson(UploadArchiveRemovedSchema, `/repos/${data.repoId}/archives/${data.archiveId}`, { method: "DELETE" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(
+      UploadArchiveRemovedSchema,
+      `/repos/${data.repoId}/archives/${data.archiveId}`,
+      { method: "DELETE" },
+      await engineAuth(),
+    ),
+  );

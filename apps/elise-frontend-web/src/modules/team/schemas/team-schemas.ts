@@ -31,7 +31,15 @@ export {
   TeamTwoFactorResetSchema,
   UpdateTeamTwoFactorRequirementBodySchema,
 } from "@repo/contracts/elise";
-export type { CreatedTeamInvite, Group, TeamInvite, TeamInvitePreview, TeamList, TeamMember, TeamRole } from "@repo/contracts/elise";
+export type {
+  CreatedTeamInvite,
+  Group,
+  TeamInvite,
+  TeamInvitePreview,
+  TeamList,
+  TeamMember,
+  TeamRole,
+} from "@repo/contracts/elise";
 
 export const ResetTwoFactorInputSchema = TeamMemberParamSchema;
 export const InviteTokenInputSchema = TeamInviteTokenParamSchema;
@@ -55,7 +63,11 @@ export const InviteDetailsSchema = z.object({
 // The name field of the create and rename forms.
 // -----
 export const GroupNameDetailsSchema = z.object({
-  name: z.string().trim().min(1, "Give the group a name.").max(GROUP_NAME_MAX, `Use ${GROUP_NAME_MAX} characters or fewer.`),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give the group a name.")
+    .max(GROUP_NAME_MAX, `Use ${GROUP_NAME_MAX} characters or fewer.`),
 });
 
 export const AcceptInviteInputSchema = TeamInviteTokenParamSchema.and(AcceptTeamInviteBodySchema);
@@ -67,7 +79,10 @@ export const AcceptInviteInputSchema = TeamInviteTokenParamSchema.and(AcceptTeam
 export const AcceptInviteDetailsSchema = z.object({
   firstName: z.string().trim().min(1, "Tell us your first name.").max(SIGN_UP_PERSON_NAME_MAX),
   lastName: z.string().trim().min(1, "Tell us your last name.").max(SIGN_UP_PERSON_NAME_MAX),
-  password: z.string().min(SIGN_UP_PASSWORD_MIN, `Use at least ${SIGN_UP_PASSWORD_MIN} characters so it is hard to guess.`).max(SIGN_UP_PASSWORD_MAX),
+  password: z
+    .string()
+    .min(SIGN_UP_PASSWORD_MIN, `Use at least ${SIGN_UP_PASSWORD_MIN} characters so it is hard to guess.`)
+    .max(SIGN_UP_PASSWORD_MAX),
 });
 
 export type CreateInviteInput = z.infer<typeof CreateInviteInputSchema>;

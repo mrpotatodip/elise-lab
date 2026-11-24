@@ -53,7 +53,9 @@ export const startTwoFactor = createServerFn({ method: "POST" })
   .validator(PasswordSchema)
   .handler(async ({ data }): Promise<z.infer<typeof EnableResponseSchema>> => {
     const { token } = await requireSession();
-    const { data: res, error } = await tryCatch(engineFetch("/auth/two-factor/enable", jsonPost(JSON.stringify(data)), { token }));
+    const { data: res, error } = await tryCatch(
+      engineFetch("/auth/two-factor/enable", jsonPost(JSON.stringify(data)), { token }),
+    );
     if (error) throw plainFailure(error);
     return EnableResponseSchema.parse(await res.json());
   });
@@ -62,7 +64,11 @@ export const confirmTwoFactor = createServerFn({ method: "POST" })
   .validator(CodeSchema)
   .handler(async ({ data }): Promise<StepResult> => {
     const { token } = await requireSession();
-    const { data: res, error } = await tryCatch(engineFetch("/auth/two-factor/verify-totp", jsonPost(JSON.stringify({ code: codeInput(data.code).code })), { token }));
+    const { data: res, error } = await tryCatch(
+      engineFetch("/auth/two-factor/verify-totp", jsonPost(JSON.stringify({ code: codeInput(data.code).code })), {
+        token,
+      }),
+    );
     if (error) return failureOf(error);
     keepRenewedToken(res);
     return { ok: true };
@@ -72,8 +78,15 @@ export const disableTwoFactor = createServerFn({ method: "POST" })
   .validator(DisableSchema)
   .handler(async ({ data }): Promise<{ accountRequires: boolean }> => {
     const { token } = await requireSession();
-    const { data: res, error } = await tryCatch(engineFetch("/auth/two-factor/disable", jsonPost(JSON.stringify({ password: data.password, code: codeInput(data.code).code })), { token }));
-    if (error instanceof EngineError && error.status === 403 && error.code === TWO_FACTOR_REQUIRED_CODE) return { accountRequires: true };
+    const { data: res, error } = await tryCatch(
+      engineFetch(
+        "/auth/two-factor/disable",
+        jsonPost(JSON.stringify({ password: data.password, code: codeInput(data.code).code })),
+        { token },
+      ),
+    );
+    if (error instanceof EngineError && error.status === 403 && error.code === TWO_FACTOR_REQUIRED_CODE)
+      return { accountRequires: true };
     if (error) throw plainFailure(error);
     keepRenewedToken(res);
     return { accountRequires: false };
@@ -83,7 +96,9 @@ export const regenerateBackupCodes = createServerFn({ method: "POST" })
   .validator(PasswordSchema)
   .handler(async ({ data }): Promise<string[]> => {
     const { token } = await requireSession();
-    const { data: res, error } = await tryCatch(engineFetch("/auth/two-factor/generate-backup-codes", jsonPost(JSON.stringify(data)), { token }));
+    const { data: res, error } = await tryCatch(
+      engineFetch("/auth/two-factor/generate-backup-codes", jsonPost(JSON.stringify(data)), { token }),
+    );
     if (error) throw plainFailure(error);
     keepRenewedToken(res);
     return BackupCodesResponseSchema.parse(await res.json()).backupCodes;

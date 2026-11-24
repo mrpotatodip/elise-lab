@@ -23,7 +23,14 @@ export function CreditCard() {
         </p>
       </CardHeader>
       <CardContent className="grid gap-5">
-        <p className={cn("text-[28px] font-semibold leading-none tracking-tight tabular-nums", data.balanceUsd <= 0 && "text-status-danger")}>{usageUsd(Math.max(0, data.balanceUsd))}</p>
+        <p
+          className={cn(
+            "text-[28px] font-semibold leading-none tracking-tight tabular-nums",
+            data.balanceUsd <= 0 && "text-status-danger",
+          )}
+        >
+          {usageUsd(Math.max(0, data.balanceUsd))}
+        </p>
         <dl className="grid gap-3 border-t pt-5 text-sm">
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-muted-foreground">Added each month</dt>
@@ -36,7 +43,10 @@ export function CreditCard() {
           </div>
         </dl>
         {canViewPlan && (
-          <Link to="/settings/plan" className={buttonVariants({ variant: "outline", size: "sm", className: "justify-self-start" })}>
+          <Link
+            to="/settings/plan"
+            className={buttonVariants({ variant: "outline", size: "sm", className: "justify-self-start" })}
+          >
             View plan
           </Link>
         )}

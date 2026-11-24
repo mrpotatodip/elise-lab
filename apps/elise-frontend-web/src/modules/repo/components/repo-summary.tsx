@@ -31,17 +31,22 @@ export function RepoSummary({ repos }: { repos: readonly Repo[] }) {
         <Column label="Repositories" footer={<RepoAddDialog />}>
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {repos.length}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{repos.length === 1 ? "repository" : "repositories"}</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              {repos.length === 1 ? "repository" : "repositories"}
+            </span>
           </p>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-            {scanPlural(scans, "scan", "scans")} so far. A repository appears here after its first scan, with every finding it has had.
+            {scanPlural(scans, "scan", "scans")} so far. A repository appears here after its first scan, with every
+            finding it has had.
           </p>
         </Column>
 
         <Column label="Open findings">
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">{totals.total}</p>
           {totals.total === 0 ? (
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Nothing is open across your repositories.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Nothing is open across your repositories.
+            </p>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -55,7 +60,9 @@ export function RepoSummary({ repos }: { repos: readonly Repo[] }) {
               </div>
               <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
                 {totals.regressed > 0 ? `${totals.regressed} came back after a fix. ` : ""}
-                {totals.needsValidation > 0 ? `${totals.needsValidation} need a person to check by hand.` : "Every open finding was verified."}
+                {totals.needsValidation > 0
+                  ? `${totals.needsValidation} need a person to check by hand.`
+                  : "Every open finding was verified."}
               </p>
             </>
           )}
@@ -68,7 +75,11 @@ export function RepoSummary({ repos }: { repos: readonly Repo[] }) {
             <ul className="divide-y rounded-lg border">
               {attention.map((repo) => (
                 <li key={repo.id}>
-                  <Link to="/repos/$repoId" params={{ repoId: repo.id }} className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                  <Link
+                    to="/repos/$repoId"
+                    params={{ repoId: repo.id }}
+                    className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
                     <span className="truncate text-sm font-medium">{repoName(repo.url)}</span>
                     <span className="flex shrink-0 items-center gap-2">
                       {repo.open.regressed > 0 && <Badge variant="destructive">{repo.open.regressed} came back</Badge>}

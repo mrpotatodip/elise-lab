@@ -34,11 +34,27 @@ export function ScanVerdictRun({ repoId, repoUrl, commit, last }: ScanVerdictRun
     onError: (error) => toast.error(`We couldn't start the scan. ${error.message}`),
   });
 
-  const reason = running ? "A scan of this repository is already running." : budgetSpent ? "This month's budget is used up." : null;
+  const reason = running
+    ? "A scan of this repository is already running."
+    : budgetSpent
+      ? "This month's budget is used up."
+      : null;
 
   return (
     <div className="grid justify-items-start gap-1.5">
-      <Button size="sm" disabled={start.isPending || reason !== null} onClick={() => start.mutate({ repo: repoUrl, ref: commit, model: last.model === "claude-opus-5-5" ? "claude-sonnet-5-5" : last.model, effort: last.effort, profile: last.profile })}>
+      <Button
+        size="sm"
+        disabled={start.isPending || reason !== null}
+        onClick={() =>
+          start.mutate({
+            repo: repoUrl,
+            ref: commit,
+            model: last.model === "claude-opus-5-5" ? "claude-sonnet-5-5" : last.model,
+            effort: last.effort,
+            profile: last.profile,
+          })
+        }
+      >
         <Play className="size-3.5" />
         {start.isPending ? "Starting…" : "Run the missing scan"}
       </Button>

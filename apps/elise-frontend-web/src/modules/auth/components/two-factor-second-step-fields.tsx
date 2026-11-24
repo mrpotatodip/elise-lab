@@ -10,7 +10,11 @@ import type { SecondStepFailure } from "../utils";
 
 const timeFormat = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" });
 
-const lockMessage = () => AUTH_COPY.twoFactor.locked(`${TWO_FACTOR_LOCK_MINUTES} minutes`, timeFormat.format(new Date(Date.now() + TWO_FACTOR_LOCK_MINUTES * 60_000)));
+const lockMessage = () =>
+  AUTH_COPY.twoFactor.locked(
+    `${TWO_FACTOR_LOCK_MINUTES} minutes`,
+    timeFormat.format(new Date(Date.now() + TWO_FACTOR_LOCK_MINUTES * 60_000)),
+  );
 
 const failureMessage = (failure: SecondStepFailure): string => {
   if (failure === "locked") return lockMessage();
@@ -46,7 +50,16 @@ export function TwoFactorSecondStepFields({ redirectTo }: { redirectTo: string |
     >
       <div className="grid gap-2">
         <Label htmlFor="code">{AUTH_COPY.twoFactor.label}</Label>
-        <Input ref={inputRef} id="code" name="code" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value)} aria-invalid={message ? true : undefined} aria-describedby={message ? "code-error" : undefined} />
+        <Input
+          ref={inputRef}
+          id="code"
+          name="code"
+          autoComplete="one-time-code"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          aria-invalid={message ? true : undefined}
+          aria-describedby={message ? "code-error" : undefined}
+        />
         {message ? (
           <p id="code-error" role="alert" className="text-xs text-status-danger">
             {message}

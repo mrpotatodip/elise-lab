@@ -9,7 +9,16 @@ import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { DataTable } from "#/components/ui/data-table";
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "#/components/ui/empty";
 import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
@@ -28,10 +37,20 @@ const plural = (count: number) => `${count} ${count === 1 ? "person" : "people"}
 
 function useRefresh() {
   const queryClient = useQueryClient();
-  return () => Promise.all([teamKeys.groups(), teamKeys.members()].map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+  return () =>
+    Promise.all([teamKeys.groups(), teamKeys.members()].map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
-type NameFormProps = { id: string; label: string; initial: string; pending: boolean; submitLabel: string; onSave: (name: string) => void; onCancel?: () => void; compact?: boolean };
+type NameFormProps = {
+  id: string;
+  label: string;
+  initial: string;
+  pending: boolean;
+  submitLabel: string;
+  onSave: (name: string) => void;
+  onCancel?: () => void;
+  compact?: boolean;
+};
 
 function NameForm({ id, label, initial, pending, submitLabel, onSave, onCancel, compact }: NameFormProps) {
   const form = useForm({
@@ -95,7 +114,8 @@ function NameForm({ id, label, initial, pending, submitLabel, onSave, onCancel, 
                   <FieldError id={id} message={fieldMessage(field)} />
                 ) : (
                   <p id={`${id}-help`} className="text-xs text-muted-foreground">
-                    Short and specific, like the team or the job. You can rename it later. {field.state.value.length} of {GROUP_NAME_MAX}.
+                    Short and specific, like the team or the job. You can rename it later. {field.state.value.length} of{" "}
+                    {GROUP_NAME_MAX}.
                   </p>
                 )}
               </DialogBody>
@@ -133,9 +153,18 @@ export function NewGroupDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New group</DialogTitle>
-          <DialogDescription>A group sorts people into a team. It grants nothing: what a person can do comes from their role.</DialogDescription>
+          <DialogDescription>
+            A group sorts people into a team. It grants nothing: what a person can do comes from their role.
+          </DialogDescription>
         </DialogHeader>
-        <NameForm id="group-name" label="What should the group be called?" initial="" pending={create.isPending} submitLabel="Create group" onSave={(name) => create.mutate({ name })} />
+        <NameForm
+          id="group-name"
+          label="What should the group be called?"
+          initial=""
+          pending={create.isPending}
+          submitLabel="Create group"
+          onSave={(name) => create.mutate({ name })}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -153,7 +182,19 @@ function GroupNameCell({ group }: { group: Group }) {
     onError: failure("rename the group"),
   });
 
-  if (renaming) return <NameForm compact id={`rename-${group.id}`} label={`New name for ${group.name}`} initial={group.name} pending={rename.isPending} submitLabel="Save" onSave={(name) => rename.mutate(name)} onCancel={() => setRenaming(false)} />;
+  if (renaming)
+    return (
+      <NameForm
+        compact
+        id={`rename-${group.id}`}
+        label={`New name for ${group.name}`}
+        initial={group.name}
+        pending={rename.isPending}
+        submitLabel="Save"
+        onSave={(name) => rename.mutate(name)}
+        onCancel={() => setRenaming(false)}
+      />
+    );
 
   return (
     <span className="flex items-center gap-2">
@@ -172,8 +213,16 @@ function GroupNameCell({ group }: { group: Group }) {
 
 function GroupPeopleCell({ group, members }: { group: Group; members: readonly TeamMember[] }) {
   const refresh = useRefresh();
-  const add = useMutation({ mutationFn: (partyId: string) => addGroupMember({ data: { groupId: group.id, partyId } }), onSuccess: refresh, onError: failure("add that person") });
-  const remove = useMutation({ mutationFn: (partyId: string) => removeGroupMember({ data: { groupId: group.id, partyId } }), onSuccess: refresh, onError: failure("remove that person") });
+  const add = useMutation({
+    mutationFn: (partyId: string) => addGroupMember({ data: { groupId: group.id, partyId } }),
+    onSuccess: refresh,
+    onError: failure("add that person"),
+  });
+  const remove = useMutation({
+    mutationFn: (partyId: string) => removeGroupMember({ data: { groupId: group.id, partyId } }),
+    onSuccess: refresh,
+    onError: failure("remove that person"),
+  });
   const inGroup = members.filter((m) => group.memberIds.includes(m.partyId));
   const candidates = members.filter((m) => !group.memberIds.includes(m.partyId));
 
@@ -195,7 +244,12 @@ function GroupPeopleCell({ group, members }: { group: Group; members: readonly T
       ))}
       {inGroup.length === 0 && <span className="text-muted-foreground">No one yet.</span>}
       {candidates.length > 0 && (
-        <Select value="" disabled={add.isPending} items={candidates.map((m) => ({ value: m.partyId, label: m.name }))} onValueChange={(next) => next && add.mutate(next)}>
+        <Select
+          value=""
+          disabled={add.isPending}
+          items={candidates.map((m) => ({ value: m.partyId, label: m.name }))}
+          onValueChange={(next) => next && add.mutate(next)}
+        >
           <SelectTrigger aria-label={`Add a person to ${group.name}`} className="h-8 w-36">
             <SelectValue placeholder={add.isPending ? "Adding" : "Add a person"} />
           </SelectTrigger>
@@ -214,7 +268,11 @@ function GroupPeopleCell({ group, members }: { group: Group; members: readonly T
 
 function GroupDeleteCell({ group }: { group: Group }) {
   const refresh = useRefresh();
-  const drop = useMutation({ mutationFn: () => deleteGroup({ data: { groupId: group.id } }), onSuccess: refresh, onError: failure("delete the group") });
+  const drop = useMutation({
+    mutationFn: () => deleteGroup({ data: { groupId: group.id } }),
+    onSuccess: refresh,
+    onError: failure("delete the group"),
+  });
 
   return (
     <TeamConfirmDialog
@@ -236,10 +294,33 @@ type GroupRow = { group: Group; members: readonly TeamMember[] };
 const column = dataTableColumns<GroupRow>();
 
 const columns = column.columns([
-  column.display({ id: "name", header: "Group", meta: { head: "w-64" }, cell: ({ row }) => <GroupNameCell group={row.original.group} /> }),
-  column.display({ id: "count", header: "Size", meta: { head: "w-32" }, cell: ({ row }) => <span className="whitespace-nowrap tabular-nums text-muted-foreground">{plural(row.original.group.memberIds.length)}</span> }),
-  column.display({ id: "people", header: "People", cell: ({ row }) => <GroupPeopleCell group={row.original.group} members={row.original.members} /> }),
-  column.display({ id: "actions", header: () => <span className="sr-only">Actions</span>, meta: { head: "w-24", cell: "text-right" }, cell: ({ row }) => <GroupDeleteCell group={row.original.group} /> }),
+  column.display({
+    id: "name",
+    header: "Group",
+    meta: { head: "w-64" },
+    cell: ({ row }) => <GroupNameCell group={row.original.group} />,
+  }),
+  column.display({
+    id: "count",
+    header: "Size",
+    meta: { head: "w-32" },
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+        {plural(row.original.group.memberIds.length)}
+      </span>
+    ),
+  }),
+  column.display({
+    id: "people",
+    header: "People",
+    cell: ({ row }) => <GroupPeopleCell group={row.original.group} members={row.original.members} />,
+  }),
+  column.display({
+    id: "actions",
+    header: () => <span className="sr-only">Actions</span>,
+    meta: { head: "w-24", cell: "text-right" },
+    cell: ({ row }) => <GroupDeleteCell group={row.original.group} />,
+  }),
 ]);
 
 export function GroupsTable() {
@@ -251,7 +332,9 @@ export function GroupsTable() {
     <Card>
       <CardHeader>
         <CardTitle>All groups</CardTitle>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Rename a group, or add and remove its people. A person can be in several groups.</p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          Rename a group, or add and remove its people. A person can be in several groups.
+        </p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         {groups.length === 0 ? (

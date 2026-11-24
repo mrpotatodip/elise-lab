@@ -1,1 +1,12 @@
-export type SessionUser = { id: string; accountId: string; partyId?: string; email: string; name: string; accountName: string; role: string; powers: string[]; twoFactorEnabled: boolean; twoFactorSetupRequired: boolean };
+export type SessionUser = {
+  id: string;
+  accountId: string;
+  partyId?: string;
+  email: string;
+  name: string;
+  accountName: string;
+  role: string;
+  powers: string[];
+  twoFactorEnabled: boolean;
+  twoFactorSetupRequired: boolean;
+};

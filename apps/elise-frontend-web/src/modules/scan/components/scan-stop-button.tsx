@@ -1,14 +1,33 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 import { stopScan } from "../api";
 import { isScanActive, scanKeys } from "../hooks";
 import type { ScanStatus } from "../schemas";
 
 export const canStopScan = (scan: Pick<ScanStatus, "status">): boolean => isScanActive(scan.status);
 
-export function ScanStopButton({ scanId, onRunner, size = "sm", className }: { scanId: string; onRunner: boolean; size?: "sm" | "default"; className?: string }) {
+export function ScanStopButton({
+  scanId,
+  onRunner,
+  size = "sm",
+  className,
+}: {
+  scanId: string;
+  onRunner: boolean;
+  size?: "sm" | "default";
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const stop = useMutation({
@@ -37,7 +56,11 @@ export function ScanStopButton({ scanId, onRunner, size = "sm", className }: { s
               : "The scan ends at once and its sandbox is destroyed. No report and no findings are kept. Findings found so far are dropped. The cost so far is still charged."}
           </DialogDescription>
         </DialogHeader>
-        {stop.isError && <p role="alert" className="text-sm text-status-danger">{stop.error.message}</p>}
+        {stop.isError && (
+          <p role="alert" className="text-sm text-status-danger">
+            {stop.error.message}
+          </p>
+        )}
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Keep running</DialogClose>
           <Button variant="destructive" disabled={stop.isPending} onClick={() => stop.mutate()}>

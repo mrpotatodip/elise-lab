@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { KnownRepo } from "#/modules/scan/utils/scan-known-repos";
 import { scanRepoLinkPick, scanRepoPickMatches, scanRepoPicks } from "#/modules/scan/utils/scan-repo-picks";
 
-const known = (over: Partial<KnownRepo>): KnownRepo => ({ provider: "github", repoId: "r1", url: "https://github.com/acme/api", label: "acme/api", last: "succeeded", running: false, isPrivate: false, ...over });
+const known = (over: Partial<KnownRepo>): KnownRepo => ({
+  provider: "github",
+  repoId: "r1",
+  url: "https://github.com/acme/api",
+  label: "acme/api",
+  last: "succeeded",
+  running: false,
+  isPrivate: false,
+  ...over,
+});
 
 describe("scanRepoPicks", () => {
   it("lists a scanned public repository once, with its engine branches", () => {
@@ -12,12 +21,25 @@ describe("scanRepoPicks", () => {
   });
 
   it("says a repository with a queued or running scan is running", () => {
-    expect(scanRepoPicks([known({ running: true })])[0]).toMatchObject({ running: true, note: "A scan is running now" });
+    expect(scanRepoPicks([known({ running: true })])[0]).toMatchObject({
+      running: true,
+      note: "A scan is running now",
+    });
   });
 
   it("lists only the chosen provider's repositories", () => {
-    const repos = [known({}), known({ provider: "gitlab", repoId: "r2", url: "https://gitlab.com/acme/platform/api", label: "acme/platform/api" })];
-    expect(scanRepoPicks(repos, "gitlab").map((item) => [item.provider, item.label])).toEqual([["gitlab", "acme/platform/api"]]);
+    const repos = [
+      known({}),
+      known({
+        provider: "gitlab",
+        repoId: "r2",
+        url: "https://gitlab.com/acme/platform/api",
+        label: "acme/platform/api",
+      }),
+    ];
+    expect(scanRepoPicks(repos, "gitlab").map((item) => [item.provider, item.label])).toEqual([
+      ["gitlab", "acme/platform/api"],
+    ]);
     expect(scanRepoPicks(repos, "github").map((item) => item.label)).toEqual(["acme/api"]);
   });
 });
@@ -31,15 +53,23 @@ describe("scanRepoLinkPick", () => {
     expect(scanRepoLinkPick(text)).toMatchObject({ url, label: "honojs/hono", isPrivate: false, fromLink: true });
   });
 
-  it.each(["honojs", "https://gitlab.com/a/b", "https://github.com/a/b/tree/main", ""])("does not read %j as a repository", (text) => {
-    expect(scanRepoLinkPick(text)).toBeNull();
-  });
+  it.each(["honojs", "https://gitlab.com/a/b", "https://github.com/a/b/tree/main", ""])(
+    "does not read %j as a repository",
+    (text) => {
+      expect(scanRepoLinkPick(text)).toBeNull();
+    },
+  );
 
   it.each([
     ["gitlab", "https://gitlab.com/acme/platform/api", "https://gitlab.com/acme/platform/api", "acme/platform/api"],
     ["gitlab", "gitlab.com/acme/platform/api.git", "https://gitlab.com/acme/platform/api", "acme/platform/api"],
     ["gitlab", "https://gitlab.com/acme/api/-/tree/main", "https://gitlab.com/acme/api", "acme/api"],
-    ["gitlab-sh", "https://Git.Example.com/team/api/-/tree/dev", "https://git.example.com/team/api", "git.example.com/team/api"],
+    [
+      "gitlab-sh",
+      "https://Git.Example.com/team/api/-/tree/dev",
+      "https://git.example.com/team/api",
+      "git.example.com/team/api",
+    ],
   ] as const)("reads a %s link %s as that provider's repository", (provider, text, url, label) => {
     expect(scanRepoLinkPick(text, provider)).toMatchObject({ provider, url, label, isPrivate: false, fromLink: true });
   });
@@ -56,7 +86,10 @@ describe("scanRepoLinkPick", () => {
 });
 
 describe("scanRepoPickMatches", () => {
-  const picks = scanRepoPicks([known({}), known({ repoId: "r2", url: "https://github.com/honojs/hono", label: "honojs/hono" })]);
+  const picks = scanRepoPicks([
+    known({}),
+    known({ repoId: "r2", url: "https://github.com/honojs/hono", label: "honojs/hono" }),
+  ]);
 
   it("filters by name, ignoring case", () => {
     expect(scanRepoPickMatches(picks, "HONO").map((item) => item.label)).toEqual(["honojs/hono"]);
