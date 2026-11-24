@@ -583,7 +583,7 @@ async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_
     match ran {
         Ok(()) => collect(work).map_err(|error| format!("The report phase ended. {error}")),
         Err(Halt::Failed(error)) => Err(error),
-        Err(Halt::Limit { limit, phase, message }) => partial_scan(work, limit, &phase).ok_or(message),
+        Err(Halt::Limit { limit, phase, message }) => partial_scan(tools, job, work, limit, &phase, stop).await.ok_or(message),
     }
 }
 
@@ -630,7 +630,7 @@ async fn run_each_phase(
         on_event(Event::PhaseStarted { phase: phase.to_string() });
         let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32), stop).await?;
         settle_told(run, spent, phase, cap, on_event)?;
-        match check_after(tools, job, work, phase, stop).await {
+        match check_after(tools, job, work, phase, stop, false).await {
             Ok(()) => {}
             Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, phase, &error, on_event, stop).await?,
             Err(CheckFailure::Environment(error)) => return Err(error.into()),
@@ -639,9 +639,21 @@ async fn run_each_phase(
     Ok(())
 }
 
-async fn check_after(tools: &Tools, job: &Job, work: &Path, phase: &str, stop: &Stop) -> Result<(), CheckFailure> {
-    let out = work.join("out");
-    let ledger = out.join("coverage-ledger.json");
+async fn check_after(tools: &Tools, job: &Job, work: &Path, phase: &str, stop: &Stop, after_repair: bool) -> Result<(), CheckFailure> {
+    let ledger = work.join("out").join("coverage-ledger.json");
+    let changed = apply_phase_files(tools, job, work, phase, stop).await?;
+    if phase == VALIDATED_AFTER {
+        return validate_full(tools, work, stop).await;
+    }
+    if changed || (after_repair && ledger.is_file()) {
+        let failed = "coverage-ledger.json, built by this app from what the agent wrote, did not pass the audit skill's own check (validate-coverage-ledger.cjs)";
+        run_skill_script(tools, work, stop, "validate-coverage-ledger.cjs", &[ledger], "coverage-ledger.json", failed).await?;
+    }
+    Ok(())
+}
+
+async fn apply_phase_files(tools: &Tools, job: &Job, work: &Path, phase: &str, stop: &Stop) -> Result<bool, CheckFailure> {
+    let ledger = work.join("out").join("coverage-ledger.json");
     let mut changed = false;
     if phase == "recon" {
         changed = apply_ledger_file(tools, work, stop, "recon-list.json", "recon-list.applied.json", "build-coverage-ledger.cjs", |list| {
@@ -655,14 +667,7 @@ async fn check_after(tools: &Tools, job: &Job, work: &Path, phase: &str, stop: &
         })
         .await?;
     }
-    if phase == VALIDATED_AFTER {
-        return validate_full(tools, work, stop).await;
-    }
-    if changed {
-        let failed = "coverage-ledger.json, built by this app from what the agent wrote, did not pass the audit skill's own check (validate-coverage-ledger.cjs)";
-        run_skill_script(tools, work, stop, "validate-coverage-ledger.cjs", &[ledger], "coverage-ledger.json", failed).await?;
-    }
-    Ok(())
+    Ok(changed)
 }
 
 async fn apply_ledger_file(
@@ -757,7 +762,7 @@ async fn repair(
         .await
         .map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
     settle_told(run, spent, REPAIR, cap, on_event).map_err(|halt| format!("{failed} The repair run did not fix it: {}", halt.message()))?;
-    check_after(tools, job, work, phase, stop).await.map_err(|again| {
+    check_after(tools, job, work, phase, stop, true).await.map_err(|again| {
         format!("The {phase} phase left files that did not pass the check, and a repair run did not fix them. {}", again.message())
     })
 }
@@ -1375,9 +1380,23 @@ fn sent_report(work: &Path, files: BTreeMap<String, String>) -> Report {
     }
 }
 
-fn partial_scan(work: &Path, limit: Limit, phase: &str) -> Option<Report> {
+async fn file_passes(tools: &Tools, work: &Path, stop: &Stop, script: &str, file: &str) -> bool {
+    let path = work.join("out").join(file);
+    path.is_file() && run_skill_script(tools, work, stop, script, &[path], file, "").await.is_ok()
+}
+
+async fn partial_scan(tools: &Tools, job: &Job, work: &Path, limit: Limit, phase: &str, stop: &Stop) -> Option<Report> {
+    let _ = apply_phase_files(tools, job, work, phase, stop).await;
     let mut files = out_files(work).ok()?;
     files.retain(|name, text| !name.ends_with(".json") || serde_json::from_str::<serde_json::Value>(text).is_ok());
+    let mut left_out = Vec::new();
+    if files.contains_key("findings.json") && !file_passes(tools, work, stop, "validate-findings.cjs", "findings.json").await {
+        files.remove("findings.json");
+        left_out.push("findings.json");
+    }
+    if !file_passes(tools, work, stop, "validate-coverage-ledger.cjs", "coverage-ledger.json").await {
+        return None;
+    }
     let ledger = serde_json::from_str::<Vec<serde_json::Value>>(files.get("coverage-ledger.json")?).ok()?;
     if ledger.is_empty() {
         return None;
@@ -1390,12 +1409,29 @@ fn partial_scan(work: &Path, limit: Limit, phase: &str) -> Option<Report> {
     };
     let listed: String = missed.iter().take(PARTIAL_LISTED).map(|id| format!("- `{id}`\n")).collect();
     let more = missed.len().saturating_sub(PARTIAL_LISTED);
-    let mut text = format!(
-        "{first} {} units were not covered.\n\nThis Scan is partial. The {phase} phase stopped because {why}, so the phases after it did not run and the units below were not reached.\n\nNot reached:\n\n{listed}",
-        missed.len()
-    );
+    let mut text = if missed.is_empty() {
+        let later: Vec<&str> = PHASES.iter().map(|(name, _)| *name).skip_while(|name| *name != phase).skip(1).collect();
+        let skipped = match later.as_slice() {
+            [] => String::new(),
+            [only] => format!(", and the {only} phase did not run"),
+            [rest @ .., last] => format!(", and the {} and {last} phases did not run", rest.join(", ")),
+        };
+        format!(
+            "{first} every unit in the ledger was covered, but the {phase} phase did not finish{skipped}.\n\nThis Scan is partial. The {phase} phase stopped because {why}.\n"
+        )
+    } else {
+        format!(
+            "{first} {} units were not covered.\n\nThis Scan is partial. The {phase} phase stopped because {why}, so the phases after it did not run and the units below were not reached.\n\nNot reached:\n\n{listed}",
+            missed.len()
+        )
+    };
     if more > 0 {
         text.push_str(&format!("- and {more} more, in `coverage-ledger.json`\n"));
+    }
+    for name in left_out {
+        text.push_str(&format!(
+            "\n`{name}` was left out of this Scan: the stop cut it short and it did not pass the audit skill's check, so it is not sent.\n"
+        ));
     }
     text.push_str("\nThe findings in this Scan are only what the earlier phases wrote. An unreached unit was not checked, so this Scan does not show that the code is free of findings. Start another Scan for what was missed.\n");
     if let Some(begun) = files.get("REPORT.md") {
@@ -1692,6 +1728,11 @@ case "$prompt" in
 esac
 case "$prompt" in
   *"halfjson=1"*) printf '{"findings":[' > out/findings.json ;;
+  *"badfindings=1"*) echo '{"INVALID":true}' > out/findings.json ;;
+esac
+case "$prompt" in
+  *"updates=1"*) echo '[]' > out/ledger-updates.json ;;
+  *"ledger=done"*) echo '[{"coverage_id":"a","status":"covered","unresolved":[]}]' > out/coverage-ledger.json ;;
 esac
 subtype=success; code=0
 case "$prompt" in
@@ -1733,7 +1774,7 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let _ = fs::remove_dir_all(&root);
         let skill = root.join("skills").join("security-audit");
         fs::create_dir_all(&skill).unwrap();
-        for file in ["SKILL.md", "validate-findings.cjs", "validate-coverage-ledger.cjs"] {
+        for file in ["SKILL.md", "validate-findings.cjs", "validate-coverage-ledger.cjs", "build-coverage-ledger.cjs"] {
             fs::write(skill.join(file), "").unwrap();
         }
         let bin = root.join("bin");
@@ -1939,6 +1980,63 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let text = &report.files["REPORT.md"];
         assert!(text.starts_with("PARTIAL: money ran out;") && text.contains("report phase"), "{text}");
         assert!(text.contains("# Report"), "{text}");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_partial_scan_merges_the_stopped_phases_updates_before_it_is_sent() {
+        let stage = stage("partial-merge");
+        let job = phased_job([
+            "phase=recon ledger=1 cost=1",
+            "phase=hunt updates=1 stop=limit cost=11",
+            "phase=check cost=1",
+            "phase=report cost=1",
+        ]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert!(lines_of(stage.work.join("validated.txt")).contains(&"build-coverage-ledger.cjs merge |".to_string()));
+        assert!(!report.files.contains_key("ledger-updates.json"), "applied once, set aside");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_partial_scan_never_sends_a_findings_file_that_failed_validation_and_says_so() {
+        let stage = stage("partial-unvalidated");
+        let job = phased_job([
+            "phase=recon ledger=1 cost=1",
+            "phase=hunt cost=1",
+            "phase=check ledger=1 badfindings=1 stop=limit cost=11",
+            "phase=report cost=1",
+        ]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert!(!report.files.contains_key("findings.json"));
+        let text = &report.files["REPORT.md"];
+        assert!(text.starts_with("PARTIAL: money ran out;"), "{text}");
+        assert!(text.contains("findings.json") && text.contains("did not pass"), "{text}");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_stopped_phase_with_every_unit_covered_names_the_phases_that_did_not_run() {
+        let stage = stage("partial-nothing-missing");
+        let job =
+            phased_job(["phase=recon ledger=done cost=1", "phase=hunt stop=hang cost=1", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan_in(&stage, &job, Duration::from_millis(250));
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let text = &report.files["REPORT.md"];
+        assert!(text.starts_with("PARTIAL: a phase ran out of time;"), "{text}");
+        assert!(!text.contains("0 units"), "{text}");
+        assert!(text.contains("check") && text.contains("report") && text.contains("did not run"), "{text}");
         let _ = fs::remove_dir_all(&stage.root);
     }
 

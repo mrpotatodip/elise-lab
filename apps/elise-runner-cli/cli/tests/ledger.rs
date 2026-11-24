@@ -77,3 +77,47 @@ fn a_bad_short_list_goes_to_the_one_repair_run_in_the_validators_words() {
     assert_eq!(result["state"], "succeeded", "{result}");
     assert_eq!(ledger_of(result).len(), 3);
 }
+
+fn run_with_hunt(scan_id: &str, hunt: &str) -> (Engine, Runner, support::Stubs) {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "real-node"]);
+    let hunt = format!("phase=hunt {hunt} cost=1");
+    engine.queue_job(job_with_profile(
+        scan_id,
+        "standard",
+        ["phase=recon list=ok cost=1", &hunt, "phase=check real=1 cost=1", "phase=report cost=1"],
+    ));
+    runner.run(&["run", "--once"], "");
+    (engine, runner, stubs)
+}
+
+#[test]
+fn an_update_that_builds_but_leaves_an_invalid_ledger_is_checked_again_after_the_repair() {
+    let (engine, _runner, stubs) = run_with_hunt("scan_v", "update=invalid");
+
+    let (_, result) = &engine.results()[0];
+    assert_eq!(result["state"], "failed", "{result}");
+    let said = result["error"].as_str().unwrap();
+    assert!(said.contains("hunt phase") && said.contains("repair run did not fix"), "{said}");
+    assert!(!said.contains("already used"), "{said}");
+    assert!(stubs.repair_prompt().contains("coverage-ledger.json"));
+}
+
+#[test]
+fn a_changed_order_of_canonical_refs_is_not_a_change_of_the_unit() {
+    let (engine, _runner, _stubs) = run_with_hunt("scan_o", "update=reordered");
+
+    let (_, result) = &engine.results()[0];
+    assert_eq!(result["state"], "succeeded", "{result}");
+    assert_eq!(ledger_of(result).iter().filter(|unit| unit["status"] == "covered").count(), 1);
+}
+
+#[test]
+fn a_malformed_new_unit_is_reported_in_the_builders_words_not_as_a_stack_trace() {
+    let (_engine, _runner, stubs) = run_with_hunt("scan_n", "update=malformed");
+
+    let said = stubs.repair_prompt();
+    assert!(said.contains("ledger-updates.json") && said.contains("updates[0].canonical_refs"), "{said}");
+    assert!(!said.contains("node:internal") && !said.contains("Error:") && !said.contains(" at "), "{said}");
+}
