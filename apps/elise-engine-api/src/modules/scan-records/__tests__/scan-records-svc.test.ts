@@ -296,6 +296,11 @@ describe("the partial rule", () => {
       true,
     ],
     [
+      "the Runner says a Phase ran out of time",
+      { "REPORT.md": "PARTIAL: a phase ran out of time; 2 units were not covered.\n\n- `b`" },
+      true,
+    ],
+    [
       "a unit is deferred for money_exhausted",
       {
         "REPORT.md": "# Report",

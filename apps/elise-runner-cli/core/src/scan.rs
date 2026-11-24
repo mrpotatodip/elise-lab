@@ -34,6 +34,8 @@ const VALIDATED_AFTER: &str = "check";
 // the validators it is outside the 90 minutes of the Phases.
 const REPAIR: &str = "repair";
 const REPAIR_MINUTES: u64 = 5;
+const TIMED_OUT: &str = "timed out";
+const PARTIAL_LISTED: usize = 40;
 const VALIDATE_TIMEOUT: Duration = Duration::from_secs(60);
 const REPORT_TRIES: u32 = 3;
 const ERROR_MAX: usize = 3800;
@@ -520,6 +522,9 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event
     }
 
     let end = run_agent(tools, work, job, &job.prompt, budget_for(job), None, AGENT_TIMEOUT, stop).await?.end?;
+    if let AgentEnd::TimedOut(minutes) = end {
+        return Err(timed_out_message("The audit", minutes));
+    }
     // -----
     // A scan whose budget ran out ends as a Partial Scan when the audit had already written its
     // report, with the files it left (the engine reads the report's `PARTIAL:` line). `claude` stops
@@ -552,8 +557,9 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event
 // The four Phases, one run of the agent each, in order, on the prompt the engine built for it. They
 // spend one pool: the cap, less what the Phases before reported in their own results. A Runner has no
 // server meter and the agent is told nothing about money, so the limit alone stops it, and what it
-// had not reached is never recorded. This app never makes a Phased Scan a Partial Scan: a Phase with
-// no money left does not start, and a Phase the limit stops ends the Scan, whatever it had written.
+// had not reached is never recorded in its ledger. A Phase with no money left does not start, and a
+// Phase the limit or its time slot stops ends the Scan as a Partial Scan (`partial_scan`) when there
+// is a ledger to send, as a failed one when there is not.
 // The validators run after the check Phase, and when they report errors about the agent's files the
 // agent gets one repair run (`repair`); a failure of the environment ends the Scan without one.
 // The files of the Phases that ended stay in the work folder when a later one fails.
@@ -572,8 +578,36 @@ async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_
     if let Some(sum) = spent.sum_line() {
         append_to_log(work, &format!("{sum}\n"));
     }
-    ran?;
-    collect(work).map_err(|error| format!("The report phase ended. {error}"))
+    match ran {
+        Ok(()) => collect(work).map_err(|error| format!("The report phase ended. {error}")),
+        Err(Halt::Failed(error)) => Err(error),
+        Err(Halt::Limit { limit, phase, message }) => partial_scan(work, limit, &phase).ok_or(message),
+    }
+}
+
+enum Halt {
+    Failed(String),
+    Limit { limit: Limit, phase: String, message: String },
+}
+
+#[derive(Clone, Copy)]
+enum Limit {
+    Budget { cap: f64 },
+    Time { minutes: u64 },
+}
+
+impl From<String> for Halt {
+    fn from(error: String) -> Self {
+        Halt::Failed(error)
+    }
+}
+
+impl Halt {
+    fn message(self) -> String {
+        match self {
+            Halt::Failed(message) | Halt::Limit { message, .. } => message,
+        }
+    }
 }
 
 async fn run_each_phase(
@@ -584,12 +618,12 @@ async fn run_each_phase(
     minute: Duration,
     on_event: OnEvent<'_>,
     stop: &Stop,
-) -> Result<(), String> {
+) -> Result<(), Halt> {
     let cap = budget_for(job);
     for (prompt, (phase, minutes)) in job.phase_prompts.iter().zip(PHASES) {
         let left = money(cap - spent.cost);
         if left <= 0.0 {
-            return Err(phase_cap_message(phase, cap));
+            return Err(Halt::Limit { limit: Limit::Budget { cap }, phase: phase.to_string(), message: phase_cap_message(phase, cap) });
         }
         on_event(Event::PhaseStarted { phase: phase.to_string() });
         let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32), stop).await?;
@@ -598,7 +632,7 @@ async fn run_each_phase(
             match validate_full(tools, work, stop).await {
                 Ok(()) => {}
                 Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, &error, on_event, stop).await?,
-                Err(CheckFailure::Environment(error)) => return Err(error),
+                Err(CheckFailure::Environment(error)) => return Err(error.into()),
             }
         }
     }
@@ -608,25 +642,34 @@ async fn run_each_phase(
 // What a run of the agent leaves in the pool and whether the Scan may go on: the cost its result
 // reports is spent even when the run failed, a run the limit stopped or that reported no usable
 // cost ends the Scan. `phase` is a Phase or `repair`.
-fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(), String> {
+fn settle(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64) -> Result<(), Halt> {
     if let Some(result) = &run.result {
         spent.add(result);
     }
-    if run.end? == AgentEnd::CapReached {
-        return Err(phase_cap_message(phase, cap));
+    let limited = |limit: Limit, message: String| Halt::Limit { limit, phase: phase.to_string(), message };
+    match run.end? {
+        AgentEnd::CapReached => return Err(limited(Limit::Budget { cap }, phase_cap_message(phase, cap))),
+        AgentEnd::TimedOut(minutes) => {
+            return Err(limited(Limit::Time { minutes }, timed_out_message(&capitalized(&run_label(phase)), minutes)));
+        }
+        AgentEnd::Finished => {}
     }
     let name = capitalized(&run_label(phase));
     let Some(result) = &run.result else {
-        return Err(format!("{name} ended without reporting its result, so this runner cannot tell what is left of the Budget cap (${cap}). Agent output: {}", tail(run.stdout.trim(), 1500)));
+        return Err(format!("{name} ended without reporting its result, so this runner cannot tell what is left of the Budget cap (${cap}). Agent output: {}", tail(run.stdout.trim(), 1500)).into());
     };
     // A cost that is missing or not a number of dollars would leave the pool as it was.
     if cost_of(result).is_none() {
-        return Err(format!("{name}'s result has no usable total_cost_usd, so this runner cannot tell what is left of the Budget cap (${cap}) and stopped the audit."));
+        return Err(format!("{name}'s result has no usable total_cost_usd, so this runner cannot tell what is left of the Budget cap (${cap}) and stopped the audit.").into());
     }
     Ok(())
 }
 
-fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event: OnEvent<'_>) -> Result<(), String> {
+fn timed_out_message(who: &str, minutes: u64) -> String {
+    format!("{who} ran longer than {minutes} minutes, so this runner stopped it.")
+}
+
+fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event: OnEvent<'_>) -> Result<(), Halt> {
     let cost_usd = run.result.as_ref().and_then(cost_of);
     let settled = settle(run, spent, phase, cap);
     on_event(Event::PhaseEnded { phase: phase.to_string(), cost_usd, pool_left_usd: money(cap - spent.cost) });
@@ -662,7 +705,7 @@ async fn repair(
     let run = run_agent(tools, work, job, &repair_prompt(error), left, Some(REPAIR), minute * (REPAIR_MINUTES as u32), stop)
         .await
         .map_err(|why| format!("{failed} The repair run did not start: {why}"))?;
-    settle_told(run, spent, REPAIR, cap, on_event).map_err(|why| format!("{failed} The repair run did not fix it: {why}"))?;
+    settle_told(run, spent, REPAIR, cap, on_event).map_err(|halt| format!("{failed} The repair run did not fix it: {}", halt.message()))?;
     validate_full(tools, work, stop).await.map_err(|again| {
         format!(
             "The {VALIDATED_AFTER} phase left files that did not pass the check, and a repair run did not fix them. {}",
@@ -1084,10 +1127,6 @@ async fn run_agent(
     if stop.is_stopped() {
         return Err(STOPPED.to_string());
     }
-    let named = |what: &str| match phase {
-        Some(phase) => format!("{} {what}", capitalized(&run_label(phase))),
-        None => format!("The audit {what}"),
-    };
     let claude = tools.claude.as_ref().ok_or("Claude Code is not installed on this computer, or this app cannot find it. Install it from https://claude.com/claude-code and sign in, then start the scan again.")?;
     let bin_dir = claude.parent().map(Path::to_path_buf).unwrap_or_default();
     let path = agent_path(&bin_dir, tools.node.as_deref());
@@ -1126,7 +1165,7 @@ async fn run_agent(
     let following = trace::follow(&work.join(&log_name), phase);
     let pushing = live::follow(&work.join("out").join(LIVE_FINDINGS_FILE));
     let waited = tokio::select! {
-        waited = timeout(limit, child.wait()) => waited.map_err(|_| named(&format!("ran longer than {} minutes, so this runner stopped it.", limit.as_secs() / 60))),
+        waited = timeout(limit, child.wait()) => waited.map_err(|_| TIMED_OUT.to_string()),
         _ = stop.stopped() => Err(STOPPED.to_string()),
     };
     if let Some(following) = following {
@@ -1144,7 +1183,8 @@ async fn run_agent(
             if phase.is_some() {
                 append_to_log(work, &stdout);
             }
-            return Ok(AgentRun { end: Err(why), result: last_result(&stdout), stdout });
+            let end = if why == TIMED_OUT { Ok(AgentEnd::TimedOut(limit.as_secs() / 60)) } else { Err(why) };
+            return Ok(AgentRun { end, result: last_result(&stdout), stdout });
         }
     };
     let stdout = fs::read_to_string(work.join(&log_name)).unwrap_or_default();
@@ -1205,6 +1245,7 @@ fn last_result(log: &str) -> Option<serde_json::Value> {
 enum AgentEnd {
     Finished,
     CapReached,
+    TimedOut(u64),
 }
 
 fn agent_end(success: bool, log: &str, full: bool) -> Result<AgentEnd, ()> {
@@ -1244,6 +1285,64 @@ fn read_trimmed(path: PathBuf) -> Option<String> {
 // What the agent wrote, and what git said about the clone.
 // -----
 fn collect(work: &Path) -> Result<Report, String> {
+    let files = out_files(work)?;
+    if !files.contains_key("REPORT.md") {
+        let log = fs::read_to_string(work.join("agent.log")).unwrap_or_default();
+        let err = fs::read_to_string(work.join("agent.err")).unwrap_or_default();
+        return Err(format!(
+            "The audit finished without writing REPORT.md. The agent was probably stopped by a permission. Agent output: {} {}",
+            tail(err.trim(), 600),
+            tail(log.trim(), 2400)
+        ));
+    }
+    Ok(sent_report(work, files))
+}
+
+fn sent_report(work: &Path, files: BTreeMap<String, String>) -> Report {
+    Report {
+        state: "succeeded",
+        error: None,
+        checkout: Some(Checkout {
+            commit_sha: read_trimmed(work.join("repo.sha")),
+            head_branch: read_trimmed(work.join("repo.branch")),
+            kind: read_trimmed(work.join("repo.kind")),
+        }),
+        agent_log: read_agent_log(work),
+        files,
+    }
+}
+
+fn partial_scan(work: &Path, limit: Limit, phase: &str) -> Option<Report> {
+    let mut files = out_files(work).ok()?;
+    files.retain(|name, text| !name.ends_with(".json") || serde_json::from_str::<serde_json::Value>(text).is_ok());
+    let ledger = serde_json::from_str::<Vec<serde_json::Value>>(files.get("coverage-ledger.json")?).ok()?;
+    if ledger.is_empty() {
+        return None;
+    }
+    let open = |unit: &&serde_json::Value| matches!(unit["status"].as_str(), Some("planned" | "in_progress"));
+    let missed: Vec<&str> = ledger.iter().filter(open).filter_map(|unit| unit["coverage_id"].as_str()).collect();
+    let (first, why) = match limit {
+        Limit::Budget { cap } => ("PARTIAL: money ran out;", format!("the Budget cap of ${cap} was reached")),
+        Limit::Time { minutes } => ("PARTIAL: a phase ran out of time;", format!("it ran longer than its {minutes} minutes")),
+    };
+    let listed: String = missed.iter().take(PARTIAL_LISTED).map(|id| format!("- `{id}`\n")).collect();
+    let more = missed.len().saturating_sub(PARTIAL_LISTED);
+    let mut text = format!(
+        "{first} {} units were not covered.\n\nThis Scan is partial. The {phase} phase stopped because {why}, so the phases after it did not run and the units below were not reached.\n\nNot reached:\n\n{listed}",
+        missed.len()
+    );
+    if more > 0 {
+        text.push_str(&format!("- and {more} more, in `coverage-ledger.json`\n"));
+    }
+    text.push_str("\nThe findings in this Scan are only what the earlier phases wrote. An unreached unit was not checked, so this Scan does not show that the code is free of findings. Start another Scan for what was missed.\n");
+    if let Some(begun) = files.get("REPORT.md") {
+        text.push_str(&format!("\n---\n\n{begun}\n"));
+    }
+    files.insert("REPORT.md".to_string(), text);
+    Some(sent_report(work, files))
+}
+
+fn out_files(work: &Path) -> Result<BTreeMap<String, String>, String> {
     let mut files = BTreeMap::new();
     for entry in fs::read_dir(work.join("out")).map_err(|e| format!("Could not read the audit's output: {e}"))?.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
@@ -1258,27 +1357,7 @@ fn collect(work: &Path) -> Result<Report, String> {
             }
         }
     }
-    if !files.contains_key("REPORT.md") {
-        let log = fs::read_to_string(work.join("agent.log")).unwrap_or_default();
-        let err = fs::read_to_string(work.join("agent.err")).unwrap_or_default();
-        return Err(format!(
-            "The audit finished without writing REPORT.md. The agent was probably stopped by a permission. Agent output: {} {}",
-            tail(err.trim(), 600),
-            tail(log.trim(), 2400)
-        ));
-    }
-    let agent_log = read_agent_log(work);
-    Ok(Report {
-        state: "succeeded",
-        error: None,
-        checkout: Some(Checkout {
-            commit_sha: read_trimmed(work.join("repo.sha")),
-            head_branch: read_trimmed(work.join("repo.branch")),
-            kind: read_trimmed(work.join("repo.kind")),
-        }),
-        agent_log,
-        files,
-    })
+    Ok(files)
 }
 
 // -----
@@ -1545,6 +1624,10 @@ case "$prompt" in
 esac
 case "$prompt" in
   *"invalid=1"*) echo INVALID > out/findings.json ;;
+  *"ledger=1"*) echo '[{"coverage_id":"a","status":"covered","unresolved":[]},{"coverage_id":"b","status":"planned","unresolved":[]},{"coverage_id":"c","status":"in_progress","unresolved":[]}]' > out/coverage-ledger.json ;;
+esac
+case "$prompt" in
+  *"halfjson=1"*) printf '{"findings":[' > out/findings.json ;;
 esac
 subtype=success; code=0
 case "$prompt" in
@@ -1703,7 +1786,6 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let _ = fs::remove_dir_all(&stage.root);
     }
 
-    // A Phase the limit stopped ends the Scan, whatever it had written, and never as a Partial Scan.
     #[cfg(unix)]
     #[test]
     fn a_phase_stopped_by_the_limit_ends_the_scan_with_the_cap_error() {
@@ -1717,6 +1799,94 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert!(said.contains("cap was reached") && said.contains("$12") && said.contains("hunt phase"), "{said}");
         assert!(!said.contains("PARTIAL:"));
         assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
+        assert!(report.files.is_empty());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_phase_stopped_by_the_cap_sends_a_partial_scan_naming_what_it_did_not_reach() {
+        let stage = stage("partial-cap");
+        let job = phased_job(["phase=recon cost=1", "phase=hunt ledger=1 stop=limit cost=11", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert!(report.error.is_none());
+        let text = &report.files["REPORT.md"];
+        assert!(text.starts_with("PARTIAL: money ran out; 2 units were not covered."), "{text}");
+        assert!(text.contains("hunt phase") && text.contains("$12") && text.contains("`b`") && text.contains("`c`"), "{text}");
+        assert!(!text.contains("`a`"), "{text}");
+        assert!(report.files.contains_key("recon.md") && report.files.contains_key("coverage-ledger.json"));
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
+        assert_eq!(last_json(report.agent_log.as_deref().unwrap())["total_cost_usd"], 12.0);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_spent_pool_with_a_ledger_behind_it_sends_a_partial_scan() {
+        let stage = stage("partial-spent");
+        let job = Job {
+            profile_cap_usd: Some(5.0),
+            ..phased_job(["phase=recon cost=3", "phase=hunt ledger=1 cost=2", "phase=check cost=1", "phase=report cost=1"])
+        };
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let text = &report.files["REPORT.md"];
+        assert!(text.starts_with("PARTIAL: money ran out;") && text.contains("check phase"), "{text}");
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_phase_that_outruns_its_slot_sends_a_partial_scan_that_says_it_ran_out_of_time() {
+        let stage = stage("partial-time");
+        let job = phased_job(["phase=recon cost=1", "phase=hunt ledger=1 stop=hang cost=3", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan_in(&stage, &job, Duration::from_millis(250));
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let text = &report.files["REPORT.md"];
+        assert!(text.starts_with("PARTIAL: a phase ran out of time; 2 units were not covered."), "{text}");
+        assert!(text.contains("hunt phase") && text.contains("ran longer than"), "{text}");
+        assert_eq!(last_json(report.agent_log.as_deref().unwrap())["total_cost_usd"], 4.0);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_partial_scan_drops_a_json_file_cut_in_half_and_keeps_a_report_it_had_begun() {
+        let stage = stage("partial-halfjson");
+        let job = phased_job([
+            "phase=recon cost=1",
+            "phase=hunt cost=1",
+            "phase=check ledger=1 cost=1",
+            "phase=report halfjson=1 stop=limit cost=11",
+        ]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert!(!report.files.contains_key("findings.json"));
+        let text = &report.files["REPORT.md"];
+        assert!(text.starts_with("PARTIAL: money ran out;") && text.contains("report phase"), "{text}");
+        assert!(text.contains("# Report"), "{text}");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_phase_that_crashes_still_fails_the_scan_whatever_it_wrote() {
+        let stage = stage("crash-with-ledger");
+        let job = phased_job(["phase=recon ledger=1 cost=1", "phase=hunt stop=crash", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
         assert!(report.files.is_empty());
         let _ = fs::remove_dir_all(&stage.root);
     }
@@ -1770,7 +1940,7 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         let stage = stage("timeout");
         let job = phased_job(["phase=recon cost=1", "phase=hunt stop=hang cost=3", "phase=check cost=1", "phase=report cost=1"]);
 
-        let report = scan_in(&stage, &job, Duration::from_millis(100));
+        let report = scan_in(&stage, &job, Duration::from_millis(250));
 
         assert_eq!(report.state, "failed");
         let said = report.error.clone().unwrap();
