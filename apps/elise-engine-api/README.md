@@ -29,7 +29,7 @@ Neon records every scan in `scans`, `scan_files` and `scan_findings` (`packages/
 | `AUTH_SECRET`           | better-auth signing secret.                                        |
 | `KEY_ENCRYPTION_SECRET` | Optional. Without it an account cannot save its own Anthropic key. |
 
-A scan's budget cap comes from its profile. A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` guards the table of caps.
+A scan's budget cap comes from its profile: Focused $12, Balanced $24, Exhaustive $50 (provisional until #142). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` (50) guards the table of caps.
 
 ## Run it
 

@@ -207,7 +207,7 @@ A value stored in the Worker, not in git, such as `ANTHROPIC_API_KEY` or `SCAN_A
 _Avoid_: Env var (an env var is not always secret)
 
 **Budget cap**:
-The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`, provisional). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` is the ceiling that guards that table for full Scans. A Runner Scan keeps `RUNNER_MAX_BUDGET_USD` as its own ceiling. ADR 0006 holds the rules.
+The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`: $12, $24 and $50, provisional). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` ($50) is the ceiling that guards that table for full Scans. A Runner Scan keeps `RUNNER_MAX_BUDGET_USD` as its own ceiling. ADR 0006 holds the rules.
 _Avoid_: Limit, quota
 
 **Pool**:

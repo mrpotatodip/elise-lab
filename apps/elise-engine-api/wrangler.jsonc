@@ -64,7 +64,7 @@
     "ENVIRONMENT": "production",
     "MODEL": "claude-sonnet-5-5",
     "EFFORT": "high",
-    "MAX_BUDGET_FULL_USD": "18",
+    "MAX_BUDGET_FULL_USD": "50",
     "MAX_ACTIVE_SCANS": "3",
     "MAX_ACTIVE_FULL_SCANS": "1",
     "MONTHLY_BUDGET_USD": "20",
@@ -81,7 +81,7 @@
   // BUDGET_ALLOWANCE_USD is the most an admin may set as the monthly budget (tenants.monthly_scan_budget_allowance_usd overrides it for one account).
   // BILLING_ENFORCED: "true" refuses new scans from an account with no plan row; "false" does not refuse an own-key or Runner scan for it. A scan on the platform's key needs a plan whatever this says (NO_ACTIVE_PLAN, #135); an account with its own key and no plan runs on its key. Accounts that have a plan row follow it either way.
   // Every new scan runs the full Skill and is stored skill full, a scan on a Runner included. A scan on a Runner takes no credit and has a fixed safety cap in code (RUNNER_MAX_BUDGET_USD): ship the Runner app release that stops at the job's profileCapUsd before this Worker.
-  // MAX_BUDGET_FULL_USD (at least 18) guards the default cap of each profile (SCAN_PROFILE_CAPS_USD), on either key: a profile whose cap is above it refuses its scans, and a request may lower the cap, never raise it. Changing it is a deploy.
+  // MAX_BUDGET_FULL_USD (at least 50) guards the default cap of each profile (SCAN_PROFILE_CAPS_USD), on either key: a profile whose cap is above it refuses its scans, and a request may lower the cap, never raise it. Changing it is a deploy.
   // MAX_ACTIVE_FULL_SCANS is how many scans in our cloud one account may have live at once. MAX_ACTIVE_SCANS is the same count for scans on a Runner only.
   // Secrets (wrangler secret put / --secrets-file): ANTHROPIC_API_KEY, SCAN_API_TOKEN, DATABASE_URL, AUTH_SECRET
   // Optional, for accounts that bring their own Anthropic key: KEY_ENCRYPTION_SECRET (any long random string; changing it makes every saved key unreadable, and those accounts' scans stop until they save the key again)

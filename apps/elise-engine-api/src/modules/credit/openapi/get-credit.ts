@@ -12,7 +12,7 @@ import {
   routeText,
 } from "#/lib/openapi";
 
-const EXAMPLE = `{ "data": { "planKey": "pro", "keySource": "platform", "balanceUsd": 41.25, "monthlyCreditUsd": 49, "scans": 12, "scanAllowance": null, "profiles": [{ "profile": "quick", "capUsd": 6, "holdUsd": 9 }, { "profile": "standard", "capUsd": 12, "holdUsd": 18 }, { "profile": "deep", "capUsd": 18, "holdUsd": 27 }] }, "error": null }`;
+const EXAMPLE = `{ "data": { "planKey": "pro", "keySource": "platform", "balanceUsd": 41.25, "monthlyCreditUsd": 49, "scans": 12, "scanAllowance": null, "profiles": [{ "profile": "quick", "capUsd": 12, "holdUsd": 18 }, { "profile": "standard", "capUsd": 24, "holdUsd": 36 }, { "profile": "deep", "capUsd": 50, "holdUsd": 75 }] }, "error": null }`;
 
 export const getCreditDoc = describeRoute({
   tags: ["usage"],

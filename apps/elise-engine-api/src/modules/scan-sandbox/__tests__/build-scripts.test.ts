@@ -208,13 +208,16 @@ describe("buildAgentPrompt", () => {
     expect(buildPhasePrompt(full, "report")).toContain("Finish by producing REPORT.md");
   });
 
-  it.each(["recon", "hunt"] as const)("tells a Runner's %s run that the app validates the ledger and the agent runs no code", (phase) => {
-    const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
+  it.each(["recon", "hunt"] as const)(
+    "tells a Runner's %s run that the app validates the ledger and the agent runs no code",
+    (phase) => {
+      const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
 
-    expect(prompt).toContain("runs the skill's validators on coverage-ledger.json after this run ends");
-    expect(prompt).toContain("do not run node or any other script");
-    expect(prompt).toContain("A command refused to you is expected here");
-  });
+      expect(prompt).toContain("runs the skill's validators on coverage-ledger.json after this run ends");
+      expect(prompt).toContain("do not run node or any other script");
+      expect(prompt).toContain("A command refused to you is expected here");
+    },
+  );
 
   it("tells a Runner's check run that a refused validator is expected and that no candidates need no verifier", () => {
     const full: ScanOptions = { ...options, skill: "full" };
