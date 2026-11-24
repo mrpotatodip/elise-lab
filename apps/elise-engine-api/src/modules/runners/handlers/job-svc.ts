@@ -5,7 +5,7 @@ import {
   type RunnerJobResultBody,
   type RunnerJobState,
 } from "@repo/contracts/elise";
-import { SCAN_PROFILE_CAPS_USD, SCAN_REPORT_FILES } from "#/constants";
+import { SCAN_REPORT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
 import { NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
@@ -104,7 +104,7 @@ const claimNextJob = (
       model: options.value.model,
       effort: options.value.effort,
       profile: options.value.profile,
-      profileCapUsd: SCAN_PROFILE_CAPS_USD[options.value.profile],
+      profileCapUsd: options.value.maxBudgetUsd,
       maxBudgetUsd: options.value.maxBudgetUsd,
       prompt: row.prompt,
       phasePrompts: SCAN_SANDBOX_FULL_PHASES.map((phase) => ({

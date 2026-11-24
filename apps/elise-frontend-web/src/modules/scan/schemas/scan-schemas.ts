@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  RUNNER_SPEND_LIMIT_MAX_USD,
   SCAN_EFFORTS,
   SCAN_MODELS,
   SCAN_PROFILES,
@@ -49,6 +50,7 @@ export const CreateScanInputSchema = z
     ref: z.string().optional(),
     runnerId: z.uuid().optional(),
     archiveId: z.uuid().optional(),
+    maxBudgetUsd: z.number().min(1).max(RUNNER_SPEND_LIMIT_MAX_USD).optional(),
   })
   .superRefine((input, ctx) => {
     const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);

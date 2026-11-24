@@ -13,8 +13,10 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Segmented } from "#/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
-import { fieldAria, fieldMessage } from "#/lib/form-field";
+import { fieldAria, fieldMessage, fieldMessageAria } from "#/lib/form-field";
 import { cn } from "#/lib/utils";
+import { RUNNER_SPEND_LIMIT_MAX_USD } from "@repo/contracts/elise";
+import { creditQuery } from "#/modules/credit";
 import { RUNNER_GIT_LOGIN_HINT, runnersQuery } from "#/modules/runner";
 import {
   SCAN_DEFAULT_BRANCH,
@@ -42,6 +44,8 @@ import {
   scanRepoLinkPick,
   scanRepoPickSame,
   scanRepoPicks,
+  scanSpendLimitOf,
+  scanSpendLimitTextAfterProfileChange,
   scanStartProblem,
   type ScanRepoPick,
 } from "../utils";
@@ -207,8 +211,14 @@ export function ScanNewForm({
       : branchPick === SCAN_DEFAULT_BRANCH
         ? undefined
         : branchPick;
+  const { data: credit } = useQuery(creditQuery());
+  const profileCapUsd = credit?.profiles?.find((item) => item.profile === values.profile)?.capUsd;
+  const [limitText, setLimitText] = useState<string | null>(null);
+  const spendLimit = scanSpendLimitOf(limitText);
+  const limitShown = limitText ?? (profileCapUsd === undefined ? "" : String(profileCapUsd));
   const plan: CreateScanInput = {
     ...values,
+    maxBudgetUsd: spendLimit.usd,
     provider: providerId,
     runnerId: runner?.id,
     repo: selected?.url ?? "",
@@ -381,7 +391,10 @@ export function ScanNewForm({
                   label="How much of the codebase should the audit cover?"
                   value={values.profile}
                   options={SCAN_PROFILE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                  onChange={(next) => form.setFieldValue("profile", next)}
+                  onChange={(next) => {
+                    setLimitText(scanSpendLimitTextAfterProfileChange(limitText, profileCapUsd));
+                    form.setFieldValue("profile", next);
+                  }}
                   className="w-full sm:w-72"
                 />
               </div>
@@ -406,7 +419,7 @@ export function ScanNewForm({
                 </span>
               </CollapsibleTrigger>
               <CollapsiblePanel>
-                <div className={cn("grid items-start gap-3 pt-3", showRunner ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+                <div className={cn("grid items-start gap-3 pt-3", showRunner ? "sm:grid-cols-2" : "sm:grid-cols-3")}>
                   {showRunner && (
                     <div className="grid gap-1.5">
                       <Label htmlFor="run-where" className="text-xs text-muted-foreground">
@@ -451,7 +464,27 @@ export function ScanNewForm({
                     value={values.effort}
                     onPick={(v) => form.setFieldValue("effort", v)}
                   />
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="spend-limit" className="text-xs text-muted-foreground">
+                      Spend limit (USD)
+                    </Label>
+                    <Input
+                      id="spend-limit"
+                      className="h-9"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={limitShown}
+                      placeholder="Profile default"
+                      onChange={(event) => setLimitText(event.target.value)}
+                      {...fieldMessageAria(spendLimit.problem ?? undefined, "spend-limit", "spend-limit-help")}
+                    />
+                    <FieldError id="spend-limit" message={spendLimit.problem ?? undefined} />
+                  </div>
                 </div>
+                <p id="spend-limit-help" className="pt-3 text-sm leading-relaxed text-muted-foreground">
+                  The audit stops when it has spent this much of your Claude. It starts at the cap of the Coverage you
+                  picked, and you can set any amount from $1 up to ${RUNNER_SPEND_LIMIT_MAX_USD}.
+                </p>
                 <p className="pt-3 text-sm leading-relaxed text-muted-foreground">
                   More effort can find more issues, but takes longer. The Elise Runner must be running on that computer,
                   with Claude Code signed in.
@@ -470,11 +503,16 @@ export function ScanNewForm({
         <div className="flex items-center justify-end gap-3">
           <p className="mr-auto text-sm leading-relaxed text-muted-foreground">
             {runner !== undefined
-              ? `This audit runs on ${runner.name}'s own Claude. Elise charges nothing per audit. It stops at its own spend limit and shows what it would have cost.`
+              ? `This audit runs on ${runner.name}'s own Claude. Elise charges nothing per audit. It stops when it reaches its spend limit.`
               : "Connect a Runner to start an audit."}
           </p>
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="submit" disabled={start.isPending || selected === null || selected.running || noRunner}>
+          <Button
+            type="submit"
+            disabled={
+              start.isPending || selected === null || selected.running || noRunner || spendLimit.problem !== null
+            }
+          >
             {start.isPending ? "Starting…" : "Start audit"}
           </Button>
         </div>
