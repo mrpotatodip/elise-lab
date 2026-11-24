@@ -98,8 +98,8 @@ const AGENT_DENY_RULES: [&str; 34] = [
 ];
 const AGENT_SETTINGS_FILE: &str = ".claude/settings.json";
 
-// Ceiling on what one scan may spend, whatever the server asks for. It is the same safety net
-// the server sets for a Runner scan (RUNNER_MAX_BUDGET_USD in the engine).
+// Ceiling on what one scan may spend, whatever the server asks for. It is the same ceiling
+// the server holds a Runner scan's spend limit to (RUNNER_MAX_BUDGET_USD in the engine).
 const BUDGET_CAP_USD: f64 = 50.0;
 
 // Files a repository may carry that change how Claude Code behaves or reach outside the clone.
@@ -1483,9 +1483,10 @@ fn tail(text: &str, max: usize) -> String {
 // -----
 // What the agent may spend on this scan. A Runner has no meter on the server, so the agent's own
 // `--max-budget-usd` is the only stop, as one run with no Phases. A full job takes the lower of
-// its profile's cap and the budget the server sent (the Runner's own ceiling there), and both
-// are held to this app's ceiling; a number that is not positive is left out. A job that does not
-// say full, or an older Worker that sends no cap, uses the server's budget alone.
+// its profileCapUsd and its maxBudgetUsd (a current Worker sends the Scan's spend limit in both,
+// an older one sent the profile's cap and the Runner ceiling), and both are held to this app's
+// ceiling; a number that is not positive is left out. A job that does not say full, or an older
+// Worker that sends no cap, uses the server's budget alone.
 // -----
 fn budget_for(job: &Job) -> f64 {
     let positive = |value: f64| (value.is_finite() && value > 0.0).then_some(value);
@@ -1511,8 +1512,6 @@ fn safe_ref(name: &str) -> bool {
 mod tests {
     use super::*;
 
-    // Node on Windows lacks O_NOFOLLOW and O_NONBLOCK, so the upstream checks refuse every input
-    // unless the shim is loaded first.
     #[test]
     fn a_check_on_windows_loads_the_input_shim_before_the_script_and_elsewhere_does_not() {
         let skill = Path::new("skill");

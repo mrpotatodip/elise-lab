@@ -81,11 +81,10 @@ export const RunnerRemovedSchema = z.object({
 // when it is not empty (the Worker now always sends ""), and gives
 // the agent the prompt. The Worker
 // builds the prompt, so the audit's words stay in one place.
-// profile and profileCapUsd are the Scan's profile and the cap the
-// profile has in the Worker's table, for a Runner app that runs the
-// full Skill. Both are optional: an old Worker sends neither, and an
-// old app ignores them. maxBudgetUsd stays the Runner's own ceiling,
-// and the Runner takes no credit.
+// profile and profileCapUsd are the Scan's profile and the Scan's
+// spend limit, for a Runner app that runs the full Skill. Both are
+// optional: an old Worker sends neither, and an old app ignores them.
+// maxBudgetUsd carries the same limit, and the Runner takes no credit.
 // phasePrompts are the four Phase prompts in order, each with its Phase
 // name, built for a Runner's place when the job is claimed. An app that
 // knows Phases runs them one after the other; an older app ignores the

@@ -18,6 +18,7 @@ export const SCAN_RECORDED_MODELS = [...SCAN_MODELS, "claude-opus-5-5"] as const
 export const SCAN_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export const SCAN_SKILLS = ["lite", "full"] as const;
 export const SCAN_PROFILES = ["quick", "standard", "deep"] as const;
+export const RUNNER_SPEND_LIMIT_MAX_USD = 50;
 // -----
 // What a Profile check says a Runner Scan met: a profile, or none
 // of them. Stored as text, so it is not a database enum.
