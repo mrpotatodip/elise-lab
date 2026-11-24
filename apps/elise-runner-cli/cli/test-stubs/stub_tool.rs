@@ -62,6 +62,29 @@ fn one_bad_update() -> String {
 const NEW_UNIT_UPDATE: &str = r#"[{"coverage_id":"src%2Fnew.ts%23GET%20%2Fnew::src%2Fnew.ts%23guard::packages%2Fapi::ATTACK-CLASSES.md%23Injection","canonical_refs":{"surface":"src/new.ts#GET /new","boundary":"src/new.ts#guard","subsystem":"packages/api","attack_class":"ATTACK-CLASSES.md#Injection"},"starting_paths":["src/new.ts"],"status":"covered","agent_id":"hunter-1","wave":1,"reviewed_paths":["src/typed-by-hand.ts"],"local_checks":[{"agent_id":"hunter-1","reviewed_paths":["src/new.ts","src/second.ts"],"invariant":"input is escaped","method":"source","result":"it is","artifact":null}]}]
 "#;
 
+fn big_list() -> String {
+    let entries: Vec<String> = (0..50)
+        .map(|n| {
+            let place = format!("packages/part-{}", n / 10);
+            format!(
+                r#"{{"surface":"{place}/route-{n}.ts#GET /r{n}","boundary":"{place}/guard.ts#check","subsystem":"{place}","paths":["{place}/route-{n}.ts"]}}"#
+            )
+        })
+        .collect();
+    format!(r#"{{"entries":[{}]}}"#, entries.join(","))
+}
+
+fn list_of_units(count: usize) -> String {
+    let entries: Vec<String> = (0..count)
+        .map(|n| {
+            format!(
+                r#"{{"surface":"packages/api/route-{n}.ts#GET /r{n}","boundary":"packages/api/guard.ts#check","subsystem":"packages/api","paths":["packages/api/route-{n}.ts"],"classes":["Access control"]}}"#
+            )
+        })
+        .collect();
+    format!(r#"{{"entries":[{}]}}"#, entries.join(","))
+}
+
 fn append(path: &Path, line: &str) {
     let mut file = OpenOptions::new().create(true).append(true).open(path).unwrap();
     writeln!(file, "{line}").unwrap();
@@ -162,6 +185,12 @@ fn claude(record: &Path, args: &[String]) {
     }
     if prompt.contains("phase=recon") && prompt.contains("list=ok") {
         fs::write("out/recon-list.json", SHORT_LIST).unwrap();
+    }
+    if prompt.contains("phase=recon") && prompt.contains("list=big") {
+        fs::write("out/recon-list.json", big_list()).unwrap();
+    }
+    if let Some(count) = prompt.split("list=units").nth(1).and_then(|rest| rest.split_whitespace().next()).and_then(|n| n.parse().ok()) {
+        fs::write("out/recon-list.json", list_of_units(count)).unwrap();
     }
     if prompt.contains("phase=recon") && prompt.contains("list=bad") {
         fs::write("out/recon-list.json", SHORT_LIST.replace("src/upload.ts\"]", "../upload.ts\"]")).unwrap();
