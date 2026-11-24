@@ -1,22 +1,13 @@
 import { convertSchemaToJsonSchema, toolDefinition } from "@tanstack/ai";
 import { Cause, Effect, Exit, Ref } from "effect";
-import {
-  ChatBotJsonSchema,
-  type ChatBotJson,
-  type ChatBotToolError,
-} from "../contracts";
+import { ChatBotJsonSchema, type ChatBotJson, type ChatBotToolError } from "../contracts";
 import {
   CHAT_BOT_MAX_TOOL_CALLS_PER_TURN,
   CHAT_BOT_TOOL_ERROR_FAILED,
   CHAT_BOT_TOOL_ERROR_INVALID_INPUT,
   CHAT_BOT_TOOL_ERROR_LIMIT_REACHED,
 } from "../constants";
-import type {
-  ChatBotRuntime,
-  ChatBotServices,
-  ChatBotToolBudget,
-  ChatBotToolSpec,
-} from "../types";
+import type { ChatBotRuntime, ChatBotServices, ChatBotToolBudget, ChatBotToolSpec } from "../types";
 
 // -----
 // One budget per turn, shared by main and

@@ -11,13 +11,28 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/", createRunnerDoc, requirePower("company:runners:create"), zValidator("header", AccountHeaderSchema), zValidator("json", CreateRunnerBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const body = c.req.valid("json");
-  const actorUserId = userIdOf(c);
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(createRunnerSvc(db, accountId, actorUserId, body)));
-  await notifyRunnerChange(c, { kind: "runner-added", power: "company:runners:create", accountId, runnerId: data.id, actorUserId });
-  return c.json({ data, error: null }, 201);
-});
+app.post(
+  "/",
+  createRunnerDoc,
+  requirePower("company:runners:create"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", CreateRunnerBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const body = c.req.valid("json");
+    const actorUserId = userIdOf(c);
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(createRunnerSvc(db, accountId, actorUserId, body)));
+    await notifyRunnerChange(c, {
+      kind: "runner-added",
+      power: "company:runners:create",
+      accountId,
+      runnerId: data.id,
+      actorUserId,
+    });
+    return c.json({ data, error: null }, 201);
+  },
+);
 
 export default app;

@@ -28,7 +28,9 @@ export const listObjectsEffect = (reports: R2Bucket, prefix: string): Effect.Eff
 
 export const deleteObjectsEffect = (reports: R2Bucket, keys: readonly string[]): Effect.Effect<void, ExternalError> =>
   Effect.forEach(
-    Array.from({ length: Math.ceil(keys.length / R2_DELETE_BATCH) }, (_, index) => keys.slice(index * R2_DELETE_BATCH, (index + 1) * R2_DELETE_BATCH)),
+    Array.from({ length: Math.ceil(keys.length / R2_DELETE_BATCH) }, (_, index) =>
+      keys.slice(index * R2_DELETE_BATCH, (index + 1) * R2_DELETE_BATCH),
+    ),
     (batch) => Effect.tryPromise({ try: () => reports.delete(batch), catch: toExternalError }),
     { discard: true },
   );

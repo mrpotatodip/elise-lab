@@ -20,7 +20,10 @@ const sumOf = (tenantId: string) =>
 export const balanceEffect = (db: AppDbType, tenantId: string): Effect.Effect<number, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const [row] = await db.select({ balance: sumOf(tenantId) }).from(tenants).where(eq(tenants.id, tenantId));
+      const [row] = await db
+        .select({ balance: sumOf(tenantId) })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId));
       return Number(row?.balance ?? 0);
     },
     catch: toDbError,
@@ -31,7 +34,11 @@ export const balanceEffect = (db: AppDbType, tenantId: string): Effect.Effect<nu
 // scan and a renewal, cannot read the same balance and both act on it.
 // -----
 const lockedBalanceOf = async (tx: AppDbType, tenantId: string): Promise<number> => {
-  const [row] = await tx.select({ balance: sumOf(tenantId) }).from(tenants).where(eq(tenants.id, tenantId)).for("update");
+  const [row] = await tx
+    .select({ balance: sumOf(tenantId) })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .for("update");
   return Number(row?.balance ?? 0);
 };
 
@@ -41,7 +48,10 @@ const lockedBalanceOf = async (tx: AppDbType, tenantId: string): Promise<number>
 // its hold and takes nothing more. Inside withTenant the
 // transaction is a savepoint of the route's own.
 // -----
-export const holdCreditEffect = (db: AppTxDbType, input: { tenantId: string; scanId: string; holdUsd: number }): Effect.Effect<HoldResult, DbError> =>
+export const holdCreditEffect = (
+  db: AppTxDbType,
+  input: { tenantId: string; scanId: string; holdUsd: number },
+): Effect.Effect<HoldResult, DbError> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -68,7 +78,10 @@ export const holdCreditEffect = (db: AppTxDbType, input: { tenantId: string; sca
 // charge in one row. A scan with no hold (its Account used its own
 // key, or it ran before credit) takes nothing. A scan settles once.
 // -----
-export const settleCreditEffect = (db: AppTxDbType, input: { tenantId: string; scanId: string; chargeUsd: number }): Effect.Effect<SettleResult, DbError> =>
+export const settleCreditEffect = (
+  db: AppTxDbType,
+  input: { tenantId: string; scanId: string; chargeUsd: number },
+): Effect.Effect<SettleResult, DbError> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -97,12 +110,21 @@ export const settleCreditEffect = (db: AppTxDbType, input: { tenantId: string; s
 // Adds credit a customer paid for. The key is the Stripe ID of the
 // payment: a repeated webhook finds it and adds nothing.
 // -----
-export const addTopupEffect = (db: DbConnectType, input: { tenantId: string; amountUsd: number; idempotencyKey: string; note?: string }): Effect.Effect<boolean, DbError> =>
+export const addTopupEffect = (
+  db: DbConnectType,
+  input: { tenantId: string; amountUsd: number; idempotencyKey: string; note?: string },
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const inserted = await db
         .insert(tenantCreditLedger)
-        .values({ tenantId: input.tenantId, kind: "topup", amountUsd: input.amountUsd.toFixed(4), idempotencyKey: input.idempotencyKey, note: input.note ?? null })
+        .values({
+          tenantId: input.tenantId,
+          kind: "topup",
+          amountUsd: input.amountUsd.toFixed(4),
+          idempotencyKey: input.idempotencyKey,
+          note: input.note ?? null,
+        })
         .onConflictDoNothing()
         .returning({ id: tenantCreditLedger.id });
       return inserted.length > 0;
@@ -127,7 +149,12 @@ export const renewCreditEffect = (
         const [existing] = await tx
           .select({ id: tenantCreditLedger.id })
           .from(tenantCreditLedger)
-          .where(and(eq(tenantCreditLedger.tenantId, input.tenantId), eq(tenantCreditLedger.idempotencyKey, input.idempotencyKey)));
+          .where(
+            and(
+              eq(tenantCreditLedger.tenantId, input.tenantId),
+              eq(tenantCreditLedger.idempotencyKey, input.idempotencyKey),
+            ),
+          );
         if (existing) return { grantedUsd: 0, duplicate: true };
         const grantedUsd = renewalGrantOf(balanceUsd, input.grantUsd, input.capUsd);
         await tx.insert(tenantCreditLedger).values({

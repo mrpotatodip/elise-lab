@@ -1,6 +1,16 @@
 import { describeRoute } from "hono-openapi";
 import { CreditEntriesSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, json, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  json,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 const EXAMPLE = `{ "data": { "entries": [{ "id": "7b0c2f1e-3a54-4c1d-9a55-0f9f3e6f6a10", "kind": "scan_settle", "amountUsd": -0.42, "scanId": "zd3trs3d", "note": null, "createdAt": "2026-11-11T10:00:00.000Z" }], "nextCursor": null }, "error": null }`;
 
@@ -16,7 +26,18 @@ export const getCreditEntriesDoc = describeRoute({
       "The Worker reads the ledger newest first, joining each scan's hold to its settle so the entry shows the charge.",
       "The Worker returns up to `limit` entries and a `nextCursor` when older ones remain.",
     ],
-    example: ["Read the first page:", bash(`curl ${EXAMPLE_BASE_URL}/usage/credit/entries?limit=10 \\`, '  -H "cookie: $SESSION_COOKIE" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`), json(EXAMPLE)],
+    example: [
+      "Read the first page:",
+      bash(
+        `curl ${EXAMPLE_BASE_URL}/usage/credit/entries?limit=10 \\`,
+        '  -H "cookie: $SESSION_COOKIE" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
+      json(EXAMPLE),
+    ],
   }),
-  responses: { 200: jsonResponse("A page of the credit history.", envelope(CreditEntriesSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("A page of the credit history.", envelope(CreditEntriesSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });

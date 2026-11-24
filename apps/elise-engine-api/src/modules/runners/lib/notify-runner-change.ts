@@ -8,11 +8,20 @@ import { listLoginsWithPowerEffect } from "#/modules/me/queries";
 import { RUNNER_NOTICE_PATH } from "#/modules/runners/constants";
 import type { AppEnv } from "#/types/variables";
 
-type RunnerChange = { kind: "runner-added" | "runner-removed"; power: AccessPower; accountId: string; runnerId: string; actorUserId: string };
+type RunnerChange = {
+  kind: "runner-added" | "runner-removed";
+  power: AccessPower;
+  accountId: string;
+  runnerId: string;
+  actorUserId: string;
+};
 
 export const notifyRunnerChange = async (c: Context<AppEnv>, change: RunnerChange): Promise<void> => {
   const recipients = await runEffect(
-    tenantEffectOf(c, change.accountId)((db) => listLoginsWithPowerEffect(db, change.accountId, change.power)).pipe(
+    tenantEffectOf(
+      c,
+      change.accountId,
+    )((db) => listLoginsWithPowerEffect(db, change.accountId, change.power)).pipe(
       Effect.match({
         onSuccess: (logins) => logins.map((login) => login.email),
         onFailure: () => {
@@ -27,6 +36,14 @@ export const notifyRunnerChange = async (c: Context<AppEnv>, change: RunnerChang
   const deps = c.get("deps");
   await enqueueEmailsQuietly(
     (mail) => deps.enqueueEmail(c.env, mail),
-    recipients.map((to) => ({ kind: change.kind, to, accountId: change.accountId, runnerId: change.runnerId, actorUserId: change.actorUserId, at, link })),
+    recipients.map((to) => ({
+      kind: change.kind,
+      to,
+      accountId: change.accountId,
+      runnerId: change.runnerId,
+      actorUserId: change.actorUserId,
+      at,
+      link,
+    })),
   );
 };

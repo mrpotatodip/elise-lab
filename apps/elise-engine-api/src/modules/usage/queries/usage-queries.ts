@@ -20,7 +20,11 @@ import type { MonthSpend } from "#/modules/usage/types";
 // estimate they carry is for the person to read, not to be spent.
 // The five reads do not depend on each other and run together.
 // -----
-export const monthSpendEffect = (db: AppDbType, tenantId: string, monthStart: Date): Effect.Effect<MonthSpend, DbError> =>
+export const monthSpendEffect = (
+  db: AppDbType,
+  tenantId: string,
+  monthStart: Date,
+): Effect.Effect<MonthSpend, DbError> =>
   Effect.gen(function* () {
     const read = Effect.all(
       {
@@ -53,17 +57,15 @@ export const monthSpendEffect = (db: AppDbType, tenantId: string, monthStart: Da
             db
               .select({ total: sql<string>`coalesce(sum(${scans.maxBudgetUsd}), 0)` })
               .from(scans)
-              .where(
-                and(
-                  eq(scans.tenantId, tenantId),
-                  eq(scans.keySource, "platform"),
-                  liveScansSql(Date.now()),
-                ),
-              ),
+              .where(and(eq(scans.tenantId, tenantId), eq(scans.keySource, "platform"), liveScansSql(Date.now()))),
           catch: toDbError,
         }),
         ownKey: Effect.tryPromise({
-          try: () => db.select({ tenantId: tenantAnthropicKeys.tenantId }).from(tenantAnthropicKeys).where(eq(tenantAnthropicKeys.tenantId, tenantId)),
+          try: () =>
+            db
+              .select({ tenantId: tenantAnthropicKeys.tenantId })
+              .from(tenantAnthropicKeys)
+              .where(eq(tenantAnthropicKeys.tenantId, tenantId)),
           catch: toDbError,
         }),
         plan: planOfEffect(db, tenantId),
@@ -101,11 +103,19 @@ export const monthSpendEffect = (db: AppDbType, tenantId: string, monthStart: Da
 // transaction, so the change and its audit row commit together and
 // there is no change without a record of who made it.
 // -----
-export const setMonthlyBudgetEffect = (db: AppDbType, tenantId: string, userId: string, budgetUsd: number | null): Effect.Effect<void, DbError> =>
+export const setMonthlyBudgetEffect = (
+  db: AppDbType,
+  tenantId: string,
+  userId: string,
+  budgetUsd: number | null,
+): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const actorPartyId = await actorPartyOf(db, userId);
-      const [before] = await db.select({ budget: tenants.monthlyScanBudgetUsd }).from(tenants).where(eq(tenants.id, tenantId));
+      const [before] = await db
+        .select({ budget: tenants.monthlyScanBudgetUsd })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId));
       await db
         .update(tenants)
         .set({ monthlyScanBudgetUsd: budgetUsd === null ? null : budgetUsd.toFixed(2) })

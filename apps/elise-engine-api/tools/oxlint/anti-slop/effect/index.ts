@@ -13,19 +13,19 @@ import { requireTryPromiseCatchRule } from "./rules/require-try-promise-catch.ts
 
 /** Opt-in Oxlint rules for Effect services, layers and run points. */
 const antiSlopEffectPlugin = eslintCompatPlugin({
-	meta: { name: "anti-slop-effect" },
-	rules: {
-		"no-async-in-effect-layers": noAsyncInEffectLayersRule,
-		"no-effect-catch-all": noEffectCatchAllRule,
-		"no-effect-run-outside-runner": noEffectRunOutsideRunnerRule,
-		"no-run-effect-in-effect-layers": noRunEffectInEffectLayersRule,
-		"no-service-constructor-imports": noServiceConstructorImportsRule,
-		"no-throw-in-effect-gen": noThrowInEffectGenRule,
-		"require-effect-return-type": requireEffectReturnTypeRule,
-		"require-return-yield-error": requireReturnYieldErrorRule,
-			"require-tagged-error-name": requireTaggedErrorNameRule,
-			"require-try-promise-catch": requireTryPromiseCatchRule,
-	},
+  meta: { name: "anti-slop-effect" },
+  rules: {
+    "no-async-in-effect-layers": noAsyncInEffectLayersRule,
+    "no-effect-catch-all": noEffectCatchAllRule,
+    "no-effect-run-outside-runner": noEffectRunOutsideRunnerRule,
+    "no-run-effect-in-effect-layers": noRunEffectInEffectLayersRule,
+    "no-service-constructor-imports": noServiceConstructorImportsRule,
+    "no-throw-in-effect-gen": noThrowInEffectGenRule,
+    "require-effect-return-type": requireEffectReturnTypeRule,
+    "require-return-yield-error": requireReturnYieldErrorRule,
+    "require-tagged-error-name": requireTaggedErrorNameRule,
+    "require-try-promise-catch": requireTryPromiseCatchRule,
+  },
 });
 
 export default antiSlopEffectPlugin;

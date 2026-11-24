@@ -11,7 +11,10 @@ export const testExecutionContext: ExecutionContext = executionContext;
 type Created = { id: string; params: ScanParams };
 type WorkflowStatus = { status: string; error?: { name: string; message: string } };
 
-export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: WorkflowStatus = { status: "running" }) {
+export function fakeBindings(
+  overrides: Partial<Bindings> = {},
+  workflowStatus: WorkflowStatus = { status: "running" },
+) {
   const store = new Map<string, string>();
   const uploadedAt = new Map<string, Date>();
   const createdFull: Created[] = [];
@@ -38,7 +41,9 @@ export function fakeBindings(overrides: Partial<Bindings> = {}, workflowStatus: 
         const start = Number(options.cursor ?? 0);
         const limit = options.limit ?? 1000;
         const truncated = start + limit < keys.length;
-        const objects = keys.slice(start, start + limit).map((key) => ({ key, uploaded: uploadedAt.get(key) ?? new Date() }));
+        const objects = keys
+          .slice(start, start + limit)
+          .map((key) => ({ key, uploaded: uploadedAt.get(key) ?? new Date() }));
         return { objects, delimitedPrefixes: [], truncated, cursor: truncated ? String(start + limit) : undefined };
       }
       const prefixes = [

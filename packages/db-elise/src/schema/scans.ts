@@ -73,7 +73,9 @@ export const scanRepos = pgTable(
     chkProvider: check("scan_repos_provider", sql`${t.provider} in (${inList(SOURCE_PROVIDER_VALUES)})`),
     chkHost: check("scan_repos_host", sql`${t.host} = lower(${t.host})`),
     // A constraint, not an index: only a constraint takes NULLS NOT DISTINCT in drizzle, and two upload apps of one name both have a null host.
-    uqTenantIdentity: unique("uq_scan_repos_tenant_identity").on(t.tenantId, t.provider, t.host, t.canonical).nullsNotDistinct(),
+    uqTenantIdentity: unique("uq_scan_repos_tenant_identity")
+      .on(t.tenantId, t.provider, t.host, t.canonical)
+      .nullsNotDistinct(),
     uqIdTenant: uniqueIndex("uq_scan_repos_id_tenant").on(t.id, t.tenantId),
   }),
 );
@@ -345,7 +347,10 @@ export const scanFindingTriage = pgTable(
       "scan_finding_triage_accepted",
       sql`(${t.status} = 'accepted_risk') = (${t.acceptedUntil} is not null) and (${t.status} <> 'accepted_risk' or ${t.note} is not null)`,
     ),
-    chkDuplicate: check("scan_finding_triage_duplicate", sql`(${t.status} = 'duplicate') = (${t.duplicateOf} is not null)`),
+    chkDuplicate: check(
+      "scan_finding_triage_duplicate",
+      sql`(${t.status} = 'duplicate') = (${t.duplicateOf} is not null)`,
+    ),
     fkRepoTenant: foreignKey({
       name: "scan_finding_triage_repo_tenant_fk",
       columns: [t.repoId, t.tenantId],

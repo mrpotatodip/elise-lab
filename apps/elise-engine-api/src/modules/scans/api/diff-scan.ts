@@ -7,11 +7,17 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/:scanId/diff", scanDiffDoc, zValidator("header", AccountHeaderSchema), zValidator("param", ScanIdParamSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { scanId } = c.req.valid("param");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(scanDiffSvc(db, accountId, scanId)));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/:scanId/diff",
+  scanDiffDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", ScanIdParamSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { scanId } = c.req.valid("param");
+    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(scanDiffSvc(db, accountId, scanId)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

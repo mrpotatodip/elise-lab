@@ -10,7 +10,8 @@ import { USAGE_BUDGET_CHANGES_LIMIT } from "#/modules/usage/constants";
 
 const BudgetDetailsSchema = z.object({ monthlyBudgetUsd: z.number().nullable() });
 
-const budgetOf = (parsed: ReturnType<typeof BudgetDetailsSchema.safeParse>): number | null => (parsed.success ? parsed.data.monthlyBudgetUsd : null);
+const budgetOf = (parsed: ReturnType<typeof BudgetDetailsSchema.safeParse>): number | null =>
+  parsed.success ? parsed.data.monthlyBudgetUsd : null;
 
 // -----
 // The audit rows of one account's budget changes, newest first. The

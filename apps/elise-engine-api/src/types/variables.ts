@@ -65,8 +65,17 @@ export type Bindings = {
 export type AppDeps = {
   scanRepo: (env: Bindings, db: TenantDbType) => ScanRepo;
   monthSpend: (db: TenantDbType, accountId: string) => Effect.Effect<MonthSpend, DbError>;
-  holdCredit: (db: TenantDbType, accountId: string, scanId: string, holdUsd: number) => Effect.Effect<HoldResult, DbError>;
-  connectedRunnerSources: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<string[] | null, DbError>;
+  holdCredit: (
+    db: TenantDbType,
+    accountId: string,
+    scanId: string,
+    holdUsd: number,
+  ) => Effect.Effect<HoldResult, DbError>;
+  connectedRunnerSources: (
+    db: TenantDbType,
+    accountId: string,
+    runnerId: string,
+  ) => Effect.Effect<string[] | null, DbError>;
   linkArchive: (db: TenantDbType, accountId: string, link: ScanArchiveLink) => Effect.Effect<void, Invalid | DbError>;
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
   teardownScan: (env: Bindings, scanId: string) => Promise<ScanUsage | null>;

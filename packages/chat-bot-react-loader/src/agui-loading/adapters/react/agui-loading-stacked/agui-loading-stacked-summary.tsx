@@ -26,11 +26,7 @@ function AGUILoadingStackedSummary({
   if (view !== "summary" || outcome !== result) return null;
 
   const summary =
-    text === undefined
-      ? stackedSummaryText(state)
-      : typeof text === "function"
-        ? text(stackedStepCount(state))
-        : text;
+    text === undefined ? stackedSummaryText(state) : typeof text === "function" ? text(stackedStepCount(state)) : text;
 
   return (
     <span className={cn("cbl-row", className)} {...props}>
@@ -45,30 +41,14 @@ function AGUILoadingStackedSummary({
 // Default text: "Finished · 4 steps". Put an icon
 // in children; it shows before the text.
 // -----
-export function AGUILoadingStackedSummaryDone(
-  props: AGUILoadingStackedSummaryProps,
-) {
-  return (
-    <AGUILoadingStackedSummary
-      part="AGUILoadingStackedSummaryDone"
-      result="done"
-      {...props}
-    />
-  );
+export function AGUILoadingStackedSummaryDone(props: AGUILoadingStackedSummaryProps) {
+  return <AGUILoadingStackedSummary part="AGUILoadingStackedSummaryDone" result="done" {...props} />;
 }
 
 // -----
 // One line after a failed or stopped run folds.
 // Default text: "Stopped · 4 steps".
 // -----
-export function AGUILoadingStackedSummaryFailed(
-  props: AGUILoadingStackedSummaryProps,
-) {
-  return (
-    <AGUILoadingStackedSummary
-      part="AGUILoadingStackedSummaryFailed"
-      result="failed"
-      {...props}
-    />
-  );
+export function AGUILoadingStackedSummaryFailed(props: AGUILoadingStackedSummaryProps) {
+  return <AGUILoadingStackedSummary part="AGUILoadingStackedSummaryFailed" result="failed" {...props} />;
 }

@@ -14,7 +14,8 @@ export const scanWeight = ({ skill, profile, partial, profileMet }: Weighable): 
   return PROFILE_WEIGHTS.get(profileMet ?? profile) ?? 0;
 };
 
-export const scanWasRead = (scan: Weighable): boolean => scanWeight(scan) > 0 || scan.partial === true || scan.profileMet === "none";
+export const scanWasRead = (scan: Weighable): boolean =>
+  scanWeight(scan) > 0 || scan.partial === true || scan.profileMet === "none";
 
 const WEIGHED_PROFILES = Object.entries(VERDICT_SCAN_WEIGHTS)
   .filter(([name, weight]) => name !== "lite" && weight > 0)

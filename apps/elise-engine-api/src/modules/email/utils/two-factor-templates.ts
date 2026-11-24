@@ -1,15 +1,29 @@
 import type { TwoFactorNoticeEmail, TwoFactorRequirementEmail, TwoFactorResetEmail } from "#/modules/email/types";
 import { renderEmailLayout } from "./layout";
 
-const utcOf = (at: string) => `${new Date(at).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" })} (UTC)`;
+const utcOf = (at: string) =>
+  `${new Date(at).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" })} (UTC)`;
 
-const NOTICE_FOOTER = "If this was not you, change your password now and tell an admin of your Account. This is a security notice: you get it whatever your email settings.";
+const NOTICE_FOOTER =
+  "If this was not you, change your password now and tell an admin of your Account. This is a security notice: you get it whatever your email settings.";
 
 const OWN_WORDING = {
-  "two-factor-enabled": { heading: "Two-factor was turned on", line: "Two-factor was turned on for your EliseLAB login. Other sessions were signed out." },
-  "two-factor-disabled": { heading: "Two-factor was turned off", line: "Two-factor was turned off for your EliseLAB login. Other sessions were signed out." },
-  "backup-codes-regenerated": { heading: "Backup codes were regenerated", line: "Your Backup codes were regenerated. The old ten no longer work, and other sessions were signed out." },
-  "backup-code-used": { heading: "A Backup code was used", line: "A Backup code was used to sign in to your EliseLAB login. It cannot be used again." },
+  "two-factor-enabled": {
+    heading: "Two-factor was turned on",
+    line: "Two-factor was turned on for your EliseLAB login. Other sessions were signed out.",
+  },
+  "two-factor-disabled": {
+    heading: "Two-factor was turned off",
+    line: "Two-factor was turned off for your EliseLAB login. Other sessions were signed out.",
+  },
+  "backup-codes-regenerated": {
+    heading: "Backup codes were regenerated",
+    line: "Your Backup codes were regenerated. The old ten no longer work, and other sessions were signed out.",
+  },
+  "backup-code-used": {
+    heading: "A Backup code was used",
+    line: "A Backup code was used to sign in to your EliseLAB login. It cannot be used again.",
+  },
 } as const;
 
 export const renderTwoFactorNotice = (mail: TwoFactorNoticeEmail) => {
@@ -32,7 +46,9 @@ export const renderTwoFactorReset = (mail: TwoFactorResetEmail) =>
     heading: "Your Two-factor was reset",
     intro: [
       { text: mail.actorName, strong: true },
-      { text: ` reset your Two-factor in ${mail.accountName}. You were signed out everywhere and will set it up again at your next sign-in.` },
+      {
+        text: ` reset your Two-factor in ${mail.accountName}. You were signed out everywhere and will set it up again at your next sign-in.`,
+      },
     ],
     facts: [
       { label: "Account", value: mail.accountName },

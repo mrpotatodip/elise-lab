@@ -8,5 +8,8 @@ import type { Bindings } from "#/types/variables";
 // once a day. It has no request and no Account, so it opens the
 // owner connection; every query it runs touches upload rows only.
 // -----
-export const runUploadRetention = (env: Bindings, waitUntil: (promise: Promise<unknown>) => void): Promise<UploadSweep> =>
+export const runUploadRetention = (
+  env: Bindings,
+  waitUntil: (promise: Promise<unknown>) => void,
+): Promise<UploadSweep> =>
   withPool(env.DATABASE_URL, waitUntil, (db) => runEffect(sweepUploadsSvc(db, env.REPORTS, new Date())));

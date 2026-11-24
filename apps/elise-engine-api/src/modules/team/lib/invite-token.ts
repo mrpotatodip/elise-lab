@@ -8,7 +8,10 @@ import { TEAM_INVITE_TOKEN_BYTES } from "@repo/contracts/elise";
 // -----
 export const generateInviteToken = (): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(TEAM_INVITE_TOKEN_BYTES));
-  return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
 };
 
 export const hashInviteToken = (token: string): Promise<string> => sha256Hex(token);

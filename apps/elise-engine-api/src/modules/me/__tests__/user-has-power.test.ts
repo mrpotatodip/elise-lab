@@ -32,7 +32,8 @@ afterAll(async () => {
   await test.close();
 });
 
-const has = (userId: string, power: AccessPower, accountId = tenantId) => Effect.runPromise(userHasPowerEffect(test.http, userId, accountId, power));
+const has = (userId: string, power: AccessPower, accountId = tenantId) =>
+  Effect.runPromise(userHasPowerEffect(test.http, userId, accountId, power));
 
 describe("userHasPowerEffect", () => {
   it.each<[string, AccessPower, boolean]>([

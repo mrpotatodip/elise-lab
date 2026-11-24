@@ -1,6 +1,14 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { authUser, ensureTenantRoles, findTenantRole, parties, partyMasterTypes, partyPersons, partyRoles } from "@repo/db-elise";
+import {
+  authUser,
+  ensureTenantRoles,
+  findTenantRole,
+  parties,
+  partyMasterTypes,
+  partyPersons,
+  partyRoles,
+} from "@repo/db-elise";
 import type { AccessPower } from "@repo/contracts/elise";
 import { fakeBindings, testExecutionContext } from "#/__tests__/fake-bindings";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
@@ -12,7 +20,10 @@ let tenantId: string;
 let memberPartyId: string;
 const queued: QueuedEmail[] = [];
 
-const POWERS: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:team:two_factor:reset", "company:team:two_factor_requirement:update"]);
+const POWERS: ReadonlySet<AccessPower> = new Set<AccessPower>([
+  "company:team:two_factor:reset",
+  "company:team:two_factor_requirement:update",
+]);
 
 const app = tenantRouteApp(() => test, {
   sessionUserId: async () => "owner",
@@ -26,7 +37,15 @@ const call = (path: string, method: string, body?: { required: boolean }) => {
   const { env } = fakeBindings();
   const headers = new Headers({ authorization: "Bearer session-token", "x-account-id": tenantId });
   if (body !== undefined) headers.set("content-type", "application/json");
-  return app.fetch(new Request(`http://localhost${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }), env, testExecutionContext);
+  return app.fetch(
+    new Request(`http://localhost${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+    env,
+    testExecutionContext,
+  );
 };
 
 const addPerson = async (id: string, roleKey: string) => {
@@ -35,7 +54,9 @@ const addPerson = async (id: string, roleKey: string) => {
   const [personType] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
   const [party] = await test.raw.insert(parties).values({ masterTypeId: personType.id }).returning();
   await test.raw.insert(partyPersons).values({ partyId: party.id, firstName: id, lastName: "Test" });
-  await test.raw.insert(authUser).values({ id, name: id, email: `${id}@example.com`, emailVerified: true, partyId: party.id });
+  await test.raw
+    .insert(authUser)
+    .values({ id, name: id, email: `${id}@example.com`, emailVerified: true, partyId: party.id });
   await test.raw.insert(partyRoles).values({ partyId: party.id, tenantId, roleId: role.id, roleScope: "tenant" });
   return party.id;
 };
@@ -66,7 +87,9 @@ describe("2FA reset notice", () => {
   });
 
   it("queues nothing when the reset is refused", async () => {
-    const ownerParty = (await test.raw.select({ id: authUser.partyId }).from(authUser).where(eq(authUser.id, "owner")))[0].id;
+    const ownerParty = (
+      await test.raw.select({ id: authUser.partyId }).from(authUser).where(eq(authUser.id, "owner"))
+    )[0].id;
     const res = await call(`/team/members/${ownerParty}/two-factor/reset`, "POST");
 
     expect([res.status, queued.length]).toEqual([403, 0]);

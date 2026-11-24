@@ -9,11 +9,19 @@ import { AccountHeaderSchema, ScanIdParamSchema } from "#/modules/scans/schemas"
 
 const app = new Hono<AppEnv>();
 
-app.get("/:scanId", detailScanDoc, zValidator("header", AccountHeaderSchema), zValidator("param", ScanIdParamSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { scanId } = c.req.valid("param");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(detailScanSvc(c.env, scanReads(db), accountId, scanId)));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/:scanId",
+  detailScanDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", ScanIdParamSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { scanId } = c.req.valid("param");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(detailScanSvc(c.env, scanReads(db), accountId, scanId)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

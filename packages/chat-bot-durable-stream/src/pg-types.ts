@@ -1,8 +1,5 @@
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-import type {
-  ChatBotDurableStreamInit,
-  ChatBotDurableStreamStoreOptions,
-} from "./stream/types";
+import type { ChatBotDurableStreamInit, ChatBotDurableStreamStoreOptions } from "./stream/types";
 
 // -----
 // The Postgres side of the package. These need

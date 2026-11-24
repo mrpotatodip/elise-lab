@@ -3,13 +3,17 @@ import type { TFindingComment } from "@repo/db-elise/schema";
 
 export type CommentAuthor = { firstName: string; lastName: string } | null;
 
-export const authorNameOf = (person: CommentAuthor | undefined): string | null => (person ? `${person.firstName} ${person.lastName}`.trim() || null : null);
+export const authorNameOf = (person: CommentAuthor | undefined): string | null =>
+  person ? `${person.firstName} ${person.lastName}`.trim() || null : null;
 
 // -----
 // The row as the thread shows it. A deleted comment shows
 // no text, whatever its row still holds.
 // -----
-export const findingCommentView = (comment: TFindingComment, author: CommentAuthor | undefined = null): FindingComment => ({
+export const findingCommentView = (
+  comment: TFindingComment,
+  author: CommentAuthor | undefined = null,
+): FindingComment => ({
   kind: "comment",
   id: comment.id,
   authorPartyId: comment.authorPartyId,

@@ -4,18 +4,11 @@
     "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": [
-      "ES2023",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
     "verbatimModuleSyntax": true
   },
-  "include": [
-    "src",
-    "demo"
-  ]
+  "include": ["src", "demo"]
 }

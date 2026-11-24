@@ -59,7 +59,12 @@ export function createUsageScanner(onUsage: (tokens: MeteredTokens) => void) {
     }
     const event = EventSchema.safeParse(raw);
     if (!event.success) return;
-    const usage = event.data.type === "message_start" ? event.data.message?.usage : event.data.type === "message_delta" ? event.data.usage : undefined;
+    const usage =
+      event.data.type === "message_start"
+        ? event.data.message?.usage
+        : event.data.type === "message_delta"
+          ? event.data.usage
+          : undefined;
     if (usage === undefined) return;
     sawEvent = true;
     whole = "";

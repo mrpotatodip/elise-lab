@@ -2,7 +2,13 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { scanFindings, scanRepoBranches, scanRunnerJobs, scans, tenantRunners } from "@repo/db-elise/schema";
-import { LIVE_FINDINGS_PER_SCAN_MAX, LiveFindingsSavedSchema, RepoFindingListSchema, type RunnerIdentity, type SaveLiveFindingsBody } from "@repo/contracts/elise";
+import {
+  LIVE_FINDINGS_PER_SCAN_MAX,
+  LiveFindingsSavedSchema,
+  RepoFindingListSchema,
+  type RunnerIdentity,
+  type SaveLiveFindingsBody,
+} from "@repo/contracts/elise";
 import { fakeBindings, testExecutionContext } from "#/__tests__/fake-bindings";
 import { asTenant, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
@@ -44,19 +50,41 @@ const confirmed = (id: string, title = "Missing filter") => ({
   evidence: EVIDENCE,
   remediation: { strategy: "add the filter" },
 });
-const needsValidation = (id: string) => ({ verdict: "needs_validation" as const, fingerprint: id, title: "Maybe", description: "unclear", evidence: EVIDENCE, validation_plan: { local: "run it" } });
+const needsValidation = (id: string) => ({
+  verdict: "needs_validation" as const,
+  fingerprint: id,
+  title: "Maybe",
+  description: "unclear",
+  evidence: EVIDENCE,
+  validation_plan: { local: "run it" },
+});
 
 const post = (scanId: string, body: SaveLiveFindingsBody, token = RUNNER_TOKEN) => {
   const { env } = fakeBindings();
   const headers = new Headers({ authorization: `Bearer ${token}`, "content-type": "application/json" });
-  return app.fetch(new Request(`http://localhost/runners/jobs/${scanId}/findings`, { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
+  return app.fetch(
+    new Request(`http://localhost/runners/jobs/${scanId}/findings`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }),
+    env,
+    testExecutionContext,
+  );
 };
 
-const rowsOf = async (scanId: string) => (await test.raw.select().from(scanFindings).where(eq(scanFindings.scanId, scanId))).toSorted((a, b) => a.findingId.localeCompare(b.findingId));
-const statusOf = async (scanId: string) => (await test.raw.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)))[0]?.status;
+const rowsOf = async (scanId: string) =>
+  (await test.raw.select().from(scanFindings).where(eq(scanFindings.scanId, scanId))).toSorted((a, b) =>
+    a.findingId.localeCompare(b.findingId),
+  );
+const statusOf = async (scanId: string) =>
+  (await test.raw.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)))[0]?.status;
 
 const pairRunner = async (accountId: string, partyId: string, name: string): Promise<RunnerIdentity> => {
-  const [row] = await test.raw.insert(tenantRunners).values({ tenantId: accountId, name, createdBy: partyId, tokenHash: `hash-${name}` }).returning();
+  const [row] = await test.raw
+    .insert(tenantRunners)
+    .values({ tenantId: accountId, name, createdBy: partyId, tokenHash: `hash-${name}` })
+    .returning();
   return { runnerId: row.id, name, accountId, accountName: "acme" };
 };
 
@@ -64,8 +92,19 @@ const runnerScan = async (over: Partial<typeof scans.$inferInsert> = {}) => {
   counter += 1;
   const scanId = `live-scan-${counter}`;
   const repoId = await seedRepo(test, tenantId, `https://github.com/octocat/live-${counter}`);
-  await test.raw.insert(scans).values(scanValues(tenantId, repoId, scanId, NOW, { status: "running", step: "auditing", skill: "full", ...over }));
-  await test.raw.insert(scanRunnerJobs).values({ scanId, tenantId, runnerId: runner.runnerId, state: "claimed", repoUrl: "https://github.com/octocat/Hello-World", prompt: "audit", optionsJson: "{}", priorsJson: "" });
+  await test.raw
+    .insert(scans)
+    .values(scanValues(tenantId, repoId, scanId, NOW, { status: "running", step: "auditing", skill: "full", ...over }));
+  await test.raw.insert(scanRunnerJobs).values({
+    scanId,
+    tenantId,
+    runnerId: runner.runnerId,
+    state: "claimed",
+    repoUrl: "https://github.com/octocat/Hello-World",
+    prompt: "audit",
+    optionsJson: "{}",
+    priorsJson: "",
+  });
   return { scanId, repoId };
 };
 
@@ -86,7 +125,9 @@ describe("POST /runners/jobs/:scanId/findings", () => {
   it("keeps one row for each fingerprint: a repeat batch adds none and a later record replaces the earlier", async () => {
     const { scanId } = await runnerScan();
     await post(scanId, { findings: [confirmed("A"), needsValidation("B")] });
-    const repeat = SavedEnvelope.parse(await (await post(scanId, { findings: [confirmed("A", "Renamed"), confirmed("A", "Renamed twice")] })).json());
+    const repeat = SavedEnvelope.parse(
+      await (await post(scanId, { findings: [confirmed("A", "Renamed"), confirmed("A", "Renamed twice")] })).json(),
+    );
     const rows = await rowsOf(scanId);
 
     expect(repeat.data).toEqual({ accepted: 1, dropped: 1 });
@@ -96,13 +137,16 @@ describe("POST /runners/jobs/:scanId/findings", () => {
     ]);
   });
 
-  it.each(["succeeded", "failed", "stopped", "queued"] as const)("answers a conflict and writes nothing for a %s Scan", async (status) => {
-    const { scanId } = await runnerScan({ status });
-    const res = await post(scanId, { findings: [confirmed("A")] });
+  it.each(["succeeded", "failed", "stopped", "queued"] as const)(
+    "answers a conflict and writes nothing for a %s Scan",
+    async (status) => {
+      const { scanId } = await runnerScan({ status });
+      const res = await post(scanId, { findings: [confirmed("A")] });
 
-    expect(res.status).toBe(409);
-    expect(await rowsOf(scanId)).toHaveLength(0);
-  });
+      expect(res.status).toBe(409);
+      expect(await rowsOf(scanId)).toHaveLength(0);
+    },
+  );
 
   it("answers not found for another Runner's job and for an unknown Scan", async () => {
     const { scanId } = await runnerScan();
@@ -116,7 +160,9 @@ describe("POST /runners/jobs/:scanId/findings", () => {
   it("keeps the valid records of a batch and counts a malformed one as dropped", async () => {
     const { scanId } = await runnerScan();
     const bad = { verdict: "confirmed", fingerprint: "BAD", title: "no severity" };
-    const res = SavedEnvelope.parse(await (await post(scanId, { findings: [confirmed("A"), bad, needsValidation("B")] })).json());
+    const res = SavedEnvelope.parse(
+      await (await post(scanId, { findings: [confirmed("A"), bad, needsValidation("B")] })).json(),
+    );
 
     expect(res.data).toEqual({ accepted: 2, dropped: 1 });
     expect((await rowsOf(scanId)).map((row) => row.findingId)).toEqual(["A", "B"]);
@@ -133,8 +179,11 @@ describe("POST /runners/jobs/:scanId/findings", () => {
       title: "seeded",
       class: "full-audit",
     }));
-    for (let at = 0; at < seeded.length; at += 250) await test.raw.insert(scanFindings).values(seeded.slice(at, at + 250));
-    const res = SavedEnvelope.parse(await (await post(scanId, { findings: [needsValidation("seed-0"), needsValidation("fresh")] })).json());
+    for (let at = 0; at < seeded.length; at += 250)
+      await test.raw.insert(scanFindings).values(seeded.slice(at, at + 250));
+    const res = SavedEnvelope.parse(
+      await (await post(scanId, { findings: [needsValidation("seed-0"), needsValidation("fresh")] })).json(),
+    );
 
     expect(res.data).toEqual({ accepted: 1, dropped: 1 });
     expect((await rowsOf(scanId)).some((row) => row.findingId === "fresh")).toBe(false);
@@ -146,7 +195,12 @@ describe("a running Scan's live rows", () => {
     const { scanId } = await runnerScan();
     await post(scanId, { findings: [confirmed("A"), needsValidation("B")] });
     const [row] = await test.raw.select().from(scans).where(eq(scans.id, scanId));
-    const counts = (await rowsOf(scanId)).map(({ status, severity, origin }) => ({ status, severity, origin, total: 1 }));
+    const counts = (await rowsOf(scanId)).map(({ status, severity, origin }) => ({
+      status,
+      severity,
+      origin,
+      total: 1,
+    }));
 
     expect(summaryOf(row, counts)).toMatchObject({ total: 2, needsValidation: 1, severity: { high: 1 } });
   });
@@ -156,7 +210,10 @@ describe("a running Scan's live rows", () => {
     await post(scanId, { findings: [confirmed("LIVE-ONLY-3")] });
     const [{ repo }] = await test.raw.select({ repo: scans.repo }).from(scans).where(eq(scans.id, scanId));
     const fingerprint = await sha256Hex("LIVE-ONLY-3");
-    const triage = await callAs(app, tenantId, "/findings/triage", { method: "PUT", body: { repo, fingerprint, status: "false_positive" } });
+    const triage = await callAs(app, tenantId, "/findings/triage", {
+      method: "PUT",
+      body: { repo, fingerprint, status: "false_positive" },
+    });
     const owner = await Effect.runPromise(findingRepoIdEffect(test.http, tenantId, repo, fingerprint));
 
     expect(triage.status).toBe(404);
@@ -168,10 +225,30 @@ describe("the end of a Scan", () => {
   it("replaces every live row with the final records", async () => {
     const { scanId, repoId } = await runnerScan();
     await post(scanId, { findings: [confirmed("A"), confirmed("GONE")] });
-    const params: ScanParams = { scanId, accountId: tenantId, repo: "https://github.com/octocat/Hello-World", options: { skill: "full", model: "claude-sonnet-5-5", effort: "high", profile: "quick", maxBudgetUsd: 2 }, keySource: "account", createdAt: NOW };
+    const params: ScanParams = {
+      scanId,
+      accountId: tenantId,
+      repo: "https://github.com/octocat/Hello-World",
+      options: { skill: "full", model: "claude-sonnet-5-5", effort: "high", profile: "quick", maxBudgetUsd: 2 },
+      keySource: "account",
+      createdAt: NOW,
+    };
     const bindings = fakeBindings();
-    bindings.store.set(`accounts/${tenantId}/scans/${scanId}/findings.json`, JSON.stringify([confirmed("A", "Final"), needsValidation("NEW")]));
-    const record = await Effect.runPromise(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { id: null, name: null, reason: null }, "succeeded", null, null));
+    bindings.store.set(
+      `accounts/${tenantId}/scans/${scanId}/findings.json`,
+      JSON.stringify([confirmed("A", "Final"), needsValidation("NEW")]),
+    );
+    const record = await Effect.runPromise(
+      buildScanRecordSvc(
+        bindings.env.REPORTS,
+        params,
+        repoId,
+        { id: null, name: null, reason: null },
+        "succeeded",
+        null,
+        null,
+      ),
+    );
     await Effect.runPromise(writeScanRecordEffect(test.http, record));
 
     expect((await rowsOf(scanId)).map((row) => [row.findingId, row.title])).toEqual([
@@ -192,7 +269,9 @@ describe("the end of a Scan", () => {
   it("clears the rows of a failed Scan", async () => {
     const { scanId } = await runnerScan();
     await post(scanId, { findings: [confirmed("A")] });
-    await asTenant(test, tenantId, (db) => Effect.runPromise(tenantScanRepo(db).mark(tenantId, scanId, { status: "failed", error: "boom" })));
+    await asTenant(test, tenantId, (db) =>
+      Effect.runPromise(tenantScanRepo(db).mark(tenantId, scanId, { status: "failed", error: "boom" })),
+    );
 
     expect(await statusOf(scanId)).toBe("failed");
     expect(await rowsOf(scanId)).toHaveLength(0);
@@ -202,12 +281,17 @@ describe("the end of a Scan", () => {
 describe("what ignores a running Scan's rows", () => {
   it("keeps them out of the Findings page, a Branch's findings and a Verdict's evidence", async () => {
     const { scanId, repoId } = await runnerScan({ commitSha: "c0ffee", ref: null });
-    const [branch] = await test.raw.select().from(scanRepoBranches).where(and(eq(scanRepoBranches.repoId, repoId), eq(scanRepoBranches.name, "main")));
+    const [branch] = await test.raw
+      .select()
+      .from(scanRepoBranches)
+      .where(and(eq(scanRepoBranches.repoId, repoId), eq(scanRepoBranches.name, "main")));
     await test.raw.update(scans).set({ branchId: branch.id, branch: "main" }).where(eq(scans.id, scanId));
     await post(scanId, { findings: [confirmed("LIVE-ONLY-1"), needsValidation("LIVE-ONLY-2")] });
 
     const page = FindingsEnvelope.parse(await (await callAs(app, tenantId, "/findings")).json());
-    const onBranch = z.object({ data: RepoFindingListSchema }).parse(await (await callAs(app, tenantId, `/repos/${repoId}/findings`)).json());
+    const onBranch = z
+      .object({ data: RepoFindingListSchema })
+      .parse(await (await callAs(app, tenantId, `/repos/${repoId}/findings`)).json());
     const evidence = await Effect.runPromise(commitEvidenceEffect(test.http, tenantId, repoId, "c0ffee"));
 
     expect(await rowsOf(scanId)).toHaveLength(2);

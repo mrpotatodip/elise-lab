@@ -20,7 +20,9 @@ beforeAll(async () => {
   tenantId = seeded.tenantId;
   await ensureTenantRoles(db.raw, tenantId);
   adminUserId = "admin-user";
-  await db.raw.insert(authUser).values({ id: adminUserId, name: "Ada Rossi", email: "ada@example.com", partyId: seeded.partyId });
+  await db.raw
+    .insert(authUser)
+    .values({ id: adminUserId, name: "Ada Rossi", email: "ada@example.com", partyId: seeded.partyId });
 });
 
 afterAll(() => db.close());
@@ -28,20 +30,49 @@ afterAll(() => db.close());
 const seedUnverified = async (id: string, email: string) => {
   const { partyId } = await seedTenant(db, `acct-${id}`);
   const now = new Date();
-  await db.raw.insert(authUser).values({ id, partyId, name: "Bo", email, emailVerified: false, createdAt: now, updatedAt: now });
-  await db.raw.insert(authAccount).values({ id: `a-${id}`, accountId: id, providerId: "credential", userId: id, password: await hashPassword("old-password-1"), createdAt: now, updatedAt: now });
+  await db.raw
+    .insert(authUser)
+    .values({ id, partyId, name: "Bo", email, emailVerified: false, createdAt: now, updatedAt: now });
+  await db.raw.insert(authAccount).values({
+    id: `a-${id}`,
+    accountId: id,
+    providerId: "credential",
+    userId: id,
+    password: await hashPassword("old-password-1"),
+    createdAt: now,
+    updatedAt: now,
+  });
 };
 
 const invite = async (email: string) => {
   const tokenHash = crypto.randomUUID();
   await Effect.runPromise(
-    createInviteEffect(db.pool, { tenantId, actorUserId: adminUserId, email, roleKey: "workspace_member", groupIds: [], tokenHash, now: NOW, expiresAt: new Date("2026-11-15T00:00:00Z") }),
+    createInviteEffect(db.pool, {
+      tenantId,
+      actorUserId: adminUserId,
+      email,
+      roleKey: "workspace_member",
+      groupIds: [],
+      tokenHash,
+      now: NOW,
+      expiresAt: new Date("2026-11-15T00:00:00Z"),
+    }),
   );
   return tokenHash;
 };
 
-const acceptInvite = (tokenHash: string, extra: { signedInUserId?: string; newLogin?: { firstName: string; lastName: string; passwordHash: string } }) =>
-  Effect.runPromise(acceptInviteEffect(db.pool, { tokenHash, now: NOW, signedInUserId: extra.signedInUserId, newLogin: extra.newLogin }));
+const acceptInvite = (
+  tokenHash: string,
+  extra: { signedInUserId?: string; newLogin?: { firstName: string; lastName: string; passwordHash: string } },
+) =>
+  Effect.runPromise(
+    acceptInviteEffect(db.pool, {
+      tokenHash,
+      now: NOW,
+      signedInUserId: extra.signedInUserId,
+      newLogin: extra.newLogin,
+    }),
+  );
 
 const resetPassword = async (email: string) => {
   const queued: QueuedEmail[] = [];
@@ -61,7 +92,8 @@ const resetPassword = async (email: string) => {
   await auth.api.resetPassword({ body: { token, newPassword: "new-password-22" } });
 };
 
-const verifiedOf = async (email: string) => (await db.raw.select().from(authUser).where(eq(authUser.email, email)))[0]?.emailVerified;
+const verifiedOf = async (email: string) =>
+  (await db.raw.select().from(authUser).where(eq(authUser.email, email)))[0]?.emailVerified;
 
 describe("a proof of ownership verifies the Login", () => {
   it.each([
@@ -70,14 +102,18 @@ describe("a proof of ownership verifies the Login", () => {
       email: "signed-in@example.com",
       run: async (email: string) => {
         await seedUnverified("u-invited", email);
-        await acceptInvite(await invite(email), { newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: await hashPassword("invitee-password-1") } });
+        await acceptInvite(await invite(email), {
+          newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: await hashPassword("invitee-password-1") },
+        });
       },
     },
     {
       proof: "accepting an invite sent to its address, as a new Login",
       email: "fresh@example.com",
       run: async (email: string) => {
-        await acceptInvite(await invite(email), { newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: "hash" } });
+        await acceptInvite(await invite(email), {
+          newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: "hash" },
+        });
       },
     },
     {
@@ -100,7 +136,9 @@ describe("an invite to an address held by an unverified Login", () => {
     await seedUnverified("u-squat", "squat@example.com");
     const newHash = await hashPassword("invitee-password-1");
 
-    await acceptInvite(await invite("squat@example.com"), { newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: newHash } });
+    await acceptInvite(await invite("squat@example.com"), {
+      newLogin: { firstName: "Bo", lastName: "Chen", passwordHash: newHash },
+    });
 
     const [credential] = await db.raw.select().from(authAccount).where(eq(authAccount.userId, "u-squat"));
     expect(credential?.password).toBe(newHash);

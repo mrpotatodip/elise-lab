@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 
-import {
-  SHUFFLE_FRAME_MS,
-  shuffleDurationMs,
-  shuffleFrame,
-  shuffleScramblePool,
-} from "../../..";
+import { SHUFFLE_FRAME_MS, shuffleDurationMs, shuffleFrame, shuffleScramblePool } from "../../..";
 
 function ShuffleText({ text }: { text: string }) {
   const [chars, setChars] = useState(() => text.split(""));

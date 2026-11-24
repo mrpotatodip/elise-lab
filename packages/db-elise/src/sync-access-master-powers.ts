@@ -11,7 +11,12 @@ export async function syncAccessMasterPowers(db: SyncAccessMasterPowersDb) {
   if (missing.length > 0) {
     await db
       .insert(accessMasterPowers)
-      .values(missing.map((power) => ({ power, scope: power.startsWith("platform:") ? ("platform" as const) : ("tenant" as const) })))
+      .values(
+        missing.map((power) => ({
+          power,
+          scope: power.startsWith("platform:") ? ("platform" as const) : ("tenant" as const),
+        })),
+      )
       .onConflictDoNothing();
   }
   const catalogue = new Set<string>(ACCESS_POWERS);

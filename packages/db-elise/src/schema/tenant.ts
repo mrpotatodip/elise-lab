@@ -136,6 +136,6 @@ export const partyRoles = pgTable(
 // -----
 export const SUPERUSER_ROLE_KEY = "superuser";
 
-export type TTenant =typeof tenants.$inferSelect;
+export type TTenant = typeof tenants.$inferSelect;
 export type TPartyMasterRole = typeof partyMasterRoles.$inferSelect;
 export type TPartyRole = typeof partyRoles.$inferSelect;

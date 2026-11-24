@@ -1,5 +1,12 @@
 import { Effect } from "effect";
-import { scanFindings, scanFindingTriage, scanRepoBranches, scanRepoFindings, scanRepos, scans } from "@repo/db-elise/schema";
+import {
+  scanFindings,
+  scanFindingTriage,
+  scanRepoBranches,
+  scanRepoFindings,
+  scanRepos,
+  scans,
+} from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { branchIdOf, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { getRepoEffect, listRepoBranchesEffect, listReposEffect } from "#/modules/repos/queries";
@@ -15,9 +22,21 @@ const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 const fail = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(Effect.flip(effect));
 
 const scan = (id: string, createdAt: string, extra: Partial<typeof scans.$inferInsert> = {}) =>
-  scanValues(tenantId, repoId, id, createdAt, { skill: "full", partial: false, branch: "main", branchId, commitSha: `${id}-sha`, ...extra });
+  scanValues(tenantId, repoId, id, createdAt, {
+    skill: "full",
+    partial: false,
+    branch: "main",
+    branchId,
+    commitSha: `${id}-sha`,
+    ...extra,
+  });
 
-const found = (scanId: string, letter: string, severity: "critical" | "high" | "medium" | "low", origin: "new" | "carried" = "new") => ({
+const found = (
+  scanId: string,
+  letter: string,
+  severity: "critical" | "high" | "medium" | "low",
+  origin: "new" | "carried" = "new",
+) => ({
   tenantId,
   scanId,
   findingId: `${scanId}-${letter}`,
@@ -52,23 +71,34 @@ beforeAll(async () => {
   tenantId = (await seedTenant(test, "acme")).tenantId;
   repoId = await seedRepo(test, tenantId);
   branchId = await branchIdOf(test, repoId);
-  await test.raw.insert(scans).values([scan("s0", "2026-10-31T00:00:00Z"), scan("s1", "2026-11-01T00:00:00Z"), scan("s2", "2026-11-02T00:00:00Z"), scan("old", "2026-11-03T00:00:00Z", { partial: null })]);
-  await test.raw.insert(scanFindings).values([
-    found("s0", "e", "low"),
-    found("s1", "a", "high"),
-    found("s1", "b", "medium"),
-    found("s1", "d", "low"),
-    found("s2", "a", "high", "carried"),
-    found("s2", "c", "critical"),
-    found("s2", "e", "low"),
-  ]);
-  await test.raw.insert(scanRepoFindings).values([
-    history("a", {}),
-    history("b", { state: "fixed_by_code", lastSeenScanId: "s1", fixedInScanId: "s2" }),
-    history("c", { firstSeenScanId: "s2" }),
-    history("d", { lastSeenScanId: "s1", unchecked: true }),
-    history("e", { state: "regressed", firstSeenScanId: "s0", fixedInScanId: "s1" }),
-  ]);
+  await test.raw
+    .insert(scans)
+    .values([
+      scan("s0", "2026-10-31T00:00:00Z"),
+      scan("s1", "2026-11-01T00:00:00Z"),
+      scan("s2", "2026-11-02T00:00:00Z"),
+      scan("old", "2026-11-03T00:00:00Z", { partial: null }),
+    ]);
+  await test.raw
+    .insert(scanFindings)
+    .values([
+      found("s0", "e", "low"),
+      found("s1", "a", "high"),
+      found("s1", "b", "medium"),
+      found("s1", "d", "low"),
+      found("s2", "a", "high", "carried"),
+      found("s2", "c", "critical"),
+      found("s2", "e", "low"),
+    ]);
+  await test.raw
+    .insert(scanRepoFindings)
+    .values([
+      history("a", {}),
+      history("b", { state: "fixed_by_code", lastSeenScanId: "s1", fixedInScanId: "s2" }),
+      history("c", { firstSeenScanId: "s2" }),
+      history("d", { lastSeenScanId: "s1", unchecked: true }),
+      history("e", { state: "regressed", firstSeenScanId: "s0", fixedInScanId: "s1" }),
+    ]);
   await test.raw.insert(scanFindingTriage).values({ tenantId, repoId, fingerprint: fp("c"), status: "false_positive" });
 });
 
@@ -80,7 +110,14 @@ describe("listReposEffect", () => {
   it("counts the scans, names the latest and counts only what is still open", async () => {
     const [repo] = await run(listReposEffect(test.http, tenantId));
 
-    expect(repo).toMatchObject({ id: repoId, canonical: "octocat/hello-world", branchNames: ["main"], scans: 4, lastScanId: "old", lastScanStatus: "succeeded" });
+    expect(repo).toMatchObject({
+      id: repoId,
+      canonical: "octocat/hello-world",
+      branchNames: ["main"],
+      scans: 4,
+      lastScanId: "old",
+      lastScanStatus: "succeeded",
+    });
     expect(repo.open).toEqual({
       total: 3,
       severity: { critical: 0, high: 1, medium: 0, low: 2, informational: 0 },
@@ -92,17 +129,28 @@ describe("listReposEffect", () => {
 
   it("shows a repo added with no branches and no scans, with an empty list of branch names", async () => {
     const fresh = (await seedTenant(test, "fresh")).tenantId;
-    await test.raw.insert(scanRepos).values({ tenantId: fresh, canonical: "octo/new", url: "https://github.com/octo/new" });
+    await test.raw
+      .insert(scanRepos)
+      .values({ tenantId: fresh, canonical: "octo/new", url: "https://github.com/octo/new" });
 
     const [repo] = await run(listReposEffect(test.http, fresh));
 
-    expect(repo).toMatchObject({ canonical: "octo/new", defaultBranch: null, branchNames: [], scans: 0, lastScanId: null });
+    expect(repo).toMatchObject({
+      canonical: "octo/new",
+      defaultBranch: null,
+      branchNames: [],
+      scans: 0,
+      lastScanId: null,
+    });
     expect(repo.open.total).toBe(0);
   });
 
   it("falls back to the oldest tracked branch when no scan without a ref ever set the default", async () => {
     const named = (await seedTenant(test, "named")).tenantId;
-    const [repo] = await test.raw.insert(scanRepos).values({ tenantId: named, canonical: "octo/named", url: "https://github.com/octo/named" }).returning();
+    const [repo] = await test.raw
+      .insert(scanRepos)
+      .values({ tenantId: named, canonical: "octo/named", url: "https://github.com/octo/named" })
+      .returning();
     await test.raw.insert(scanRepoBranches).values([
       { tenantId: named, repoId: repo.id, name: "feat/a", createdAt: new Date("2026-01-01") },
       { tenantId: named, repoId: repo.id, name: "feat/b", createdAt: new Date("2026-01-02") },
@@ -112,7 +160,10 @@ describe("listReposEffect", () => {
     const branches = await run(listRepoBranchesEffect(test.http, named, repo.id));
 
     expect(listed).toMatchObject({ defaultBranch: "feat/a", branchNames: ["feat/a", "feat/b"] });
-    expect(branches.map((branch) => [branch.name, branch.isDefault])).toEqual([["feat/a", true], ["feat/b", false]]);
+    expect(branches.map((branch) => [branch.name, branch.isDefault])).toEqual([
+      ["feat/a", true],
+      ["feat/b", false],
+    ]);
   });
 
   it("shows nothing of another account", async () => {
@@ -137,11 +188,23 @@ describe("Repo identity", () => {
 
   it("keeps a gitlab Repo and a github Repo with the same path apart in one Account, and still refuses a second github one", async () => {
     const both = (await seedTenant(test, "both")).tenantId;
-    await test.raw.insert(scanRepos).values({ tenantId: both, canonical: "acme/app", url: "https://github.com/acme/app" });
-    await test.raw.insert(scanRepos).values({ tenantId: both, provider: "gitlab", host: "gitlab.com", canonical: "acme/app", url: "https://gitlab.com/acme/app" });
+    await test.raw
+      .insert(scanRepos)
+      .values({ tenantId: both, canonical: "acme/app", url: "https://github.com/acme/app" });
+    await test.raw.insert(scanRepos).values({
+      tenantId: both,
+      provider: "gitlab",
+      host: "gitlab.com",
+      canonical: "acme/app",
+      url: "https://gitlab.com/acme/app",
+    });
 
     const listed = await run(listReposEffect(test.http, both));
-    const again = await test.raw.insert(scanRepos).values({ tenantId: both, canonical: "acme/app", url: "https://github.com/acme/app" }).onConflictDoNothing().returning();
+    const again = await test.raw
+      .insert(scanRepos)
+      .values({ tenantId: both, canonical: "acme/app", url: "https://github.com/acme/app" })
+      .onConflictDoNothing()
+      .returning();
 
     expect(listed.map((repo) => [repo.provider, repo.host, repo.canonical]).toSorted()).toEqual([
       ["github", "github.com", "acme/app"],
@@ -163,12 +226,18 @@ describe("listRepoFindingsSvc", () => {
       ["problem d", "open"],
     ]);
     expect(page.findings[0].triage).toMatchObject({ status: "false_positive" });
-    expect(page.findings.find((finding) => finding.title === "problem d")).toMatchObject({ unchecked: true, scanId: "s1" });  });
+    expect(page.findings.find((finding) => finding.title === "problem d")).toMatchObject({
+      unchecked: true,
+      scanId: "s1",
+    });
+  });
 
   it("filters by state and pages with a cursor", async () => {
     const regressed = await run(listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 50, state: "regressed" }));
     const first = await run(listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 2 }));
-    const second = await run(listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 2, cursor: first.nextCursor ?? undefined }));
+    const second = await run(
+      listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 2, cursor: first.nextCursor ?? undefined }),
+    );
 
     expect(regressed.findings.map((finding) => finding.title)).toEqual(["problem e"]);
     expect(first.findings).toHaveLength(2);
@@ -179,7 +248,9 @@ describe("listRepoFindingsSvc", () => {
   it("is NotFound for a repo of another account", async () => {
     const other = (await seedTenant(test, "third")).tenantId;
 
-    expect(await fail(listRepoFindingsSvc(test.http, other, repoId, { limit: 50 }))).toMatchObject({ _tag: "NotFound" });
+    expect(await fail(listRepoFindingsSvc(test.http, other, repoId, { limit: 50 }))).toMatchObject({
+      _tag: "NotFound",
+    });
   });
 });
 
@@ -187,10 +258,15 @@ describe("a second branch", () => {
   let releaseId: string;
 
   beforeAll(async () => {
-    [{ id: releaseId }] = await test.raw.insert(scanRepoBranches).values({ tenantId, repoId, name: "release" }).returning({ id: scanRepoBranches.id });
+    [{ id: releaseId }] = await test.raw
+      .insert(scanRepoBranches)
+      .values({ tenantId, repoId, name: "release" })
+      .returning({ id: scanRepoBranches.id });
     await test.raw.insert(scans).values(scan("r1", "2026-11-05T00:00:00Z", { branch: "release", branchId: releaseId }));
     await test.raw.insert(scanFindings).values(found("r1", "x", "medium"));
-    await test.raw.insert(scanRepoFindings).values({ ...history("x", { firstSeenScanId: "r1", lastSeenScanId: "r1" }), branchId: releaseId });
+    await test.raw
+      .insert(scanRepoFindings)
+      .values({ ...history("x", { firstSeenScanId: "r1", lastSeenScanId: "r1" }), branchId: releaseId });
   });
 
   it("has its own problems, and the default branch's list does not change", async () => {
@@ -212,19 +288,30 @@ describe("a second branch", () => {
   it("is listed with its own counts and the commit of its newest succeeded scan", async () => {
     const branches = await run(listRepoBranchesEffect(test.http, tenantId, repoId));
 
-    expect(branches.map((branch) => [branch.name, branch.isDefault])).toEqual([["main", true], ["release", false]]);
-    expect(branches[1]).toMatchObject({ latestScanId: "r1", latestCommit: "r1-sha", open: { total: 1, severity: { medium: 1 } } });
+    expect(branches.map((branch) => [branch.name, branch.isDefault])).toEqual([
+      ["main", true],
+      ["release", false],
+    ]);
+    expect(branches[1]).toMatchObject({
+      latestScanId: "r1",
+      latestCommit: "r1-sha",
+      open: { total: 1, severity: { medium: 1 } },
+    });
     expect(branches[0].latestScanId).toBe("old");
   });
 
   it("is NotFound for a branch the repo does not track", async () => {
-    expect(await fail(listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 50, branch: "nope" }))).toMatchObject({ _tag: "NotFound" });
+    expect(await fail(listRepoFindingsSvc(test.http, tenantId, repoId, { limit: 50, branch: "nope" }))).toMatchObject({
+      _tag: "NotFound",
+    });
   });
 });
 
 describe("addBranchSvc", () => {
   it("refuses a commit id and HEAD, which are not branches, and tracks nothing", async () => {
-    const commit = await fail(addBranchSvc(test.pool, tenantId, repoId, { name: "7495881421f63f1e64673e7f32bbb1f40555435d" }));
+    const commit = await fail(
+      addBranchSvc(test.pool, tenantId, repoId, { name: "7495881421f63f1e64673e7f32bbb1f40555435d" }),
+    );
     const head = await fail(addBranchSvc(test.pool, tenantId, repoId, { name: "HEAD" }));
     const names = (await run(listRepoBranchesEffect(test.http, tenantId, repoId))).map((branch) => branch.name);
 
@@ -236,11 +323,19 @@ describe("addBranchSvc", () => {
 
 describe("a branch read only by profile scans", () => {
   it("shows the profile scan as the branch's latest scan and commit", async () => {
-    const [{ id: developId }] = await test.raw.insert(scanRepoBranches).values({ tenantId, repoId, name: "develop" }).returning({ id: scanRepoBranches.id });
-    await test.raw.insert(scans).values(scan("d1", "2026-11-06T00:00:00Z", { skill: "full", branch: "develop", branchId: developId }));
+    const [{ id: developId }] = await test.raw
+      .insert(scanRepoBranches)
+      .values({ tenantId, repoId, name: "develop" })
+      .returning({ id: scanRepoBranches.id });
+    await test.raw
+      .insert(scans)
+      .values(scan("d1", "2026-11-06T00:00:00Z", { skill: "full", branch: "develop", branchId: developId }));
 
     const branches = await run(listRepoBranchesEffect(test.http, tenantId, repoId));
 
-    expect(branches.find((branch) => branch.name === "develop")).toMatchObject({ latestScanId: "d1", latestCommit: "d1-sha" });
+    expect(branches.find((branch) => branch.name === "develop")).toMatchObject({
+      latestScanId: "d1",
+      latestCommit: "d1-sha",
+    });
   });
 });

@@ -17,10 +17,7 @@ export const ChatBotLookupIdSchema = z.string().regex(CHAT_BOT_LOOKUP_ID_PATTERN
 
 export const ChatBotThreadIdSchema = z.string().uuid();
 
-export const ChatBotRunIdSchema = z
-  .string()
-  .max(CHAT_BOT_RUN_ID_MAX)
-  .regex(CHAT_BOT_RUN_ID_PATTERN);
+export const ChatBotRunIdSchema = z.string().max(CHAT_BOT_RUN_ID_MAX).regex(CHAT_BOT_RUN_ID_PATTERN);
 
 export const ChatBotThreadParamSchema = z.object({
   id: ChatBotThreadIdSchema,

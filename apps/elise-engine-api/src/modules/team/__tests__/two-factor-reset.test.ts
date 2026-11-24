@@ -31,11 +31,27 @@ const addPerson = async (id: string, tenant: string, roleKey: string, twoFactor:
   const [personType] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
   const [party] = await test.raw.insert(parties).values({ masterTypeId: personType.id }).returning();
   await test.raw.insert(partyPersons).values({ partyId: party.id, firstName: id, lastName: "Test" });
-  await test.raw.insert(authUser).values({ id, name: id, email: `${id}@example.com`, emailVerified: true, partyId: party.id, twoFactorEnabled: twoFactor });
-  await test.raw.insert(partyRoles).values({ partyId: party.id, tenantId: tenant, roleId: role.id, roleScope: "tenant" });
-  if (twoFactor) await test.raw.insert(authTwoFactor).values({ id: `tf-${id}`, userId: id, secret: "sealed", backupCodes: "sealed" });
-  await test.raw.insert(authSession).values({ id: `s1-${id}`, userId: id, token: `t1-${id}`, expiresAt: new Date("2099-01-01T00:00:00Z") });
-  await test.raw.insert(authSession).values({ id: `s2-${id}`, userId: id, token: `t2-${id}`, expiresAt: new Date("2099-01-01T00:00:00Z") });
+  await test.raw.insert(authUser).values({
+    id,
+    name: id,
+    email: `${id}@example.com`,
+    emailVerified: true,
+    partyId: party.id,
+    twoFactorEnabled: twoFactor,
+  });
+  await test.raw
+    .insert(partyRoles)
+    .values({ partyId: party.id, tenantId: tenant, roleId: role.id, roleScope: "tenant" });
+  if (twoFactor)
+    await test.raw
+      .insert(authTwoFactor)
+      .values({ id: `tf-${id}`, userId: id, secret: "sealed", backupCodes: "sealed" });
+  await test.raw
+    .insert(authSession)
+    .values({ id: `s1-${id}`, userId: id, token: `t1-${id}`, expiresAt: new Date("2099-01-01T00:00:00Z") });
+  await test.raw
+    .insert(authSession)
+    .values({ id: `s2-${id}`, userId: id, token: `t2-${id}`, expiresAt: new Date("2099-01-01T00:00:00Z") });
   return { userId: id, partyId: party.id };
 };
 
@@ -61,9 +77,18 @@ afterAll(async () => {
 });
 
 const stateOf = async (person: Person) => {
-  const [login] = await test.raw.select({ on: authUser.twoFactorEnabled }).from(authUser).where(eq(authUser.id, person.userId));
-  const secrets = await test.raw.select({ id: authTwoFactor.id }).from(authTwoFactor).where(eq(authTwoFactor.userId, person.userId));
-  const sessions = await test.raw.select({ id: authSession.id }).from(authSession).where(eq(authSession.userId, person.userId));
+  const [login] = await test.raw
+    .select({ on: authUser.twoFactorEnabled })
+    .from(authUser)
+    .where(eq(authUser.id, person.userId));
+  const secrets = await test.raw
+    .select({ id: authTwoFactor.id })
+    .from(authTwoFactor)
+    .where(eq(authTwoFactor.userId, person.userId));
+  const sessions = await test.raw
+    .select({ id: authSession.id })
+    .from(authSession)
+    .where(eq(authSession.userId, person.userId));
   return { enabled: login.on, secrets: secrets.length, sessions: sessions.length };
 };
 
@@ -89,21 +114,29 @@ describe("resetTwoFactorEffect", () => {
   it("refuses a workspace_admin on a tenant_admin and on another workspace_admin, and changes nothing", async () => {
     const peer = await addPerson("ws-peer", tenantId, "workspace_admin", true);
 
-    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, wsAdmin.userId, owner.partyId))).toMatchObject({ _tag: "Forbidden" });
-    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, wsAdmin.userId, peer.partyId))).toMatchObject({ _tag: "Forbidden" });
+    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, wsAdmin.userId, owner.partyId))).toMatchObject({
+      _tag: "Forbidden",
+    });
+    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, wsAdmin.userId, peer.partyId))).toMatchObject({
+      _tag: "Forbidden",
+    });
     expect(await stateOf(owner)).toEqual({ enabled: true, secrets: 1, sessions: 2 });
     expect(await stateOf(peer)).toEqual({ enabled: true, secrets: 1, sessions: 2 });
   });
 
   it("refuses anyone resetting their own Two-factor", async () => {
-    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, owner.userId, owner.partyId))).toMatchObject({ _tag: "Forbidden" });
+    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, owner.userId, owner.partyId))).toMatchObject({
+      _tag: "Forbidden",
+    });
     expect(await stateOf(owner)).toEqual({ enabled: true, secrets: 1, sessions: 2 });
   });
 
   it("answers NotFound for a member of another Account", async () => {
     const stranger = await addPerson("stranger", otherTenantId, "workspace_member", true);
 
-    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, owner.userId, stranger.partyId))).toMatchObject({ _tag: "NotFound" });
+    expect(await fail(resetTwoFactorEffect(test.pool, tenantId, owner.userId, stranger.partyId))).toMatchObject({
+      _tag: "NotFound",
+    });
     expect(await stateOf(stranger)).toEqual({ enabled: true, secrets: 1, sessions: 2 });
   });
 });

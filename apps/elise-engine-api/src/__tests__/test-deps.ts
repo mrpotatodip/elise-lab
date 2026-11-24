@@ -13,7 +13,18 @@ import { noOwnerDb, noTenantDb } from "./no-tenant-db";
 // -----
 export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   scanRepo: () => memoryScanRepo().repo,
-  monthSpend: () => Effect.succeed({ spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: true, plan: null }),
+  monthSpend: () =>
+    Effect.succeed({
+      spentUsd: 0,
+      scans: 0,
+      tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      budgetOverrideUsd: null,
+      budgetAllowanceUsd: null,
+      platformSpentUsd: 0,
+      platformReservedUsd: 0,
+      ownKey: true,
+      plan: null,
+    }),
   holdCredit: () => Effect.succeed({ held: true, balanceUsd: 0 }),
   connectedRunnerSources: () => Effect.succeed(["git", "archive"]),
   linkArchive: () => Effect.void,

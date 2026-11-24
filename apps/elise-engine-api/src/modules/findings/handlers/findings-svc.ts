@@ -8,7 +8,11 @@ import { findingRepoIdEffect, listFindingsEffect, setTriageEffect } from "#/modu
 // One more row than asked tells whether another
 // page exists; the cursor is the next offset.
 // -----
-export const listFindingsSvc = (db: AppDbType, accountId: string, query: FindingsQuery): Effect.Effect<FindingList, DbError> =>
+export const listFindingsSvc = (
+  db: AppDbType,
+  accountId: string,
+  query: FindingsQuery,
+): Effect.Effect<FindingList, DbError> =>
   Effect.gen(function* () {
     const rows = yield* listFindingsEffect(db, accountId, query);
     const hasMore = rows.length > query.limit;

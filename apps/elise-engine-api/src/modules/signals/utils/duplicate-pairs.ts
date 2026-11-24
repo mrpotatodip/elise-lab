@@ -4,11 +4,17 @@ export type FindingPair = { fingerprint: string; other: string };
 
 export const duplicatePairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-const related = (a: PairFinding, b: PairFinding) => (a.class !== null && a.class === b.class) || (a.file !== null && a.file === b.file);
+const related = (a: PairFinding, b: PairFinding) =>
+  (a.class !== null && a.class === b.class) || (a.file !== null && a.file === b.file);
 
 const byFingerprint = (x: PairFinding, y: PairFinding) => x.fingerprint.localeCompare(y.fingerprint);
 
-export const duplicatePairsOf = (fresh: readonly PairFinding[], open: readonly PairFinding[], known: ReadonlySet<string>, cap: number) => {
+export const duplicatePairsOf = (
+  fresh: readonly PairFinding[],
+  open: readonly PairFinding[],
+  known: ReadonlySet<string>,
+  cap: number,
+) => {
   const seen = new Set<string>(known);
   const all: FindingPair[] = [];
   const sortedOpen = open.toSorted(byFingerprint);

@@ -17,13 +17,34 @@ export { weighedScanWhere } from "#/modules/verdict/utils";
 // branch), their findings, and the decisions people made about
 // the repo. The History is not read.
 // -----
-export const commitEvidenceEffect = (db: AppDbType, tenantId: string, repoId: string, commit: string): Effect.Effect<CommitEvidence, DbError> =>
+export const commitEvidenceEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+  commit: string,
+): Effect.Effect<CommitEvidence, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const scanRows = await db
-        .select({ id: scans.id, createdAt: scans.createdAt, skill: scans.skill, profile: scans.profile, partial: scans.partial, profileMet: scans.profileMet, priorsGiven: scans.priorsGiven, priorsUnchecked: scans.priorsUnchecked })
+        .select({
+          id: scans.id,
+          createdAt: scans.createdAt,
+          skill: scans.skill,
+          profile: scans.profile,
+          partial: scans.partial,
+          profileMet: scans.profileMet,
+          priorsGiven: scans.priorsGiven,
+          priorsUnchecked: scans.priorsUnchecked,
+        })
         .from(scans)
-        .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), eq(scans.commitSha, commit), eq(scans.status, "succeeded")))
+        .where(
+          and(
+            eq(scans.tenantId, tenantId),
+            eq(scans.repoId, repoId),
+            eq(scans.commitSha, commit),
+            eq(scans.status, "succeeded"),
+          ),
+        )
         .orderBy(desc(scans.createdAt))
         .limit(VERDICT_SCAN_FETCH_LIMIT);
       if (scanRows.length === 0) return { scans: [], findings: [], triage: [] };
@@ -53,7 +74,13 @@ export const commitEvidenceEffect = (db: AppDbType, tenantId: string, repoId: st
           ),
         );
       const triage = await db
-        .select({ fingerprint: scanFindingTriage.fingerprint, status: scanFindingTriage.status, note: scanFindingTriage.note, acceptedUntil: scanFindingTriage.acceptedUntil, duplicateOf: scanFindingTriage.duplicateOf })
+        .select({
+          fingerprint: scanFindingTriage.fingerprint,
+          status: scanFindingTriage.status,
+          note: scanFindingTriage.note,
+          acceptedUntil: scanFindingTriage.acceptedUntil,
+          duplicateOf: scanFindingTriage.duplicateOf,
+        })
         .from(scanFindingTriage)
         .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId)));
       return { scans: scanRows, findings, triage };

@@ -18,10 +18,24 @@ const torn: string[] = [];
 let metered: ScanUsage | null = null;
 let failTeardown = false;
 
-const USAGE: ScanUsage = { inputTokens: 1000, outputTokens: 500, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.5, turns: 3, durationMs: 4000 };
+const USAGE: ScanUsage = {
+  inputTokens: 1000,
+  outputTokens: 500,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  costUsd: 0.5,
+  turns: 3,
+  durationMs: 4000,
+};
 const HOLD_USD = 3;
 const NOW = new Date("2026-11-19T09:00:00Z");
-const OPTIONS: ScanOptions = { skill: "full", model: "claude-sonnet-5-5", effort: "high", profile: "quick", maxBudgetUsd: 2 };
+const OPTIONS: ScanOptions = {
+  skill: "full",
+  model: "claude-sonnet-5-5",
+  effort: "high",
+  profile: "quick",
+  maxBudgetUsd: 2,
+};
 
 const app = tenantRouteApp(() => test, {
   teardownScan: async (_env, scanId) => {
@@ -37,17 +51,30 @@ const newScan = async (status: "queued" | "running", options: { held?: boolean; 
   counter += 1;
   const scanId = `stop-cloud-${counter}`;
   const repoId = await seedRepo(test, tenantId, `https://github.com/octocat/cloud-${counter}`);
-  await test.raw.insert(scans).values(scanValues(tenantId, repoId, scanId, "2026-11-19T09:00:00Z", { status, skill: "full", maxBudgetUsd: "2.00" }));
+  await test.raw
+    .insert(scans)
+    .values(
+      scanValues(tenantId, repoId, scanId, "2026-11-19T09:00:00Z", { status, skill: "full", maxBudgetUsd: "2.00" }),
+    );
   if (options.held !== false) await run(holdCreditEffect(test.pool, { tenantId, scanId, holdUsd: HOLD_USD }));
   if (options.runnerJob === true) {
-    const params: ScanParams = { scanId, accountId: tenantId, repo: "https://github.com/octocat/Hello-World", options: OPTIONS, keySource: "account", runnerId, createdAt: NOW.toISOString() };
+    const params: ScanParams = {
+      scanId,
+      accountId: tenantId,
+      repo: "https://github.com/octocat/Hello-World",
+      options: OPTIONS,
+      keySource: "account",
+      runnerId,
+      createdAt: NOW.toISOString(),
+    };
     await runnerSandbox(test.http, params, runnerId, () => NOW).launchAgent(OPTIONS);
   }
   return scanId;
 };
 
 const stop = (scanId: string) => callAs(app, tenantId, `/scans/${scanId}/stop`, { method: "POST" });
-const settleRows = (scanId: string) => test.raw.select().from(tenantCreditLedger).where(eq(tenantCreditLedger.scanId, scanId));
+const settleRows = (scanId: string) =>
+  test.raw.select().from(tenantCreditLedger).where(eq(tenantCreditLedger.scanId, scanId));
 const settledOf = async (scanId: string) => (await settleRows(scanId)).find((row) => row.kind === "scan_settle");
 
 beforeAll(async () => {
@@ -55,12 +82,26 @@ beforeAll(async () => {
   const seeded = await seedTenant(test, "stop-cloud-account");
   tenantId = seeded.tenantId;
   const userId = crypto.randomUUID();
-  await test.raw.insert(authUser).values({ id: userId, name: "Ada", email: "stop-cloud@example.com", emailVerified: true, partyId: seeded.partyId });
-  runnerId = (await run(createRunnerEffect(test.http, { tenantId, actorUserId: userId, name: "stopper", codeHash: "cloud-code", expiresAt: new Date("2026-11-19T10:00:00Z") }))).id;
+  await test.raw
+    .insert(authUser)
+    .values({ id: userId, name: "Ada", email: "stop-cloud@example.com", emailVerified: true, partyId: seeded.partyId });
+  runnerId = (
+    await run(
+      createRunnerEffect(test.http, {
+        tenantId,
+        actorUserId: userId,
+        name: "stopper",
+        codeHash: "cloud-code",
+        expiresAt: new Date("2026-11-19T10:00:00Z"),
+      }),
+    )
+  ).id;
   await run(claimPairingEffect(test.http, { codeHash: "cloud-code", tokenHash: "cloud-token", now: NOW }));
   const [pro] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "pro"));
   await test.raw.insert(tenantSubscriptions).values({ tenantId, planId: pro.id, status: "active", source: "grant" });
-  await test.raw.insert(tenantCreditLedger).values({ tenantId, kind: "topup", amountUsd: "100.0000", idempotencyKey: "stop-cloud-topup" });
+  await test.raw
+    .insert(tenantCreditLedger)
+    .values({ tenantId, kind: "topup", amountUsd: "100.0000", idempotencyKey: "stop-cloud-topup" });
 });
 
 afterAll(async () => {

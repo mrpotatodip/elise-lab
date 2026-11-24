@@ -21,10 +21,7 @@ export type AGUILoadingPresenceOptions = {
   lingerMs?: number;
 };
 
-export function initialAGUILoadingPresence(
-  active: boolean,
-  waiting = false,
-): AGUILoadingPresence {
+export function initialAGUILoadingPresence(active: boolean, waiting = false): AGUILoadingPresence {
   if (active) return "running";
   return waiting ? "waiting" : "hidden";
 }
@@ -47,8 +44,6 @@ export function presenceOnActiveChange(
   return "hidden";
 }
 
-export function presenceOnLingerElapsed(
-  presence: AGUILoadingPresence,
-): AGUILoadingPresence {
+export function presenceOnLingerElapsed(presence: AGUILoadingPresence): AGUILoadingPresence {
   return presence === "lingering" ? "hidden" : presence;
 }

@@ -9,7 +9,17 @@ import {
   TeamTwoFactorResetSchema,
 } from "@repo/contracts/elise";
 import { z } from "zod";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, json, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  json,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 const SESSION = '  -H "authorization: Bearer $SESSION_TOKEN" \\';
 const ACCOUNT = `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`;
@@ -29,7 +39,10 @@ export const listTeamDoc = describeRoute({
     ],
     example: ["List the team:", bash(`curl ${EXAMPLE_BASE_URL}/team \\`, SESSION, ACCOUNT)],
   }),
-  responses: { 200: jsonResponse("Members and pending invites.", envelope(TeamListSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("Members and pending invites.", envelope(TeamListSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });
 
 export const listTeamRolesDoc = describeRoute({
@@ -37,7 +50,8 @@ export const listTeamRolesDoc = describeRoute({
   security: SERVICE_SECURITY,
   summary: "List the Roles an invite can give",
   description: routeText({
-    context: "The invite form needs the Roles it may offer. `tenant_admin` is never on the list: an invite cannot make an admin.",
+    context:
+      "The invite form needs the Roles it may offer. `tenant_admin` is never on the list: an invite cannot make an admin.",
     steps: [
       "The Worker checks the session and that the login's Role in the account holds `company:team:members:read`.",
       "The Worker returns the account's enabled Roles except `tenant_admin`.",
@@ -65,11 +79,20 @@ export const createTeamInviteDoc = describeRoute({
     ],
     example: [
       "Invite Bo as store staff:",
-      bash(`curl -X POST ${EXAMPLE_BASE_URL}/team/invites \\`, SESSION, ACCOUNT + " \\", '  -H "Content-Type: application/json" \\', `  -d '{"email":"bo@example.com","role":"workspace_member"}'`),
+      bash(
+        `curl -X POST ${EXAMPLE_BASE_URL}/team/invites \\`,
+        SESSION,
+        ACCOUNT + " \\",
+        '  -H "Content-Type: application/json" \\',
+        `  -d '{"email":"bo@example.com","role":"workspace_member"}'`,
+      ),
       json(`{ "data": { "token": "Zr0tQ1...", "invite": ${INVITE_EXAMPLE} }, "error": null }`),
     ],
   }),
-  responses: { 201: jsonResponse("The invite and its one-time token.", envelope(CreatedTeamInviteSchema)), ...errorResponses(400, 401, 403, 409) },
+  responses: {
+    201: jsonResponse("The invite and its one-time token.", envelope(CreatedTeamInviteSchema)),
+    ...errorResponses(400, 401, 403, 409),
+  },
 });
 
 export const revokeTeamInviteDoc = describeRoute({
@@ -83,9 +106,15 @@ export const revokeTeamInviteDoc = describeRoute({
       "The Worker marks the pending invite revoked and writes an audit row.",
       "An invite that is accepted, already revoked, expired or from another account gets 404.",
     ],
-    example: ["Revoke an invite:", bash(`curl -X DELETE ${EXAMPLE_BASE_URL}/team/invites/${INVITE_ID} \\`, SESSION, ACCOUNT)],
+    example: [
+      "Revoke an invite:",
+      bash(`curl -X DELETE ${EXAMPLE_BASE_URL}/team/invites/${INVITE_ID} \\`, SESSION, ACCOUNT),
+    ],
   }),
-  responses: { 200: jsonResponse("The ID of the revoked invite.", envelope(z.object({ id: z.uuid() }))), ...errorResponses(400, 401, 403, 404) },
+  responses: {
+    200: jsonResponse("The ID of the revoked invite.", envelope(z.object({ id: z.uuid() }))),
+    ...errorResponses(400, 401, 403, 404),
+  },
 });
 
 export const resetTeamMemberTwoFactorDoc = describeRoute({
@@ -93,16 +122,23 @@ export const resetTeamMemberTwoFactorDoc = describeRoute({
   security: SERVICE_SECURITY,
   summary: "Reset a member's Two-factor",
   description: routeText({
-    context: "An admin helps a member who lost both their Authenticator and their Backup codes. The member signs in with the password and sets Two-factor up again.",
+    context:
+      "An admin helps a member who lost both their Authenticator and their Backup codes. The member signs in with the password and sets Two-factor up again.",
     steps: [
       "The Worker checks the session and that the login's Role in the account holds `company:team:two_factor:reset`.",
       "The Worker refuses a reset of your own Two-factor, and a reset of an admin by a `workspace_admin`, with 403.",
       "The Worker deletes the member's Authenticator secret and Backup codes, turns Two-factor off, signs the member out everywhere and writes an audit row.",
       "A party that holds no Role in the account gets 404.",
     ],
-    example: ["Reset a member:", bash(`curl -X POST ${EXAMPLE_BASE_URL}/team/members/${INVITE_ID}/two-factor/reset \\`, SESSION, ACCOUNT)],
+    example: [
+      "Reset a member:",
+      bash(`curl -X POST ${EXAMPLE_BASE_URL}/team/members/${INVITE_ID}/two-factor/reset \\`, SESSION, ACCOUNT),
+    ],
   }),
-  responses: { 200: jsonResponse("The Party whose Two-factor was reset.", envelope(TeamTwoFactorResetSchema)), ...errorResponses(400, 401, 403, 404) },
+  responses: {
+    200: jsonResponse("The Party whose Two-factor was reset.", envelope(TeamTwoFactorResetSchema)),
+    ...errorResponses(400, 401, 403, 404),
+  },
 });
 
 export const getTwoFactorRequirementDoc = describeRoute({
@@ -110,11 +146,18 @@ export const getTwoFactorRequirementDoc = describeRoute({
   security: SERVICE_SECURITY,
   summary: "Read the Two-factor requirement",
   description: routeText({
-    context: "An account admin sees whether the account requires Two-factor of every member. The Team list shows who has it.",
-    steps: ["The Worker checks the session and that the login's Role in the account holds `company:team:members:read`.", "The Worker returns `required`."],
+    context:
+      "An account admin sees whether the account requires Two-factor of every member. The Team list shows who has it.",
+    steps: [
+      "The Worker checks the session and that the login's Role in the account holds `company:team:members:read`.",
+      "The Worker returns `required`.",
+    ],
     example: ["Read it:", bash(`curl ${EXAMPLE_BASE_URL}/team/two-factor-requirement \\`, SESSION, ACCOUNT)],
   }),
-  responses: { 200: jsonResponse("The requirement.", envelope(TeamTwoFactorRequirementSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("The requirement.", envelope(TeamTwoFactorRequirementSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });
 
 export const setTwoFactorRequirementDoc = describeRoute({
@@ -131,10 +174,19 @@ export const setTwoFactorRequirementDoc = describeRoute({
     ],
     example: [
       "Require it:",
-      bash(`curl -X PUT ${EXAMPLE_BASE_URL}/team/two-factor-requirement \\`, SESSION, `${ACCOUNT} \\`, '  -H "Content-Type: application/json" \\', `  -d '{"required":true}'`),
+      bash(
+        `curl -X PUT ${EXAMPLE_BASE_URL}/team/two-factor-requirement \\`,
+        SESSION,
+        `${ACCOUNT} \\`,
+        '  -H "Content-Type: application/json" \\',
+        `  -d '{"required":true}'`,
+      ),
     ],
   }),
-  responses: { 200: jsonResponse("The requirement.", envelope(TeamTwoFactorRequirementSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("The requirement.", envelope(TeamTwoFactorRequirementSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });
 
 export const previewTeamInviteDoc = describeRoute({
@@ -149,7 +201,10 @@ export const previewTeamInviteDoc = describeRoute({
     ],
     example: ["Open an invite:", bash(`curl ${EXAMPLE_BASE_URL}/team/invites/$TOKEN`)],
   }),
-  responses: { 200: jsonResponse("What the invite is for.", envelope(TeamInvitePreviewSchema)), ...errorResponses(403) },
+  responses: {
+    200: jsonResponse("What the invite is for.", envelope(TeamInvitePreviewSchema)),
+    ...errorResponses(403),
+  },
 });
 
 export const acceptTeamInviteDoc = describeRoute({
@@ -166,9 +221,16 @@ export const acceptTeamInviteDoc = describeRoute({
     ],
     example: [
       "A new person accepts:",
-      bash(`curl -X POST ${EXAMPLE_BASE_URL}/team/invites/$TOKEN/accept \\`, '  -H "Content-Type: application/json" \\', `  -d '{"firstName":"Bo","lastName":"Chen","password":"correct-horse-battery"}'`),
+      bash(
+        `curl -X POST ${EXAMPLE_BASE_URL}/team/invites/$TOKEN/accept \\`,
+        '  -H "Content-Type: application/json" \\',
+        `  -d '{"firstName":"Bo","lastName":"Chen","password":"correct-horse-battery"}'`,
+      ),
       json(`{ "data": { "tenantId": "${EXAMPLE_ACCOUNT_ID}" }, "error": null }`),
     ],
   }),
-  responses: { 200: jsonResponse("The account the person joined.", envelope(AcceptedTeamInviteSchema)), ...errorResponses(400, 403, 409) },
+  responses: {
+    200: jsonResponse("The account the person joined.", envelope(AcceptedTeamInviteSchema)),
+    ...errorResponses(400, 403, 409),
+  },
 });

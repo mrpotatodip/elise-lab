@@ -1,5 +1,12 @@
 import { authUser } from "@repo/db-elise";
-import { parties, partyMasterTypes, partyPersons, scanFindingComments, scanFindings, scans } from "@repo/db-elise/schema";
+import {
+  parties,
+  partyMasterTypes,
+  partyPersons,
+  scanFindingComments,
+  scanFindings,
+  scans,
+} from "@repo/db-elise/schema";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -18,7 +25,11 @@ const CommentThreadSchema = z.object({ events: z.array(FindingCommentSchema) });
 const FINGERPRINT = "a".repeat(64);
 const REPO = "https://github.com/octocat/Hello-World";
 const THREAD_URL = `/findings/comments?repo=${REPO}&fingerprint=${FINGERPRINT}`;
-const MEMBER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:dashboard:read", "company:summary:read", "company:findings:comments:create"]);
+const MEMBER: ReadonlySet<AccessPower> = new Set<AccessPower>([
+  "company:dashboard:read",
+  "company:summary:read",
+  "company:findings:comments:create",
+]);
 const READER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:dashboard:read", "company:summary:read"]);
 const WATCHER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:summary:read"]);
 
@@ -29,15 +40,26 @@ const app = tenantRouteApp(() => test, {
 
 const call = (path: string, init: { method?: string; body?: unknown; token?: boolean } = {}) => {
   const { env } = fakeBindings();
-  const headers = new Headers({ authorization: `Bearer ${init.token ? TEST_TOKEN : "session-token"}`, "x-account-id": tenantId, "content-type": "application/json" });
+  const headers = new Headers({
+    authorization: `Bearer ${init.token ? TEST_TOKEN : "session-token"}`,
+    "x-account-id": tenantId,
+    "content-type": "application/json",
+  });
   const body = init.body === undefined ? undefined : JSON.stringify(init.body);
-  return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers, body }), env, testExecutionContext);
+  return app.fetch(
+    new Request(`http://localhost${path}`, { method: init.method, headers, body }),
+    env,
+    testExecutionContext,
+  );
 };
 
-const post = (body: string, token = false) => call("/findings/comments", { method: "POST", body: { repo: REPO, fingerprint: FINGERPRINT, body }, token });
+const post = (body: string, token = false) =>
+  call("/findings/comments", { method: "POST", body: { repo: REPO, fingerprint: FINGERPRINT, body }, token });
 
 const threadBodies = async () => {
-  const { data } = z.object({ data: CommentThreadSchema }).parse(await (await call(THREAD_URL, { token: true })).json());
+  const { data } = z
+    .object({ data: CommentThreadSchema })
+    .parse(await (await call(THREAD_URL, { token: true })).json());
   return data.events.map((event) => event.body);
 };
 
@@ -47,8 +69,19 @@ beforeAll(async () => {
   tenantId = seeded.tenantId;
   repoId = await seedRepo(test, tenantId);
   await test.raw.insert(scans).values(scanValues(tenantId, repoId, "scan-1", "2026-11-01T00:00:00Z"));
-  await test.raw.insert(scanFindings).values({ tenantId, scanId: "scan-1", findingId: "F-1", fingerprint: FINGERPRINT, status: "confirmed", severity: "high", title: "a problem", class: "authz" });
-  await test.raw.insert(authUser).values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: seeded.partyId });
+  await test.raw.insert(scanFindings).values({
+    tenantId,
+    scanId: "scan-1",
+    findingId: "F-1",
+    fingerprint: FINGERPRINT,
+    status: "confirmed",
+    severity: "high",
+    title: "a problem",
+    class: "authz",
+  });
+  await test.raw
+    .insert(authUser)
+    .values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: seeded.partyId });
 });
 
 afterAll(async () => {
@@ -66,7 +99,10 @@ describe("who may read and write a thread", () => {
     const res = await post("Fixed in the next release.");
     const thread = z.object({ data: CommentThreadSchema }).parse(await (await call(THREAD_URL)).json()).data;
 
-    expect([res.status, thread.events.map((event) => [event.body, event.authorName])]).toEqual([201, [["Fixed in the next release.", "Ada Rossi"]]]);
+    expect([res.status, thread.events.map((event) => [event.body, event.authorName])]).toEqual([
+      201,
+      [["Fixed in the next release.", "Ada Rossi"]],
+    ]);
   });
 
   it("lets a login without the create Power read the thread and refuses its comment", async () => {
@@ -110,7 +146,10 @@ describe("what a comment may hold", () => {
   });
 
   it("refuses a comment on a fingerprint the Repo does not have", async () => {
-    const res = await call("/findings/comments", { method: "POST", body: { repo: REPO, fingerprint: "c".repeat(64), body: "Nothing here." } });
+    const res = await call("/findings/comments", {
+      method: "POST",
+      body: { repo: REPO, fingerprint: "c".repeat(64), body: "Nothing here." },
+    });
 
     expect(res.status).toBe(404);
   });
@@ -121,7 +160,16 @@ describe("what a thread keeps", () => {
     await post("first");
     await post("second");
     await test.raw.insert(scans).values(scanValues(tenantId, repoId, "scan-2", "2026-11-02T00:00:00Z"));
-    await test.raw.insert(scanFindings).values({ tenantId, scanId: "scan-2", findingId: "F-1", fingerprint: FINGERPRINT, status: "confirmed", severity: "high", title: "a problem", class: "authz" });
+    await test.raw.insert(scanFindings).values({
+      tenantId,
+      scanId: "scan-2",
+      findingId: "F-1",
+      fingerprint: FINGERPRINT,
+      status: "confirmed",
+      severity: "high",
+      title: "a problem",
+      class: "authz",
+    });
 
     expect(await threadBodies()).toEqual(["first", "second"]);
   });
@@ -130,10 +178,14 @@ describe("what a thread keeps", () => {
     const [type] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
     const [gone] = await test.raw.insert(parties).values({ masterTypeId: type.id }).returning();
     await test.raw.insert(partyPersons).values({ partyId: gone.id, firstName: "Gone", lastName: "Person" });
-    await test.raw.insert(scanFindingComments).values({ tenantId, repoId, fingerprint: FINGERPRINT, authorPartyId: gone.id, body: "left behind" });
+    await test.raw
+      .insert(scanFindingComments)
+      .values({ tenantId, repoId, fingerprint: FINGERPRINT, authorPartyId: gone.id, body: "left behind" });
     await test.raw.delete(parties).where(eq(parties.id, gone.id));
 
-    const thread = z.object({ data: CommentThreadSchema }).parse(await (await call(THREAD_URL, { token: true })).json()).data;
+    const thread = z
+      .object({ data: CommentThreadSchema })
+      .parse(await (await call(THREAD_URL, { token: true })).json()).data;
 
     expect(thread.events.map((event) => [event.body, event.authorName])).toEqual([["left behind", null]]);
   });
@@ -141,7 +193,8 @@ describe("what a thread keeps", () => {
 
 describe("who may edit a comment", () => {
   const UNKNOWN_COMMENT_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-  const edit = (id: string, body: string, token = false) => call(`/findings/comments/${id}`, { method: "PATCH", body: { body }, token });
+  const edit = (id: string, body: string, token = false) =>
+    call(`/findings/comments/${id}`, { method: "PATCH", body: { body }, token });
 
   const writeAs = async (user: string, body: string) => {
     signedIn = user;
@@ -160,7 +213,14 @@ describe("who may edit a comment", () => {
     const res = await edit(written.id, "second draft");
     const saved = z.object({ data: FindingCommentSchema }).parse(await res.json()).data;
 
-    expect([res.status, saved.body, saved.authorName, saved.editedAt !== null, written.editedAt, await threadBodies()]).toEqual([200, "second draft", "Ada Rossi", true, null, ["second draft"]]);
+    expect([
+      res.status,
+      saved.body,
+      saved.authorName,
+      saved.editedAt !== null,
+      written.editedAt,
+      await threadBodies(),
+    ]).toEqual([200, "second draft", "Ada Rossi", true, null, ["second draft"]]);
   });
 
   it("keeps a comment unedited when the saved text is the text it already had", async () => {
@@ -197,7 +257,17 @@ describe("who may edit a comment", () => {
 
   it("refuses an edit of a deleted comment", async () => {
     const [login] = await test.raw.select().from(authUser).where(eq(authUser.id, "ada"));
-    const [deleted] = await test.raw.insert(scanFindingComments).values({ tenantId, repoId, fingerprint: FINGERPRINT, authorPartyId: login.partyId, body: "", deletedAt: new Date() }).returning();
+    const [deleted] = await test.raw
+      .insert(scanFindingComments)
+      .values({
+        tenantId,
+        repoId,
+        fingerprint: FINGERPRINT,
+        authorPartyId: login.partyId,
+        body: "",
+        deletedAt: new Date(),
+      })
+      .returning();
     const res = await edit(deleted.id, "back again");
 
     expect(res.status).toBe(409);

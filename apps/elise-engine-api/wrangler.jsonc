@@ -12,18 +12,20 @@
     {
       "class_name": "FullScanSandbox",
       "scheduling_policy": "durable_object",
-      "images": { "sandbox": { "dockerfile": "./Dockerfile.full" } }
-    }
+      "images": { "sandbox": { "dockerfile": "./Dockerfile.full" } },
+    },
   ],
   "durable_objects": {
-    "bindings": [{ "class_name": "FullScanSandbox", "name": "SANDBOX_FULL" }]
+    "bindings": [{ "class_name": "FullScanSandbox", "name": "SANDBOX_FULL" }],
   },
   // ScanSandbox was the lite Sandbox class: its "deleted" entry retires it, and a lite Scan that is still running loses its Sandbox and its Workflow (elise-scan-workflow is no longer bound). Deploy this only when no lite Scan is queued or running. Keep the entry until the next deploy has gone out; it is harmless after that.
   "exports": {
     "ScanSandbox": { "type": "durable-object", "state": "deleted" },
-    "FullScanSandbox": { "type": "durable-object", "storage": "sqlite" }
+    "FullScanSandbox": { "type": "durable-object", "storage": "sqlite" },
   },
-  "workflows": [{ "name": "elise-full-scan-workflow", "binding": "SCAN_WORKFLOW_FULL", "class_name": "FullScanWorkflow" }],
+  "workflows": [
+    { "name": "elise-full-scan-workflow", "binding": "SCAN_WORKFLOW_FULL", "class_name": "FullScanWorkflow" },
+  ],
   "ratelimits": [
     { "name": "SIGN_UP_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },
     { "name": "SIGN_IN_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
@@ -36,7 +38,7 @@
     { "name": "PASSWORD_RESET_ADDRESS_LIMITER", "namespace_id": "1009", "simple": { "limit": 3, "period": 60 } },
     { "name": "SIGN_UP_TOTAL_LIMITER", "namespace_id": "1010", "simple": { "limit": 20, "period": 60 } },
     { "name": "VERIFICATION_RESEND_LIMITER", "namespace_id": "1011", "simple": { "limit": 5, "period": 60 } },
-    { "name": "VERIFICATION_RESEND_ADDRESS_LIMITER", "namespace_id": "1012", "simple": { "limit": 3, "period": 60 } }
+    { "name": "VERIFICATION_RESEND_ADDRESS_LIMITER", "namespace_id": "1012", "simple": { "limit": 3, "period": 60 } },
   ],
   "r2_buckets": [{ "binding": "REPORTS", "bucket_name": "repo-scan-reports" }],
   // Upload retention (docs/adr/0008-git-providers.md): once a day the scheduled handler deletes zips no Scan has read 30 days after upload, and upload objects with no row.
@@ -48,11 +50,33 @@
   "queues": {
     "producers": [{ "binding": "EMAIL_QUEUE", "queue": "elise-invite-emails" }],
     "consumers": [
-      { "queue": "elise-invite-emails", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 4, "dead_letter_queue": "elise-invite-emails-dlq" },
-      { "queue": "elise-invite-emails-dlq", "max_batch_size": 10, "max_batch_timeout": 5 }
-    ]
+      {
+        "queue": "elise-invite-emails",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 4,
+        "dead_letter_queue": "elise-invite-emails-dlq",
+      },
+      { "queue": "elise-invite-emails-dlq", "max_batch_size": 10, "max_batch_timeout": 5 },
+    ],
   },
-  "vars": { "ENVIRONMENT": "production", "MODEL": "claude-sonnet-5-5", "EFFORT": "high", "MAX_BUDGET_FULL_USD": "18", "MAX_ACTIVE_SCANS": "3", "MAX_ACTIVE_FULL_SCANS": "1", "MONTHLY_BUDGET_USD": "20", "BUDGET_ALLOWANCE_USD": "1000", "BILLING_ENFORCED": "false", "STRIPE_BRANDING_ICON_FILE_ID": "file_1UeVDnJwpb6MWU7esr4SUtOQ", "STRIPE_BRANDING_LOGO_FILE_ID": "file_1UeV8FJwpb6MWU7eo8WtPrkC","DASHBOARD_URL": "https://app.eliselab.com", "EMAIL_FROM": "no-reply@hello.eliselab.com", "AUTH_BASE_URL": "https://api.eliselab.com", "AUTH_TRUSTED_ORIGINS": "https://api.eliselab.com,https://app.eliselab.com,http://localhost:3000" }
+  "vars": {
+    "ENVIRONMENT": "production",
+    "MODEL": "claude-sonnet-5-5",
+    "EFFORT": "high",
+    "MAX_BUDGET_FULL_USD": "18",
+    "MAX_ACTIVE_SCANS": "3",
+    "MAX_ACTIVE_FULL_SCANS": "1",
+    "MONTHLY_BUDGET_USD": "20",
+    "BUDGET_ALLOWANCE_USD": "1000",
+    "BILLING_ENFORCED": "false",
+    "STRIPE_BRANDING_ICON_FILE_ID": "file_1UeVDnJwpb6MWU7esr4SUtOQ",
+    "STRIPE_BRANDING_LOGO_FILE_ID": "file_1UeV8FJwpb6MWU7eo8WtPrkC",
+    "DASHBOARD_URL": "https://app.eliselab.com",
+    "EMAIL_FROM": "no-reply@hello.eliselab.com",
+    "AUTH_BASE_URL": "https://api.eliselab.com",
+    "AUTH_TRUSTED_ORIGINS": "https://api.eliselab.com,https://app.eliselab.com,http://localhost:3000",
+  },
   // MONTHLY_BUDGET_USD is the default monthly spend per account with no plan (a plan's included credit is the default instead; tenants.monthly_scan_budget_usd overrides both).
   // BUDGET_ALLOWANCE_USD is the most an admin may set as the monthly budget (tenants.monthly_scan_budget_allowance_usd overrides it for one account).
   // BILLING_ENFORCED: "true" refuses new scans from an account with no plan row; "false" does not refuse an own-key or Runner scan for it. A scan on the platform's key needs a plan whatever this says (NO_ACTIVE_PLAN, #135); an account with its own key and no plan runs on its key. Accounts that have a plan row follow it either way.

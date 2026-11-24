@@ -43,7 +43,15 @@ const queue = async (repo: ReturnType<typeof neonScanRepo>, params: ScanParams, 
   return record;
 };
 
-const usage = { inputTokens: 10, outputTokens: 20, cacheReadTokens: 30, cacheWriteTokens: 40, costUsd: 0.1234, turns: 5, durationMs: 9000 };
+const usage = {
+  inputTokens: 10,
+  outputTokens: 20,
+  cacheReadTokens: 30,
+  cacheWriteTokens: 40,
+  costUsd: 0.1234,
+  turns: 5,
+  durationMs: 9000,
+};
 
 describe("neonScanRepo", () => {
   it("creates a queued scan that get returns", async () => {
@@ -67,14 +75,21 @@ describe("neonScanRepo", () => {
     // SAFETY: a scan stored before the model left SCAN_MODELS, as the database may still hold it.
     await queue(repo, { ...params, options: { ...params.options, model: "claude-opus-5-5" as "claude-haiku-5-5" } });
 
-    expect(await Effect.runPromise(repo.get(acme, "a-retired-model"))).toMatchObject({ scanId: "a-retired-model", model: "claude-opus-5-5" });
+    expect(await Effect.runPromise(repo.get(acme, "a-retired-model"))).toMatchObject({
+      scanId: "a-retired-model",
+      model: "claude-opus-5-5",
+    });
   });
 
   it("moves through a step to a final state, with usage", async () => {
     const repo = neonScanRepo(test.http);
     await queue(repo, paramsFor(acme, "a-flow"));
     await Effect.runPromise(repo.mark(acme, "a-flow", { status: "running", step: "auditing" }));
-    expect(await Effect.runPromise(repo.get(acme, "a-flow"))).toMatchObject({ status: "running", step: "auditing", finishedAt: null });
+    expect(await Effect.runPromise(repo.get(acme, "a-flow"))).toMatchObject({
+      status: "running",
+      step: "auditing",
+      finishedAt: null,
+    });
 
     await Effect.runPromise(repo.mark(acme, "a-flow", { status: "succeeded", error: null, usage }));
     const done = await Effect.runPromise(repo.get(acme, "a-flow"));
@@ -88,7 +103,11 @@ describe("neonScanRepo", () => {
     await queue(repo, paramsFor(acme, "a-fail"));
     await Effect.runPromise(repo.mark(acme, "a-fail", { status: "failed", error: "boom" }));
 
-    expect(await Effect.runPromise(repo.get(acme, "a-fail"))).toMatchObject({ status: "failed", error: "boom", usage: null });
+    expect(await Effect.runPromise(repo.get(acme, "a-fail"))).toMatchObject({
+      status: "failed",
+      error: "boom",
+      usage: null,
+    });
   });
 
   it("lists the files a scan saved, by name, and finds each by name", async () => {
@@ -103,8 +122,15 @@ describe("neonScanRepo", () => {
     const scan = await Effect.runPromise(repo.get(acme, "a-files"));
 
     expect(scan?.files).toEqual(["REPORT.md", "findings.json"]);
-    expect(scan?.artifacts?.[0]).toEqual({ name: "REPORT.md", sizeBytes: 7, contentType: "text/markdown; charset=utf-8" });
-    expect(await Effect.runPromise(repo.file(acme, "a-files", "REPORT.md"))).toEqual({ r2Key: "k/REPORT.md", contentType: "text/markdown; charset=utf-8" });
+    expect(scan?.artifacts?.[0]).toEqual({
+      name: "REPORT.md",
+      sizeBytes: 7,
+      contentType: "text/markdown; charset=utf-8",
+    });
+    expect(await Effect.runPromise(repo.file(acme, "a-files", "REPORT.md"))).toEqual({
+      r2Key: "k/REPORT.md",
+      contentType: "text/markdown; charset=utf-8",
+    });
     expect(await Effect.runPromise(repo.file(acme, "a-files", "missing.md"))).toBeNull();
   });
 
@@ -115,13 +141,19 @@ describe("neonScanRepo", () => {
     await Effect.runPromise(repo.addFiles(acme, "a-twice", [file]));
     await Effect.runPromise(repo.addFiles(acme, "a-twice", [{ ...file, sizeBytes: 9 }]));
 
-    expect((await Effect.runPromise(repo.get(acme, "a-twice")))?.artifacts).toEqual([{ name: "REPORT.md", sizeBytes: 9, contentType: "text/markdown; charset=utf-8" }]);
+    expect((await Effect.runPromise(repo.get(acme, "a-twice")))?.artifacts).toEqual([
+      { name: "REPORT.md", sizeBytes: 9, contentType: "text/markdown; charset=utf-8" },
+    ]);
   });
 
   it("shows nothing of another account", async () => {
     const repo = neonScanRepo(test.http);
     await queue(repo, paramsFor(other, "o-private"));
-    await Effect.runPromise(repo.addFiles(other, "o-private", [{ name: "REPORT.md", r2Key: "k/o", sizeBytes: 1, contentType: "text/markdown; charset=utf-8" }]));
+    await Effect.runPromise(
+      repo.addFiles(other, "o-private", [
+        { name: "REPORT.md", r2Key: "k/o", sizeBytes: 1, contentType: "text/markdown; charset=utf-8" },
+      ]),
+    );
 
     expect(await Effect.runPromise(repo.get(acme, "o-private"))).toBeNull();
     expect(await Effect.runPromise(repo.file(acme, "o-private", "REPORT.md"))).toBeNull();
@@ -159,14 +191,20 @@ describe("neonScanRepo", () => {
   it("judges each skill by its own window, for the account's list and for a newer request", async () => {
     const repo = neonScanRepo(test.http);
     await queue(repo, { ...paramsFor(acme, "win-lite"), repo: "https://github.com/octocat/win-lite" });
-    const fullRecord = await queue(repo, { ...paramsFor(acme, "win-full"), repo: "https://github.com/octocat/win-full", options: { ...paramsFor(acme, "x").options, skill: "full" } });
+    const fullRecord = await queue(repo, {
+      ...paramsFor(acme, "win-full"),
+      repo: "https://github.com/octocat/win-full",
+      options: { ...paramsFor(acme, "x").options, skill: "full" },
+    });
     const at120Minutes = Date.now() + 120 * 60 * 1000;
 
     const live = (await Effect.runPromise(repo.activeSince(acme, at120Minutes))).map((scan) => scan.scanId);
     expect(live).toContain("win-full");
     expect(live).not.toContain("win-lite");
 
-    const refused = await Effect.runPromise(Effect.flip(repo.create(paramsFor(acme, "win-full-2"), fullRecord.id, at120Minutes)));
+    const refused = await Effect.runPromise(
+      Effect.flip(repo.create(paramsFor(acme, "win-full-2"), fullRecord.id, at120Minutes)),
+    );
     expect(refused).toMatchObject({ _tag: "Conflict", message: "This repo already has an active scan: win-full" });
   });
 
@@ -174,10 +212,20 @@ describe("neonScanRepo", () => {
     const repo = neonScanRepo(test.http);
     await queue(repo, paramsFor(acme, "act-cloud"));
     await queue(repo, paramsFor(acme, "act-on-runner"));
-    const [runner] = await test.raw.insert(tenantRunners).values({ tenantId: acme, name: "desk", createdBy: acmePartyId }).returning();
-    await test.raw
-      .insert(scanRunnerJobs)
-      .values({ tenantId: acme, scanId: "act-on-runner", runnerId: runner.id, state: "queued", repoUrl: "https://github.com/octocat/act-on-runner", prompt: "p", optionsJson: "{}", priorsJson: "[]" });
+    const [runner] = await test.raw
+      .insert(tenantRunners)
+      .values({ tenantId: acme, name: "desk", createdBy: acmePartyId })
+      .returning();
+    await test.raw.insert(scanRunnerJobs).values({
+      tenantId: acme,
+      scanId: "act-on-runner",
+      runnerId: runner.id,
+      state: "queued",
+      repoUrl: "https://github.com/octocat/act-on-runner",
+      prompt: "p",
+      optionsJson: "{}",
+      priorsJson: "[]",
+    });
 
     const active = await Effect.runPromise(repo.activeSince(acme, Date.now()));
 
@@ -221,13 +269,24 @@ describe("neonScanRepo", () => {
 
   it("gives back the credit hold of a scan that stalled, with no charge", async () => {
     const repo = neonScanRepo(test.http);
-    const record = await queue(repo, { ...paramsFor(acme, "stall-hold-1"), repo: "https://github.com/octocat/stall-hold" });
-    await test.raw.insert(tenantCreditLedger).values({ tenantId: acme, kind: "scan_hold", amountUsd: "-3.0000", scanId: "stall-hold-1" });
+    const record = await queue(repo, {
+      ...paramsFor(acme, "stall-hold-1"),
+      repo: "https://github.com/octocat/stall-hold",
+    });
+    await test.raw
+      .insert(tenantCreditLedger)
+      .values({ tenantId: acme, kind: "scan_hold", amountUsd: "-3.0000", scanId: "stall-hold-1" });
 
     await Effect.runPromise(repo.create(paramsFor(acme, "stall-hold-2"), record.id, PAST_ANY_WINDOW()));
-    const entries = await test.raw.select({ kind: tenantCreditLedger.kind, amountUsd: tenantCreditLedger.amountUsd }).from(tenantCreditLedger).where(eq(tenantCreditLedger.scanId, "stall-hold-1"));
+    const entries = await test.raw
+      .select({ kind: tenantCreditLedger.kind, amountUsd: tenantCreditLedger.amountUsd })
+      .from(tenantCreditLedger)
+      .where(eq(tenantCreditLedger.scanId, "stall-hold-1"));
 
-    expect(entries.map((entry) => `${entry.kind} ${Number(entry.amountUsd)}`).toSorted()).toEqual(["scan_hold -3", "scan_settle 3"]);
+    expect(entries.map((entry) => `${entry.kind} ${Number(entry.amountUsd)}`).toSorted()).toEqual([
+      "scan_hold -3",
+      "scan_settle 3",
+    ]);
   });
 
   it("keeps the requested ref and the commit that was read", async () => {
@@ -235,7 +294,10 @@ describe("neonScanRepo", () => {
     await queue(repo, paramsFor(acme, "sha-1"), "release/1.2");
     await Effect.runPromise(repo.mark(acme, "sha-1", { commitSha: "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d" }));
 
-    expect(await Effect.runPromise(repo.get(acme, "sha-1"))).toMatchObject({ ref: "release/1.2", commitSha: "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d" });
+    expect(await Effect.runPromise(repo.get(acme, "sha-1"))).toMatchObject({
+      ref: "release/1.2",
+      commitSha: "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d",
+    });
   });
 
   it("lists the scans of one repo, or those in one state", async () => {
@@ -256,11 +318,42 @@ describe("neonScanRepo", () => {
     await queue(repo, paramsFor(acme, "sum-lite"));
     await queue(repo, { ...paramsFor(acme, "sum-full"), options: { ...paramsFor(acme, "x").options, skill: "full" } });
     await queue(repo, paramsFor(acme, "sum-running"));
-    for (const id of ["sum-lite", "sum-full"]) await Effect.runPromise(repo.mark(acme, id, { status: "succeeded", error: null }));
+    for (const id of ["sum-lite", "sum-full"])
+      await Effect.runPromise(repo.mark(acme, id, { status: "succeeded", error: null }));
     await test.raw.insert(scanFindings).values([
-      { tenantId: acme, scanId: "sum-lite", findingId: "F-1", fingerprint: "a".repeat(64), status: "confirmed", severity: "high", title: "t", class: "c", origin: "new" },
-      { tenantId: acme, scanId: "sum-lite", findingId: "F-2", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "t", class: "c", origin: "carried" },
-      { tenantId: acme, scanId: "sum-lite", findingId: "F-3", fingerprint: "c".repeat(64), status: "needs_validation", severity: null, title: "t", class: "c", origin: "new" },
+      {
+        tenantId: acme,
+        scanId: "sum-lite",
+        findingId: "F-1",
+        fingerprint: "a".repeat(64),
+        status: "confirmed",
+        severity: "high",
+        title: "t",
+        class: "c",
+        origin: "new",
+      },
+      {
+        tenantId: acme,
+        scanId: "sum-lite",
+        findingId: "F-2",
+        fingerprint: "b".repeat(64),
+        status: "confirmed",
+        severity: "high",
+        title: "t",
+        class: "c",
+        origin: "carried",
+      },
+      {
+        tenantId: acme,
+        scanId: "sum-lite",
+        findingId: "F-3",
+        fingerprint: "c".repeat(64),
+        status: "needs_validation",
+        severity: null,
+        title: "t",
+        class: "c",
+        origin: "new",
+      },
     ]);
 
     expect((await Effect.runPromise(repo.get(acme, "sum-lite")))?.summary).toEqual({
@@ -285,8 +378,28 @@ describe("neonScanRepo", () => {
     await test.raw.update(scans).set({ partial: false }).where(eq(scans.id, "sum-profile-clean"));
     await test.raw.update(scans).set({ partial: true }).where(eq(scans.id, "sum-profile"));
     await test.raw.insert(scanFindings).values([
-      { tenantId: acme, scanId: "sum-profile", findingId: "auth/x", fingerprint: "d".repeat(64), status: "confirmed", severity: "critical", title: "t", class: "full-audit", origin: "new" },
-      { tenantId: acme, scanId: "sum-profile", findingId: "cfg/y", fingerprint: "e".repeat(64), status: "needs_validation", severity: null, title: "t", class: "full-audit", origin: "new" },
+      {
+        tenantId: acme,
+        scanId: "sum-profile",
+        findingId: "auth/x",
+        fingerprint: "d".repeat(64),
+        status: "confirmed",
+        severity: "critical",
+        title: "t",
+        class: "full-audit",
+        origin: "new",
+      },
+      {
+        tenantId: acme,
+        scanId: "sum-profile",
+        findingId: "cfg/y",
+        fingerprint: "e".repeat(64),
+        status: "needs_validation",
+        severity: null,
+        title: "t",
+        class: "full-audit",
+        origin: "new",
+      },
     ]);
 
     expect((await Effect.runPromise(repo.get(acme, "sum-profile")))?.summary).toEqual({
@@ -297,7 +410,11 @@ describe("neonScanRepo", () => {
       carried: 0,
       recheck: null,
     });
-    expect((await Effect.runPromise(repo.get(acme, "sum-profile-clean")))?.summary).toMatchObject({ total: 0, needsValidation: 0, recheck: null });
+    expect((await Effect.runPromise(repo.get(acme, "sum-profile-clean")))?.summary).toMatchObject({
+      total: 0,
+      needsValidation: 0,
+      recheck: null,
+    });
     expect((await Effect.runPromise(repo.get(acme, "sum-full-old")))?.summary).toBeNull();
   });
 
@@ -308,9 +425,16 @@ describe("neonScanRepo", () => {
 
     await Effect.runPromise(repo.mark(acme, "late-1", { status: "succeeded", error: null, usage }));
     await Effect.runPromise(repo.mark(acme, "late-1", { step: "saving" }));
-    expect(await Effect.runPromise(repo.get(acme, "late-1"))).toMatchObject({ status: "failed", step: null, usage: null });
+    expect(await Effect.runPromise(repo.get(acme, "late-1"))).toMatchObject({
+      status: "failed",
+      step: null,
+      usage: null,
+    });
 
     await Effect.runPromise(repo.mark(acme, "late-1", { status: "failed", error: "the agent timed out" }));
-    expect(await Effect.runPromise(repo.get(acme, "late-1"))).toMatchObject({ status: "failed", error: "the agent timed out" });
+    expect(await Effect.runPromise(repo.get(acme, "late-1"))).toMatchObject({
+      status: "failed",
+      error: "the agent timed out",
+    });
   });
 });

@@ -37,7 +37,16 @@ describe("writeScanRecordEffect", () => {
     const withFinding: ScanRecord = {
       ...record,
       findings: [
-        { tenantId: ACCOUNT, scanId: "scan-1", findingId: "F-001", fingerprint: "a".repeat(64), status: "confirmed", severity: "high", title: "t", class: "authz" },
+        {
+          tenantId: ACCOUNT,
+          scanId: "scan-1",
+          findingId: "F-001",
+          fingerprint: "a".repeat(64),
+          status: "confirmed",
+          severity: "high",
+          title: "t",
+          class: "authz",
+        },
       ],
     };
     const error = await Effect.runPromise(Effect.flip(writeScanRecordEffect(db, withFinding)));

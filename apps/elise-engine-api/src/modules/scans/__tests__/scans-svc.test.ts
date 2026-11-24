@@ -17,7 +17,17 @@ const down = async () => {
   throw new Error("down");
 };
 
-const NO_SPEND: MonthSpend = { spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: false, plan: null };
+const NO_SPEND: MonthSpend = {
+  spentUsd: 0,
+  scans: 0,
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  budgetOverrideUsd: null,
+  budgetAllowanceUsd: null,
+  platformSpentUsd: 0,
+  platformReservedUsd: 0,
+  ownKey: false,
+  plan: null,
+};
 
 // -----
 // An Account on its own key and no Plan: every new Scan in our cloud runs
@@ -37,7 +47,13 @@ describe("createScanSvc", () => {
     const { env, createdFull } = fakeBindings();
     const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
 
-    expect(queued).toMatchObject({ status: "queued", skill: "full", profile: "quick", model: "claude-sonnet-5-5", maxBudgetUsd: 6 });
+    expect(queued).toMatchObject({
+      status: "queued",
+      skill: "full",
+      profile: "quick",
+      model: "claude-sonnet-5-5",
+      maxBudgetUsd: 6,
+    });
     expect(createdFull).toHaveLength(1);
   });
 
@@ -45,7 +61,11 @@ describe("createScanSvc", () => {
     const { env } = fakeBindings();
     const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
 
-    expect(await Effect.runPromise(repo.get("acme", queued.scanId))).toMatchObject({ status: "queued", repo: input.repo, step: null });
+    expect(await Effect.runPromise(repo.get("acme", queued.scanId))).toMatchObject({
+      status: "queued",
+      repo: input.repo,
+      step: null,
+    });
   });
 
   it("marks the scan failed when the workflow cannot start", async () => {
@@ -59,13 +79,19 @@ describe("createScanSvc", () => {
   });
 
   it("fails with DbError when the ledger is down", async () => {
-    const error = await Effect.runPromise(Effect.flip(createScanSvc(fakeBindings().env, brokenScanRepo, "acme", input, OWN)));
+    const error = await Effect.runPromise(
+      Effect.flip(createScanSvc(fakeBindings().env, brokenScanRepo, "acme", input, OWN)),
+    );
 
     expect(error._tag).toBe("DbError");
   });
 
   it("fails with Invalid when the dollar cap is above the profile's cap", async () => {
-    const error = await Effect.runPromise(Effect.flip(createScanSvc(fakeBindings().env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 7 }, OWN)));
+    const error = await Effect.runPromise(
+      Effect.flip(
+        createScanSvc(fakeBindings().env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 7 }, OWN),
+      ),
+    );
 
     expect(error._tag).toBe("Invalid");
   });
@@ -80,20 +106,40 @@ describe("createScanSvc", () => {
 
   describe("the limits of each path", () => {
     const RUNNER = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
-    const start = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) => Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, repoOf(name), OWN)));
-    const startOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) => Effect.runPromise(createScanSvc(env, repo, account, repoOf(name), OWN));
+    const start = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
+      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, repoOf(name), OWN)));
+    const startOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
+      Effect.runPromise(createScanSvc(env, repo, account, repoOf(name), OWN));
     const startOnRunner = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
-      Effect.runPromise(Effect.flip(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, () => Effect.succeed(["git"]))));
+      Effect.runPromise(
+        Effect.flip(
+          createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, () =>
+            Effect.succeed(["git"]),
+          ),
+        ),
+      );
     const startOnRunnerOk = (env: ReturnType<typeof fakeBindings>["env"], account: string, name: string) =>
-      Effect.runPromise(createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, () => Effect.succeed(["git"])));
+      Effect.runPromise(
+        createScanSvc(env, repo, account, { ...repoOf(name), runner_id: RUNNER }, RUNNER_SPEND(), undefined, () =>
+          Effect.succeed(["git"]),
+        ),
+      );
 
     it("counts the Scans of one account in our cloud on MAX_ACTIVE_FULL_SCANS, and a Scan on a Runner on MAX_ACTIVE_SCANS", async () => {
       const { env } = fakeBindings({ MAX_ACTIVE_SCANS: "1", MAX_ACTIVE_FULL_SCANS: "1" });
       await startOk(env, "acme", "a");
       await startOnRunnerOk(env, "acme", "b");
 
-      expect(await start(env, "acme", "c")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("full scans (limit 1)") });
-      expect(await startOnRunner(env, "acme", "d")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("Runner scans (limit 1)") });
+      expect(await start(env, "acme", "c")).toMatchObject({
+        _tag: "RateLimited",
+        code: "TOO_MANY_ACTIVE_SCANS",
+        message: expect.stringContaining("full scans (limit 1)"),
+      });
+      expect(await startOnRunner(env, "acme", "d")).toMatchObject({
+        _tag: "RateLimited",
+        code: "TOO_MANY_ACTIVE_SCANS",
+        message: expect.stringContaining("Runner scans (limit 1)"),
+      });
     });
 
     it("stores a Scan on a Runner as full, starts it on the full workflow and counts it on MAX_ACTIVE_SCANS only", async () => {
@@ -103,7 +149,11 @@ describe("createScanSvc", () => {
       expect(queued).toMatchObject({ status: "queued", skill: "full" });
       expect(await Effect.runPromise(repo.get("acme", queued.scanId))).toMatchObject({ skill: "full" });
       expect(createdFull).toHaveLength(1);
-      expect(await startOnRunner(env, "acme", "b")).toMatchObject({ _tag: "RateLimited", code: "TOO_MANY_ACTIVE_SCANS", message: expect.stringContaining("Runner scans (limit 1)") });
+      expect(await startOnRunner(env, "acme", "b")).toMatchObject({
+        _tag: "RateLimited",
+        code: "TOO_MANY_ACTIVE_SCANS",
+        message: expect.stringContaining("Runner scans (limit 1)"),
+      });
       expect(await startOnRunnerOk(env, "other", "c")).toMatchObject({ status: "queued" });
     });
 
@@ -166,14 +216,21 @@ const hold: HoldCredit = (_scanId, holdUsd) => {
 };
 const raced: HoldCredit = () => Effect.succeed({ held: false, balanceUsd: 1 });
 const DAY = 24 * 60 * 60 * 1000;
-const onPlan = (plan: Partial<PlanState>, rest: Partial<MonthSpend> = {}): MonthSpend => ({ ...NO_SPEND, plan: { ...TEAM, ...plan }, ...rest });
+const onPlan = (plan: Partial<PlanState>, rest: Partial<MonthSpend> = {}): MonthSpend => ({
+  ...NO_SPEND,
+  plan: { ...TEAM, ...plan },
+  ...rest,
+});
 
 describe("createScanSvc: the plan", () => {
   const outcome = (spend: MonthSpend, enforced: string) => {
     const { env } = fakeBindings({ BILLING_ENFORCED: enforced });
     return Effect.runPromise(
       createScanSvc(env, memoryScanRepo().repo, "acme", input, spend, hold).pipe(
-        Effect.match({ onSuccess: () => "queued", onFailure: (failure) => (failure._tag === "RateLimited" ? failure.code : failure._tag) }),
+        Effect.match({
+          onSuccess: () => "queued",
+          onFailure: (failure) => (failure._tag === "RateLimited" ? failure.code : failure._tag),
+        }),
       ),
     );
   };
@@ -184,14 +241,30 @@ describe("createScanSvc: the plan", () => {
     ["no plan and an own key, billing not enforced", OWN, "false", "queued"],
     ["an active plan", onPlan({}), "true", "queued"],
     ["a canceled plan", onPlan({ status: "canceled" }), "false", "NO_ACTIVE_PLAN"],
-    ["a past due plan inside the grace period", onPlan({ status: "past_due", pastDueSince: new Date(Date.now() - 3 * DAY) }), "true", "queued"],
-    ["a past due plan after the grace period", onPlan({ status: "past_due", pastDueSince: new Date(Date.now() - 8 * DAY) }), "true", "PAYMENT_FAILED"],
+    [
+      "a past due plan inside the grace period",
+      onPlan({ status: "past_due", pastDueSince: new Date(Date.now() - 3 * DAY) }),
+      "true",
+      "queued",
+    ],
+    [
+      "a past due plan after the grace period",
+      onPlan({ status: "past_due", pastDueSince: new Date(Date.now() - 8 * DAY) }),
+      "true",
+      "PAYMENT_FAILED",
+    ],
     ["an unpaid plan", onPlan({ status: "unpaid" }), "true", "PAYMENT_FAILED"],
   ])("with %s the scan is %s", async (_name, spend, enforced, expected) => {
     expect(await outcome(spend, enforced)).toBe(expected);
   });
 
-  const BYOK: Partial<PlanState> = { planKey: "byok", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0, monthlyScanAllowance: 300 };
+  const BYOK: Partial<PlanState> = {
+    planKey: "byok",
+    keySource: "account",
+    includedCreditUsd: 0,
+    creditBalanceUsd: 0,
+    monthlyScanAllowance: 300,
+  };
 
   it.each([
     ["a platform plan with credit for the hold", onPlan({ creditBalanceUsd: 49 }), "queued"],
@@ -203,7 +276,11 @@ describe("createScanSvc: the plan", () => {
     ["an account plan with no own key", onPlan(BYOK, { ownKey: false }), "OWN_KEY_REQUIRED"],
     ["an account plan with its last allowed scan", onPlan(BYOK, { ownKey: true, scans: 299 }), "queued"],
     ["an account plan with its allowance used", onPlan(BYOK, { ownKey: true, scans: 300 }), "SCAN_ALLOWANCE_EXCEEDED"],
-    ["a budget the admin set, counted in credit", onPlan({}, { spentUsd: 5, budgetOverrideUsd: 10 }), "MONTHLY_BUDGET_EXCEEDED"],
+    [
+      "a budget the admin set, counted in credit",
+      onPlan({}, { spentUsd: 5, budgetOverrideUsd: 10 }),
+      "MONTHLY_BUDGET_EXCEEDED",
+    ],
     ["a budget the admin set, with room in credit", onPlan({}, { spentUsd: 4, budgetOverrideUsd: 16 }), "queued"],
   ])("with %s the scan is %s", async (_name, spend, expected) => {
     expect(await outcome(spend, "true")).toBe(expected);
@@ -211,7 +288,9 @@ describe("createScanSvc: the plan", () => {
 
   it("says in the refusal that a top up is the way out", async () => {
     const { env } = fakeBindings();
-    const failure = await Effect.runPromise(Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", input, onPlan({ creditBalanceUsd: 1 }), hold)));
+    const failure = await Effect.runPromise(
+      Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", input, onPlan({ creditBalanceUsd: 1 }), hold)),
+    );
 
     expect(failure).toMatchObject({ message: expect.stringContaining("Top up in Settings") });
   });
@@ -219,7 +298,9 @@ describe("createScanSvc: the plan", () => {
   it("holds the scan's budget cap times the markup", async () => {
     held.length = 0;
     const { env } = fakeBindings();
-    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 1 }, onPlan({}), hold));
+    await Effect.runPromise(
+      createScanSvc(env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 1 }, onPlan({}), hold),
+    );
 
     expect(held).toEqual([1.5]);
   });
@@ -227,7 +308,9 @@ describe("createScanSvc: the plan", () => {
   it("takes no hold for a scan on the account's own key", async () => {
     held.length = 0;
     const { env } = fakeBindings();
-    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", input, onPlan(BYOK, { ownKey: true }), hold));
+    await Effect.runPromise(
+      createScanSvc(env, memoryScanRepo().repo, "acme", input, onPlan(BYOK, { ownKey: true }), hold),
+    );
 
     expect(held).toEqual([]);
   });
@@ -235,7 +318,9 @@ describe("createScanSvc: the plan", () => {
   it("fails a scan whose hold lost the race and does not start it", async () => {
     const { env, createdFull } = fakeBindings();
     const mem = memoryScanRepo();
-    const failure = await Effect.runPromise(Effect.flip(createScanSvc(env, mem.repo, "acme", input, onPlan({}), raced)));
+    const failure = await Effect.runPromise(
+      Effect.flip(createScanSvc(env, mem.repo, "acme", input, onPlan({}), raced)),
+    );
 
     expect(failure).toMatchObject({ _tag: "RateLimited", code: "INSUFFICIENT_CREDIT" });
     expect([...mem.rows.values()].map((row) => row.status)).toEqual(["failed"]);
@@ -251,7 +336,9 @@ describe("createScanSvc: the plan", () => {
     // SAFETY: the service calls only create on the workflow.
     const { env } = fakeBindings({ SCAN_WORKFLOW_FULL: { create: down } as never });
     const mem = memoryScanRepo();
-    await Effect.runPromise(Effect.flip(createScanSvc(env, mem.repo, "acme", input, onPlan({}), hold, undefined, release)));
+    await Effect.runPromise(
+      Effect.flip(createScanSvc(env, mem.repo, "acme", input, onPlan({}), hold, undefined, release)),
+    );
 
     expect(released).toEqual([...mem.rows.keys()]);
   });
@@ -272,7 +359,10 @@ const outcomeOf = (spend: MonthSpend, body: CreateScanBody = input) => {
   const { env } = fakeBindings();
   return Effect.runPromise(
     createScanSvc(env, memoryScanRepo().repo, "acme", body, spend, hold).pipe(
-      Effect.match({ onSuccess: () => "queued", onFailure: (failure) => (failure._tag === "RateLimited" ? failure.code : failure._tag) }),
+      Effect.match({
+        onSuccess: () => "queued",
+        onFailure: (failure) => (failure._tag === "RateLimited" ? failure.code : failure._tag),
+      }),
     ),
   );
 };
@@ -295,9 +385,17 @@ describe("createScanSvc: the cap of a profile and the monthly budget by key", ()
   });
 
   it.each([
-    ["a platform plan, over a budget the admin set", onPlan({}, { spentUsd: 19.5, budgetOverrideUsd: 20 }), "MONTHLY_BUDGET_EXCEEDED"],
+    [
+      "a platform plan, over a budget the admin set",
+      onPlan({}, { spentUsd: 19.5, budgetOverrideUsd: 20 }),
+      "MONTHLY_BUDGET_EXCEEDED",
+    ],
     ["no plan, the account's own key, over the default budget", { ...OWN, spentUsd: 500 }, "queued"],
-    ["no plan, the account's own key, over a budget the admin set", { ...OWN, spentUsd: 500, budgetOverrideUsd: 10 }, "MONTHLY_BUDGET_EXCEEDED"],
+    [
+      "no plan, the account's own key, over a budget the admin set",
+      { ...OWN, spentUsd: 500, budgetOverrideUsd: 10 },
+      "MONTHLY_BUDGET_EXCEEDED",
+    ],
   ])("with %s the scan is %s", async (_name, spend, expected) => {
     expect(await outcomeOf(spend)).toBe(expected);
   });
@@ -305,18 +403,32 @@ describe("createScanSvc: the cap of a profile and the monthly budget by key", ()
 
 const connected = () => Effect.succeed(["git"]);
 const gone = () => Effect.succeed(null);
-const RUNNER_SPEND = (): MonthSpend => onPlan({ planKey: "runner", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0 });
+const RUNNER_SPEND = (): MonthSpend =>
+  onPlan({ planKey: "runner", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0 });
 
 describe("createScanSvc: a Runner", () => {
   const RUNNER = "5b3f0d7e-61a4-4c2f-9d58-2f7a1c9e4b10";
   const onRunner: CreateScanBody = { ...input, runner_id: RUNNER };
-  const BYOK_PLAN: Partial<PlanState> = { planKey: "byok", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0, monthlyScanAllowance: 300 };
+  const BYOK_PLAN: Partial<PlanState> = {
+    planKey: "byok",
+    keySource: "account",
+    includedCreditUsd: 0,
+    creditBalanceUsd: 0,
+    monthlyScanAllowance: 300,
+  };
 
-  const outcome = (spend: MonthSpend, runnerConnected: () => Effect.Effect<string[] | null>, body: CreateScanBody = onRunner) => {
+  const outcome = (
+    spend: MonthSpend,
+    runnerConnected: () => Effect.Effect<string[] | null>,
+    body: CreateScanBody = onRunner,
+  ) => {
     const { env } = fakeBindings({ BILLING_ENFORCED: "true" });
     return Effect.runPromise(
       createScanSvc(env, memoryScanRepo().repo, "acme", body, spend, hold, runnerConnected).pipe(
-        Effect.match({ onSuccess: () => "queued", onFailure: (failure) => (failure._tag === "RateLimited" ? failure.code : failure._tag) }),
+        Effect.match({
+          onSuccess: () => "queued",
+          onFailure: (failure) => (failure._tag === "RateLimited" ? failure.code : failure._tag),
+        }),
       ),
     );
   };
@@ -334,7 +446,9 @@ describe("createScanSvc: a Runner", () => {
   it("stores a scan on a runner full on the full workflow", async () => {
     const { env, createdFull } = fakeBindings();
     const mem = memoryScanRepo();
-    const queued = await Effect.runPromise(createScanSvc(env, mem.repo, "acme", onRunner, RUNNER_SPEND(), hold, connected));
+    const queued = await Effect.runPromise(
+      createScanSvc(env, mem.repo, "acme", onRunner, RUNNER_SPEND(), hold, connected),
+    );
 
     expect(queued.skill).toBe("full");
     expect(mem.rows.get(queued.scanId)?.skill).toBe("full");
@@ -345,15 +459,23 @@ describe("createScanSvc: a Runner", () => {
     held.length = 0;
     const { env, createdFull } = fakeBindings({ BILLING_ENFORCED: "true" });
     const spend = onPlan({ creditBalanceUsd: 0 }, { spentUsd: 500, budgetOverrideUsd: 10 });
-    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, profile: "deep" }, spend, hold, connected));
+    await Effect.runPromise(
+      createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, profile: "deep" }, spend, hold, connected),
+    );
 
     expect(held).toEqual([]);
-    expect(createdFull[0].params).toMatchObject({ runnerId: RUNNER, keySource: "account", options: { skill: "full", profile: "deep", maxBudgetUsd: 50 } });
+    expect(createdFull[0].params).toMatchObject({
+      runnerId: RUNNER,
+      keySource: "account",
+      options: { skill: "full", profile: "deep", maxBudgetUsd: 50 },
+    });
   });
 
   it("gives a scan on a runner the safety cap by default and refuses a limit above it", async () => {
     const { env, createdFull } = fakeBindings();
-    await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, RUNNER_SPEND(), hold, connected));
+    await Effect.runPromise(
+      createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, RUNNER_SPEND(), hold, connected),
+    );
 
     expect(createdFull[0].params.options.maxBudgetUsd).toBe(50);
     expect(await outcome(RUNNER_SPEND(), connected, { ...onRunner, max_budget_usd: 60 })).toBe("Invalid");
@@ -365,7 +487,9 @@ describe("createScanSvc: a Runner", () => {
 
   it("refuses a runner when the caller cannot check it", async () => {
     const { env } = fakeBindings();
-    const failure = await Effect.runPromise(Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, RUNNER_SPEND())));
+    const failure = await Effect.runPromise(
+      Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, RUNNER_SPEND())),
+    );
 
     expect(failure).toMatchObject({ _tag: "Invalid" });
   });
@@ -378,7 +502,6 @@ describe("createScanSvc: a Runner", () => {
     expect(held).toEqual([]);
     expect(createdFull[0].params).toMatchObject({ runnerId: RUNNER, keySource: "account" });
   });
-
 });
 
 describe("createScanSvc: the ref", () => {
@@ -413,7 +536,9 @@ describe("detailScanSvc", () => {
   });
 
   it("fails with DbError when the ledger is down", async () => {
-    const error = await Effect.runPromise(Effect.flip(detailScanSvc(fakeBindings().env, brokenScanRepo, "acme", "abc")));
+    const error = await Effect.runPromise(
+      Effect.flip(detailScanSvc(fakeBindings().env, brokenScanRepo, "acme", "abc")),
+    );
 
     expect(error._tag).toBe("DbError");
   });
@@ -430,7 +555,10 @@ describe("detailScanSvc", () => {
   it("fails a scan whose workflow errored", async () => {
     // SAFETY: the service calls only create and get on the workflow.
     const { env } = fakeBindings({
-      SCAN_WORKFLOW_FULL: { create: async () => undefined, get: async () => ({ status: async () => ({ status: "errored", error: { name: "Error", message: "boom" } }) }) } as never,
+      SCAN_WORKFLOW_FULL: {
+        create: async () => undefined,
+        get: async () => ({ status: async () => ({ status: "errored", error: { name: "Error", message: "boom" } }) }),
+      } as never,
     });
     const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
     const status = await Effect.runPromise(detailScanSvc(env, repo, "acme", queued.scanId));
@@ -442,7 +570,9 @@ describe("detailScanSvc", () => {
     const { env } = fakeBindings();
     const queued = await Effect.runPromise(createScanSvc(env, repo, "acme", input, OWN));
     await Effect.runPromise(
-      repo.addFiles("acme", queued.scanId, [{ name: "REPORT.md", r2Key: "k", sizeBytes: 7, contentType: "text/markdown; charset=utf-8" }]),
+      repo.addFiles("acme", queued.scanId, [
+        { name: "REPORT.md", r2Key: "k", sizeBytes: 7, contentType: "text/markdown; charset=utf-8" },
+      ]),
     );
     const status = await Effect.runPromise(detailScanSvc(env, repo, "acme", queued.scanId));
 
@@ -452,16 +582,27 @@ describe("detailScanSvc", () => {
 
 describe("readScanFileSvc", () => {
   it("fails with NotFound for a file the ledger does not list", async () => {
-    const error = await Effect.runPromise(Effect.flip(readScanFileSvc(fakeBindings().env.REPORTS, repo, "acme", "abc", "REPORT.md")));
+    const error = await Effect.runPromise(
+      Effect.flip(readScanFileSvc(fakeBindings().env.REPORTS, repo, "acme", "abc", "REPORT.md")),
+    );
 
     expect(error._tag).toBe("NotFound");
   });
 
   it("fails with NotFound when the ledger lists a file that R2 lost", async () => {
     await Effect.runPromise(
-      repo.addFiles("acme", "abc", [{ name: "REPORT.md", r2Key: "accounts/acme/scans/abc/REPORT.md", sizeBytes: 1, contentType: "text/markdown; charset=utf-8" }]),
+      repo.addFiles("acme", "abc", [
+        {
+          name: "REPORT.md",
+          r2Key: "accounts/acme/scans/abc/REPORT.md",
+          sizeBytes: 1,
+          contentType: "text/markdown; charset=utf-8",
+        },
+      ]),
     );
-    const error = await Effect.runPromise(Effect.flip(readScanFileSvc(fakeBindings().env.REPORTS, repo, "acme", "abc", "REPORT.md")));
+    const error = await Effect.runPromise(
+      Effect.flip(readScanFileSvc(fakeBindings().env.REPORTS, repo, "acme", "abc", "REPORT.md")),
+    );
 
     expect(error._tag).toBe("NotFound");
   });
@@ -470,7 +611,14 @@ describe("readScanFileSvc", () => {
     const { env, store } = fakeBindings();
     store.set("accounts/other/scans/abc/REPORT.md", "# theirs");
     await Effect.runPromise(
-      repo.addFiles("acme", "abc", [{ name: "REPORT.md", r2Key: "accounts/other/scans/abc/REPORT.md", sizeBytes: 8, contentType: "text/markdown; charset=utf-8" }]),
+      repo.addFiles("acme", "abc", [
+        {
+          name: "REPORT.md",
+          r2Key: "accounts/other/scans/abc/REPORT.md",
+          sizeBytes: 8,
+          contentType: "text/markdown; charset=utf-8",
+        },
+      ]),
     );
     const error = await Effect.runPromise(Effect.flip(readScanFileSvc(env.REPORTS, repo, "acme", "abc", "REPORT.md")));
 
@@ -481,7 +629,14 @@ describe("readScanFileSvc", () => {
     const { env, store } = fakeBindings();
     store.set("accounts/acme/scans/abc/REPORT.md", "# r");
     await Effect.runPromise(
-      repo.addFiles("acme", "abc", [{ name: "REPORT.md", r2Key: "accounts/acme/scans/abc/REPORT.md", sizeBytes: 3, contentType: "text/markdown; charset=utf-8" }]),
+      repo.addFiles("acme", "abc", [
+        {
+          name: "REPORT.md",
+          r2Key: "accounts/acme/scans/abc/REPORT.md",
+          sizeBytes: 3,
+          contentType: "text/markdown; charset=utf-8",
+        },
+      ]),
     );
     const file = await Effect.runPromise(readScanFileSvc(env.REPORTS, repo, "acme", "abc", "REPORT.md"));
 

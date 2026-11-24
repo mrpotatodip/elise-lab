@@ -12,7 +12,11 @@ export type TwoFactorStatus = { enabled: boolean; setupRequired: boolean };
 export const twoFactorStatusEffect = (db: DbConnectType, userId: string): Effect.Effect<TwoFactorStatus, DbError> =>
   Effect.gen(function* () {
     const [login] = yield* Effect.tryPromise({
-      try: () => db.select({ partyId: authUser.partyId, enabled: authUser.twoFactorEnabled }).from(authUser).where(eq(authUser.id, userId)),
+      try: () =>
+        db
+          .select({ partyId: authUser.partyId, enabled: authUser.twoFactorEnabled })
+          .from(authUser)
+          .where(eq(authUser.id, userId)),
       catch: toDbError,
     });
     if (!login) return { enabled: false, setupRequired: false };
@@ -41,7 +45,10 @@ const partyHoldsAdminRoleEffect = (db: AppDbType, partyId: string): Effect.Effec
 
 export const loginIsTwoFactorAdminEffect = (db: AppDbType, userId: string): Effect.Effect<boolean, DbError> =>
   Effect.gen(function* () {
-    const [login] = yield* Effect.tryPromise({ try: () => db.select({ partyId: authUser.partyId }).from(authUser).where(eq(authUser.id, userId)), catch: toDbError });
+    const [login] = yield* Effect.tryPromise({
+      try: () => db.select({ partyId: authUser.partyId }).from(authUser).where(eq(authUser.id, userId)),
+      catch: toDbError,
+    });
     return login ? yield* partyHoldsAdminRoleEffect(db, login.partyId) : false;
   });
 
@@ -73,18 +80,44 @@ export const listAdminEmailsEffect = (db: AppDbType, tenantId: string): Effect.E
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows.map((row) => row.email)));
 
-export const noticeNamesEffect = (db: AppDbType, tenantId: string, actorUserId: string): Effect.Effect<{ accountName: string; actorName: string }, DbError> =>
+export const noticeNamesEffect = (
+  db: AppDbType,
+  tenantId: string,
+  actorUserId: string,
+): Effect.Effect<{ accountName: string; actorName: string }, DbError> =>
   Effect.gen(function* () {
-    const [tenant] = yield* Effect.tryPromise({ try: () => db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)), catch: toDbError });
-    const [actor] = yield* Effect.tryPromise({ try: () => db.select({ name: authUser.name }).from(authUser).where(eq(authUser.id, actorUserId)), catch: toDbError });
+    const [tenant] = yield* Effect.tryPromise({
+      try: () => db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)),
+      catch: toDbError,
+    });
+    const [actor] = yield* Effect.tryPromise({
+      try: () => db.select({ name: authUser.name }).from(authUser).where(eq(authUser.id, actorUserId)),
+      catch: toDbError,
+    });
     return { accountName: tenant?.name ?? "your account", actorName: actor?.name ?? "An admin" };
   });
 
-export const auditTwoFactorChange = async (db: AppDbType, userId: string, action: "two_factor.enabled" | "two_factor.disabled" | "two_factor.locked"): Promise<void> => {
+export const auditTwoFactorChange = async (
+  db: AppDbType,
+  userId: string,
+  action: "two_factor.enabled" | "two_factor.disabled" | "two_factor.locked",
+): Promise<void> => {
   const [login] = await db.select({ partyId: authUser.partyId }).from(authUser).where(eq(authUser.id, userId));
   const partyId = login?.partyId;
   if (!partyId) return;
-  const accounts = await db.selectDistinct({ tenantId: partyRoles.tenantId }).from(partyRoles).where(eq(partyRoles.partyId, partyId));
+  const accounts = await db
+    .selectDistinct({ tenantId: partyRoles.tenantId })
+    .from(partyRoles)
+    .where(eq(partyRoles.partyId, partyId));
   const tenantIds = accounts.flatMap(({ tenantId }) => (tenantId ? [tenantId] : []));
-  await Promise.all(tenantIds.map((tenantId) => insertAuditEntry(db, { actorPartyId: action === "two_factor.locked" ? null : partyId, action, subjectId: partyId, tenantId })));
+  await Promise.all(
+    tenantIds.map((tenantId) =>
+      insertAuditEntry(db, {
+        actorPartyId: action === "two_factor.locked" ? null : partyId,
+        action,
+        subjectId: partyId,
+        tenantId,
+      }),
+    ),
+  );
 };

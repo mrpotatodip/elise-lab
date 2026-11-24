@@ -6,7 +6,9 @@ const root = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf
 const ports = process.argv.slice(2).length ? process.argv.slice(2) : ["3100", "3200", "8787", "8788", "5174"];
 
 for (const port of ports) {
-  const pids = spawnSync("lsof", ["-ti", `tcp:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" }).stdout.split("\n").filter(Boolean);
+  const pids = spawnSync("lsof", ["-ti", `tcp:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" })
+    .stdout.split("\n")
+    .filter(Boolean);
   for (const pid of pids) {
     const command = spawnSync("ps", ["-o", "command=", "-p", pid], { encoding: "utf8" }).stdout;
     if (!command.includes(root)) {

@@ -1,8 +1,5 @@
 import { CHAT_BOT_THREAD_TITLE_MAX } from "../contracts";
-import {
-  CHAT_BOT_THREAD_TITLE_FALLBACK,
-  CHAT_BOT_THREAD_TITLE_WORD_LIMIT,
-} from "../constants";
+import { CHAT_BOT_THREAD_TITLE_FALLBACK, CHAT_BOT_THREAD_TITLE_WORD_LIMIT } from "../constants";
 
 // -----
 // First user message seeds Title; later
