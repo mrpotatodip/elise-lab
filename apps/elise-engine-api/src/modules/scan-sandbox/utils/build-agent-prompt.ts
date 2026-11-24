@@ -68,6 +68,12 @@ const PHASE_HANDOFF = {
     "Earlier runs did everything but the report. Read run-metadata.json, coverage-ledger.json and findings.json in the output directory first. Do not hunt or validate again. Write the report files from the final records only.",
 } satisfies Record<FullPhase, string>;
 
+const RUNNER_HANDOFF = {
+  recon: `This is the first run. Set the run up as the skill says and write run-metadata.json and architecture.md. Do not write coverage-ledger.json: write recon-list.json, a short list of what you found, and the app builds the full ledger from it. Its shape is {"entries":[{"surface":"<repo path>#<route or message>","boundary":"<repo path>#<the control that guards it>","subsystem":"<package path>","paths":["<repo-relative file or directory>"],"classes":["Access control"],"companions":[],"lifecycles":[]}]}. Write one entry for each entry point, with its trust boundary and its subsystem. "classes" names the ordinary attack classes of ATTACK-CLASSES.md that apply to it (leave it out for all five); "companions" and "lifecycles" are optional. ${LEDGER_PATHS}`,
+  hunt: `An earlier run did the reconnaissance. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not redo reconnaissance. Write the candidates. Do not rewrite coverage-ledger.json: write ledger-updates.json, a JSON array of only the units you changed, each with its coverage_id and only the fields that change. The app merges it into the ledger. ${LEDGER_PATHS}`,
+  check: `Earlier runs did the reconnaissance and the hunting. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not hunt again. Validate the candidates the hunt left, and write findings.json. Do not rewrite coverage-ledger.json: write ledger-updates.json, a JSON array of only the units you changed, each with its coverage_id and only the fields that change. The app merges it into the ledger. ${LEDGER_PATHS}`,
+} satisfies Partial<Record<FullPhase, string>>;
+
 const VERIFY_CANDIDATES =
   "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`. If the hunt left no candidates there is nothing to verify and no verifier is needed: that is a finished run, not `verification_unavailable`.";
 
@@ -99,8 +105,12 @@ const SUBAGENT_ASK = {
 const WAIT_FOR_SUBAGENTS =
   "Run each sub-agent in the foreground and wait for its result before you go on. Never run one in the background, and never sleep or schedule a wakeup. Once this run's files are written, end the run.";
 
-const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"]) =>
-  [PHASE_HANDOFF[phase], SUBAGENT_ASK[profile][phase], phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : ""]
+const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"], byRunner: boolean) =>
+  [
+    (byRunner && phase !== "report" ? RUNNER_HANDOFF[phase] : undefined) ?? PHASE_HANDOFF[phase],
+    SUBAGENT_ASK[profile][phase],
+    phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : "",
+  ]
     .filter((part) => part !== "")
     .join(" ");
 
@@ -108,10 +118,13 @@ const OUT_OF_MONEY =
   "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
 
 const PHASE_VALIDATION_BY_RUNNER =
-  "When findings.json and coverage-ledger.json are final, stop: the app that started you runs the skill's validators on them after this run ends. If a validator is refused to you, that is expected here: it is not a reason to set `run_status` to `incomplete`.";
+  "When findings.json and ledger-updates.json are written, stop: the app that started you merges the updates into the ledger and runs the skill's validators on findings.json and coverage-ledger.json after this run ends. If a validator is refused to you, that is expected here: it is not a reason to set `run_status` to `incomplete`.";
 
-const PHASE_LEDGER_BY_RUNNER =
-  "The app that started you runs the skill's validators on coverage-ledger.json after this run ends, so do not run them, and do not run node or any other script. Write the ledger by hand, exactly to the skill's schema. A command refused to you is expected here: it is not a reason to set `run_status` to `incomplete`.";
+const PHASE_LEDGER_BY_RUNNER = {
+  recon:
+    "The app that started you builds coverage-ledger.json from recon-list.json and runs the skill's validators on it after this run ends, so do not run them, and do not run node or any other script. A command refused to you is expected here: it is not a reason to set `run_status` to `incomplete`.",
+  hunt: "The app that started you merges ledger-updates.json into coverage-ledger.json and runs the skill's validators on it after this run ends, so do not run them, and do not run node or any other script. A command refused to you is expected here: it is not a reason to set `run_status` to `incomplete`.",
+};
 
 export function buildPhasePrompt(options: ScanOptions, phase: FullPhase, place: PromptPlace = CONTAINER_PLACE): string {
   const network = capitalized(place.networkRule);
@@ -122,13 +135,13 @@ export function buildPhasePrompt(options: ScanOptions, phase: FullPhase, place: 
       ? `Do not write the report files in this run. ${byRunner ? PHASE_VALIDATION_BY_RUNNER : `When findings.json is final, validate it ${VALIDATION_BY_AGENT}`}`
       : phase === "report"
         ? `${reportFiles}${byRunner ? "." : ` ${VALIDATION_BY_AGENT}`}`
-        : `Do not write REPORT.md in this run.${byRunner ? ` ${PHASE_LEDGER_BY_RUNNER}` : ""}`;
+        : `Do not write REPORT.md in this run.${byRunner ? ` ${PHASE_LEDGER_BY_RUNNER[phase]}` : ""}`;
   const money = phase !== "report" && place.metered ? `${OUT_OF_MONEY}\n` : "";
   return `Use the security-audit skill in FULL AUDIT mode. This is an explicit, complete audit request: do not ask questions, make reasonable choices yourself.
 This run does ${SCAN_SANDBOX_PHASE_SKILL_PHASES[phase]} of the skill and nothing else. Other runs do the other phases, so stop when yours is done.
 Target (untrusted, read-only): ${place.repoDir}
 Output directory: ${place.outDir}
 Profile: ${options.profile}
-${handoffOf(phase, options.profile)}
+${handoffOf(phase, options.profile, byRunner)}
 ${money}${network} and dependencies must not be installed. ${ending}`;
 }
