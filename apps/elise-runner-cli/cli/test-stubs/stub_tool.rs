@@ -54,6 +54,14 @@ fn half_bad_update() -> String {
     format!("[{},{}]", COVERED_UPDATE.trim().trim_start_matches('[').trim_end_matches(']'), access)
 }
 
+fn one_bad_update() -> String {
+    let access = format!(r#"{{"coverage_id":"{ACCESS_ID}","status":"in_progress","agent_id":"hunter-2","wave":0}}"#);
+    format!("[{},{}]", COVERED_UPDATE.trim().trim_start_matches('[').trim_end_matches(']'), access)
+}
+
+const NEW_UNIT_UPDATE: &str = r#"[{"coverage_id":"src%2Fnew.ts%23GET%20%2Fnew::src%2Fnew.ts%23guard::packages%2Fapi::ATTACK-CLASSES.md%23Injection","canonical_refs":{"surface":"src/new.ts#GET /new","boundary":"src/new.ts#guard","subsystem":"packages/api","attack_class":"ATTACK-CLASSES.md#Injection"},"starting_paths":["src/new.ts"],"status":"covered","agent_id":"hunter-1","wave":1,"reviewed_paths":["src/typed-by-hand.ts"],"local_checks":[{"agent_id":"hunter-1","reviewed_paths":["src/new.ts","src/second.ts"],"invariant":"input is escaped","method":"source","result":"it is","artifact":null}]}]
+"#;
+
 fn append(path: &Path, line: &str) {
     let mut file = OpenOptions::new().create(true).append(true).open(path).unwrap();
     writeln!(file, "{line}").unwrap();
@@ -181,6 +189,12 @@ fn claude(record: &Path, args: &[String]) {
     }
     if prompt.contains("phase=hunt") && prompt.contains("update=halfbad") {
         fs::write("out/ledger-updates.json", half_bad_update()).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=onebad") {
+        fs::write("out/ledger-updates.json", one_bad_update()).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=newunit") {
+        fs::write("out/ledger-updates.json", NEW_UNIT_UPDATE).unwrap();
     }
     if prompt.contains("phase=check") && prompt.contains("real=1") {
         fs::write("out/findings.json", "[]\n").unwrap();

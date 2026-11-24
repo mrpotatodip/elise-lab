@@ -127,6 +127,30 @@ fn a_stopped_hunt_with_one_bad_unit_update_is_sent_with_the_good_unit_kept_and_t
     let report = result["files"]["REPORT.md"].as_str().unwrap();
     assert!(report.starts_with("PARTIAL: money ran out;"), "{report}");
     assert!(report.contains("1 unit's update was not kept"), "{report}");
+    assert!(report.contains("kept as it was before the update, or left out if it was new"), "{report}");
+    assert!(!report.contains("count as not covered"), "{report}");
+}
+
+#[test]
+fn a_stopped_hunt_with_one_bad_unit_that_gives_one_error_line_keeps_the_good_unit() {
+    let (engine, _runner, _stubs) = run_with_hunt("scan_q", "update=onebad stop=limit");
+
+    let (_, result) = &engine.results()[0];
+    assert_eq!(result["state"], "succeeded", "{result}");
+    let ledger = ledger_of(result);
+    assert_eq!(ledger.iter().filter(|unit| unit["status"] == "covered").count(), 1, "{ledger:?}");
+    assert!(result["files"]["REPORT.md"].as_str().unwrap().contains("1 unit's update was not kept"));
+}
+
+#[test]
+fn a_new_units_reviewed_paths_are_computed_from_its_checks_too() {
+    let (engine, _runner, _stubs) = run_with_hunt("scan_n", "update=newunit");
+
+    let (_, result) = &engine.results()[0];
+    assert_eq!(result["state"], "succeeded", "{result}");
+    let ledger = ledger_of(result);
+    let added = ledger.iter().find(|unit| unit["surface"] == "src/new.ts#GET /new").unwrap();
+    assert_eq!(added["reviewed_paths"], serde_json::json!(["src/new.ts", "src/second.ts"]));
 }
 
 #[test]

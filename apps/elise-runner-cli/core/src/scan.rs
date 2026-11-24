@@ -1409,43 +1409,71 @@ async fn file_passes(tools: &Tools, work: &Path, stop: &Stop, script: &str, file
     path.is_file() && run_skill_script(tools, work, stop, script, &[path], file, "").await.is_ok()
 }
 
+fn error_indexes(said: &str) -> (Vec<usize>, Vec<usize>) {
+    let (mut named, mut between) = (Vec::new(), Vec::new());
+    for line in said.lines().map(str::trim) {
+        let Some(rest) = line.strip_prefix("ERROR: $[") else { continue };
+        let Some(index) = rest.split_once(']').and_then(|(number, _)| number.parse::<usize>().ok()) else { continue };
+        let collision = ["already uses coverage ID", "duplicate coverage ID", "canonical identity collision", "units must be sorted"];
+        if collision.iter().any(|kind| line.contains(kind)) {
+            between.push(index);
+            if line.contains("units must be sorted") {
+                between.extend(index.checked_sub(1));
+            }
+            between.extend(line.rsplit_once(" at $[").and_then(|(_, tail)| tail.split_once(']')?.0.parse::<usize>().ok()));
+        } else {
+            named.push(index);
+        }
+    }
+    (named, between)
+}
+
 async fn units_to_put_back(tools: &Tools, work: &Path, stop: &Stop, before: &str) -> Option<(String, usize)> {
     let path = work.join("out").join("coverage-ledger.json");
     let before: Vec<serde_json::Value> = serde_json::from_str(before).ok()?;
     let mut ledger: Vec<serde_json::Value> = serde_json::from_str(&fs::read_to_string(&path).ok()?).ok()?;
     let mut put_back = 0;
+    let mut valid = false;
     for _ in 0..=ledger.len() {
         let said =
             match skill_script_said(tools, work, stop, "validate-coverage-ledger.cjs", std::slice::from_ref(&path), "coverage-ledger.json")
                 .await
             {
-                Ok(Ok(())) => break,
+                Ok(Ok(())) => {
+                    valid = true;
+                    break;
+                }
                 Ok(Err(said)) => said,
                 Err(_) => return None,
             };
-        let failing: Vec<usize> = said.lines().filter_map(|line| line.strip_prefix("ERROR: $[")?.split_once(']')?.0.parse().ok()).collect();
-        if failing.is_empty() {
+        let (named, between) = error_indexes(&said);
+        if named.is_empty() && between.is_empty() {
             return None;
         }
+        let before_count = put_back;
         let mut next = Vec::new();
         for (index, unit) in ledger.into_iter().enumerate() {
-            if !failing.contains(&index) {
-                next.push(unit);
-                continue;
-            }
             let id = unit["coverage_id"].as_str();
             let last = before.iter().find(|old| id.is_some() && old["coverage_id"].as_str() == id);
-            if last == Some(&unit) {
+            let unchanged = last == Some(&unit);
+            if named.contains(&index) && unchanged {
                 return None;
             }
-            put_back += 1;
-            next.extend(last.cloned());
+            if named.contains(&index) || (between.contains(&index) && !unchanged) {
+                put_back += 1;
+                next.extend(last.cloned());
+            } else {
+                next.push(unit);
+            }
+        }
+        if put_back == before_count {
+            return None;
         }
         ledger = next;
         let text = serde_json::to_string_pretty(&ledger).ok()?;
         fs::write(&path, format!("{text}\n")).ok()?;
     }
-    if ledger.is_empty() {
+    if !valid || ledger.is_empty() {
         return None;
     }
     Some((fs::read_to_string(&path).ok()?, put_back))
@@ -1453,7 +1481,7 @@ async fn units_to_put_back(tools: &Tools, work: &Path, stop: &Stop, before: &str
 
 async fn partial_scan(tools: &Tools, job: &Job, work: &Path, limit: Limit, phase: &str, stop: &Stop) -> Option<Report> {
     let before = fs::read_to_string(work.join("out").join("coverage-ledger.json")).ok();
-    let _ = apply_phase_files(tools, job, work, phase, stop).await;
+    let merge_refused = apply_phase_files(tools, job, work, phase, stop).await.is_err();
     let mut files = out_files(work).ok()?;
     let mut not_kept = 0;
     if !file_passes(tools, work, stop, "validate-coverage-ledger.cjs", "coverage-ledger.json").await {
@@ -1504,9 +1532,14 @@ async fn partial_scan(tools: &Tools, job: &Job, work: &Path, limit: Limit, phase
         ));
     }
     if not_kept > 0 {
-        let (what, verb) = if not_kept == 1 { ("unit's update was", "stays") } else { ("units' updates were", "stay") };
+        let (what, each) = if not_kept == 1 { ("unit's update was", "that unit was") } else { ("units' updates were", "each unit was") };
         text.push_str(&format!(
-            "\n{not_kept} {what} not kept: the {phase} phase wrote them, but they did not pass the audit skill's check, so those units {verb} as they were before it, and count as not covered.\n"
+            "\n{not_kept} {what} not kept: the {phase} phase wrote them, but they did not pass the audit skill's check, so {each} kept as it was before the update, or left out if it was new.\n"
+        ));
+    }
+    if merge_refused {
+        text.push_str(&format!(
+            "\nThe {phase} phase's unit updates were not kept: the ledger builder refused the file the phase wrote, so none of its updates were applied and the ledger is as it was before the phase.\n"
         ));
     }
     text.push_str("\nThe findings in this Scan are only what the earlier phases wrote. An unreached unit was not checked, so this Scan does not show that the code is free of findings. Start another Scan for what was missed.\n");
@@ -2108,6 +2141,99 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert_eq!(report.state, "failed");
         assert!(report.error.unwrap().contains("cap was reached"));
         assert!(report.files.is_empty());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    const LEDGER_NODE: &str = r#"#!/bin/sh
+case "$(basename "$1")" in
+  build-coverage-ledger.cjs)
+    if [ -f merge-fails.txt ]; then cat merge-fails.txt >&2; exit 1; fi
+    if [ "$2" = merge ] && [ -f merged.json ]; then cp merged.json "$3"; fi ;;
+  validate-coverage-ledger.cjs)
+    if grep -q BAD "$2"; then cat errors.txt >&2; exit 1; fi ;;
+esac
+"#;
+
+    #[cfg(unix)]
+    fn stopped_hunt(name: &str, files: [(&str, &str); 2]) -> (Stage, Report) {
+        let stage = stage(name);
+        executable(&stage.tools.node.clone().unwrap(), LEDGER_NODE);
+        for (file, text) in files {
+            fs::write(stage.work.join(file), text).unwrap();
+        }
+        let job = phased_job([
+            "phase=recon ledger=1 cost=1",
+            "phase=hunt updates=1 stop=limit cost=11",
+            "phase=check cost=1",
+            "phase=report cost=1",
+        ]);
+        let report = scan(&stage, &job);
+        (stage, report)
+    }
+
+    #[cfg(unix)]
+    fn status_of(report: &Report, id: &str) -> Option<String> {
+        let ledger: Vec<serde_json::Value> = serde_json::from_str(&report.files["coverage-ledger.json"]).unwrap();
+        ledger.iter().find(|unit| unit["coverage_id"] == id).map(|unit| unit["status"].as_str().unwrap().to_string())
+    }
+
+    const MERGED_ONE_BAD: &str = r#"[{"coverage_id":"a","status":"covered","unresolved":[]},{"coverage_id":"b","status":"in_progress","BAD":true,"unresolved":[]},{"coverage_id":"c","status":"in_progress","unresolved":[]}]"#;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_stopped_hunt_with_one_bad_unit_that_gives_one_error_line_still_keeps_the_good_units() {
+        let (stage, report) =
+            stopped_hunt("partial-one-line", [("merged.json", MERGED_ONE_BAD), ("errors.txt", "ERROR: $[1].status: not allowed\n")]);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert_eq!(status_of(&report, "a").as_deref(), Some("covered"));
+        assert_eq!(status_of(&report, "b").as_deref(), Some("planned"));
+        assert!(report.files["REPORT.md"].contains("1 unit's update was not kept"), "{}", report.files["REPORT.md"]);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_collision_the_validator_reports_on_an_old_unit_drops_the_new_unit_it_names() {
+        let merged = r#"[{"coverage_id":"a","status":"covered","unresolved":[]},{"coverage_id":"b","status":"planned","unresolved":[]},{"coverage_id":"b2","status":"planned","BAD":true,"unresolved":[]},{"coverage_id":"c","status":"in_progress","unresolved":[]}]"#;
+        let errors = "ERROR: $[3].canonical_refs: semantic tuple already uses coverage ID \"b2\" at $[2]\n";
+        let (stage, report) = stopped_hunt("partial-collision", [("merged.json", merged), ("errors.txt", errors)]);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert_eq!(status_of(&report, "b2"), None);
+        assert_eq!(status_of(&report, "c").as_deref(), Some("in_progress"));
+        assert!(report.files["REPORT.md"].contains("1 unit's update was not kept"), "{}", report.files["REPORT.md"]);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_ledger_error_that_names_no_unit_still_fails_the_scan() {
+        let (stage, report) = stopped_hunt(
+            "partial-no-unit-named",
+            [("merged.json", MERGED_ONE_BAD), ("errors.txt", "ERROR: $: the ledger is not a list of units\n")],
+        );
+
+        assert_eq!(report.state, "failed");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_merge_the_builder_refuses_is_said_in_the_report_and_keeps_the_ledger_as_it_was() {
+        let (stage, report) = stopped_hunt(
+            "partial-merge-refused",
+            [
+                ("merged.json", MERGED_ONE_BAD),
+                ("merge-fails.txt", "ERROR: ledger-updates.json: updates[0]: a run may not change this field\n"),
+            ],
+        );
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert_eq!(status_of(&report, "a").as_deref(), Some("covered"));
+        assert_eq!(status_of(&report, "b").as_deref(), Some("planned"));
+        let text = &report.files["REPORT.md"];
+        assert!(text.contains("hunt phase's unit updates were not kept"), "{text}");
         let _ = fs::remove_dir_all(&stage.root);
     }
 
