@@ -5,7 +5,7 @@ export const requireTaggedErrorNameRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "Require `class X extends Data.TaggedError(\"X\")` to use the same name twice.",
+      description: 'Require `class X extends Data.TaggedError("X")` to use the same name twice.',
     },
     messages: {
       nameMismatch: "The class is `{{className}}` but its tag is `{{tag}}`. Use one string for both.",

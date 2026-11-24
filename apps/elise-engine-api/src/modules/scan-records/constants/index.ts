@@ -75,7 +75,8 @@ export const SCAN_RECORDS_PROFILE_CHECK_ROWS: readonly ProfileCheckRow[] = [
   {
     id: "hunter-wave",
     profile: "quick",
-    requirement: "One hunter wave ran: a unit with an owner is covered, blocked or a candidate, with a wave of 1 or more",
+    requirement:
+      "One hunter wave ran: a unit with an owner is covered, blocked or a candidate, with a wave of 1 or more",
     file: "coverage-ledger.json",
     field: "wave, agent_id and status of each unit",
     needsSkillChange: false,
@@ -83,7 +84,8 @@ export const SCAN_RECORDS_PROFILE_CHECK_ROWS: readonly ProfileCheckRow[] = [
   {
     id: "fresh-verifier-per-candidate",
     profile: "quick",
-    requirement: "Every candidate unit has a check by an agent that is not the unit's owner, and every finding record sits on such a unit",
+    requirement:
+      "Every candidate unit has a check by an agent that is not the unit's owner, and every finding record sits on such a unit",
     file: "coverage-ledger.json",
     field: "local_checks[].agent_id against agent_id, result_fingerprints and unresolved; fingerprint in findings.json",
     needsSkillChange: false,
@@ -91,7 +93,8 @@ export const SCAN_RECORDS_PROFILE_CHECK_ROWS: readonly ProfileCheckRow[] = [
   {
     id: "final-critic-pass",
     profile: "quick",
-    requirement: "One final critic pass ran (a unit deferred as quick_profile_final_critic is the critic's own output and counts)",
+    requirement:
+      "One final critic pass ran (a unit deferred as quick_profile_final_critic is the critic's own output and counts)",
     file: "run-metadata.json",
     field: "critic_passes[], or unresolved of a deferred unit in coverage-ledger.json",
     needsSkillChange: true,
@@ -115,7 +118,8 @@ export const SCAN_RECORDS_PROFILE_CHECK_ROWS: readonly ProfileCheckRow[] = [
   {
     id: "final-records-fresh-verifier",
     profile: "standard",
-    requirement: "Each confirmed or needs_validation record was verified in the final pass by an agent that is not the owner of its unit",
+    requirement:
+      "Each confirmed or needs_validation record was verified in the final pass by an agent that is not the owner of its unit",
     file: "run-metadata.json",
     field: "final_verifiers[].fingerprint and agent_id, against agent_id in coverage-ledger.json",
     needsSkillChange: true,
@@ -131,7 +135,8 @@ export const SCAN_RECORDS_PROFILE_CHECK_ROWS: readonly ProfileCheckRow[] = [
   {
     id: "critic-waves-to-clean",
     profile: "deep",
-    requirement: "Critic waves ran until one accepted nothing, and each wave that accepted work was followed by a later hunter wave",
+    requirement:
+      "Critic waves ran until one accepted nothing, and each wave that accepted work was followed by a later hunter wave",
     file: "run-metadata.json",
     field: "critic_passes[].wave and accepted, against wave in coverage-ledger.json",
     needsSkillChange: true,
@@ -139,7 +144,8 @@ export const SCAN_RECORDS_PROFILE_CHECK_ROWS: readonly ProfileCheckRow[] = [
   {
     id: "final-records-separate-verifier",
     profile: "deep",
-    requirement: "The final verifier of each confirmed or needs_validation record is not the owner or a validation verifier of its unit",
+    requirement:
+      "The final verifier of each confirmed or needs_validation record is not the owner or a validation verifier of its unit",
     file: "run-metadata.json",
     field: "final_verifiers[].agent_id, against every local_checks[].agent_id in coverage-ledger.json",
     needsSkillChange: true,

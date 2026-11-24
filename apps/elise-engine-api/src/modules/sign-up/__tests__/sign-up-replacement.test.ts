@@ -1,6 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { authUser, parties, partyPersons, partyRoles, platformMasterPlans, scanRepos, scans, tenants, tenantSubscriptions } from "@repo/db-elise/schema";
+import {
+  authUser,
+  parties,
+  partyPersons,
+  partyRoles,
+  platformMasterPlans,
+  scanRepos,
+  scans,
+  tenants,
+  tenantSubscriptions,
+} from "@repo/db-elise/schema";
 import { buildApp } from "#/index";
 import { buildAuth } from "#/lib/auth";
 import { fakeBindings, testExecutionContext } from "#/__tests__/fake-bindings";
@@ -33,7 +43,11 @@ const signUp = async (email: string, accountName: string) => {
   );
   const { env } = fakeBindings();
   return app.fetch(
-    new Request("http://localhost/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bodyFor(email, accountName)) }),
+    new Request("http://localhost/sign-up", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(bodyFor(email, accountName)),
+    }),
     env,
     testExecutionContext,
   );
@@ -56,9 +70,14 @@ const blockers = {
   },
   "a Stripe customer": async (tenantId: string) => {
     const [plan] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "pro"));
-    await test.raw
-      .insert(tenantSubscriptions)
-      .values({ tenantId, planId: plan.id, status: "canceled", source: "stripe", stripeCustomerId: "cus_x", stripeSubscriptionId: "sub_x" });
+    await test.raw.insert(tenantSubscriptions).values({
+      tenantId,
+      planId: plan.id,
+      status: "canceled",
+      source: "stripe",
+      stripeCustomerId: "cus_x",
+      stripeSubscriptionId: "sub_x",
+    });
   },
   "a Scan": async (tenantId: string) => {
     const repoId = await seedRepo(test, tenantId);
@@ -67,9 +86,16 @@ const blockers = {
   "another member": async (tenantId: string) => {
     const [admin] = await test.raw.select().from(partyRoles).where(eq(partyRoles.tenantId, tenantId));
     const [person] = await test.raw.select().from(partyPersons).limit(1);
-    const [party] = await test.raw.insert(parties).values({ masterTypeId: (await test.raw.select().from(parties).where(eq(parties.id, person.partyId)))[0].masterTypeId }).returning();
+    const [party] = await test.raw
+      .insert(parties)
+      .values({
+        masterTypeId: (await test.raw.select().from(parties).where(eq(parties.id, person.partyId)))[0].masterTypeId,
+      })
+      .returning();
     await test.raw.insert(partyPersons).values({ partyId: party.id, firstName: "Bo", lastName: "Kim" });
-    await test.raw.insert(partyRoles).values({ partyId: party.id, tenantId, roleId: admin.roleId, roleScope: admin.roleScope });
+    await test.raw
+      .insert(partyRoles)
+      .values({ partyId: party.id, tenantId, roleId: admin.roleId, roleScope: admin.roleScope });
   },
 } satisfies Record<string, (tenantId: string) => Promise<void>>;
 
@@ -114,7 +140,11 @@ describe("POST /sign-up for an email held by an unverified Login", () => {
       enqueueEmail: async () => undefined,
     });
     const verify = (link: string | undefined) =>
-      auth.handler(new Request(`http://localhost/auth/verify-email?token=${new URL(link ?? "http://none").searchParams.get("token")}`));
+      auth.handler(
+        new Request(
+          `http://localhost/auth/verify-email?token=${new URL(link ?? "http://none").searchParams.get("token")}`,
+        ),
+      );
 
     expect((await verify(oldLink)).status).toBe(401);
     expect((await loginOf("swap@example.com")).emailVerified).toBe(false);
@@ -122,20 +152,23 @@ describe("POST /sign-up for an email held by an unverified Login", () => {
     expect((await loginOf("swap@example.com")).emailVerified).toBe(true);
   });
 
-  it.each(["a Plan", "a Stripe customer", "a Scan", "another member"] as const)("is refused when the Account has %s, and keeps everything", async (reason) => {
-    const email = `${reason.replace(/\W+/g, "-").toLowerCase()}@example.com`;
-    await signUp(email, `Held ${reason}`);
-    const old = await loginOf(email);
-    const tenant = await accountOf(old.partyId);
-    await blockers[reason](tenant.id);
+  it.each(["a Plan", "a Stripe customer", "a Scan", "another member"] as const)(
+    "is refused when the Account has %s, and keeps everything",
+    async (reason) => {
+      const email = `${reason.replace(/\W+/g, "-").toLowerCase()}@example.com`;
+      await signUp(email, `Held ${reason}`);
+      const old = await loginOf(email);
+      const tenant = await accountOf(old.partyId);
+      await blockers[reason](tenant.id);
 
-    const res = await signUp(email, "Taker");
+      const res = await signUp(email, "Taker");
 
-    expect(res.status).toBe(409);
-    expect(JSON.stringify(await res.json())).toContain(SIGN_UP_REFUSED);
-    expect((await loginOf(email)).id).toBe(old.id);
-    expect((await accountOf(old.partyId)).id).toBe(tenant.id);
-  });
+      expect(res.status).toBe(409);
+      expect(JSON.stringify(await res.json())).toContain(SIGN_UP_REFUSED);
+      expect((await loginOf(email)).id).toBe(old.id);
+      expect((await accountOf(old.partyId)).id).toBe(tenant.id);
+    },
+  );
 
   it("gives a verified email the same refusal and keeps the Login", async () => {
     await signUp("done@example.com", "Done Co");
@@ -147,6 +180,11 @@ describe("POST /sign-up for an email held by an unverified Login", () => {
     expect(res.status).toBe(409);
     expect(JSON.stringify(await res.json())).toContain(SIGN_UP_REFUSED);
     expect((await loginOf("done@example.com")).id).toBe(old.id);
-    expect(await test.raw.select().from(scanRepos).where(eq(scanRepos.tenantId, (await accountOf(old.partyId)).id))).toHaveLength(0);
+    expect(
+      await test.raw
+        .select()
+        .from(scanRepos)
+        .where(eq(scanRepos.tenantId, (await accountOf(old.partyId)).id)),
+    ).toHaveLength(0);
   });
 });

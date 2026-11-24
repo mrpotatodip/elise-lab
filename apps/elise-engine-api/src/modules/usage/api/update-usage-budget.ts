@@ -11,21 +11,39 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.patch("/budget", updateUsageBudgetDoc, requirePower("company:usage:budget:update"), zValidator("header", AccountHeaderSchema), zValidator("json", UpdateUsageBudgetBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { monthlyBudgetUsd } = c.req.valid("json");
-  const userId = userIdOf(c);
-  const deps = c.get("deps");
-  const { usage, previousBudgetUsd, audience } = await deps.withTenant(c, accountId, (db) => runEffect(changeUsageBudgetSvc(c.env, db, accountId, userId, monthlyBudgetUsd)));
-  if (previousBudgetUsd !== usage.budgetUsd) {
-    const changedAt = new Date().toISOString();
-    const link = dashboardLinkOf(c.env.DASHBOARD_URL, "/settings/budget");
-    await enqueueEmailsQuietly(
-      (mail) => deps.enqueueEmail(c.env, mail),
-      audience.recipients.map((to) => ({ kind: "budget-changed", to, accountName: audience.accountName, actorName: audience.actorName, changedAt, previousBudgetUsd, budgetUsd: usage.budgetUsd, link })),
+app.patch(
+  "/budget",
+  updateUsageBudgetDoc,
+  requirePower("company:usage:budget:update"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", UpdateUsageBudgetBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { monthlyBudgetUsd } = c.req.valid("json");
+    const userId = userIdOf(c);
+    const deps = c.get("deps");
+    const { usage, previousBudgetUsd, audience } = await deps.withTenant(c, accountId, (db) =>
+      runEffect(changeUsageBudgetSvc(c.env, db, accountId, userId, monthlyBudgetUsd)),
     );
-  }
-  return c.json({ data: usage, error: null });
-});
+    if (previousBudgetUsd !== usage.budgetUsd) {
+      const changedAt = new Date().toISOString();
+      const link = dashboardLinkOf(c.env.DASHBOARD_URL, "/settings/budget");
+      await enqueueEmailsQuietly(
+        (mail) => deps.enqueueEmail(c.env, mail),
+        audience.recipients.map((to) => ({
+          kind: "budget-changed",
+          to,
+          accountName: audience.accountName,
+          actorName: audience.actorName,
+          changedAt,
+          previousBudgetUsd,
+          budgetUsd: usage.budgetUsd,
+          link,
+        })),
+      );
+    }
+    return c.json({ data: usage, error: null });
+  },
+);
 
 export default app;

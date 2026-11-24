@@ -12,7 +12,11 @@ const app = new Hono<AppEnv>();
 
 app.get("/", getCreditDoc, zValidator("header", AccountHeaderSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(monthSpendEffect(db, accountId, monthStartOf(new Date())).pipe(Effect.map(creditBalanceOf))));
+  const data = await c
+    .get("deps")
+    .withTenant(c, accountId, (db) =>
+      runEffect(monthSpendEffect(db, accountId, monthStartOf(new Date())).pipe(Effect.map(creditBalanceOf))),
+    );
   return c.json({ data, error: null });
 });
 

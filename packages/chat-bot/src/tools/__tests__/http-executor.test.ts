@@ -46,21 +46,22 @@ function json(body: ChatBotJson, status = 200) {
 describe("executeChatBotHttpTool", () => {
   it("fills the path, adds the rest and userId as query, unwraps data", async () => {
     const rt = runtime(json({ data: { price: 42.5 }, error: null }));
-    const result = await execute(
-      spec,
-      { cardId: "Kaido 058", currency: "NZD" },
-      rt,
-    );
+    const result = await execute(spec, { cardId: "Kaido 058", currency: "NZD" }, rt);
     expect(result).toEqual({ price: 42.5 });
     const [path, init] = vi.mocked(rt.fetch).mock.calls[0]!;
-    expect(path).toBe(
-      "/api-agent/prices/Kaido%20058?currency=NZD&userId=user-1",
-    );
+    expect(path).toBe("/api-agent/prices/Kaido%20058?currency=NZD&userId=user-1");
     expect(init?.method).toBe("GET");
   });
 
   it("never lets the model override userId", async () => {
-    const loose = { ...spec, inputSchema: { type: "object", properties: { cardId: { type: "string" }, userId: { type: "string" } }, required: ["cardId"] } };
+    const loose = {
+      ...spec,
+      inputSchema: {
+        type: "object",
+        properties: { cardId: { type: "string" }, userId: { type: "string" } },
+        required: ["cardId"],
+      },
+    };
     const rt = runtime(json({ price: 1 }));
     await execute(loose, { cardId: "c1", userId: "someone-else" }, rt);
     const [path] = vi.mocked(rt.fetch).mock.calls[0]!;
@@ -76,11 +77,14 @@ describe("executeChatBotHttpTool", () => {
   });
 
   it("refuses paths outside the allowed prefix", async () => {
-    for (const path of ["/admin/users", "/api-agent/../admin", "https://evil.test/api-agent/x", "//evil.test/api-agent/x"]) {
+    for (const path of [
+      "/admin/users",
+      "/api-agent/../admin",
+      "https://evil.test/api-agent/x",
+      "//evil.test/api-agent/x",
+    ]) {
       const rt = runtime(json({ price: 1 }));
-      expect(
-        await execute({ ...spec, path }, { cardId: "c1" }, rt),
-      ).toEqual({ error: "path not allowed" });
+      expect(await execute({ ...spec, path }, { cardId: "c1" }, rt)).toEqual({ error: "path not allowed" });
       expect(rt.fetch).not.toHaveBeenCalled();
     }
   });
@@ -103,16 +107,12 @@ describe("executeChatBotHttpTool", () => {
           }),
       ),
     };
-    expect(
-      await execute({ ...spec, timeoutMs: 100 }, { cardId: "c1" }, rt),
-    ).toEqual({ error: "timed out" });
+    expect(await execute({ ...spec, timeoutMs: 100 }, { cardId: "c1" }, rt)).toEqual({ error: "timed out" });
   });
 
   it("rejects oversized responses", async () => {
     const big = JSON.stringify({ price: 1, pad: "x".repeat(CHAT_BOT_HTTP_MAX_RESPONSE_BYTES) });
-    expect(
-      await execute(spec, { cardId: "c1" }, runtime(new Response(big))),
-    ).toEqual({ error: "response too large" });
+    expect(await execute(spec, { cardId: "c1" }, runtime(new Response(big)))).toEqual({ error: "response too large" });
   });
 
   it("reports envelope errors and HTTP failures", async () => {
@@ -123,24 +123,20 @@ describe("executeChatBotHttpTool", () => {
         runtime(json({ data: null, error: { code: "NOT_FOUND", message: "Card not found" } }, 404)),
       ),
     ).toEqual({ error: "Card not found" });
-    expect(
-      await execute(spec, { cardId: "c1" }, runtime(json({ nope: true }, 500))),
-    ).toEqual({ error: "endpoint returned 500" });
+    expect(await execute(spec, { cardId: "c1" }, runtime(json({ nope: true }, 500)))).toEqual({
+      error: "endpoint returned 500",
+    });
   });
 
   it("rejects a result that fails the row's result schema", async () => {
-    expect(
-      await execute(spec, { cardId: "c1" }, runtime(json({ price: "cheap" }))),
-    ).toEqual({ error: "unexpected response" });
+    expect(await execute(spec, { cardId: "c1" }, runtime(json({ price: "cheap" })))).toEqual({
+      error: "unexpected response",
+    });
   });
 
   it("sends a JSON body for POST", async () => {
     const rt = runtime(json({ price: 2 }));
-    await execute(
-      { ...spec, method: "POST", path: "/api-agent/prices" },
-      { cardId: "c1" },
-      rt,
-    );
+    await execute({ ...spec, method: "POST", path: "/api-agent/prices" }, { cardId: "c1" }, rt);
     const [path, init] = vi.mocked(rt.fetch).mock.calls[0]!;
     expect(path).toBe("/api-agent/prices?userId=user-1");
     expect(init?.body).toBe(JSON.stringify({ cardId: "c1" }));

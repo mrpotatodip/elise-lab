@@ -31,7 +31,10 @@ export const NeedsValidationFindingRecordSchema = z.object({
   validation_plan: z.object({ local: z.string().optional(), deployment: z.string().optional() }),
 });
 
-export const LiveFindingRecordSchema = z.discriminatedUnion("verdict", [ConfirmedFindingRecordSchema, NeedsValidationFindingRecordSchema]);
+export const LiveFindingRecordSchema = z.discriminatedUnion("verdict", [
+  ConfirmedFindingRecordSchema,
+  NeedsValidationFindingRecordSchema,
+]);
 
 // -----
 // A batch from a Runner of the records that are new or changed since

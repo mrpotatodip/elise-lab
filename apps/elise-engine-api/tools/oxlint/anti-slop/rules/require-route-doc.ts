@@ -10,7 +10,8 @@ export const requireRouteDocRule = defineRule({
       description: "Require `app.<verb>(path, xDoc, ...)`: the second argument is an identifier ending in `Doc`.",
     },
     messages: {
-      missingDoc: "Pass the route's doc right after the path: `app.{{method}}(path, {{verb}}Doc, ...)`, exported from `openapi/`.",
+      missingDoc:
+        "Pass the route's doc right after the path: `app.{{method}}(path, {{verb}}Doc, ...)`, exported from `openapi/`.",
     },
   },
   createOnce(context) {

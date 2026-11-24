@@ -40,7 +40,13 @@ const triage = (letter: string, overrides: Partial<JudgedTriage>): JudgedTriage 
 const twoScans = [scan("s1", 1), scan("s2", 2)];
 
 const judge = (input: { scans?: JudgedScan[]; findings?: JudgedFinding[]; triage?: JudgedTriage[] }) =>
-  judgeCommit({ commit: COMMIT, scans: input.scans ?? twoScans, findings: input.findings ?? [], triage: input.triage ?? [], now: NOW });
+  judgeCommit({
+    commit: COMMIT,
+    scans: input.scans ?? twoScans,
+    findings: input.findings ?? [],
+    triage: input.triage ?? [],
+    now: NOW,
+  });
 
 const codes = (verdict: ReturnType<typeof judge>) => verdict.reasons.map((reason) => reason.code);
 
@@ -54,7 +60,11 @@ describe("judgeCommit: enough trusted scans", () => {
   });
 
   it("passes after one clean scan: the person reads the verdict and decides", () => {
-    expect(judge({ scans: [scan("s1", 1)] })).toMatchObject({ verdict: "pass", reasons: [], scans: { required: 1, counted: 1, ids: ["s1"] } });
+    expect(judge({ scans: [scan("s1", 1)] })).toMatchObject({
+      verdict: "pass",
+      reasons: [],
+      scans: { required: 1, counted: 1, ids: ["s1"] },
+    });
   });
 
   it("passes after two clean scans", () => {
@@ -62,11 +72,15 @@ describe("judgeCommit: enough trusted scans", () => {
   });
 
   it("cannot tell when the newest scan left a problem unchecked", () => {
-    expect(codes(judge({ scans: [scan("s1", 1), scan("s2", 2, { priorsUnchecked: 1 })] }))).toEqual(["unchecked_priors"]);
+    expect(codes(judge({ scans: [scan("s1", 1), scan("s2", 2, { priorsUnchecked: 1 })] }))).toEqual([
+      "unchecked_priors",
+    ]);
   });
 
   it("does not look at a scan older than the newest", () => {
-    const verdict = judge({ scans: [scan("s0", 0, { priorsUnchecked: 4 }), scan("s1", 1, { priorsUnchecked: 4 }), scan("s2", 2)] });
+    const verdict = judge({
+      scans: [scan("s0", 0, { priorsUnchecked: 4 }), scan("s1", 1, { priorsUnchecked: 4 }), scan("s2", 2)],
+    });
 
     expect(verdict.verdict).toBe("pass");
   });
@@ -76,7 +90,12 @@ describe("judgeCommit: enough trusted scans", () => {
   });
 
   it("takes a scan with no counts as one that asked about nothing", () => {
-    const verdict = judge({ scans: [scan("s1", 1, { priorsGiven: null, priorsUnchecked: null }), scan("s2", 2, { priorsGiven: null, priorsUnchecked: null })] });
+    const verdict = judge({
+      scans: [
+        scan("s1", 1, { priorsGiven: null, priorsUnchecked: null }),
+        scan("s2", 2, { priorsGiven: null, priorsUnchecked: null }),
+      ],
+    });
 
     expect(verdict.verdict).toBe("pass");
   });
@@ -100,15 +119,24 @@ describe("judgeCommit: the limits", () => {
   });
 
   it("never fails on low or informational problems", () => {
-    expect(judge({ findings: [finding("s2", "a", "low"), finding("s2", "b", "informational")] })).toMatchObject({ verdict: "pass", counts: { low: 1, informational: 1 } });
+    expect(judge({ findings: [finding("s2", "a", "low"), finding("s2", "b", "informational")] })).toMatchObject({
+      verdict: "pass",
+      counts: { low: 1, informational: 1 },
+    });
   });
 
   it("fails on a problem that still needs validation", () => {
-    expect(judge({ findings: [finding("s2", "a", null)] })).toMatchObject({ verdict: "fail", counts: { needsValidation: 1 } });
+    expect(judge({ findings: [finding("s2", "a", null)] })).toMatchObject({
+      verdict: "fail",
+      counts: { needsValidation: 1 },
+    });
   });
 
   it("still lists the findings over the limit when the scans cannot be trusted", () => {
-    const verdict = judge({ scans: [scan("s1", 1, { priorsUnchecked: 1 })], findings: [finding("s1", "a", "critical")] });
+    const verdict = judge({
+      scans: [scan("s1", 1, { priorsUnchecked: 1 })],
+      findings: [finding("s1", "a", "critical")],
+    });
 
     expect(verdict.verdict).toBe("cannot_tell");
     expect(codes(verdict)).toEqual(["unchecked_priors", "over_limit"]);
@@ -135,7 +163,9 @@ describe("judgeCommit: two scans together", () => {
   });
 
   it("lists the worst problem first", () => {
-    const verdict = judge({ findings: [finding("s2", "a", "low"), finding("s2", "b", "critical"), finding("s2", "c", null)] });
+    const verdict = judge({
+      findings: [finding("s2", "a", "low"), finding("s2", "b", "critical"), finding("s2", "c", null)],
+    });
 
     expect(verdict.open.map((item) => item.severity)).toEqual(["critical", "low", null]);
   });
@@ -143,9 +173,16 @@ describe("judgeCommit: two scans together", () => {
 
 describe("judgeCommit: decisions by a person", () => {
   it("takes a false positive off the open list and shows it beside", () => {
-    const verdict = judge({ findings: [finding("s2", "a", "critical")], triage: [triage("a", { status: "false_positive" })] });
+    const verdict = judge({
+      findings: [finding("s2", "a", "critical")],
+      triage: [triage("a", { status: "false_positive" })],
+    });
 
-    expect(verdict).toMatchObject({ verdict: "pass", open: [], dismissed: [expect.objectContaining({ title: "problem a" })] });
+    expect(verdict).toMatchObject({
+      verdict: "pass",
+      open: [],
+      dismissed: [expect.objectContaining({ title: "problem a" })],
+    });
   });
 
   it("counts a problem once: a duplicate is dismissed with its link and the kept one blocks", () => {
@@ -165,15 +202,31 @@ describe("judgeCommit: decisions by a person", () => {
   it("dismisses both when the kept Finding is a false positive", () => {
     const verdict = judge({
       findings: [finding("s2", "a", "high"), finding("s2", "b", "high")],
-      triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) }), triage("b", { status: "false_positive" })],
+      triage: [
+        triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) }),
+        triage("b", { status: "false_positive" }),
+      ],
     });
 
-    expect(verdict).toMatchObject({ verdict: "fail", counts: { high: 1 }, open: [expect.objectContaining({ title: "problem a" })], dismissed: [expect.objectContaining({ title: "problem b" })] });
+    expect(verdict).toMatchObject({
+      verdict: "fail",
+      counts: { high: 1 },
+      open: [expect.objectContaining({ title: "problem a" })],
+      dismissed: [expect.objectContaining({ title: "problem b" })],
+    });
   });
 
   it.each([
-    ["under an accepted risk that is still running", triage("b", { status: "accepted_risk", note: "x", acceptedUntil: new Date("2026-12-01T00:00:00Z") }), 1],
-    ["under an accepted risk that expired", triage("b", { status: "accepted_risk", note: "x", acceptedUntil: new Date("2026-11-09T00:00:00Z") }), 1],
+    [
+      "under an accepted risk that is still running",
+      triage("b", { status: "accepted_risk", note: "x", acceptedUntil: new Date("2026-12-01T00:00:00Z") }),
+      1,
+    ],
+    [
+      "under an accepted risk that expired",
+      triage("b", { status: "accepted_risk", note: "x", acceptedUntil: new Date("2026-11-09T00:00:00Z") }),
+      1,
+    ],
     ["itself a duplicate", triage("b", { status: "duplicate", duplicateOf: "c".repeat(64) }), 2],
     ["marked fixed", triage("b", { status: "fixed" }), 1],
   ])("counts the right open total for a duplicate whose kept Finding is %s", (_name, kept, high) => {
@@ -186,21 +239,34 @@ describe("judgeCommit: decisions by a person", () => {
   });
 
   it("counts a duplicate again when the kept Finding is not on this commit", () => {
-    const verdict = judge({ findings: [finding("s2", "a", "high")], triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) })] });
+    const verdict = judge({
+      findings: [finding("s2", "a", "high")],
+      triage: [triage("a", { status: "duplicate", duplicateOf: "b".repeat(64) })],
+    });
 
     expect(verdict).toMatchObject({ verdict: "fail", counts: { high: 1 } });
   });
 
   it("lets an accepted risk pass until its end date, and lists it with the reason", () => {
     const acceptedUntil = new Date("2026-12-01T00:00:00Z");
-    const verdict = judge({ findings: [finding("s2", "a", "high")], triage: [triage("a", { status: "accepted_risk", note: "Behind the VPN", acceptedUntil })] });
+    const verdict = judge({
+      findings: [finding("s2", "a", "high")],
+      triage: [triage("a", { status: "accepted_risk", note: "Behind the VPN", acceptedUntil })],
+    });
 
-    expect(verdict).toMatchObject({ verdict: "pass", open: [], accepted: [expect.objectContaining({ note: "Behind the VPN", acceptedUntil: acceptedUntil.toISOString() })] });
+    expect(verdict).toMatchObject({
+      verdict: "pass",
+      open: [],
+      accepted: [expect.objectContaining({ note: "Behind the VPN", acceptedUntil: acceptedUntil.toISOString() })],
+    });
   });
 
   it("makes an expired accepted risk block again and says when it ended", () => {
     const acceptedUntil = new Date("2026-11-09T00:00:00Z");
-    const verdict = judge({ findings: [finding("s2", "a", "high")], triage: [triage("a", { status: "accepted_risk", note: "x", acceptedUntil })] });
+    const verdict = judge({
+      findings: [finding("s2", "a", "high")],
+      triage: [triage("a", { status: "accepted_risk", note: "x", acceptedUntil })],
+    });
 
     expect(verdict.verdict).toBe("fail");
     expect(verdict.open[0].acceptanceExpiredAt).toBe(acceptedUntil.toISOString());
@@ -208,17 +274,33 @@ describe("judgeCommit: decisions by a person", () => {
   });
 
   it("ignores a manual fixed, because a scan of this commit found the problem here", () => {
-    expect(judge({ findings: [finding("s2", "a", "high")], triage: [triage("a", { status: "fixed" })] }).verdict).toBe("fail");
+    expect(judge({ findings: [finding("s2", "a", "high")], triage: [triage("a", { status: "fixed" })] }).verdict).toBe(
+      "fail",
+    );
   });
 
   it("hands the impact, evidence and fix of an open problem to the caller", () => {
-    const withWords: JudgedFinding = { ...finding("s2", "a", "high"), impact: "An attacker reads other accounts.", evidence: "src/a.ts:1 skips the owner check.", fix: "Check the owner.", needs: null };
+    const withWords: JudgedFinding = {
+      ...finding("s2", "a", "high"),
+      impact: "An attacker reads other accounts.",
+      evidence: "src/a.ts:1 skips the owner check.",
+      fix: "Check the owner.",
+      needs: null,
+    };
 
-    expect(judge({ findings: [withWords] }).open[0]).toMatchObject({ impact: "An attacker reads other accounts.", evidence: "src/a.ts:1 skips the owner check.", fix: "Check the owner.", needs: null });
+    expect(judge({ findings: [withWords] }).open[0]).toMatchObject({
+      impact: "An attacker reads other accounts.",
+      evidence: "src/a.ts:1 skips the owner check.",
+      fix: "Check the owner.",
+      needs: null,
+    });
   });
 
   it("applies a decision only to its own problem", () => {
-    const verdict = judge({ findings: [finding("s2", "a", "high"), finding("s2", "b", "high")], triage: [triage("a", { status: "false_positive" })] });
+    const verdict = judge({
+      findings: [finding("s2", "a", "high"), finding("s2", "b", "high")],
+      triage: [triage("a", { status: "false_positive" })],
+    });
 
     expect(verdict.open.map((item) => item.title)).toEqual(["problem b"]);
   });

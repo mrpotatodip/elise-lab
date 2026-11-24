@@ -30,7 +30,10 @@ export const scanFindingComments = pgTable(
     deletedByPartyId: uuid("deleted_by_party_id").references(() => parties.id, { onDelete: "set null" }),
   },
   (t) => ({
-    chkBody: check("scan_finding_comments_body", sql`${t.deletedAt} is not null or char_length(${t.body}) between 1 and ${sql.raw(String(FINDING_COMMENT_BODY_MAX))}`),
+    chkBody: check(
+      "scan_finding_comments_body",
+      sql`${t.deletedAt} is not null or char_length(${t.body}) between 1 and ${sql.raw(String(FINDING_COMMENT_BODY_MAX))}`,
+    ),
     fkRepoTenant: foreignKey({
       name: "scan_finding_comments_repo_tenant_fk",
       columns: [t.repoId, t.tenantId],

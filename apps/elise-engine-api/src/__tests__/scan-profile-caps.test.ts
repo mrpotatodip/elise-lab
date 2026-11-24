@@ -17,7 +17,17 @@ const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const REPO = "https://github.com/octocat/Hello-World";
 const headers = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": ACCOUNT, "content-type": "application/json" };
 
-const NO_SPEND: MonthSpend = { spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: false, plan: null };
+const NO_SPEND: MonthSpend = {
+  spentUsd: 0,
+  scans: 0,
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  budgetOverrideUsd: null,
+  budgetAllowanceUsd: null,
+  platformSpentUsd: 0,
+  platformReservedUsd: 0,
+  ownKey: false,
+  plan: null,
+};
 const PRO: PlanState = {
   planKey: "pro",
   includedCreditUsd: 49,
@@ -52,7 +62,12 @@ beforeEach(() => {
 });
 
 type Body = { repo: string; profile?: string; max_budget_usd?: number };
-const post = (env: Bindings, body: Body) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
+const post = (env: Bindings, body: Body) =>
+  app.fetch(
+    new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }),
+    env,
+    testExecutionContext,
+  );
 
 const ScanBodySchema = z.object({ data: z.object({ maxBudgetUsd: z.number(), profile: z.string() }) });
 const ErrorBodySchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
@@ -120,7 +135,11 @@ describe("POST /scans: the cap of a profile", () => {
 });
 
 describe("GET /usage/credit: the cap and hold of each profile", () => {
-  const ProfilesSchema = z.object({ data: z.object({ profiles: z.array(z.object({ profile: z.string(), capUsd: z.number(), holdUsd: z.number().nullable() })) }) });
+  const ProfilesSchema = z.object({
+    data: z.object({
+      profiles: z.array(z.object({ profile: z.string(), capUsd: z.number(), holdUsd: z.number().nullable() })),
+    }),
+  });
   let test: TestDb;
   const accountOf = new Map<string, string>();
   const creditApp = tenantRouteApp(() => test);
@@ -131,7 +150,10 @@ describe("GET /usage/credit: the cap and hold of each profile", () => {
       const { tenantId } = await seedTenant(test, planKey);
       accountOf.set(planKey, tenantId);
       const [plan] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, planKey));
-      if (plan) await test.raw.insert(tenantSubscriptions).values({ tenantId, planId: plan.id, status: "active", source: "grant" });
+      if (plan)
+        await test.raw
+          .insert(tenantSubscriptions)
+          .values({ tenantId, planId: plan.id, status: "active", source: "grant" });
     }
   });
 

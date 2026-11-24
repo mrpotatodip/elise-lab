@@ -25,7 +25,7 @@ export type NewScanFile = ScanArtifact & { r2Key: string };
 
 export type ScanFileRef = { r2Key: string; contentType: string };
 
-export type ScanPage ={ scans: ScanStatus[]; nextCursor: string | null };
+export type ScanPage = { scans: ScanStatus[]; nextCursor: string | null };
 
 // -----
 // Neon is the record of every scan. The workflow

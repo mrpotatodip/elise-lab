@@ -1,25 +1,15 @@
 import type { ComponentProps, ReactNode } from "react";
 
-import {
-  valueForEventType,
-  type AGUILoadingByEvent,
-  type AGUILoadingStatusKey,
-  type EventType,
-} from "../../..";
+import { valueForEventType, type AGUILoadingByEvent, type AGUILoadingStatusKey, type EventType } from "../../..";
 import { cn } from "../cn";
 
 import { AGUI_LOADING_WAITING_ICON } from "../agui-loading-waiting-icon";
 import { useAGUILoadingContext } from "./agui-loading";
 
 // Spinning circle, used when no icon is given.
-const DEFAULT_FALLBACK = (
-  <span className="cbl-spinner" />
-);
+const DEFAULT_FALLBACK = <span className="cbl-spinner" />;
 
-export type AGUILoadingIconProps<TEvent extends string = EventType> = Omit<
-  ComponentProps<"span">,
-  "children"
-> & {
+export type AGUILoadingIconProps<TEvent extends string = EventType> = Omit<ComponentProps<"span">, "children"> & {
   // Icon per event, plus "waiting" and "stopped". Use null to show no icon.
   byEvent?: AGUILoadingByEvent<ReactNode, TEvent>;
   // Icon for events with no entry in byEvent. Default: a spinner.
@@ -45,15 +35,7 @@ export function AGUILoadingIcon<TEvent extends string = EventType>({
   const shownFallback = presence === "waiting" ? waitingFallback : fallback;
 
   return (
-    <span
-      aria-hidden
-      className={cn(
-        "cbl-slot",
-        ended && "cbl-paused",
-        className,
-      )}
-      {...props}
-    >
+    <span aria-hidden className={cn("cbl-slot", ended && "cbl-paused", className)} {...props}>
       {icon === undefined ? shownFallback : icon}
     </span>
   );

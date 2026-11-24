@@ -10,8 +10,10 @@ export type ScanRefusal = { code: "TOO_MANY_ACTIVE_SCANS"; message: string };
 // the other one (MAX_ACTIVE_SCANS), so an Account at its full limit can
 // still start a Scan on its Runner and the other way round.
 // -----
-export const accountLimitOf = (env: Pick<CreateScanEnv, "MAX_ACTIVE_SCANS" | "MAX_ACTIVE_FULL_SCANS">, path: ScanPath): number =>
-  Number(path === "full" ? env.MAX_ACTIVE_FULL_SCANS : env.MAX_ACTIVE_SCANS);
+export const accountLimitOf = (
+  env: Pick<CreateScanEnv, "MAX_ACTIVE_SCANS" | "MAX_ACTIVE_FULL_SCANS">,
+  path: ScanPath,
+): number => Number(path === "full" ? env.MAX_ACTIVE_FULL_SCANS : env.MAX_ACTIVE_SCANS);
 
 // -----
 // Which of the two counts a live Scan is in. A Scan on a Runner is always
@@ -33,7 +35,10 @@ const POOL_NAME = { full: "full", lite: "Runner" } as const;
 export const scanRefusalOf = (env: CreateScanEnv, path: ScanPath, accountActive: number): ScanRefusal | null => {
   const accountLimit = accountLimitOf(env, path);
   if (accountActive >= accountLimit) {
-    return { code: "TOO_MANY_ACTIVE_SCANS", message: `This account already has ${accountActive} active ${POOL_NAME[path]} scans (limit ${accountLimit})` };
+    return {
+      code: "TOO_MANY_ACTIVE_SCANS",
+      message: `This account already has ${accountActive} active ${POOL_NAME[path]} scans (limit ${accountLimit})`,
+    };
   }
   return null;
 };

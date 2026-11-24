@@ -18,20 +18,31 @@ import type { Bindings } from "#/types/variables";
 // cost metered: a Workflow that reaches its end after the Stop
 // has no meter left and must not win with a zero charge.
 // -----
-export const settleScanCredit = async (env: Bindings, params: ScanParams, status: "succeeded" | "failed", usage: ScanUsage | null): Promise<void> => {
+export const settleScanCredit = async (
+  env: Bindings,
+  params: ScanParams,
+  status: "succeeded" | "failed",
+  usage: ScanUsage | null,
+): Promise<void> => {
   if (params.keySource === "account") return;
   const owner = dbConnect(env.DATABASE_URL);
   if (await runEffect(scanStoppedEffect(owner, params.scanId))) return;
   const plan = await runEffect(planOfEffect(owner, params.accountId));
   if (plan === null) return;
-  const settlement = settlementOf({ status, costUsd: usage === null ? null : usage.costUsd, markup: plan.creditMarkup });
+  const settlement = settlementOf({
+    status,
+    costUsd: usage === null ? null : usage.costUsd,
+    markup: plan.creditMarkup,
+  });
   if (!settlement.ok) {
     console.error(`scan ${params.scanId}: succeeded with no cost, so its credit hold was left in place`);
     return;
   }
   const { db, close } = poolConnect(env.DATABASE_URL);
   try {
-    await runEffect(settleCreditEffect(db, { tenantId: params.accountId, scanId: params.scanId, chargeUsd: settlement.chargeUsd }));
+    await runEffect(
+      settleCreditEffect(db, { tenantId: params.accountId, scanId: params.scanId, chargeUsd: settlement.chargeUsd }),
+    );
   } finally {
     await close();
   }

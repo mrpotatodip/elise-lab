@@ -28,9 +28,7 @@ function handoffText(messages: ReadonlyArray<ModelMessage>): string | null {
 // reply, so main disbelieves it. Move it into
 // the instructions for the model call only.
 // -----
-export function toChatBotSpecialistConfig(
-  config: ChatMiddlewareConfig,
-): Partial<ChatMiddlewareConfig> | undefined {
+export function toChatBotSpecialistConfig(config: ChatMiddlewareConfig): Partial<ChatMiddlewareConfig> | undefined {
   const text = handoffText(config.messages);
   if (text === null) return undefined;
   const reply = text.trim();
@@ -43,9 +41,7 @@ export function toChatBotSpecialistConfig(
     // prompts carry over, so add it once.
     // -----
     systemPrompts:
-      known || config.systemPrompts.includes(prompt)
-        ? config.systemPrompts
-        : [...config.systemPrompts, prompt],
+      known || config.systemPrompts.includes(prompt) ? config.systemPrompts : [...config.systemPrompts, prompt],
   };
 }
 

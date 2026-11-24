@@ -17,9 +17,13 @@ const BASELINE = path.join(root, "scripts/ratchets.json");
 const COMMENT_ROOTS = ["apps/elise-engine-api/src", "apps/elise-frontend-web/src"];
 const GITHUB_ROOTS = ["apps/elise-frontend-web/src/modules/repo", "apps/elise-frontend-web/src/modules/scan"];
 const DIVIDER = /^\s*\/\/ -{5,}\s*$/;
-const ADVICE = "Remove the comment (names, types and small functions say what code does). If a rule in docs/standards asks for it, raise the baseline in this same commit (node scripts/check-ratchets.mjs --update) so the reviewer sees it.";
+const ADVICE =
+  "Remove the comment (names, types and small functions say what code does). If a rule in docs/standards asks for it, raise the baseline in this same commit (node scripts/check-ratchets.mjs --update) so the reviewer sees it.";
 
-const tracked = (...patterns) => spawnSync("git", ["ls-files", "-z", "--", ...patterns], { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 }).stdout.split("\0").filter(Boolean);
+const tracked = (...patterns) =>
+  spawnSync("git", ["ls-files", "-z", "--", ...patterns], { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 })
+    .stdout.split("\0")
+    .filter(Boolean);
 const lines = (file) => fs.readFileSync(path.join(root, file), "utf8").split("\n");
 const isTest = (file) => /\/__tests__\/|\.test\.tsx?$/.test(file);
 const sorted = (entries) => Object.fromEntries(entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
@@ -55,7 +59,10 @@ export function findRatchetBreaks() {
       if (count > old) breaks.push(`${file}: ${unit} went from ${old} to ${count}. ${ADVICE}`);
     }
   }
-  if (current.github > baseline.github) breaks.push(`apps/elise-frontend-web/src/modules/{repo,scan}: the word "GitHub" went from ${baseline.github} to ${current.github}. Use the provider's name from data, not a literal. If a rule asks for it, raise "github" in scripts/ratchets.json in this same commit.`);
+  if (current.github > baseline.github)
+    breaks.push(
+      `apps/elise-frontend-web/src/modules/{repo,scan}: the word "GitHub" went from ${baseline.github} to ${current.github}. Use the provider's name from data, not a literal. If a rule asks for it, raise "github" in scripts/ratchets.json in this same commit.`,
+    );
   return breaks;
 }
 
@@ -64,7 +71,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const current = countRatchets();
     fs.writeFileSync(BASELINE, `${JSON.stringify(current, null, 1)}\n`);
     const total = (o) => Object.values(o).reduce((a, b) => a + b, 0);
-    console.log(`ratchets: ${Object.keys(current.comments).length} files / ${total(current.comments)} blocks, ${Object.keys(current.rust).length} files / ${total(current.rust)} Rust comment lines, ${current.github} GitHub`);
+    console.log(
+      `ratchets: ${Object.keys(current.comments).length} files / ${total(current.comments)} blocks, ${Object.keys(current.rust).length} files / ${total(current.rust)} Rust comment lines, ${current.github} GitHub`,
+    );
   } else {
     const breaks = findRatchetBreaks();
     if (breaks.length) {

@@ -7,10 +7,8 @@ describe("chatBotThreadTitleFromContent", () => {
   });
 
   it("cuts a long first message to eight words", () => {
-    expect(
-      chatBotThreadTitleFromContent(
-        "How many cards am I watching on this list today?",
-      ),
-    ).toBe("How many cards am I watching on this");
+    expect(chatBotThreadTitleFromContent("How many cards am I watching on this list today?")).toBe(
+      "How many cards am I watching on this",
+    );
   });
 });

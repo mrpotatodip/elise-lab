@@ -52,12 +52,18 @@ export const tenantSubscriptions = pgTable(
       .where(sql`${t.stripeSubscriptionId} is not null`),
     chkStatus: check("tenant_subscriptions_status", sql`${t.status} in (${inList(SUBSCRIPTION_STATUS_VALUES)})`),
     chkSource: check("tenant_subscriptions_source", sql`${t.source} in (${inList(SUBSCRIPTION_SOURCE_VALUES)})`),
-    chkBillingInterval: check("tenant_subscriptions_billing_interval", sql`${t.billingInterval} is null or ${t.billingInterval} in (${inList(BILLING_INTERVAL_VALUES)})`),
+    chkBillingInterval: check(
+      "tenant_subscriptions_billing_interval",
+      sql`${t.billingInterval} is null or ${t.billingInterval} in (${inList(BILLING_INTERVAL_VALUES)})`,
+    ),
     chkGrantHasNoStripe: check(
       "tenant_subscriptions_grant_has_no_stripe",
       sql`(${t.source} = 'grant') = (${t.stripeSubscriptionId} is null and ${t.stripeCustomerId} is null)`,
     ),
-    chkPastDueSince: check("tenant_subscriptions_past_due_since", sql`${t.pastDueSince} is null or ${t.status} = 'past_due'`),
+    chkPastDueSince: check(
+      "tenant_subscriptions_past_due_since",
+      sql`${t.pastDueSince} is null or ${t.status} = 'past_due'`,
+    ),
   }),
 );
 

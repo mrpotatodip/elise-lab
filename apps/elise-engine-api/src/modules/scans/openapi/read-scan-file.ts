@@ -1,5 +1,13 @@
 import { describeRoute } from "hono-openapi";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, EXAMPLE_SCAN_ID, SERVICE_SECURITY, bash, errorResponses, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  EXAMPLE_SCAN_ID,
+  SERVICE_SECURITY,
+  bash,
+  errorResponses,
+  routeText,
+} from "#/lib/openapi";
 
 export const readScanFileDoc = describeRoute({
   tags: ["scans"],

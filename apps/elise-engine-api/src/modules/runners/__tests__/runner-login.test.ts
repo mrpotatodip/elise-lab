@@ -4,7 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accessAuditLog, authUser, platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
 import { StartedRunnerLoginSchema, type StartRunnerLoginBody } from "@repo/contracts/elise";
 import { asTenantEffect, openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { approveRunnerLoginSvc, checkRunnerLoginSvc, claimJobSvc, denyRunnerLoginSvc, lookupRunnerLoginSvc, runnerIdentitySvc, startRunnerLoginSvc } from "#/modules/runners/handlers";
+import {
+  approveRunnerLoginSvc,
+  checkRunnerLoginSvc,
+  claimJobSvc,
+  denyRunnerLoginSvc,
+  lookupRunnerLoginSvc,
+  runnerIdentitySvc,
+  startRunnerLoginSvc,
+} from "#/modules/runners/handlers";
 import { hashDeviceCode, hashPairingCode, hashRunnerToken } from "#/modules/runners/utils";
 
 let test: TestDb;
@@ -16,13 +24,20 @@ const START: StartRunnerLoginBody = { name: "build-box", os: "linux 6.8", cpu: "
 
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 const start = () => run(startRunnerLoginSvc(test.http, START, { ip: "203.0.113.7", dashboardUrl: DASHBOARD }));
-const approveEffect = (userCode: string, name: string) => asTenantEffect(test, tenantId, (db) => approveRunnerLoginSvc(db, tenantId, userId, "198.51.100.9", { userCode, name }));
+const approveEffect = (userCode: string, name: string) =>
+  asTenantEffect(test, tenantId, (db) =>
+    approveRunnerLoginSvc(db, tenantId, userId, "198.51.100.9", { userCode, name }),
+  );
 const approve = (userCode: string, name = "Build box") => run(approveEffect(userCode, name));
-const refusedApproval = (userCode: string) => run(Effect.flip(approveEffect(userCode, "Build box")).pipe(Effect.map((error) => error._tag)));
+const refusedApproval = (userCode: string) =>
+  run(Effect.flip(approveEffect(userCode, "Build box")).pipe(Effect.map((error) => error._tag)));
 const check = (deviceCode: string) => run(checkRunnerLoginSvc(test.http, { deviceCode }));
-const refusedCheck = (deviceCode: string) => run(Effect.flip(checkRunnerLoginSvc(test.http, { deviceCode })).pipe(Effect.map((error) => error._tag)));
-const denyEffect = (userCode: string) => asTenantEffect(test, tenantId, (db) => denyRunnerLoginSvc(db, tenantId, userId, "198.51.100.9", { userCode }));
-const refusedDenial = (userCode: string) => run(Effect.flip(denyEffect(userCode)).pipe(Effect.map((error) => error._tag)));
+const refusedCheck = (deviceCode: string) =>
+  run(Effect.flip(checkRunnerLoginSvc(test.http, { deviceCode })).pipe(Effect.map((error) => error._tag)));
+const denyEffect = (userCode: string) =>
+  asTenantEffect(test, tenantId, (db) => denyRunnerLoginSvc(db, tenantId, userId, "198.51.100.9", { userCode }));
+const refusedDenial = (userCode: string) =>
+  run(Effect.flip(denyEffect(userCode)).pipe(Effect.map((error) => error._tag)));
 const insertExpiredLogin = async (userCode: string, deviceCode: string) => {
   const [row] = await test.raw
     .insert(platformRunnerDeviceLogins)
@@ -39,8 +54,20 @@ const insertExpiredLogin = async (userCode: string, deviceCode: string) => {
     .returning({ id: platformRunnerDeviceLogins.id });
   return row?.id ?? "";
 };
-const expireLogin = (userCode: string) => hashPairingCode(userCode).then((hash) => test.raw.update(platformRunnerDeviceLogins).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(platformRunnerDeviceLogins.userCodeHash, hash)));
-const waitedLongEnough = (userCode: string) => hashPairingCode(userCode).then((hash) => test.raw.update(platformRunnerDeviceLogins).set({ lastCheckedAt: new Date(Date.now() - 60_000) }).where(eq(platformRunnerDeviceLogins.userCodeHash, hash)));
+const expireLogin = (userCode: string) =>
+  hashPairingCode(userCode).then((hash) =>
+    test.raw
+      .update(platformRunnerDeviceLogins)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(platformRunnerDeviceLogins.userCodeHash, hash)),
+  );
+const waitedLongEnough = (userCode: string) =>
+  hashPairingCode(userCode).then((hash) =>
+    test.raw
+      .update(platformRunnerDeviceLogins)
+      .set({ lastCheckedAt: new Date(Date.now() - 60_000) })
+      .where(eq(platformRunnerDeviceLogins.userCodeHash, hash)),
+  );
 const runnerCount = async () => (await test.raw.select({ n: count() }).from(tenantRunners))[0]?.n ?? 0;
 
 beforeAll(async () => {
@@ -48,7 +75,9 @@ beforeAll(async () => {
   const seeded = await seedTenant(test, "acme");
   tenantId = seeded.tenantId;
   userId = crypto.randomUUID();
-  await test.raw.insert(authUser).values({ id: userId, name: "Ada", email: "ada@example.com", emailVerified: true, partyId: seeded.partyId });
+  await test.raw
+    .insert(authUser)
+    .values({ id: userId, name: "Ada", email: "ada@example.com", emailVerified: true, partyId: seeded.partyId });
 });
 
 afterAll(async () => {
@@ -59,12 +88,24 @@ describe("starting a Runner login", () => {
   it("answers a short user code, a link carrying it, a device code and a 10 minute expiry, and keeps only hashes", async () => {
     const before = Date.now();
     const started = StartedRunnerLoginSchema.parse(await start());
-    const [row] = await test.raw.select().from(platformRunnerDeviceLogins).where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(started.userCode)));
+    const [row] = await test.raw
+      .select()
+      .from(platformRunnerDeviceLogins)
+      .where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(started.userCode)));
 
     expect(started.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     expect(started.verificationUrl).toBe(`${DASHBOARD}/device?code=${started.userCode}`);
     expect(Date.parse(started.expiresAt) - before).toBeGreaterThan(9 * 60 * 1000);
-    expect(row).toMatchObject({ state: "pending", suggestedName: "build-box", os: "linux 6.8", cpu: "x64", runnerVersion: "0.1.0", requestIp: "203.0.113.7", tenantId: null, runnerId: null });
+    expect(row).toMatchObject({
+      state: "pending",
+      suggestedName: "build-box",
+      os: "linux 6.8",
+      cpu: "x64",
+      runnerVersion: "0.1.0",
+      requestIp: "203.0.113.7",
+      tenantId: null,
+      runnerId: null,
+    });
     expect(JSON.stringify(row)).not.toContain(started.deviceCode);
     expect(JSON.stringify(row)).not.toContain(started.userCode);
     expect(JSON.stringify(row)).not.toContain(started.userCode.replace("-", ""));
@@ -76,13 +117,23 @@ describe("reading a pending login for the approval page", () => {
     const started = await start();
     const found = await run(lookupRunnerLoginSvc(test.http, started.userCode.toLowerCase().replace("-", "")));
 
-    expect(found).toMatchObject({ suggestedName: "build-box", os: "linux 6.8", cpu: "x64", version: "0.1.0", requestIp: "203.0.113.7", expiresAt: started.expiresAt });
+    expect(found).toMatchObject({
+      suggestedName: "build-box",
+      os: "linux 6.8",
+      cpu: "x64",
+      version: "0.1.0",
+      requestIp: "203.0.113.7",
+      expiresAt: started.expiresAt,
+    });
     expect(Object.keys(found).toSorted()).toEqual(["cpu", "expiresAt", "os", "requestIp", "suggestedName", "version"]);
   });
 
   it("refuses an unknown code, an approved login and an expired login alike", async () => {
     const approvedLogin = await start();
-    await test.raw.update(platformRunnerDeviceLogins).set({ state: "approved" }).where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(approvedLogin.userCode)));
+    await test.raw
+      .update(platformRunnerDeviceLogins)
+      .set({ state: "approved" })
+      .where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(approvedLogin.userCode)));
     await test.raw.insert(platformRunnerDeviceLogins).values({
       userCodeHash: await hashPairingCode("LOOK-EXPD"),
       deviceCodeHash: await hashRunnerToken("lookup-expired-device-code"),
@@ -93,9 +144,14 @@ describe("reading a pending login for the approval page", () => {
       requestIp: "203.0.113.7",
       expiresAt: new Date(Date.now() - 1000),
     });
-    const refusal = (code: string) => run(Effect.flip(lookupRunnerLoginSvc(test.http, code)).pipe(Effect.map((error) => error._tag)));
+    const refusal = (code: string) =>
+      run(Effect.flip(lookupRunnerLoginSvc(test.http, code)).pipe(Effect.map((error) => error._tag)));
 
-    expect([await refusal("ZZZZ-ZZZZ"), await refusal(approvedLogin.userCode), await refusal("LOOK-EXPD")]).toEqual(["Forbidden", "Forbidden", "Forbidden"]);
+    expect([await refusal("ZZZZ-ZZZZ"), await refusal(approvedLogin.userCode), await refusal("LOOK-EXPD")]).toEqual([
+      "Forbidden",
+      "Forbidden",
+      "Forbidden",
+    ]);
   });
 });
 
@@ -109,7 +165,10 @@ describe("a Runner login from start to collection", () => {
     const [created] = await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, approved.runnerId));
     expect(created).toMatchObject({ tenantId, name: "CI box", tokenHash: null });
     expect(created?.createdBy).toBeTruthy();
-    const [login] = await test.raw.select().from(platformRunnerDeviceLogins).where(eq(platformRunnerDeviceLogins.runnerId, approved.runnerId));
+    const [login] = await test.raw
+      .select()
+      .from(platformRunnerDeviceLogins)
+      .where(eq(platformRunnerDeviceLogins.runnerId, approved.runnerId));
     expect(login).toMatchObject({ state: "approved", tenantId, approverIp: "198.51.100.9" });
   });
 });
@@ -128,7 +187,9 @@ describe("the Audit trail of an approved login", () => {
       after: { tenantId, name: "Audit box", requestIp: "203.0.113.7", approverIp: "198.51.100.9" },
     });
     await refusedApproval(started.userCode);
-    expect(await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, approved.runnerId))).toHaveLength(1);
+    expect(
+      await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, approved.runnerId)),
+    ).toHaveLength(1);
   });
 });
 
@@ -139,7 +200,12 @@ describe("collecting the token", () => {
     const first = await check(started.deviceCode);
 
     if (first.status !== "approved") throw new Error("not collected");
-    expect(first).toMatchObject({ runnerId: approved.runnerId, name: "Build box", accountId: tenantId, accountName: "acme" });
+    expect(first).toMatchObject({
+      runnerId: approved.runnerId,
+      name: "Build box",
+      accountId: tenantId,
+      accountName: "acme",
+    });
     expect(first.token).toMatch(/^elr_/);
     const [row] = await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, approved.runnerId));
     expect(row?.tokenHash).toBe(await hashRunnerToken(first.token));
@@ -191,13 +257,22 @@ describe("denying a login", () => {
     const started = await start();
     const before = await runnerCount();
     expect(await run(denyEffect(started.userCode.toLowerCase()))).toEqual({ denied: true });
-    const [login] = await test.raw.select().from(platformRunnerDeviceLogins).where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(started.userCode)));
-    const entries = await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, login?.id ?? ""));
+    const [login] = await test.raw
+      .select()
+      .from(platformRunnerDeviceLogins)
+      .where(eq(platformRunnerDeviceLogins.userCodeHash, await hashPairingCode(started.userCode)));
+    const entries = await test.raw
+      .select()
+      .from(accessAuditLog)
+      .where(eq(accessAuditLog.subjectId, login?.id ?? ""));
 
     expect(await check(started.deviceCode)).toEqual({ status: "denied" });
     expect(await runnerCount()).toBe(before);
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ action: "runner.login.deny", after: { tenantId, name: "build-box", requestIp: "203.0.113.7", approverIp: "198.51.100.9" } });
+    expect(entries[0]).toMatchObject({
+      action: "runner.login.deny",
+      after: { tenantId, name: "build-box", requestIp: "203.0.113.7", approverIp: "198.51.100.9" },
+    });
   });
 
   it("refuses an unknown, approved or already denied code, and a denied code cannot be approved", async () => {
@@ -206,12 +281,12 @@ describe("denying a login", () => {
     const deniedLogin = await start();
     await run(denyEffect(deniedLogin.userCode));
 
-    expect([await refusedDenial("ZZZZ-ZZZZ"), await refusedDenial(approvedLogin.userCode), await refusedDenial(deniedLogin.userCode), await refusedApproval(deniedLogin.userCode)]).toEqual([
-      "Forbidden",
-      "Forbidden",
-      "Forbidden",
-      "Forbidden",
-    ]);
+    expect([
+      await refusedDenial("ZZZZ-ZZZZ"),
+      await refusedDenial(approvedLogin.userCode),
+      await refusedDenial(deniedLogin.userCode),
+      await refusedApproval(deniedLogin.userCode),
+    ]).toEqual(["Forbidden", "Forbidden", "Forbidden", "Forbidden"]);
   });
 });
 
@@ -261,7 +336,9 @@ describe("cleaning up expired logins", () => {
     const live = await start();
     await insertExpiredLogin("CLEA-NUPA", "cleanup-device-code");
     await start();
-    const logins = await test.raw.select({ userCodeHash: platformRunnerDeviceLogins.userCodeHash }).from(platformRunnerDeviceLogins);
+    const logins = await test.raw
+      .select({ userCodeHash: platformRunnerDeviceLogins.userCodeHash })
+      .from(platformRunnerDeviceLogins);
     const hashes = logins.map((row) => row.userCodeHash);
 
     expect(collectedCheck.status).toBe("approved");
@@ -269,7 +346,11 @@ describe("cleaning up expired logins", () => {
     expect(hashes).not.toContain(await hashPairingCode(dead.userCode));
     expect(hashes).not.toContain(await hashPairingCode(collected.userCode));
     expect(hashes).not.toContain(await hashPairingCode("CLEA-NUPA"));
-    expect(await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, deadApproved.runnerId))).toHaveLength(0);
-    expect(await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, collectedApproved.runnerId))).toHaveLength(1);
+    expect(await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, deadApproved.runnerId))).toHaveLength(
+      0,
+    );
+    expect(
+      await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, collectedApproved.runnerId)),
+    ).toHaveLength(1);
   });
 });

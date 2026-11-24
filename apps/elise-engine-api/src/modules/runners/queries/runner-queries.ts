@@ -13,7 +13,14 @@ const identityOf = (db: DbConnectType, row: RunnerRow): Effect.Effect<RunnerIden
   Effect.tryPromise({
     try: () => db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, row.tenantId)),
     catch: toDbError,
-  }).pipe(Effect.map(([tenant]) => ({ runnerId: row.id, name: row.name, accountId: row.tenantId, accountName: tenant?.name ?? "" })));
+  }).pipe(
+    Effect.map(([tenant]) => ({
+      runnerId: row.id,
+      name: row.name,
+      accountId: row.tenantId,
+      accountName: tenant?.name ?? "",
+    })),
+  );
 
 export const identityOrNull = (db: DbConnectType, rows: RunnerRow[]): Effect.Effect<RunnerIdentity | null, DbError> => {
   const [row] = rows;
@@ -24,19 +31,32 @@ export const identityOrNull = (db: DbConnectType, rows: RunnerRow[]): Effect.Eff
 // A row that holds only a pairing code: no token yet. The
 // answer has the id and the expiry, never a hash.
 // -----
-export const createRunnerEffect = (db: AppDbType, runner: NewRunner): Effect.Effect<{ id: string; name: string; expiresAt: string }, Forbidden | DbError> =>
+export const createRunnerEffect = (
+  db: AppDbType,
+  runner: NewRunner,
+): Effect.Effect<{ id: string; name: string; expiresAt: string }, Forbidden | DbError> =>
   Effect.tryPromise({
     try: async () => {
       const createdBy = await actorPartyOf(db, runner.actorUserId);
       if (!createdBy) return null;
       const [row] = await db
         .insert(tenantRunners)
-        .values({ tenantId: runner.tenantId, name: runner.name, pairingCodeHash: runner.codeHash, pairingExpiresAt: runner.expiresAt, createdBy })
+        .values({
+          tenantId: runner.tenantId,
+          name: runner.name,
+          pairingCodeHash: runner.codeHash,
+          pairingExpiresAt: runner.expiresAt,
+          createdBy,
+        })
         .returning({ id: tenantRunners.id, name: tenantRunners.name });
       return row ? { id: row.id, name: row.name, expiresAt: runner.expiresAt.toISOString() } : null;
     },
     catch: toDbError,
-  }).pipe(Effect.flatMap((created) => (created ? Effect.succeed(created) : Effect.fail(new Forbidden({ message: "Forbidden" })))));
+  }).pipe(
+    Effect.flatMap((created) =>
+      created ? Effect.succeed(created) : Effect.fail(new Forbidden({ message: "Forbidden" })),
+    ),
+  );
 
 // -----
 // Pairing is one UPDATE. It matches only a code that is
@@ -45,13 +65,28 @@ export const createRunnerEffect = (db: AppDbType, runner: NewRunner): Effect.Eff
 // cannot both win. No match is null: the caller does not
 // learn which of the conditions failed.
 // -----
-export const claimPairingEffect = (db: DbConnectType, claim: PairingClaim): Effect.Effect<RunnerIdentity | null, DbError> =>
+export const claimPairingEffect = (
+  db: DbConnectType,
+  claim: PairingClaim,
+): Effect.Effect<RunnerIdentity | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
         .update(tenantRunners)
-        .set({ pairingCodeHash: null, pairingExpiresAt: null, tokenHash: claim.tokenHash, pairedAt: claim.now, lastSeenAt: claim.now })
-        .where(and(eq(tenantRunners.pairingCodeHash, claim.codeHash), gt(tenantRunners.pairingExpiresAt, claim.now), isNull(tenantRunners.revokedAt)))
+        .set({
+          pairingCodeHash: null,
+          pairingExpiresAt: null,
+          tokenHash: claim.tokenHash,
+          pairedAt: claim.now,
+          lastSeenAt: claim.now,
+        })
+        .where(
+          and(
+            eq(tenantRunners.pairingCodeHash, claim.codeHash),
+            gt(tenantRunners.pairingExpiresAt, claim.now),
+            isNull(tenantRunners.revokedAt),
+          ),
+        )
         .returning({ id: tenantRunners.id, name: tenantRunners.name, tenantId: tenantRunners.tenantId }),
     catch: toDbError,
   }).pipe(Effect.flatMap((rows) => identityOrNull(db, rows)));
@@ -96,28 +131,48 @@ export const listRunnersEffect = (db: AppDbType, tenantId: string, now: Date): E
 // CTE chain), so it never stays running after its Runner is gone. False when the
 // Account has no such live Runner.
 // -----
-export const removeRunnerEffect = (db: AppDbType, tenantId: string, runnerId: string, now: Date): Effect.Effect<boolean, DbError> =>
+export const removeRunnerEffect = (
+  db: AppDbType,
+  tenantId: string,
+  runnerId: string,
+  now: Date,
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const revoked = db.$with("revoked").as(
         db
           .update(tenantRunners)
           .set({ revokedAt: now, pairingCodeHash: null, pairingExpiresAt: null })
-          .where(and(eq(tenantRunners.id, runnerId), eq(tenantRunners.tenantId, tenantId), isNull(tenantRunners.revokedAt)))
+          .where(
+            and(eq(tenantRunners.id, runnerId), eq(tenantRunners.tenantId, tenantId), isNull(tenantRunners.revokedAt)),
+          )
           .returning({ id: tenantRunners.id }),
       );
       const cancelled = db.$with("cancelled").as(
         db
           .update(scanRunnerJobs)
           .set({ state: "cancelled", finishedAt: now })
-          .where(and(eq(scanRunnerJobs.runnerId, runnerId), eq(scanRunnerJobs.tenantId, tenantId), eq(scanRunnerJobs.state, "claimed"), exists(db.select({ id: revoked.id }).from(revoked))))
+          .where(
+            and(
+              eq(scanRunnerJobs.runnerId, runnerId),
+              eq(scanRunnerJobs.tenantId, tenantId),
+              eq(scanRunnerJobs.state, "claimed"),
+              exists(db.select({ id: revoked.id }).from(revoked)),
+            ),
+          )
           .returning({ scanId: scanRunnerJobs.scanId }),
       );
       const stopped = db.$with("stopped").as(
         db
           .update(scans)
           .set({ status: "stopped", step: null, finishedAt: now, updatedAt: now })
-          .where(and(eq(scans.tenantId, tenantId), inArray(scans.status, ["queued", "running"]), inArray(scans.id, db.select({ scanId: cancelled.scanId }).from(cancelled))))
+          .where(
+            and(
+              eq(scans.tenantId, tenantId),
+              inArray(scans.status, ["queued", "running"]),
+              inArray(scans.id, db.select({ scanId: cancelled.scanId }).from(cancelled)),
+            ),
+          )
           .returning({ id: scans.id }),
       );
       const cleared = db.$with("cleared").as(
@@ -136,7 +191,11 @@ export const removeRunnerEffect = (db: AppDbType, tenantId: string, runnerId: st
 // A Runner stops itself: its token no longer works. False
 // when no live Runner holds the token.
 // -----
-export const revokeRunnerByTokenEffect = (db: DbConnectType, tokenHash: string, now: Date): Effect.Effect<boolean, DbError> =>
+export const revokeRunnerByTokenEffect = (
+  db: DbConnectType,
+  tokenHash: string,
+  now: Date,
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -152,7 +211,11 @@ export const revokeRunnerByTokenEffect = (db: DbConnectType, tokenHash: string, 
 // unknown or revoked. Asking also records that it was
 // seen, so "last seen" costs no extra request.
 // -----
-export const findRunnerByTokenEffect = (db: DbConnectType, tokenHash: string, now: Date): Effect.Effect<RunnerIdentity | null, DbError> =>
+export const findRunnerByTokenEffect = (
+  db: DbConnectType,
+  tokenHash: string,
+  now: Date,
+): Effect.Effect<RunnerIdentity | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db

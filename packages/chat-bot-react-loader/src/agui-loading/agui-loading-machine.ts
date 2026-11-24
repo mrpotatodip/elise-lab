@@ -34,9 +34,7 @@ export type AGUILoadingRunOutcome =
   | { type: "interrupt"; interrupts: AGUILoadingInterrupt[] }
   | { type: "cancelled" };
 
-export type AGUILoadingSubagentOutcome =
-  | { type: "success" }
-  | { type: "suspended"; interruptIds?: string[] };
+export type AGUILoadingSubagentOutcome = { type: "success" } | { type: "suspended"; interruptIds?: string[] };
 
 export type AGUILoadingStreamEvent =
   | {
@@ -153,10 +151,7 @@ function findSubagentName(state: AGUILoadingState, id: string | undefined): stri
 // Only a new run gets past a waiting one. Other
 // events name their owner in subagentName.
 // -----
-export function aguiLoadingReducer(
-  state: AGUILoadingState,
-  event: AGUILoadingStreamEvent,
-): AGUILoadingState {
+export function aguiLoadingReducer(state: AGUILoadingState, event: AGUILoadingStreamEvent): AGUILoadingState {
   if (isTerminal(state)) return state;
   if (state.status === "waiting" && event.type !== EventType.RUN_STARTED) return state;
 
@@ -177,10 +172,7 @@ export function aguiLoadingReducer(
   return { ...next, subagentName: findSubagentName(next, ownerId) };
 }
 
-function reduceStreamEvent(
-  state: AGUILoadingState,
-  event: AGUILoadingStreamEvent,
-): AGUILoadingState {
+function reduceStreamEvent(state: AGUILoadingState, event: AGUILoadingStreamEvent): AGUILoadingState {
   switch (event.type) {
     case EventType.RUN_STARTED:
       if (continuesWaitingRun(state, event)) {

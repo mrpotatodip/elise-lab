@@ -15,7 +15,11 @@ import { roundUsd } from "#/modules/credit/utils";
 // cursor is the ID of the last entry on the page before; the next
 // page is everything older than it.
 // -----
-export const creditEntriesEffect = (db: AppDbType, tenantId: string, query: { limit: number; cursor?: string }): Effect.Effect<CreditEntries, DbError> =>
+export const creditEntriesEffect = (
+  db: AppDbType,
+  tenantId: string,
+  query: { limit: number; cursor?: string },
+): Effect.Effect<CreditEntries, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const hold = alias(tenantCreditLedger, "hold");
@@ -38,7 +42,13 @@ export const creditEntriesEffect = (db: AppDbType, tenantId: string, query: { li
         })
         .from(tenantCreditLedger)
         .leftJoin(hold, and(eq(hold.scanId, tenantCreditLedger.scanId), eq(hold.kind, "scan_hold")))
-        .where(and(eq(tenantCreditLedger.tenantId, tenantId), or(ne(tenantCreditLedger.kind, "scan_hold"), sql`not ${exists(settled)}`), olderThanCursor))
+        .where(
+          and(
+            eq(tenantCreditLedger.tenantId, tenantId),
+            or(ne(tenantCreditLedger.kind, "scan_hold"), sql`not ${exists(settled)}`),
+            olderThanCursor,
+          ),
+        )
         .orderBy(desc(tenantCreditLedger.createdAt), desc(tenantCreditLedger.id))
         .limit(query.limit + 1);
       const page = rows.slice(0, query.limit);

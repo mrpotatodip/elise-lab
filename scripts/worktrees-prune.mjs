@@ -13,10 +13,17 @@ const common = run("git", ["rev-parse", "--path-format=absolute", "--git-common-
 const main = path.dirname(common);
 const remove = process.argv.includes("--remove");
 
-const entries = run("git", ["worktree", "list", "--porcelain"], main).stdout.split("\n\n").map((block) => {
-  const field = (key) => block.split("\n").find((l) => l.startsWith(`${key} `))?.slice(key.length + 1);
-  return { dir: field("worktree"), branch: field("branch")?.replace("refs/heads/", "") };
-}).filter((e) => e.dir && e.dir !== main && e.dir.startsWith(`${main}/.claude/worktrees/`));
+const entries = run("git", ["worktree", "list", "--porcelain"], main)
+  .stdout.split("\n\n")
+  .map((block) => {
+    const field = (key) =>
+      block
+        .split("\n")
+        .find((l) => l.startsWith(`${key} `))
+        ?.slice(key.length + 1);
+    return { dir: field("worktree"), branch: field("branch")?.replace("refs/heads/", "") };
+  })
+  .filter((e) => e.dir && e.dir !== main && e.dir.startsWith(`${main}/.claude/worktrees/`));
 
 if (entries.length === 0) console.log("no worktrees under .claude/worktrees");
 for (const { dir, branch } of entries) {
@@ -29,7 +36,9 @@ for (const { dir, branch } of entries) {
     remote = run("git", ["ls-remote", "--exit-code", "--heads", "origin", branch], main).status === 0;
   }
   const removable = dirty === 0 && merged && Boolean(branch);
-  console.log(`${path.basename(dir)}  branch=${branch ?? "(detached)"}  ${dirty === 0 ? "clean" : `${dirty} dirty files`}  merged PR=${merged ? "yes" : "no"}  remote branch=${remote ? "yes" : "no"}${removable ? "  -> removable" : ""}`);
+  console.log(
+    `${path.basename(dir)}  branch=${branch ?? "(detached)"}  ${dirty === 0 ? "clean" : `${dirty} dirty files`}  merged PR=${merged ? "yes" : "no"}  remote branch=${remote ? "yes" : "no"}${removable ? "  -> removable" : ""}`,
+  );
   if (!remove || !removable) continue;
   const gone = run("git", ["worktree", "remove", dir], main);
   if (gone.status !== 0) {

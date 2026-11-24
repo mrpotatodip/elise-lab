@@ -2,12 +2,7 @@ import { Effect } from "effect";
 import { CHAT_BOT_THREAD_ID_REQUIRED } from "../constants";
 import { ChatBotDbError, ChatBotInvalid, ChatBotNotFound } from "../errors";
 import { toChatBotUiMessages } from "../lib/ui-messages";
-import type {
-  ChatBotDurableStreams,
-  ChatBotHydrateResult,
-  ChatBotOwner,
-  ChatBotStore,
-} from "../types";
+import type { ChatBotDurableStreams, ChatBotHydrateResult, ChatBotOwner, ChatBotStore } from "../types";
 import { isChatBotStreamResume, joinChatBotSseSvc } from "./resume";
 
 // -----

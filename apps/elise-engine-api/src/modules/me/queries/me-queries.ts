@@ -106,7 +106,11 @@ export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me
 // Does this login hold a Role in this Account?
 // The guard for a signed-in caller of /scans.
 // -----
-export const userHasAccountEffect = (db: DbConnectType, userId: string, accountId: string): Effect.Effect<boolean, DbError> =>
+export const userHasAccountEffect = (
+  db: DbConnectType,
+  userId: string,
+  accountId: string,
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -143,7 +147,12 @@ export const listLoginsWithPowerEffect = (
 // the Powers granted to its Master Role. The guard for its team,
 // groups, GitHub connection and accepted risks.
 // -----
-export const userHasPowerEffect = (db: DbConnectType, userId: string, accountId: string, power: AccessPower): Effect.Effect<boolean, DbError> =>
+export const userHasPowerEffect = (
+  db: DbConnectType,
+  userId: string,
+  accountId: string,
+  power: AccessPower,
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () =>
       db

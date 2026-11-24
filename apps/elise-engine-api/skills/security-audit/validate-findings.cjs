@@ -49,7 +49,8 @@ const LIMITS = Object.freeze({
 });
 const VISIBLE_CONTENT = /[^\p{White_Space}\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}]/u;
 const PATH_FORBIDDEN_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u;
-const WINDOWS_RESERVED_COMPONENT = /^(?:con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu;
+const WINDOWS_RESERVED_COMPONENT =
+  /^(?:con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu;
 const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const UNSAFE_DIAGNOSTIC_CHARACTER = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/gu;
 const MAX_DIAGNOSTIC_STRING_LENGTH = 256;
@@ -60,18 +61,15 @@ class SafeInputError extends Error {}
 function escapeUnsafeDiagnosticCharacters(value) {
   return String(value).replace(UNSAFE_DIAGNOSTIC_CHARACTER, (character) => {
     const codePoint = character.codePointAt(0);
-    return codePoint <= 0xffff
-      ? `\\u${codePoint.toString(16).padStart(4, "0")}`
-      : `\\u{${codePoint.toString(16)}}`;
+    return codePoint <= 0xffff ? `\\u${codePoint.toString(16).padStart(4, "0")}` : `\\u{${codePoint.toString(16)}}`;
   });
 }
 
 function safeQuote(value) {
   let serialized;
   if (typeof value === "string") {
-    const clipped = value.length > MAX_DIAGNOSTIC_STRING_LENGTH
-      ? `${value.slice(0, MAX_DIAGNOSTIC_STRING_LENGTH)}...`
-      : value;
+    const clipped =
+      value.length > MAX_DIAGNOSTIC_STRING_LENGTH ? `${value.slice(0, MAX_DIAGNOSTIC_STRING_LENGTH)}...` : value;
     serialized = JSON.stringify(clipped);
   } else if (value === null || typeof value === "boolean") {
     serialized = String(value);
@@ -84,9 +82,7 @@ function safeQuote(value) {
 }
 
 function propertyPath(base, key) {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key)
-    ? `${base}.${key}`
-    : `${base}[${safeQuote(key)}]`;
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? `${base}.${key}` : `${base}[${safeQuote(key)}]`;
 }
 
 function createErrorList() {
@@ -118,8 +114,10 @@ function deepEqual(left, right) {
   if (left !== null && typeof left === "object") {
     const leftKeys = Object.keys(left);
     const rightKeys = Object.keys(right);
-    return leftKeys.length === rightKeys.length &&
-      leftKeys.every((key) => hasOwn(right, key) && deepEqual(left[key], right[key]));
+    return (
+      leftKeys.length === rightKeys.length &&
+      leftKeys.every((key) => hasOwn(right, key) && deepEqual(left[key], right[key]))
+    );
   }
   return false;
 }
@@ -188,12 +186,14 @@ function canonicalKey(value) {
       append("]");
     } else if (type === "object") {
       append("object:{");
-      Object.keys(item).sort().forEach((key, index) => {
-        if (index > 0) append(",");
-        append(JSON.stringify(key));
-        append(":");
-        encode(item[key]);
-      });
+      Object.keys(item)
+        .sort()
+        .forEach((key, index) => {
+          if (index > 0) append(",");
+          append(JSON.stringify(key));
+          append(":");
+          encode(item[key]);
+        });
       append("}");
     } else {
       append(`${type}:${String(item)}`);
@@ -212,10 +212,18 @@ function collectDataLimitErrors(value, location = "$data") {
     const current = stack.pop();
     if (current.value === null || typeof current.value !== "object") continue;
     if (current.depth > LIMITS.nestingDepth) {
-      return [escapeUnsafeDiagnosticCharacters(`${current.location}: exceeds ${LIMITS.nestingDepth} level nesting depth limit`)];
+      return [
+        escapeUnsafeDiagnosticCharacters(
+          `${current.location}: exceeds ${LIMITS.nestingDepth} level nesting depth limit`,
+        ),
+      ];
     }
     if (seen.has(current.value)) {
-      return [escapeUnsafeDiagnosticCharacters(`${current.location}: input must not contain repeated or cyclic object references`)];
+      return [
+        escapeUnsafeDiagnosticCharacters(
+          `${current.location}: input must not contain repeated or cyclic object references`,
+        ),
+      ];
     }
     seen.add(current.value);
 
@@ -263,14 +271,15 @@ function collectSchemaErrors(schema, location = "schema") {
     if (hasOwn(node, "description") && typeof node.description !== "string") {
       errors.push(`${p}.description: expected string`);
     }
-    if (hasOwn(node, "type") && (!SUPPORTED_TYPES.has(node.type))) {
+    if (hasOwn(node, "type") && !SUPPORTED_TYPES.has(node.type)) {
       errors.push(`${p}.type: unsupported type ${safeQuote(node.type)}`);
     }
     if (hasOwn(node, "properties")) {
       if (node.properties === null || typeof node.properties !== "object" || Array.isArray(node.properties)) {
         errors.push(`${p}.properties: expected object`);
       } else {
-        for (const key of Object.keys(node.properties)) check(node.properties[key], propertyPath(`${p}.properties`, key));
+        for (const key of Object.keys(node.properties))
+          check(node.properties[key], propertyPath(`${p}.properties`, key));
       }
     }
     if (hasOwn(node, "required")) {
@@ -363,7 +372,7 @@ function validate(value, schema, p, errors) {
   if (hasOwn(schema, "oneOf")) {
     const results = schema.oneOf.map((branch) => collectUnchecked(value, branch, p));
     const passingIndexes = results
-      .map((branchErrors, index) => branchErrors.length === 0 ? index : -1)
+      .map((branchErrors, index) => (branchErrors.length === 0 ? index : -1))
       .filter((index) => index !== -1);
 
     if (passingIndexes.length !== 1) {
@@ -371,7 +380,12 @@ function validate(value, schema, p, errors) {
       if (passingIndexes.length === 0 && value !== null && typeof value === "object" && !Array.isArray(value)) {
         const matchingDiscriminators = schema.oneOf
           .map((branch, index) => ({ discriminator: findDiscriminator(branch), index }))
-          .filter(({ discriminator }) => discriminator && hasOwn(value, discriminator.key) && deepEqual(value[discriminator.key], discriminator.value));
+          .filter(
+            ({ discriminator }) =>
+              discriminator &&
+              hasOwn(value, discriminator.key) &&
+              deepEqual(value[discriminator.key], discriminator.value),
+          );
         if (matchingDiscriminators.length === 1) {
           errors.push(...results[matchingDiscriminators[0].index]);
         }
@@ -387,7 +401,11 @@ function validate(value, schema, p, errors) {
     errors.push(`${p}: invalid value ${safeQuote(value)} (expected one of ${allowed})`);
   }
 
-  if (hasOwn(schema, "type") && typeOf(value) !== schema.type && !(schema.type === "integer" && typeOf(value) === "number" && Number.isInteger(value))) {
+  if (
+    hasOwn(schema, "type") &&
+    typeOf(value) !== schema.type &&
+    !(schema.type === "integer" && typeOf(value) === "number" && Number.isInteger(value))
+  ) {
     errors.push(`${p}: expected ${schema.type}, got ${typeOf(value)}`);
     return;
   }
@@ -448,7 +466,7 @@ function validate(value, schema, p, errors) {
         errors.push(`${p}: must contain a visible character`);
       }
     }
-    if (hasOwn(schema, "pattern") && !(new RegExp(schema.pattern).test(value))) {
+    if (hasOwn(schema, "pattern") && !new RegExp(schema.pattern).test(value)) {
       errors.push(`${p}: must match pattern ${JSON.stringify(schema.pattern)}`);
     }
   }
@@ -471,15 +489,27 @@ function collect(value, schema, p = "$data") {
 }
 
 function isSafeRelativeSourcePath(value) {
-  if (typeof value !== "string" || value.length === 0 || !hasValidUnicodeScalarValues(value) || value.trim() !== value || PATH_FORBIDDEN_CHARACTER.test(value) || value.includes("\\") || value.includes(":")) return false;
-  if (path.posix.isAbsolute(value) || path.win32.isAbsolute(value) || /^[A-Za-z]:/.test(value) || value.startsWith("~")) return false;
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    !hasValidUnicodeScalarValues(value) ||
+    value.trim() !== value ||
+    PATH_FORBIDDEN_CHARACTER.test(value) ||
+    value.includes("\\") ||
+    value.includes(":")
+  )
+    return false;
+  if (path.posix.isAbsolute(value) || path.win32.isAbsolute(value) || /^[A-Za-z]:/.test(value) || value.startsWith("~"))
+    return false;
   const segments = value.split("/");
-  return segments.every((segment) =>
-    segment !== "" &&
-    segment !== "." &&
-    segment !== ".." &&
-    !/[ .]$/u.test(segment) &&
-    !WINDOWS_RESERVED_COMPONENT.test(segment));
+  return segments.every(
+    (segment) =>
+      segment !== "" &&
+      segment !== "." &&
+      segment !== ".." &&
+      !/[ .]$/u.test(segment) &&
+      !WINDOWS_RESERVED_COMPONENT.test(segment),
+  );
 }
 
 function collectFindingSemanticErrors(findings) {
@@ -520,7 +550,9 @@ function collectFindingSemanticErrors(findings) {
     if (finding.remediation && Array.isArray(finding.remediation.code_changes)) {
       finding.remediation.code_changes.forEach((change, changeIndex) => {
         if (change && hasOwn(change, "file_name") && !isSafeRelativeSourcePath(change.file_name)) {
-          errors.push(`${base}.remediation.code_changes[${changeIndex}].file_name: must be a safe repository-relative source path`);
+          errors.push(
+            `${base}.remediation.code_changes[${changeIndex}].file_name: must be a safe repository-relative source path`,
+          );
         }
       });
     }
@@ -540,7 +572,9 @@ function collectFindingSemanticErrors(findings) {
       }
       for (let traceIndex = 1; traceIndex < last; traceIndex++) {
         if (finding.trace[traceIndex] && finding.trace[traceIndex].kind !== "propagation") {
-          errors.push(`${base}.trace[${traceIndex}].kind: must be "propagation", got ${safeQuote(finding.trace[traceIndex].kind)}`);
+          errors.push(
+            `${base}.trace[${traceIndex}].kind: must be "propagation", got ${safeQuote(finding.trace[traceIndex].kind)}`,
+          );
         }
       }
     }
@@ -548,23 +582,39 @@ function collectFindingSemanticErrors(findings) {
     const verdict = finding.verdict;
     if (verdict === "confirmed") {
       for (const forbidden of ["claimed_root_cause", "blockers", "validation_plan", "reason"]) {
-        if (hasOwn(finding, forbidden)) errors.push(`${base}: confirmed finding must not contain ${safeQuote(forbidden)}`);
+        if (hasOwn(finding, forbidden))
+          errors.push(`${base}: confirmed finding must not contain ${safeQuote(forbidden)}`);
       }
-      if (!finding.execution || typeof finding.execution !== "object" || typeof finding.execution.observed_result !== "string" || !hasVisibleProse(finding.execution.observed_result)) {
+      if (
+        !finding.execution ||
+        typeof finding.execution !== "object" ||
+        typeof finding.execution.observed_result !== "string" ||
+        !hasVisibleProse(finding.execution.observed_result)
+      ) {
         errors.push(`${base}: confirmed finding requires a visible execution observed_result`);
       }
-      if (!finding.remediation || typeof finding.remediation !== "object" || typeof finding.remediation.strategy !== "string" || !hasVisibleProse(finding.remediation.strategy)) {
+      if (
+        !finding.remediation ||
+        typeof finding.remediation !== "object" ||
+        typeof finding.remediation.strategy !== "string" ||
+        !hasVisibleProse(finding.remediation.strategy)
+      ) {
         errors.push(`${base}: confirmed finding requires visible remediation`);
       }
       const overall = finding.severity && finding.severity.overall_severity;
       const impact = finding.severity && finding.severity.impact && finding.severity.impact.score;
-      if (SEVERITY_RANK.has(overall) && SEVERITY_RANK.has(impact) && SEVERITY_RANK.get(overall) > SEVERITY_RANK.get(impact)) {
+      if (
+        SEVERITY_RANK.has(overall) &&
+        SEVERITY_RANK.has(impact) &&
+        SEVERITY_RANK.get(overall) > SEVERITY_RANK.get(impact)
+      ) {
         errors.push(`${base}.severity.overall_severity: cannot exceed demonstrated impact ${safeQuote(impact)}`);
       }
     } else if (verdict === "needs_validation") {
       if (hasOwn(finding, "severity")) errors.push(`${base}: needs_validation finding must not contain "severity"`);
       for (const forbidden of ["execution", "remediation", "reason", "root_cause"]) {
-        if (hasOwn(finding, forbidden)) errors.push(`${base}: needs_validation finding must not contain ${safeQuote(forbidden)}`);
+        if (hasOwn(finding, forbidden))
+          errors.push(`${base}: needs_validation finding must not contain ${safeQuote(forbidden)}`);
       }
       const plan = finding.validation_plan;
       const hasLocalPlan = plan && typeof plan.local === "string" && hasVisibleProse(plan.local);
@@ -574,7 +624,8 @@ function collectFindingSemanticErrors(findings) {
       }
     } else if (verdict === "rejected") {
       for (const forbidden of ["severity", "execution", "remediation", "blockers", "validation_plan", "root_cause"]) {
-        if (hasOwn(finding, forbidden)) errors.push(`${base}: rejected finding must not contain ${safeQuote(forbidden)}`);
+        if (hasOwn(finding, forbidden))
+          errors.push(`${base}: rejected finding must not contain ${safeQuote(forbidden)}`);
       }
     }
   });
@@ -670,13 +721,13 @@ function enforceJsonTextLimits(contents) {
         escaped = false;
       } else if (character === "\\") {
         escaped = true;
-      } else if (character === "\"") {
+      } else if (character === '"') {
         inString = false;
       }
       continue;
     }
 
-    if (character === "\"") {
+    if (character === '"') {
       markArrayItem();
       inString = true;
     } else if (character === "[" || character === "{") {

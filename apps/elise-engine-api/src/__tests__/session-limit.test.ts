@@ -10,8 +10,18 @@ let db: TestDb;
 
 const seedLogin = async (partyId: string, id: string) => {
   const now = new Date();
-  await db.raw.insert(authUser).values({ id, partyId, name: id, email: `${id}@example.com`, emailVerified: true, createdAt: now, updatedAt: now });
-  await db.raw.insert(authAccount).values({ id: `acc-${id}`, accountId: id, providerId: "credential", userId: id, password: await hashPassword("password-123"), createdAt: now, updatedAt: now });
+  await db.raw
+    .insert(authUser)
+    .values({ id, partyId, name: id, email: `${id}@example.com`, emailVerified: true, createdAt: now, updatedAt: now });
+  await db.raw.insert(authAccount).values({
+    id: `acc-${id}`,
+    accountId: id,
+    providerId: "credential",
+    userId: id,
+    password: await hashPassword("password-123"),
+    createdAt: now,
+    updatedAt: now,
+  });
 };
 
 beforeAll(async () => {
@@ -47,7 +57,11 @@ describe("Session limit", () => {
     await signIn("u1@example.com");
     await signIn("u1@example.com");
 
-    const mine = await db.raw.select().from(authSession).where(eq(authSession.userId, "u1")).orderBy(asc(authSession.createdAt));
+    const mine = await db.raw
+      .select()
+      .from(authSession)
+      .where(eq(authSession.userId, "u1"))
+      .orderBy(asc(authSession.createdAt));
     const theirs = await db.raw.select().from(authSession).where(eq(authSession.userId, "u2"));
     expect(mine).toHaveLength(MAX_SESSIONS_PER_LOGIN);
     expect(mine.map((row) => row.token)).not.toContain(first);
@@ -58,7 +72,14 @@ describe("Session limit", () => {
     const now = new Date();
     await db.raw.update(authUser).set({ twoFactorEnabled: true }).where(eq(authUser.id, "u3"));
     await db.raw.insert(authSession).values(
-      [1, 2, 3].map((n) => ({ id: `s3-${n}`, token: `t3-${n}`, userId: "u3", expiresAt: new Date(now.getTime() + 3_600_000), createdAt: new Date(now.getTime() - n * 1000), updatedAt: now })),
+      [1, 2, 3].map((n) => ({
+        id: `s3-${n}`,
+        token: `t3-${n}`,
+        userId: "u3",
+        expiresAt: new Date(now.getTime() + 3_600_000),
+        createdAt: new Date(now.getTime() - n * 1000),
+        updatedAt: now,
+      })),
     );
 
     const result = await auth().api.signInEmail({ body: { email: "u3@example.com", password: "password-123" } });

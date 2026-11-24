@@ -4,7 +4,12 @@ import type { AppDbType } from "#/lib/db-connection";
 import { Invalid, type DbError } from "#/lib/effect-query";
 import { activeScansEffect } from "#/modules/scan-ledger";
 import { getUsageSvc } from "./get-usage-svc";
-import { monthSpendEffect, noticeAudienceEffect, setMonthlyBudgetEffect, type NoticeAudience } from "#/modules/usage/queries";
+import {
+  monthSpendEffect,
+  noticeAudienceEffect,
+  setMonthlyBudgetEffect,
+  type NoticeAudience,
+} from "#/modules/usage/queries";
 import type { MonthSpend, UsageEnv } from "#/modules/usage/types";
 import { allowanceUsdOf, defaultBudgetUsdOf, monthStartOf, reservedUsdOf, summarizeUsage } from "#/modules/usage/utils";
 
@@ -28,11 +33,15 @@ export const setUsageBudgetSvc = (
     const budgetUsd = requestedUsd ?? defaultBudgetUsdOf(spend, env);
     const allowanceUsd = allowanceUsdOf(spend, env);
     if (budgetUsd > allowanceUsd) {
-      return yield* new Invalid({ message: `monthlyBudgetUsd: must be at most $${allowanceUsd}, the most this account may set` });
+      return yield* new Invalid({
+        message: `monthlyBudgetUsd: must be at most $${allowanceUsd}, the most this account may set`,
+      });
     }
     const committedUsd = spend.spentUsd + reservedUsd;
     if (budgetUsd < committedUsd) {
-      return yield* new Invalid({ message: `monthlyBudgetUsd: must be at least $${Math.ceil(committedUsd * 100) / 100}, which this month has already spent or holds for running scans` });
+      return yield* new Invalid({
+        message: `monthlyBudgetUsd: must be at least $${Math.ceil(committedUsd * 100) / 100}, which this month has already spent or holds for running scans`,
+      });
     }
     yield* setMonthlyBudgetEffect(db, accountId, userId, requestedUsd);
     return summarizeUsage(now, { ...spend, budgetOverrideUsd: requestedUsd }, env, reservedUsd);
@@ -40,7 +49,13 @@ export const setUsageBudgetSvc = (
 
 export type BudgetChange = { usage: Usage; previousBudgetUsd: number; audience: NoticeAudience };
 
-export const changeUsageBudgetSvc = (env: UsageEnv, db: AppDbType, accountId: string, userId: string, requestedUsd: number | null): Effect.Effect<BudgetChange, DbError | Invalid> =>
+export const changeUsageBudgetSvc = (
+  env: UsageEnv,
+  db: AppDbType,
+  accountId: string,
+  userId: string,
+  requestedUsd: number | null,
+): Effect.Effect<BudgetChange, DbError | Invalid> =>
   Effect.gen(function* () {
     const before = yield* getUsageSvc(env, db, accountId);
     const usage = yield* updateUsageBudgetSvc(env, db, accountId, userId, requestedUsd);
@@ -48,7 +63,13 @@ export const changeUsageBudgetSvc = (env: UsageEnv, db: AppDbType, accountId: st
     return { usage, previousBudgetUsd: before.budgetUsd, audience };
   });
 
-export const updateUsageBudgetSvc = (env: UsageEnv, db: AppDbType, accountId: string, userId: string, requestedUsd: number | null): Effect.Effect<Usage, DbError | Invalid> =>
+export const updateUsageBudgetSvc = (
+  env: UsageEnv,
+  db: AppDbType,
+  accountId: string,
+  userId: string,
+  requestedUsd: number | null,
+): Effect.Effect<Usage, DbError | Invalid> =>
   Effect.gen(function* () {
     const now = new Date();
     const spend = yield* monthSpendEffect(db, accountId, monthStartOf(now));

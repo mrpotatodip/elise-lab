@@ -1,6 +1,10 @@
 import { SCAN_REPORT_FILES } from "#/constants";
 import type { ScanOptions } from "#/schemas";
-import { SCAN_SANDBOX_OUT_DIR, SCAN_SANDBOX_PHASE_SKILL_PHASES, SCAN_SANDBOX_REPO_DIR } from "#/modules/scan-sandbox/constants";
+import {
+  SCAN_SANDBOX_OUT_DIR,
+  SCAN_SANDBOX_PHASE_SKILL_PHASES,
+  SCAN_SANDBOX_REPO_DIR,
+} from "#/modules/scan-sandbox/constants";
 import type { FullPhase } from "#/modules/scan-sandbox/types";
 
 // -----
@@ -9,7 +13,13 @@ import type { FullPhase } from "#/modules/scan-sandbox/types";
 // network. A Runner works in a folder of its own, with paths
 // relative to it.
 // -----
-export type PromptPlace = { repoDir: string; outDir: string; networkRule: string; validatedBy: "agent" | "runner"; metered: boolean };
+export type PromptPlace = {
+  repoDir: string;
+  outDir: string;
+  networkRule: string;
+  validatedBy: "agent" | "runner";
+  metered: boolean;
+};
 
 export const CONTAINER_PLACE: PromptPlace = {
   repoDir: SCAN_SANDBOX_REPO_DIR,
@@ -25,7 +35,8 @@ export const CONTAINER_PLACE: PromptPlace = {
 // (the computer is the person's, and the repo is untrusted), so the Runner app runs
 // them after the agent ends, and the agent writes both files by hand.
 // -----
-const VALIDATION_BY_AGENT = "and run the skill's validators (validate-findings.cjs, validate-coverage-ledger.cjs) as it instructs.";
+const VALIDATION_BY_AGENT =
+  "and run the skill's validators (validate-findings.cjs, validate-coverage-ledger.cjs) as it instructs.";
 const VALIDATION_BY_RUNNER =
   "Do not run the validators or any node command. The app that started you runs validate-findings.cjs on findings.json and validate-coverage-ledger.cjs on coverage-ledger.json after you end, which replaces the skill's own validation steps. Write both files by hand, exactly to the skill's schema, and do not generate them with a script.";
 
@@ -53,7 +64,8 @@ const PHASE_HANDOFF = {
   recon: `This is the first run. Set the run up as the skill says and write run-metadata.json, architecture.md and the initial coverage-ledger.json. ${LEDGER_PATHS}`,
   hunt: `An earlier run did the reconnaissance. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not redo reconnaissance. Write the candidates and the updated ledger. ${LEDGER_PATHS}`,
   check: `Earlier runs did the reconnaissance and the hunting. Read run-metadata.json, architecture.md and coverage-ledger.json in the output directory first, and continue from them. Do not hunt again. Validate the candidates the hunt left, and write findings.json and the final ledger. ${LEDGER_PATHS}`,
-  report: "Earlier runs did everything but the report. Read run-metadata.json, coverage-ledger.json and findings.json in the output directory first. Do not hunt or validate again. Write the report files from the final records only.",
+  report:
+    "Earlier runs did everything but the report. Read run-metadata.json, coverage-ledger.json and findings.json in the output directory first. Do not hunt or validate again. Write the report files from the final records only.",
 } satisfies Record<FullPhase, string>;
 
 const VERIFY_CANDIDATES =
@@ -88,9 +100,12 @@ const WAIT_FOR_SUBAGENTS =
   "Run each sub-agent in the foreground and wait for its result before you go on. Never run one in the background, and never sleep or schedule a wakeup. Once this run's files are written, end the run.";
 
 const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"]) =>
-  [PHASE_HANDOFF[phase], SUBAGENT_ASK[profile][phase], phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : ""].filter((part) => part !== "").join(" ");
+  [PHASE_HANDOFF[phase], SUBAGENT_ASK[profile][phase], phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : ""]
+    .filter((part) => part !== "")
+    .join(" ");
 
-const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
+const OUT_OF_MONEY =
+  "The money for this run is limited. If it runs out, stop at a safe point: write down what you did, and record every unit you did not reach as deferred in the coverage ledger.";
 
 const PHASE_VALIDATION_BY_RUNNER =
   "When findings.json and coverage-ledger.json are final, stop: the app that started you runs the skill's validators on them after this run ends. If a validator is refused to you, that is expected here: it is not a reason to set `run_status` to `incomplete`.";

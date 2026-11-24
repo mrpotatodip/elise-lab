@@ -1,6 +1,11 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { RUNNER_JOB_PHASE_VALUES, TRACE_LABEL_VALUES, type RunnerJobPhaseValue, type TraceLabelValue } from "@repo/contracts/elise";
+import {
+  RUNNER_JOB_PHASE_VALUES,
+  TRACE_LABEL_VALUES,
+  type RunnerJobPhaseValue,
+  type TraceLabelValue,
+} from "@repo/contracts/elise";
 import { scans } from "./scans";
 import { tenants } from "./tenant";
 
@@ -34,7 +39,10 @@ export const scanTraceEntries = pgTable(
   (t) => ({
     pk: primaryKey({ name: "scan_trace_entries_pk", columns: [t.scanId, t.id] }),
     chkLabel: check("scan_trace_entries_label", sql`${t.label} in (${inList(TRACE_LABEL_VALUES)})`),
-    chkPhase: check("scan_trace_entries_phase", sql`${t.phase} is null or ${t.phase} in (${inList(RUNNER_JOB_PHASE_VALUES)})`),
+    chkPhase: check(
+      "scan_trace_entries_phase",
+      sql`${t.phase} is null or ${t.phase} in (${inList(RUNNER_JOB_PHASE_VALUES)})`,
+    ),
     chkCount: check("scan_trace_entries_count", sql`${t.count} >= 1`),
     fkScanTenant: foreignKey({
       name: "scan_trace_entries_scan_tenant_fk",

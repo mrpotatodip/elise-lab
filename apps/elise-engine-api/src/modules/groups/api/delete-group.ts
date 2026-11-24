@@ -10,11 +10,20 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.delete("/:groupId", deleteGroupDoc, requirePower("company:team:groups:delete"), zValidator("header", AccountHeaderSchema), zValidator("param", GroupParamSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { groupId } = c.req.valid("param");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(deleteGroupSvc(db, accountId, userIdOf(c), groupId)));
-  return c.json({ data, error: null });
-});
+app.delete(
+  "/:groupId",
+  deleteGroupDoc,
+  requirePower("company:team:groups:delete"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", GroupParamSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { groupId } = c.req.valid("param");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(deleteGroupSvc(db, accountId, userIdOf(c), groupId)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

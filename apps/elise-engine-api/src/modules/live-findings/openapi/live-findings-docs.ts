@@ -1,6 +1,14 @@
 import { describeRoute } from "hono-openapi";
 import { LiveFindingsSavedSchema } from "@repo/contracts/elise";
-import { EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const saveLiveFindingsDoc = describeRoute({
   tags: ["runners"],
@@ -24,5 +32,8 @@ export const saveLiveFindingsDoc = describeRoute({
       ),
     ],
   }),
-  responses: { 200: jsonResponse("How many records were kept.", envelope(LiveFindingsSavedSchema)), ...errorResponses(400, 401, 404, 409) },
+  responses: {
+    200: jsonResponse("How many records were kept.", envelope(LiveFindingsSavedSchema)),
+    ...errorResponses(400, 401, 404, 409),
+  },
 });

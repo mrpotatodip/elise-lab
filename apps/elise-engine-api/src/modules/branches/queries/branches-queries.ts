@@ -9,21 +9,37 @@ import { isCommitId } from "#/modules/branches/utils";
 
 export const BRANCH_LIMIT_MESSAGE = `A repo can track at most ${REPO_BRANCH_LIMIT} branches`;
 
-const limitMessageFor = (tracked: Iterable<string>): string => `${BRANCH_LIMIT_MESSAGE}; it tracks ${[...tracked].toSorted().join(", ") || "none"}`;
+const limitMessageFor = (tracked: Iterable<string>): string =>
+  `${BRANCH_LIMIT_MESSAGE}; it tracks ${[...tracked].toSorted().join(", ") || "none"}`;
 
 export type BranchRef = { id: string; name: string };
 
-export const findBranchEffect = (db: AppDbType, tenantId: string, repoId: string, name: string): Effect.Effect<BranchRef | null, DbError> =>
+export const findBranchEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+  name: string,
+): Effect.Effect<BranchRef | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
         .select({ id: scanRepoBranches.id, name: scanRepoBranches.name })
         .from(scanRepoBranches)
-        .where(and(eq(scanRepoBranches.tenantId, tenantId), eq(scanRepoBranches.repoId, repoId), eq(scanRepoBranches.name, name))),
+        .where(
+          and(
+            eq(scanRepoBranches.tenantId, tenantId),
+            eq(scanRepoBranches.repoId, repoId),
+            eq(scanRepoBranches.name, name),
+          ),
+        ),
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows[0] ?? null));
 
-export const listBranchesEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<BranchRef[], DbError> =>
+export const listBranchesEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+): Effect.Effect<BranchRef[], DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -39,20 +55,38 @@ export const listBranchesEffect = (db: AppDbType, tenantId: string, repoId: stri
 // the commit of the newest succeeded scan of the branch, the
 // same commit the repo page shows as its latest.
 // -----
-export const findBranchesAtTipEffect = (db: AppDbType, tenantId: string, repoId: string, commit: string): Effect.Effect<BranchRef[], DbError> =>
+export const findBranchesAtTipEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+  commit: string,
+): Effect.Effect<BranchRef[], DbError> =>
   Effect.tryPromise({
     try: async () => {
       const tips = await db
         .selectDistinctOn([scans.branchId], { branchId: scans.branchId, commitSha: scans.commitSha })
         .from(scans)
-        .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), isNotNull(scans.branchId), eq(scans.status, "succeeded")))
+        .where(
+          and(
+            eq(scans.tenantId, tenantId),
+            eq(scans.repoId, repoId),
+            isNotNull(scans.branchId),
+            eq(scans.status, "succeeded"),
+          ),
+        )
         .orderBy(scans.branchId, desc(scans.createdAt));
       const ids = tips.flatMap((tip) => (tip.commitSha === commit && tip.branchId !== null ? [tip.branchId] : []));
       if (ids.length === 0) return [];
       return db
         .select({ id: scanRepoBranches.id, name: scanRepoBranches.name })
         .from(scanRepoBranches)
-        .where(and(eq(scanRepoBranches.tenantId, tenantId), eq(scanRepoBranches.repoId, repoId), inArray(scanRepoBranches.id, ids)))
+        .where(
+          and(
+            eq(scanRepoBranches.tenantId, tenantId),
+            eq(scanRepoBranches.repoId, repoId),
+            inArray(scanRepoBranches.id, ids),
+          ),
+        )
         .orderBy(asc(scanRepoBranches.name));
     },
     catch: toDbError,
@@ -80,7 +114,12 @@ const resolveNamedScanBranchEffect = (
     try: async () => {
       const { name, ref } = scan;
       if (!name) {
-        return { id: null, reason: ref ? `"${ref}" is a tag or a commit, not a branch, so this scan has no History` : "the clone was not on a branch, so this scan has no History" };
+        return {
+          id: null,
+          reason: ref
+            ? `"${ref}" is a tag or a commit, not a branch, so this scan has no History`
+            : "the clone was not on a branch, so this scan has no History",
+        };
       }
       const [repo] = await db
         .select({ defaultBranch: scanRepos.defaultBranch })
@@ -88,7 +127,10 @@ const resolveNamedScanBranchEffect = (
         .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
       if (!repo) return { id: null, reason: null };
       if (ref === null && repo.defaultBranch !== name) {
-        await db.update(scanRepos).set({ defaultBranch: name }).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
+        await db
+          .update(scanRepos)
+          .set({ defaultBranch: name })
+          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
       }
       const [existing] = await db
         .select({ id: scanRepoBranches.id })
@@ -96,9 +138,20 @@ const resolveNamedScanBranchEffect = (
         .where(and(eq(scanRepoBranches.repoId, repoId), eq(scanRepoBranches.name, name)));
       if (existing) return { id: existing.id, reason: null };
 
-      const [{ total }] = await db.select({ total: count() }).from(scanRepoBranches).where(eq(scanRepoBranches.repoId, repoId));
-      if (total >= REPO_BRANCH_LIMIT) return { id: null, reason: `the repo already tracks ${REPO_BRANCH_LIMIT} branches, so this scan has no History` };
-      const [created] = await db.insert(scanRepoBranches).values({ tenantId, repoId, name }).onConflictDoNothing().returning({ id: scanRepoBranches.id });
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(scanRepoBranches)
+        .where(eq(scanRepoBranches.repoId, repoId));
+      if (total >= REPO_BRANCH_LIMIT)
+        return {
+          id: null,
+          reason: `the repo already tracks ${REPO_BRANCH_LIMIT} branches, so this scan has no History`,
+        };
+      const [created] = await db
+        .insert(scanRepoBranches)
+        .values({ tenantId, repoId, name })
+        .onConflictDoNothing()
+        .returning({ id: scanRepoBranches.id });
       if (created) return { id: created.id, reason: null };
       const [raced] = await db
         .select({ id: scanRepoBranches.id })
@@ -124,11 +177,16 @@ export const resolveScanBranchEffect = (
   scan: { name: string | null; ref: string | null },
 ): Effect.Effect<ScanBranchOutcome, DbError> =>
   Effect.gen(function* () {
-    if (scan.name || !scan.ref || !isCommitId(scan.ref)) return yield* resolveNamedScanBranchEffect(db, tenantId, repoId, scan);
+    if (scan.name || !scan.ref || !isCommitId(scan.ref))
+      return yield* resolveNamedScanBranchEffect(db, tenantId, repoId, scan);
     const atTip = yield* findBranchesAtTipEffect(db, tenantId, repoId, scan.ref.toLowerCase());
     if (atTip.length === 1) return { id: atTip[0].id, name: atTip[0].name, reason: null };
-    if (atTip.length === 0) return { id: null, reason: "this commit is not the latest of a tracked branch, so this scan has no History" };
-    return { id: null, reason: `this commit is the latest of ${atTip.length} tracked branches (${atTip.map((branch) => branch.name).join(", ")}), so this scan has no History` };
+    if (atTip.length === 0)
+      return { id: null, reason: "this commit is not the latest of a tracked branch, so this scan has no History" };
+    return {
+      id: null,
+      reason: `this commit is the latest of ${atTip.length} tracked branches (${atTip.map((branch) => branch.name).join(", ")}), so this scan has no History`,
+    };
   });
 
 // -----
@@ -137,14 +195,22 @@ export const resolveScanBranchEffect = (
 // the rows are counted, so two requests cannot both pass the limit.
 // Throws NotFound or Conflict to roll the transaction back.
 // -----
-export const addBranchesTx = async (tx: AppDbType, tenantId: string, repoId: string, names: string[]): Promise<BranchRef[]> => {
+export const addBranchesTx = async (
+  tx: AppDbType,
+  tenantId: string,
+  repoId: string,
+  names: string[],
+): Promise<BranchRef[]> => {
   const [repo] = await tx
     .select({ id: scanRepos.id })
     .from(scanRepos)
     .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)))
     .for("update");
   if (!repo) throw new NotFound({ message: "Repo not found" });
-  const have = await tx.select({ name: scanRepoBranches.name }).from(scanRepoBranches).where(eq(scanRepoBranches.repoId, repoId));
+  const have = await tx
+    .select({ name: scanRepoBranches.name })
+    .from(scanRepoBranches)
+    .where(eq(scanRepoBranches.repoId, repoId));
   const known = new Set(have.map((row) => row.name));
   const fresh = [...new Set(names)].filter((name) => !known.has(name));
   if (known.size + fresh.length > REPO_BRANCH_LIMIT) throw new Conflict({ message: limitMessageFor(known) });
@@ -168,7 +234,12 @@ export const classifyBranchFailure = (cause: unknown): Conflict | NotFound | DbE
       ? new Conflict({ message: BRANCH_LIMIT_MESSAGE })
       : toDbError(cause);
 
-export const addBranchesEffect = (db: AppTxDbType, tenantId: string, repoId: string, names: string[]): Effect.Effect<BranchRef[], Conflict | NotFound | DbError> =>
+export const addBranchesEffect = (
+  db: AppTxDbType,
+  tenantId: string,
+  repoId: string,
+  names: string[],
+): Effect.Effect<BranchRef[], Conflict | NotFound | DbError> =>
   Effect.tryPromise({
     try: () => db.transaction((tx) => addBranchesTx(tx, tenantId, repoId, names)),
     catch: classifyBranchFailure,

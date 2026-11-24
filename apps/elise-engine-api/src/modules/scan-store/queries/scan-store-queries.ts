@@ -23,10 +23,15 @@ export const saveScanFilesEffect = (
     contentType: scanFileContentType(name),
   }));
   return Effect.all(
-    saved.map((file) => Effect.tryPromise({ try: () => reports.put(file.r2Key, file.content), catch: toExternalError })),
+    saved.map((file) =>
+      Effect.tryPromise({ try: () => reports.put(file.r2Key, file.content), catch: toExternalError }),
+    ),
     { concurrency: "unbounded" },
   ).pipe(Effect.as(saved.map(({ name, r2Key, sizeBytes, contentType }) => ({ name, r2Key, sizeBytes, contentType }))));
 };
 
-export const readScanFileEffect = (reports: R2Bucket, r2Key: string): Effect.Effect<R2ObjectBody | null, ExternalError> =>
+export const readScanFileEffect = (
+  reports: R2Bucket,
+  r2Key: string,
+): Effect.Effect<R2ObjectBody | null, ExternalError> =>
   Effect.tryPromise({ try: () => reports.get(r2Key), catch: toExternalError });

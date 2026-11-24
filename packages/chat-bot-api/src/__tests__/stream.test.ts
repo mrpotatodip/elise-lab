@@ -182,12 +182,12 @@ describe("startChatBotRunSvc", () => {
     // consumes its async iterator.
     // -----
     vi.mocked(runChatBot).mockReturnValue(fakeStream() as never);
-    vi.mocked(listMessagesForModel).mockReturnValue(Effect.succeed([
-      { role: "user", content: "How many?" },
-    ]));
-    vi.mocked(insertThreadWithRun).mockReturnValue(Effect.succeed({
-      id: "11111111-1111-1111-1111-111111111111",
-    }));
+    vi.mocked(listMessagesForModel).mockReturnValue(Effect.succeed([{ role: "user", content: "How many?" }]));
+    vi.mocked(insertThreadWithRun).mockReturnValue(
+      Effect.succeed({
+        id: "11111111-1111-1111-1111-111111111111",
+      }),
+    );
     vi.mocked(insertAssistantMessage).mockReturnValue(Effect.void);
     vi.mocked(insertUserMessage).mockReturnValue(Effect.succeed(undefined));
     vi.mocked(insertRun).mockReturnValue(Effect.succeed(undefined));
@@ -234,10 +234,7 @@ describe("startChatBotRunSvc", () => {
       scopeId: owner.scopeId,
       content: "How many?",
     });
-    expect(listMessagesForModel).toHaveBeenCalledWith(
-      "11111111-1111-1111-1111-111111111111",
-      20,
-    );
+    expect(listMessagesForModel).toHaveBeenCalledWith("11111111-1111-1111-1111-111111111111", 20);
     expect(adapterFor).toHaveBeenCalledWith("gpt-4o-mini");
     expect(runChatBot).toHaveBeenCalledWith({
       adapter: "fake-adapter",
@@ -449,17 +446,21 @@ describe("startChatBotRunSvc", () => {
   });
 
   it("reuses a thread the user owns", async () => {
-    vi.mocked(findThread).mockReturnValue(Effect.succeed({
-      id: "22222222-2222-2222-2222-222222222222",
-      title: null,
-      trigger: "chat",
-      module: "chat",
-    }));
-    vi.mocked(listMessagesForModel).mockReturnValue(Effect.succeed([
-      { role: "user", content: "Earlier" },
-      { role: "assistant", content: "Before" },
-      { role: "user", content: "Again" },
-    ]));
+    vi.mocked(findThread).mockReturnValue(
+      Effect.succeed({
+        id: "22222222-2222-2222-2222-222222222222",
+        title: null,
+        trigger: "chat",
+        module: "chat",
+      }),
+    );
+    vi.mocked(listMessagesForModel).mockReturnValue(
+      Effect.succeed([
+        { role: "user", content: "Earlier" },
+        { role: "assistant", content: "Before" },
+        { role: "user", content: "Again" },
+      ]),
+    );
 
     const result = await runStream({
       log,
@@ -477,10 +478,7 @@ describe("startChatBotRunSvc", () => {
       runId: "run-1",
       threadId: "22222222-2222-2222-2222-222222222222",
     });
-    expect(findThread).toHaveBeenCalledWith(
-      owner,
-      "22222222-2222-2222-2222-222222222222",
-    );
+    expect(findThread).toHaveBeenCalledWith(owner, "22222222-2222-2222-2222-222222222222");
     expect(insertUserMessage).toHaveBeenCalledWith({
       threadId: "22222222-2222-2222-2222-222222222222",
       scopeId: owner.scopeId,
@@ -490,9 +488,9 @@ describe("startChatBotRunSvc", () => {
   });
 
   it("fails with Invalid for an unknown module, before creating a thread", async () => {
-    vi.mocked(assertThreadStart).mockReturnValue(Effect.fail(
-      new ChatBotInvalid({ message: "Unknown chat module: nope" }),
-    ));
+    vi.mocked(assertThreadStart).mockReturnValue(
+      Effect.fail(new ChatBotInvalid({ message: "Unknown chat module: nope" })),
+    );
 
     const error = await failStream({
       log,
@@ -505,9 +503,7 @@ describe("startChatBotRunSvc", () => {
   });
 
   it("fails with NotFound when the thread is missing or not owned", async () => {
-    vi.mocked(findThread).mockReturnValue(Effect.fail(
-      new ChatBotNotFound({ message: "Chat thread not found" }),
-    ));
+    vi.mocked(findThread).mockReturnValue(Effect.fail(new ChatBotNotFound({ message: "Chat thread not found" })));
 
     const error = await failStream({
       log,
@@ -525,10 +521,12 @@ describe("startChatBotRunSvc", () => {
   });
 
   it("does not store a new user turn when the client is resuming a run", async () => {
-    vi.mocked(lookupRun).mockReturnValue(Effect.succeed({
-      id: "run-1",
-      threadId: "11111111-1111-1111-1111-111111111111",
-    }));
+    vi.mocked(lookupRun).mockReturnValue(
+      Effect.succeed({
+        id: "run-1",
+        threadId: "11111111-1111-1111-1111-111111111111",
+      }),
+    );
 
     const result = await runStream({
       log,
@@ -605,10 +603,12 @@ describe("startChatBotRunSvc", () => {
 
     it("leaves old chunks alone when the client is resuming", async () => {
       await seedRunsEitherSideOfRetention();
-      vi.mocked(lookupRun).mockReturnValue(Effect.succeed({
-        id: "run-1",
-        threadId: "11111111-1111-1111-1111-111111111111",
-      }));
+      vi.mocked(lookupRun).mockReturnValue(
+        Effect.succeed({
+          id: "run-1",
+          threadId: "11111111-1111-1111-1111-111111111111",
+        }),
+      );
 
       await runStream({
         log,
@@ -661,9 +661,7 @@ describe("startChatBotRunSvc", () => {
           module: "chat",
         }),
       );
-      vi.mocked(insertRun).mockReturnValue(
-        Effect.fail(new ChatBotConflict({ message: "Chat run already exists" })),
-      );
+      vi.mocked(insertRun).mockReturnValue(Effect.fail(new ChatBotConflict({ message: "Chat run already exists" })));
 
       const error = await failStream({
         log,
@@ -676,9 +674,7 @@ describe("startChatBotRunSvc", () => {
     });
 
     it("closes the claimed run as failed when a later setup write fails", async () => {
-      vi.mocked(insertUserMessage).mockReturnValue(
-        Effect.fail(new ChatBotDbError({ cause: new Error("db down") })),
-      );
+      vi.mocked(insertUserMessage).mockReturnValue(Effect.fail(new ChatBotDbError({ cause: new Error("db down") })));
 
       const error = await failStream({
         log,
@@ -696,9 +692,7 @@ describe("startChatBotRunSvc", () => {
       vi.mocked(listMessagesForModel).mockReturnValue(
         Effect.fail(new ChatBotDbError({ cause: new Error("read failed") })),
       );
-      vi.mocked(closeRun).mockReturnValue(
-        Effect.fail(new ChatBotDbError({ cause: new Error("close failed") })),
-      );
+      vi.mocked(closeRun).mockReturnValue(Effect.fail(new ChatBotDbError({ cause: new Error("close failed") })));
 
       const error = await failStream({
         log,
@@ -707,11 +701,7 @@ describe("startChatBotRunSvc", () => {
 
       expect(error).toBeInstanceOf(ChatBotDbError);
       expect(error).toHaveProperty("cause", new Error("read failed"));
-      expect(logged).toHaveBeenCalledWith(
-        "chat-bot: failed to close run",
-        "run-1",
-        expect.stringContaining("DbError"),
-      );
+      expect(logged).toHaveBeenCalledWith("chat-bot: failed to close run", "run-1", expect.stringContaining("DbError"));
       logged.mockRestore();
     });
 
@@ -754,9 +744,7 @@ describe("startChatBotRunSvc", () => {
       vi.mocked(lookupRun).mockReturnValue(
         Effect.suspend(() => {
           attempts += 1;
-          return attempts === 1
-            ? Effect.fail(dbDown())
-            : Effect.succeed(null);
+          return attempts === 1 ? Effect.fail(dbDown()) : Effect.succeed(null);
         }),
       );
 

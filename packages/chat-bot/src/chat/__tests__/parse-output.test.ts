@@ -30,9 +30,7 @@ describe("parseChatBotJson", () => {
   });
 
   it("parses a fenced payload", () => {
-    expect(parseChatBotJson("```json\n" + complete + "\n```").answer).toBe(
-      "That comes to **5**.",
-    );
+    expect(parseChatBotJson("```json\n" + complete + "\n```").answer).toBe("That comes to **5**.");
   });
 
   it("returns nothing for ordinary chat text", () => {

@@ -72,9 +72,7 @@ export function useChatBot(options: UseChatBotOptions = {}) {
   // -----
   const onChunk = (chunk: StreamChunk) => latest.current.onChunk?.(chunk);
   const chat = useChat(
-    threadId === undefined
-      ? { connection, onChunk }
-      : { connection, onChunk, threadId, persistence: true },
+    threadId === undefined ? { connection, onChunk } : { connection, onChunk, threadId, persistence: true },
   );
 
   const send = (content: Parameters<typeof chat.sendMessage>[0]) => {

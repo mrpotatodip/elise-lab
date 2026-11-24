@@ -34,7 +34,10 @@ export const tenantRunners = pgTable(
     // reads git only. An archive job is never handed to a Runner
     // without archive here, and an upload Scan cannot start on one.
     // -----
-    jobSources: text("job_sources").array().notNull().default(sql`'{git}'::text[]`),
+    jobSources: text("job_sources")
+      .array()
+      .notNull()
+      .default(sql`'{git}'::text[]`),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

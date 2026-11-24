@@ -1,5 +1,13 @@
 import { createTestDb } from "@repo/db-elise/test-db";
-import { parties, partyMasterTypes, partyPersons, scanRepoBranches, scanRepos, scans, tenants } from "@repo/db-elise/schema";
+import {
+  parties,
+  partyMasterTypes,
+  partyPersons,
+  scanRepoBranches,
+  scanRepos,
+  scans,
+  tenants,
+} from "@repo/db-elise/schema";
 import { and, eq, sql } from "drizzle-orm";
 import type { Effect } from "effect";
 import type { DbConnectType, PoolDbType, TenantDbType } from "#/lib/db-connection";
@@ -39,14 +47,20 @@ export const asTenant = <T>(test: TestDb, accountId: string, run: (db: TenantDbT
 // asTenant for a service: a failed effect rolls the transaction
 // back, like a route's error does, and comes back as the failure.
 // -----
-export const asTenantEffect = <A, E>(test: TestDb, accountId: string, make: (db: TenantDbType) => Effect.Effect<A, E>): Effect.Effect<A, E | DbError> =>
-  effectInCallback((callback) => asTenant(test, accountId, callback), make);
+export const asTenantEffect = <A, E>(
+  test: TestDb,
+  accountId: string,
+  make: (db: TenantDbType) => Effect.Effect<A, E>,
+): Effect.Effect<A, E | DbError> => effectInCallback((callback) => asTenant(test, accountId, callback), make);
 
 export async function seedTenant(test: TestDb, slug = "acme") {
   const [type] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
   const [party] = await test.raw.insert(parties).values({ masterTypeId: type.id }).returning();
   await test.raw.insert(partyPersons).values({ partyId: party.id, firstName: "Ada", lastName: "Rossi" });
-  const [tenant] = await test.raw.insert(tenants).values({ partyId: party.id, name: slug, slug, timezone: "UTC" }).returning();
+  const [tenant] = await test.raw
+    .insert(tenants)
+    .values({ partyId: party.id, name: slug, slug, timezone: "UTC" })
+    .returning();
   return { tenantId: tenant.id, partyId: party.id };
 }
 
@@ -54,8 +68,15 @@ export async function seedTenant(test: TestDb, slug = "acme") {
 // A repo record for a Tenant, so a scan row can point at it.
 // -----
 export async function seedRepo(test: TestDb, tenantId: string, url = "https://github.com/octocat/Hello-World") {
-  const canonical = url.replace(/^https:\/\/github\.com\//, "").replace(/(\.git)?\/?$/, "").toLowerCase();
-  const [repo] = await test.raw.insert(scanRepos).values({ tenantId, canonical, url, defaultBranch: "main" }).onConflictDoNothing().returning();
+  const canonical = url
+    .replace(/^https:\/\/github\.com\//, "")
+    .replace(/(\.git)?\/?$/, "")
+    .toLowerCase();
+  const [repo] = await test.raw
+    .insert(scanRepos)
+    .values({ tenantId, canonical, url, defaultBranch: "main" })
+    .onConflictDoNothing()
+    .returning();
   if (repo) {
     await test.raw.insert(scanRepoBranches).values({ tenantId, repoId: repo.id, name: "main" });
     return repo.id;

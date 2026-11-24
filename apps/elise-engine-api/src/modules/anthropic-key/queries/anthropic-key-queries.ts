@@ -19,7 +19,9 @@ export const findAnthropicKeyEffect = (db: AppDbType, tenantId: string): Effect.
         .select({ lastFour: tenantAnthropicKeys.lastFour, updatedAt: tenantAnthropicKeys.updatedAt })
         .from(tenantAnthropicKeys)
         .where(eq(tenantAnthropicKeys.tenantId, tenantId));
-      return row ? { source: "account" as const, lastFour: row.lastFour, updatedAt: row.updatedAt.toISOString() } : PLATFORM_KEY;
+      return row
+        ? { source: "account" as const, lastFour: row.lastFour, updatedAt: row.updatedAt.toISOString() }
+        : PLATFORM_KEY;
     },
     catch: toDbError,
   });
@@ -30,7 +32,10 @@ export const findAnthropicKeyEffect = (db: AppDbType, tenantId: string): Effect.
 export const findSealedKeyEffect = (db: DbConnectType, tenantId: string): Effect.Effect<string | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const [row] = await db.select({ sealedKey: tenantAnthropicKeys.sealedKey }).from(tenantAnthropicKeys).where(eq(tenantAnthropicKeys.tenantId, tenantId));
+      const [row] = await db
+        .select({ sealedKey: tenantAnthropicKeys.sealedKey })
+        .from(tenantAnthropicKeys)
+        .where(eq(tenantAnthropicKeys.tenantId, tenantId));
       return row?.sealedKey ?? null;
     },
     catch: toDbError,
@@ -48,7 +53,13 @@ const classify = (cause: unknown): Forbidden | DbError => (cause instanceof Refu
 // it to the audit trail, in the caller's transaction. The audit row
 // holds the last four characters, never the key.
 // -----
-export const saveAnthropicKeyEffect = (db: AppDbType, tenantId: string, userId: string, sealedKey: string, lastFour: string): Effect.Effect<AnthropicKey, Forbidden | DbError> =>
+export const saveAnthropicKeyEffect = (
+  db: AppDbType,
+  tenantId: string,
+  userId: string,
+  sealedKey: string,
+  lastFour: string,
+): Effect.Effect<AnthropicKey, Forbidden | DbError> =>
   Effect.tryPromise({
     try: async () => {
       const actorPartyId = await actorPartyOf(db, userId);
@@ -56,9 +67,18 @@ export const saveAnthropicKeyEffect = (db: AppDbType, tenantId: string, userId: 
       const [row] = await db
         .insert(tenantAnthropicKeys)
         .values({ tenantId, sealedKey, lastFour, updatedBy: actorPartyId })
-        .onConflictDoUpdate({ target: tenantAnthropicKeys.tenantId, set: { sealedKey, lastFour, updatedBy: actorPartyId } })
+        .onConflictDoUpdate({
+          target: tenantAnthropicKeys.tenantId,
+          set: { sealedKey, lastFour, updatedBy: actorPartyId },
+        })
         .returning({ updatedAt: tenantAnthropicKeys.updatedAt });
-      await insertAuditEntry(db, { actorPartyId, action: "anthropic.key.set", subjectId: tenantId, tenantId, after: { lastFour } });
+      await insertAuditEntry(db, {
+        actorPartyId,
+        action: "anthropic.key.set",
+        subjectId: tenantId,
+        tenantId,
+        after: { lastFour },
+      });
       return { source: "account" as const, lastFour, updatedAt: row.updatedAt.toISOString() };
     },
     catch: classify,
@@ -68,13 +88,26 @@ export const saveAnthropicKeyEffect = (db: AppDbType, tenantId: string, userId: 
 // Go back to the platform key. Removing a key that is not there
 // changes nothing and writes no audit row.
 // -----
-export const removeAnthropicKeyEffect = (db: AppDbType, tenantId: string, userId: string): Effect.Effect<{ key: AnthropicKey; removed: boolean }, DbError> =>
+export const removeAnthropicKeyEffect = (
+  db: AppDbType,
+  tenantId: string,
+  userId: string,
+): Effect.Effect<{ key: AnthropicKey; removed: boolean }, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const [removed] = await db.delete(tenantAnthropicKeys).where(eq(tenantAnthropicKeys.tenantId, tenantId)).returning({ lastFour: tenantAnthropicKeys.lastFour });
+      const [removed] = await db
+        .delete(tenantAnthropicKeys)
+        .where(eq(tenantAnthropicKeys.tenantId, tenantId))
+        .returning({ lastFour: tenantAnthropicKeys.lastFour });
       if (removed) {
         const actorPartyId = await actorPartyOf(db, userId);
-        await insertAuditEntry(db, { actorPartyId, action: "anthropic.key.removed", subjectId: tenantId, tenantId, before: { lastFour: removed.lastFour } });
+        await insertAuditEntry(db, {
+          actorPartyId,
+          action: "anthropic.key.removed",
+          subjectId: tenantId,
+          tenantId,
+          before: { lastFour: removed.lastFour },
+        });
       }
       return { key: PLATFORM_KEY, removed: removed !== undefined };
     },

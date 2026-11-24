@@ -11,13 +11,7 @@ import {
 } from "../contracts";
 import type { ChatBot } from "../create-chat-bot";
 import { ChatBotStreamHeaderSchema } from "../schemas";
-import type {
-  ChatBotAgent,
-  ChatBotOwner,
-  ChatBotServices,
-  ChatBotThreadAttrs,
-  StreamChatBotError,
-} from "../types";
+import type { ChatBotAgent, ChatBotOwner, ChatBotServices, ChatBotThreadAttrs, StreamChatBotError } from "../types";
 
 export type ChatBotRouteName =
   | "listThreads"
@@ -93,8 +87,7 @@ export function createChatBotRoutes<E extends Env, S extends ChatBotServices>(
   // oxlint-disable-next-line no-explicit-any
   const host = (c: Context<any, any, any>): Context<E> => c as Context<E>;
   const doc = (name: ChatBotRouteName): MiddlewareHandler =>
-    config.docs?.[name] ??
-    describeRoute({ tags: ["chat-bot"], summary: DEFAULT_SUMMARIES[name] });
+    config.docs?.[name] ?? describeRoute({ tags: ["chat-bot"], summary: DEFAULT_SUMMARIES[name] });
 
   const valid = <Target extends "query" | "param" | "json" | "header", T extends z.ZodType>(
     target: Target,
@@ -102,9 +95,7 @@ export function createChatBotRoutes<E extends Env, S extends ChatBotServices>(
   ) =>
     validator(target, schema, (result) => {
       if (result.success) return;
-      const message = result.error
-        .map((issue) => `${issuePath(issue.path) || target}: ${issue.message}`)
-        .join("; ");
+      const message = result.error.map((issue) => `${issuePath(issue.path) || target}: ${issue.message}`).join("; ");
       config.invalid(message);
     });
 

@@ -24,9 +24,17 @@ afterAll(async () => {
 
 const call = async (account: string, path: string, init: { method?: string; json?: unknown } = {}) => {
   const { env } = fakeBindings();
-  const headers = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountOf.get(account) ?? "", "content-type": "application/json" };
+  const headers = {
+    authorization: `Bearer ${TEST_TOKEN}`,
+    "x-account-id": accountOf.get(account) ?? "",
+    "content-type": "application/json",
+  };
   const body = init.json === undefined ? undefined : JSON.stringify(init.json);
-  return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers, body }), env, testExecutionContext);
+  return app.fetch(
+    new Request(`http://localhost${path}`, { method: init.method, headers, body }),
+    env,
+    testExecutionContext,
+  );
 };
 
 // -----
@@ -42,20 +50,50 @@ const dataOf = async (res: Response) => EnvelopeSchema.parse(await res.json()).d
 
 type Env = ReturnType<typeof fakeBindings>["env"];
 
-const send = (env: Env, account: string, path: string, init: { method?: string; body?: Uint8Array; contentType?: string } = {}) => {
-  const headers = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": accountOf.get(account) ?? "", "content-type": init.contentType ?? "application/json" };
-  return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers, body: init.body }), env, testExecutionContext);
+const send = (
+  env: Env,
+  account: string,
+  path: string,
+  init: { method?: string; body?: Uint8Array; contentType?: string } = {},
+) => {
+  const headers = {
+    authorization: `Bearer ${TEST_TOKEN}`,
+    "x-account-id": accountOf.get(account) ?? "",
+    "content-type": init.contentType ?? "application/json",
+  };
+  return app.fetch(
+    new Request(`http://localhost${path}`, { method: init.method, headers, body: init.body }),
+    env,
+    testExecutionContext,
+  );
 };
 
 const upload = (env: Env, account: string, appId: string, label: string, bytes: Uint8Array) =>
-  send(env, account, `/repos/${appId}/archives?label=${encodeURIComponent(label)}`, { method: "POST", body: bytes, contentType: "application/zip" });
+  send(env, account, `/repos/${appId}/archives?label=${encodeURIComponent(label)}`, {
+    method: "POST",
+    body: bytes,
+    contentType: "application/zip",
+  });
 
 const newApp = async (account: string, name: string) =>
-  z.uuid().parse(DataSchema.parse(await (await call(account, "/repos", { method: "POST", json: { provider: "upload", repo: name } })).json()).data.id);
+  z
+    .uuid()
+    .parse(
+      DataSchema.parse(
+        await (await call(account, "/repos", { method: "POST", json: { provider: "upload", repo: name } })).json(),
+      ).data.id,
+    );
 
 const appsOf = (account: string) =>
   test.raw
-    .select({ provider: scanRepos.provider, host: scanRepos.host, canonical: scanRepos.canonical, url: scanRepos.url, defaultBranch: scanRepos.defaultBranch, branch: scanRepoBranches.name })
+    .select({
+      provider: scanRepos.provider,
+      host: scanRepos.host,
+      canonical: scanRepos.canonical,
+      url: scanRepos.url,
+      defaultBranch: scanRepos.defaultBranch,
+      branch: scanRepoBranches.name,
+    })
     .from(scanRepos)
     .innerJoin(scanRepoBranches, eq(scanRepoBranches.repoId, scanRepos.id))
     .where(eq(scanRepos.tenantId, accountOf.get(account) ?? ""));
@@ -66,19 +104,41 @@ describe("an upload app", () => {
 
     expect({ status: res.status, apps: await appsOf("acme") }).toEqual({
       status: 200,
-      apps: [{ provider: "upload", host: null, canonical: "billing api", url: "Billing API", defaultBranch: "upload", branch: "upload" }],
+      apps: [
+        {
+          provider: "upload",
+          host: null,
+          canonical: "billing api",
+          url: "Billing API",
+          defaultBranch: "upload",
+          branch: "upload",
+        },
+      ],
     });
   });
 
   it("has a name unique in its Account, however it is cased, and free for another Account", async () => {
-    const first = DataSchema.parse(await (await call("acme", "/repos", { method: "POST", json: { provider: "upload", repo: "Ledger" } })).json()).data.id;
-    const again = DataSchema.parse(await (await call("acme", "/repos", { method: "POST", json: { provider: "upload", repo: "LEDGER" } })).json()).data.id;
-    const theirs = DataSchema.parse(await (await call("other", "/repos", { method: "POST", json: { provider: "upload", repo: "Ledger" } })).json()).data.id;
+    const first = DataSchema.parse(
+      await (await call("acme", "/repos", { method: "POST", json: { provider: "upload", repo: "Ledger" } })).json(),
+    ).data.id;
+    const again = DataSchema.parse(
+      await (await call("acme", "/repos", { method: "POST", json: { provider: "upload", repo: "LEDGER" } })).json(),
+    ).data.id;
+    const theirs = DataSchema.parse(
+      await (await call("other", "/repos", { method: "POST", json: { provider: "upload", repo: "Ledger" } })).json(),
+    ).data.id;
 
-    expect({ sameInAccount: again === first, sameAcrossAccounts: theirs === first }).toEqual({ sameInAccount: true, sameAcrossAccounts: false });
+    expect({ sameInAccount: again === first, sameAcrossAccounts: theirs === first }).toEqual({
+      sameInAccount: true,
+      sameAcrossAccounts: false,
+    });
   });
 
-  it.each([["a GitHub address", "https://github.com/octocat/Hello-World"], ["an empty name", " "], ["a name with a slash", "acme/app"]])("refuses %s as an app name", async (_label, repo) => {
+  it.each([
+    ["a GitHub address", "https://github.com/octocat/Hello-World"],
+    ["an empty name", " "],
+    ["a name with a slash", "acme/app"],
+  ])("refuses %s as an app name", async (_label, repo) => {
     const res = await call("acme", "/repos", { method: "POST", json: { provider: "upload", repo } });
 
     expect(res.status).toBe(400);
@@ -126,7 +186,11 @@ describe("the zips of an upload app", () => {
 
   it("takes no zip for a git Repo", async () => {
     const { env } = fakeBindings();
-    const repoId = DataSchema.parse(await (await call("acme", "/repos", { method: "POST", json: { repo: "https://github.com/octocat/Hello-World" } })).json()).data.id;
+    const repoId = DataSchema.parse(
+      await (
+        await call("acme", "/repos", { method: "POST", json: { repo: "https://github.com/octocat/Hello-World" } })
+      ).json(),
+    ).data.id;
 
     const res = await upload(env, "acme", z.uuid().parse(repoId), "app.zip", ZIP);
 
@@ -141,9 +205,18 @@ describe("the zips of an upload app", () => {
     const listed = await send(env, "acme", `/repos/${theirApp}/archives`);
     const added = await upload(env, "acme", theirApp, "mine.zip", ZIP);
     const removed = await send(env, "acme", `/repos/${theirApp}/archives/${theirs.id}`, { method: "DELETE" });
-    const rows = await test.raw.select({ id: scanUploadArchives.id }).from(scanUploadArchives).where(eq(scanUploadArchives.repoId, theirApp));
+    const rows = await test.raw
+      .select({ id: scanUploadArchives.id })
+      .from(scanUploadArchives)
+      .where(eq(scanUploadArchives.repoId, theirApp));
 
-    expect({ listed: listed.status, added: added.status, removed: removed.status, rows: rows.map((row) => row.id), stored: store.size }).toEqual({
+    expect({
+      listed: listed.status,
+      added: added.status,
+      removed: removed.status,
+      rows: rows.map((row) => row.id),
+      stored: store.size,
+    }).toEqual({
       listed: 404,
       added: 404,
       removed: 404,

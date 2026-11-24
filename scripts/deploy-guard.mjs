@@ -12,7 +12,9 @@ if (!app) {
   process.exit(2);
 }
 
-const status = spawnSync("git", ["status", "--porcelain", "--", app, "packages"], { encoding: "utf8" }).stdout.split("\n").filter(Boolean);
+const status = spawnSync("git", ["status", "--porcelain", "--", app, "packages"], { encoding: "utf8" })
+  .stdout.split("\n")
+  .filter(Boolean);
 if (status.length === 0) process.exit(0);
 
 const list = status.slice(0, 20).join("\n");
@@ -22,5 +24,7 @@ if (process.env.ALLOW_DIRTY_DEPLOY === "1") {
   process.exit(0);
 }
 
-console.error(`deploy-guard: ${status.length} uncommitted change(s) under ${app} or packages/ would ship with this deploy:\n${list}${more}\n\nCommit them, then deploy the commit from a clean copy that ignores your working tree: node scripts/deploy-clean.mjs ${app}. Or stash them, or set ALLOW_DIRTY_DEPLOY=1 to ship them on purpose (the live Worker then matches no commit).`);
+console.error(
+  `deploy-guard: ${status.length} uncommitted change(s) under ${app} or packages/ would ship with this deploy:\n${list}${more}\n\nCommit them, then deploy the commit from a clean copy that ignores your working tree: node scripts/deploy-clean.mjs ${app}. Or stash them, or set ALLOW_DIRTY_DEPLOY=1 to ship them on purpose (the live Worker then matches no commit).`,
+);
 process.exit(1);

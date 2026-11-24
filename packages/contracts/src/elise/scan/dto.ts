@@ -1,11 +1,20 @@
 import { z } from "zod";
 import { ACCEPTED_RISK_MAX_DAYS } from "../constants";
 import { ScanArchiveRefSchema } from "../upload/dto";
-import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_FAILURE_CODE_VALUES, SCAN_STATE_VALUES, SCAN_STEP_VALUES, SOURCE_PROVIDER_VALUES } from "../enums";
+import {
+  FINDING_SEVERITY_VALUES,
+  FINDING_STATUS_VALUES,
+  FINDING_TRIAGE_STATUS_VALUES,
+  REPO_FINDING_STATE_VALUES,
+  SCAN_FAILURE_CODE_VALUES,
+  SCAN_STATE_VALUES,
+  SCAN_STEP_VALUES,
+  SOURCE_PROVIDER_VALUES,
+} from "../enums";
 
 export const SCAN_MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"] as const;
 // Opus is not offered for new scans, but a stored scan may still carry it.
-export const SCAN_RECORDED_MODELS =[...SCAN_MODELS, "claude-opus-5-5"] as const;
+export const SCAN_RECORDED_MODELS = [...SCAN_MODELS, "claude-opus-5-5"] as const;
 export const SCAN_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export const SCAN_SKILLS = ["lite", "full"] as const;
 export const SCAN_PROFILES = ["quick", "standard", "deep"] as const;
@@ -205,7 +214,12 @@ export const UsageBudgetChangesSchema = z.array(UsageBudgetChangeSchema);
 const SettingsChangeBase = { at: z.string(), by: z.string().nullable() };
 
 export const SettingsChangeSchema = z.discriminatedUnion("kind", [
-  z.object({ ...SettingsChangeBase, kind: z.literal("budget"), fromUsd: z.number().min(0).nullable(), toUsd: z.number().min(0).nullable() }),
+  z.object({
+    ...SettingsChangeBase,
+    kind: z.literal("budget"),
+    fromUsd: z.number().min(0).nullable(),
+    toUsd: z.number().min(0).nullable(),
+  }),
   z.object({ ...SettingsChangeBase, kind: z.literal("anthropic_key_set"), lastFour: z.string().nullable() }),
   z.object({ ...SettingsChangeBase, kind: z.literal("anthropic_key_removed"), lastFour: z.string().nullable() }),
 ]);
@@ -296,16 +310,26 @@ export const FindingTriageBodySchema = z
   })
   .superRefine((body, ctx) => {
     if (body.signalId !== undefined && body.status !== "accepted_risk") {
-      ctx.addIssue({ code: "custom", path: ["signalId"], message: "Only an accepted risk takes the Signal it was saved over" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["signalId"],
+        message: "Only an accepted risk takes the Signal it was saved over",
+      });
     }
     if (body.status === "duplicate" && body.duplicateOf === undefined) {
       ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "A duplicate needs the Finding it duplicates" });
     } else if (body.status !== "duplicate" && body.duplicateOf !== undefined) {
-      ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "Only a duplicate takes a Finding it duplicates" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["duplicateOf"],
+        message: "Only a duplicate takes a Finding it duplicates",
+      });
     }
     if (body.status === "accepted_risk") {
-      if (!body.note?.trim()) ctx.addIssue({ code: "custom", path: ["note"], message: "An accepted risk needs a reason" });
-      if (body.acceptDays === undefined) ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "An accepted risk needs a number of days" });
+      if (!body.note?.trim())
+        ctx.addIssue({ code: "custom", path: ["note"], message: "An accepted risk needs a reason" });
+      if (body.acceptDays === undefined)
+        ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "An accepted risk needs a number of days" });
     } else if (body.acceptDays !== undefined) {
       ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "Only an accepted risk takes days" });
     }
@@ -395,7 +419,10 @@ export const RepoBranchSchema = z.object({
 
 export const RepoBranchListSchema = z.object({ branches: z.array(RepoBranchSchema) });
 
-export const RepoDetailSchema = RepoSchema.extend({ history: z.array(ScanStatusSchema), branches: z.array(RepoBranchSchema) });
+export const RepoDetailSchema = RepoSchema.extend({
+  history: z.array(ScanStatusSchema),
+  branches: z.array(RepoBranchSchema),
+});
 
 export const RepoParamSchema = z.object({ repoId: z.uuid() });
 
@@ -422,7 +449,10 @@ export const RepoFindingsQuerySchema = z.object({
   cursor: z.string().regex(/^\d+$/).optional(),
 });
 
-export const RepoFindingListSchema = z.object({ findings: z.array(RepoFindingSchema), nextCursor: z.string().nullable() });
+export const RepoFindingListSchema = z.object({
+  findings: z.array(RepoFindingSchema),
+  nextCursor: z.string().nullable(),
+});
 
 // -----
 // GET /scans/:scanId/diff. Compared with the previous succeeded

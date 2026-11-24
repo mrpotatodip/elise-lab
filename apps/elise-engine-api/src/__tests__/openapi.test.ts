@@ -17,14 +17,25 @@ const operations = (spec: Spec) =>
 // Opened by someone with no login yet: the invitee, and a
 // Runner that pairs with a code.
 // -----
-const PUBLIC_ROUTES: ReadonlySet<string> = new Set(["GET /team/invites/{token}", "POST /team/invites/{token}/accept", "POST /runners/enroll", "POST /runners/login/start", "POST /runners/login/check", "POST /stripe/webhook"]);
+const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
+  "GET /team/invites/{token}",
+  "POST /team/invites/{token}/accept",
+  "POST /runners/enroll",
+  "POST /runners/login/start",
+  "POST /runners/login/check",
+  "POST /stripe/webhook",
+]);
 
 describe("GET /openapi.json", () => {
   it("lists every route of the API", async () => {
     const spec: Spec = await (await request("development")).json();
 
     expect(spec.openapi).toBe("3.1.0");
-    expect(operations(spec).map(({ route }) => route).toSorted()).toEqual([
+    expect(
+      operations(spec)
+        .map(({ route }) => route)
+        .toSorted(),
+    ).toEqual([
       "DELETE /findings/comments/{commentId}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",
@@ -112,8 +123,23 @@ describe("GET /openapi.json", () => {
 
     for (const { route, operation } of operations(spec)) {
       expect({ route, summary: Boolean(operation.summary) }).toEqual({ route, summary: true });
-      expect({ route, description: operation.description?.includes("**Context.**") }).toEqual({ route, description: true });
-      const tag = ["groups", "team", "repos", "scans", "files", "runners", "findings", "usage", "me", "sign-up", "stripe"].find((name) => route.includes(`/${name}`));
+      expect({ route, description: operation.description?.includes("**Context.**") }).toEqual({
+        route,
+        description: true,
+      });
+      const tag = [
+        "groups",
+        "team",
+        "repos",
+        "scans",
+        "files",
+        "runners",
+        "findings",
+        "usage",
+        "me",
+        "sign-up",
+        "stripe",
+      ].find((name) => route.includes(`/${name}`));
       expect({ route, tags: operation.tags }).toEqual({ route, tags: [tag] });
       const security = tag === "sign-up" || PUBLIC_ROUTES.has(route) ? undefined : [{ bearerAuth: [] }];
       expect({ route, security: operation.security }).toEqual({ route, security });

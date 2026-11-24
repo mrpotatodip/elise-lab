@@ -17,7 +17,8 @@ export const detailScanDoc = describeRoute({
   summary: "Read the status of a scan",
   security: SERVICE_SECURITY,
   description: routeText({
-    context: "A dashboard needs to know if a scan is done. This route returns its status, its settings, and the names of its saved files.",
+    context:
+      "A dashboard needs to know if a scan is done. This route returns its status, its settings, and the names of its saved files.",
     steps: [
       "The Worker checks the token and the account.",
       "The Worker reads the saved status of that scan. Another account gets 404.",

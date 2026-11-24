@@ -1,6 +1,15 @@
 import { describeRoute } from "hono-openapi";
 import { FindingListSchema, FindingTriageSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const listFindingsDoc = describeRoute({
   tags: ["findings"],
@@ -24,7 +33,10 @@ export const listFindingsDoc = describeRoute({
       ),
     ],
   }),
-  responses: { 200: jsonResponse("A page of findings.", envelope(FindingListSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("A page of findings.", envelope(FindingListSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });
 
 export const setFindingTriageDoc = describeRoute({
@@ -49,5 +61,8 @@ export const setFindingTriageDoc = describeRoute({
       ),
     ],
   }),
-  responses: { 200: jsonResponse("The saved decision.", envelope(FindingTriageSchema)), ...errorResponses(400, 401, 403, 404) },
+  responses: {
+    200: jsonResponse("The saved decision.", envelope(FindingTriageSchema)),
+    ...errorResponses(400, 401, 403, 404),
+  },
 });

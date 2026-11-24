@@ -14,8 +14,24 @@ beforeAll(async () => {
   const verified = await seedTenant(test, "resend-verified");
   const now = new Date();
   await test.raw.insert(authUser).values([
-    { id: "u-new", partyId: unverified.partyId, name: "Ada", email: "ada@example.com", emailVerified: false, createdAt: now, updatedAt: now },
-    { id: "u-old", partyId: verified.partyId, name: "Bo", email: "bo@example.com", emailVerified: true, createdAt: now, updatedAt: now },
+    {
+      id: "u-new",
+      partyId: unverified.partyId,
+      name: "Ada",
+      email: "ada@example.com",
+      emailVerified: false,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "u-old",
+      partyId: verified.partyId,
+      name: "Bo",
+      email: "bo@example.com",
+      emailVerified: true,
+      createdAt: now,
+      updatedAt: now,
+    },
   ]);
 });
 
@@ -34,11 +50,20 @@ const countingLimiter = (limit: number): RateLimit => {
 
 const resender = (limiters: { ip?: RateLimit; address?: RateLimit } = {}) => {
   const queued: QueuedEmail[] = [];
-  const { app } = buildApp(testDeps({ enqueueEmail: async (_env, mail) => void queued.push(mail), withOwner: (_c, run) => run(test.pool) }));
-  const { env } = fakeBindings({ VERIFICATION_RESEND_LIMITER: limiters.ip, VERIFICATION_RESEND_ADDRESS_LIMITER: limiters.address });
+  const { app } = buildApp(
+    testDeps({ enqueueEmail: async (_env, mail) => void queued.push(mail), withOwner: (_c, run) => run(test.pool) }),
+  );
+  const { env } = fakeBindings({
+    VERIFICATION_RESEND_LIMITER: limiters.ip,
+    VERIFICATION_RESEND_ADDRESS_LIMITER: limiters.address,
+  });
   const resend = async (email: string) => {
     const res = await app.fetch(
-      new Request("http://localhost/sign-up/resend-verification", { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "1.2.3.4" }, body: JSON.stringify({ email }) }),
+      new Request("http://localhost/sign-up/resend-verification", {
+        method: "POST",
+        headers: { "content-type": "application/json", "cf-connecting-ip": "1.2.3.4" },
+        body: JSON.stringify({ email }),
+      }),
       env,
       testExecutionContext,
     );
@@ -51,7 +76,11 @@ describe("POST /sign-up/resend-verification", () => {
   it("queues one verify-email for an unverified Login and answers the same for an unknown or verified address", async () => {
     const { queued, resend } = resender();
 
-    const answers = [await resend("ada@example.com"), await resend("bo@example.com"), await resend("nobody@example.com")];
+    const answers = [
+      await resend("ada@example.com"),
+      await resend("bo@example.com"),
+      await resend("nobody@example.com"),
+    ];
 
     expect(queued.map((mail) => mail.kind === "verify-email" && mail.to)).toEqual(["ada@example.com"]);
     expect(new Set(answers.map((a) => a.body)).size).toBe(1);
@@ -61,7 +90,12 @@ describe("POST /sign-up/resend-verification", () => {
   it("queues no email past the address cap, whatever the letter case, and answers the same", async () => {
     const { queued, resend } = resender({ address: countingLimiter(2) });
 
-    const answers = [await resend("ada@example.com"), await resend("ADA@example.com"), await resend("Ada@Example.com"), await resend("ada@example.com")];
+    const answers = [
+      await resend("ada@example.com"),
+      await resend("ADA@example.com"),
+      await resend("Ada@Example.com"),
+      await resend("ada@example.com"),
+    ];
 
     expect(queued).toHaveLength(2);
     expect(new Set(answers.map((a) => a.body)).size).toBe(1);

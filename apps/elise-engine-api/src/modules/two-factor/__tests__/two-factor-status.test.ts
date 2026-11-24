@@ -64,7 +64,10 @@ describe("twoFactorStatusEffect", () => {
 
   it("requires setup of a member the moment a Role makes them an admin", async () => {
     expect((await statusOf("promoted")).setupRequired).toBe(false);
-    const [login] = await test.raw.select({ partyId: authUser.partyId }).from(authUser).where(eq(authUser.id, "promoted"));
+    const [login] = await test.raw
+      .select({ partyId: authUser.partyId })
+      .from(authUser)
+      .where(eq(authUser.id, "promoted"));
     const role = await findTenantRole(test.raw, tenantId, "workspace_admin");
     if (!role) throw new Error("workspace_admin role missing");
     await test.raw.update(partyRoles).set({ roleId: role.id }).where(eq(partyRoles.partyId, login.partyId));
@@ -74,7 +77,8 @@ describe("twoFactorStatusEffect", () => {
 });
 
 describe("the Account's Two-factor requirement", () => {
-  const setRequired = (id: string, required: boolean) => test.raw.update(tenants).set({ twoFactorRequired: required }).where(eq(tenants.id, id));
+  const setRequired = (id: string, required: boolean) =>
+    test.raw.update(tenants).set({ twoFactorRequired: required }).where(eq(tenants.id, id));
 
   afterEach(async () => {
     await setRequired(tenantId, false);

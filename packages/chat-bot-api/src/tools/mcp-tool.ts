@@ -1,10 +1,6 @@
 import { convertSchemaToJsonSchema, toolDefinition } from "@tanstack/ai";
 import { Cause, Effect, Exit } from "effect";
-import {
-  ChatBotJsonSchema,
-  type ChatBotJson,
-  type ChatBotToolError,
-} from "../contracts";
+import { ChatBotJsonSchema, type ChatBotJson, type ChatBotToolError } from "../contracts";
 import { CHAT_BOT_TOOL_ERROR_FAILED, CHAT_BOT_TOOL_ERROR_INVALID_INPUT } from "../constants";
 import type { ChatBotRuntime, ChatBotServices, ChatBotToolSpec } from "../types";
 
@@ -12,10 +8,7 @@ import type { ChatBotRuntime, ChatBotServices, ChatBotToolSpec } from "../types"
 // Same tool as the chat bot's, for an MCP
 // server: no turn budget, one runtime per request.
 // -----
-export function toChatBotMcpTool<S extends ChatBotServices>(
-  spec: ChatBotToolSpec<S>,
-  runtime: ChatBotRuntime<S>,
-) {
+export function toChatBotMcpTool<S extends ChatBotServices>(spec: ChatBotToolSpec<S>, runtime: ChatBotRuntime<S>) {
   const { name, description, inputSchema } = spec.definition;
   return toolDefinition({
     name,

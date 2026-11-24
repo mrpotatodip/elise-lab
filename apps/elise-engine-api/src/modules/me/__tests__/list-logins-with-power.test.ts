@@ -36,7 +36,9 @@ afterAll(async () => {
 
 describe("listLoginsWithPowerEffect", () => {
   it("returns the Logins of the Account whose Role holds the Power, and no one else", async () => {
-    const logins = await Effect.runPromise(listLoginsWithPowerEffect(test.http, tenantId, "company:team:invites:create"));
+    const logins = await Effect.runPromise(
+      listLoginsWithPowerEffect(test.http, tenantId, "company:team:invites:create"),
+    );
 
     expect(logins.map((login) => login.email)).toEqual(["admin@example.com", "owner@example.com"]);
     expect(logins).toContainEqual({ email: "admin@example.com", name: "Name admin", partyId: partyIds.admin });

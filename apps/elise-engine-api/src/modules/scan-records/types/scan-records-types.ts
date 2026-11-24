@@ -1,6 +1,9 @@
 import type { scanFindings, scans } from "@repo/db-elise/schema";
 import type { SCAN_PROFILES } from "@repo/contracts/elise";
-import type { SCAN_RECORDS_PROFILE_CHECK_FILES, SCAN_RECORDS_PROFILE_CHECK_ROW_IDS } from "#/modules/scan-records/constants";
+import type {
+  SCAN_RECORDS_PROFILE_CHECK_FILES,
+  SCAN_RECORDS_PROFILE_CHECK_ROW_IDS,
+} from "#/modules/scan-records/constants";
 import type { ProfileCheckFinding, ProfileCheckMetadata, ProfileCheckUnit } from "#/modules/scan-records/schemas";
 import type { Bindings } from "#/types/variables";
 

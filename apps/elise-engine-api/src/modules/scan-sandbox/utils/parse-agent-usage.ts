@@ -36,7 +36,10 @@ const parseResult = (text: string) => {
 // line is skipped: the last line that starts with "{" wins.
 // -----
 export const parseAgentUsage = (log: string): ScanUsage | null => {
-  const lastObjectLine = log.trim().split("\n").findLast((line) => line.startsWith("{"));
+  const lastObjectLine = log
+    .trim()
+    .split("\n")
+    .findLast((line) => line.startsWith("{"));
   const parsed = parseResult(log.trim()) ?? (lastObjectLine ? parseResult(lastObjectLine) : null);
   if (!parsed?.success || (parsed.data.usage === undefined && parsed.data.total_cost_usd === undefined)) return null;
   const { usage, total_cost_usd, num_turns, duration_ms } = parsed.data;

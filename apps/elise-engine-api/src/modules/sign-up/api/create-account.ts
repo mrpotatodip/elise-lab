@@ -12,12 +12,19 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/", createAccountDoc, requireSignUpLimit, requireSignUpTotalLimit, zValidator("json", SignUpBodySchema), async (c) => {
-  const body = c.req.valid("json");
-  const passed = await c.get("deps").verifyTurnstile(c.env, body.turnstileToken, c.req.header("cf-connecting-ip"));
-  if (!passed) throw new ConflictError(SIGN_UP_REFUSED);
-  const data = await c.get("deps").withOwner(c, (db) => runEffect(createAccountSvc(db, body, authConfigOf(c, db))));
-  return c.json({ data, error: null }, 201);
-});
+app.post(
+  "/",
+  createAccountDoc,
+  requireSignUpLimit,
+  requireSignUpTotalLimit,
+  zValidator("json", SignUpBodySchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const passed = await c.get("deps").verifyTurnstile(c.env, body.turnstileToken, c.req.header("cf-connecting-ip"));
+    if (!passed) throw new ConflictError(SIGN_UP_REFUSED);
+    const data = await c.get("deps").withOwner(c, (db) => runEffect(createAccountSvc(db, body, authConfigOf(c, db))));
+    return c.json({ data, error: null }, 201);
+  },
+);
 
 export default app;

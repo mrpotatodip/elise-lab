@@ -28,7 +28,15 @@ import {
   SCAN_SANDBOX_WORK_DIR,
 } from "#/modules/scan-sandbox/constants";
 import { drainTrace as drainLog, emptyTraceState, phaseMarker, type TraceState } from "#/modules/scan-trace/utils";
-import type { AgentState, FullPhase, Meter, MeteredTokens, OutboundAnthropicKey, OutboundExport, ScanCheckout } from "#/modules/scan-sandbox/types";
+import type {
+  AgentState,
+  FullPhase,
+  Meter,
+  MeteredTokens,
+  OutboundAnthropicKey,
+  OutboundExport,
+  ScanCheckout,
+} from "#/modules/scan-sandbox/types";
 import {
   agentErrorText,
   buildAgentPrompt,
@@ -118,7 +126,8 @@ export class FullScanSandbox extends DurableObject<Bindings> {
       await this.#files.writeFile(SCAN_SANDBOX_CLONED_MARKER, "ok");
     }
     const commitSha = (await this.#readText(SCAN_SANDBOX_COMMIT_FILE))?.trim() || null;
-    if (ref) return { commitSha, branch: (await this.#readText(SCAN_SANDBOX_KIND_FILE))?.trim() === "branch" ? ref : null };
+    if (ref)
+      return { commitSha, branch: (await this.#readText(SCAN_SANDBOX_KIND_FILE))?.trim() === "branch" ? ref : null };
     return { commitSha, branch: normalizeBranchName((await this.#readText(SCAN_SANDBOX_BRANCH_FILE)) ?? "") };
   }
 
@@ -152,7 +161,12 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     const meter = await this.#openMeter(options.maxBudgetUsd);
     const started = await this.#startedPhases();
     if (!started.includes(phase)) {
-      const trace: StoredTrace = { ...emptyTraceState(), phase, pending: [phaseMarker("phase_started", phase, new Date())], ended: false };
+      const trace: StoredTrace = {
+        ...emptyTraceState(),
+        phase,
+        pending: [phaseMarker("phase_started", phase, new Date())],
+        ended: false,
+      };
       await this.ctx.storage.put({ [SCAN_SANDBOX_PHASES_KEY]: [...started, phase], [SCAN_SANDBOX_TRACE_KEY]: trace });
     }
     const remaining = remainingUsd(meter);
@@ -199,7 +213,12 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     const drained = drainLog({ offset: stored.offset, open: stored.open }, chunk, stored.phase, now);
     const entries = [...stored.pending, ...drained.entries];
     if (ended && !stored.ended) entries.push(phaseMarker("phase_ended", stored.phase, now));
-    await this.ctx.storage.put<StoredTrace>(SCAN_SANDBOX_TRACE_KEY, { ...drained.state, phase: stored.phase, pending: [], ended: stored.ended || ended });
+    await this.ctx.storage.put<StoredTrace>(SCAN_SANDBOX_TRACE_KEY, {
+      ...drained.state,
+      phase: stored.phase,
+      pending: [],
+      ended: stored.ended || ended,
+    });
     return entries;
   }
 
@@ -219,9 +238,22 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async readUsage(): Promise<ScanUsage | null> {
     const meter = await this.ctx.storage.get<Meter>(SCAN_SANDBOX_METER_KEY);
     const started = await this.#startedPhases();
-    const logs = await Promise.all((started.length > 0 ? started.map((phase) => phaseAgentFiles(phase)) : [DEFAULT_AGENT_FILES]).map((files) => this.#logEnd(files.log)));
-    const reports = logs.flatMap((log) => (log === null ? [] : [parseAgentUsage(log)])).filter((report) => report !== null);
-    const reported = reports.length === 0 ? null : { ...reports[0], turns: sumOrNull(reports.map((report) => report.turns)), durationMs: sumOrNull(reports.map((report) => report.durationMs)) };
+    const logs = await Promise.all(
+      (started.length > 0 ? started.map((phase) => phaseAgentFiles(phase)) : [DEFAULT_AGENT_FILES]).map((files) =>
+        this.#logEnd(files.log),
+      ),
+    );
+    const reports = logs
+      .flatMap((log) => (log === null ? [] : [parseAgentUsage(log)]))
+      .filter((report) => report !== null);
+    const reported =
+      reports.length === 0
+        ? null
+        : {
+            ...reports[0],
+            turns: sumOrNull(reports.map((report) => report.turns)),
+            durationMs: sumOrNull(reports.map((report) => report.durationMs)),
+          };
     if (meter === undefined) return reported;
     return {
       inputTokens: meter.inputTokens,
@@ -284,7 +316,10 @@ export class FullScanSandbox extends DurableObject<Bindings> {
 
   async #logFrom(path: string, offset: number): Promise<string> {
     try {
-      const process = await this.#container.exec(["tail", "-c", `+${offset + 1}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });
+      const process = await this.#container.exec(["tail", "-c", `+${offset + 1}`, path], {
+        cwd: SCAN_SANDBOX_WORK_DIR,
+        env: SCAN_SANDBOX_TRUST_ENV,
+      });
       const output = await process.output();
       return output.exitCode === 0 ? new TextDecoder().decode(output.stdout) : "";
     } catch {
@@ -294,7 +329,10 @@ export class FullScanSandbox extends DurableObject<Bindings> {
 
   async #logEnd(path: string): Promise<string | null> {
     try {
-      const process = await this.#container.exec(["tail", "-c", `${SCAN_SANDBOX_LOG_READ_BYTES}`, path], { cwd: SCAN_SANDBOX_WORK_DIR, env: SCAN_SANDBOX_TRUST_ENV });
+      const process = await this.#container.exec(["tail", "-c", `${SCAN_SANDBOX_LOG_READ_BYTES}`, path], {
+        cwd: SCAN_SANDBOX_WORK_DIR,
+        env: SCAN_SANDBOX_TRUST_ENV,
+      });
       const output = await process.output();
       return output.exitCode === 0 ? new TextDecoder().decode(output.stdout) : null;
     } catch {
@@ -312,7 +350,9 @@ export class FullScanSandbox extends DurableObject<Bindings> {
 
   async #start(repo: string, anthropicKey?: OutboundAnthropicKey): Promise<void> {
     if (this.#container.running) return;
-    const outbound = this.#context.exports.Outbound({ props: { sandboxId: this.#context.id.toString(), repo, anthropicKey } });
+    const outbound = this.#context.exports.Outbound({
+      props: { sandboxId: this.#context.id.toString(), repo, anthropicKey },
+    });
     this.#container.start({
       image: this.#container.images.sandbox,
       instance: SCAN_SANDBOX_INSTANCE_TYPE,
@@ -336,7 +376,9 @@ export class FullScanSandbox extends DurableObject<Bindings> {
       const output = await Promise.race([process.output(), guard]);
       if (output.exitCode !== 0) {
         const decoder = new TextDecoder();
-        const detail = (decoder.decode(output.stderr) || decoder.decode(output.stdout)).slice(-SCAN_SANDBOX_LOG_TAIL_CHARS);
+        const detail = (decoder.decode(output.stderr) || decoder.decode(output.stdout)).slice(
+          -SCAN_SANDBOX_LOG_TAIL_CHARS,
+        );
         throw new Error(`command exited ${output.exitCode}: ${detail}`);
       }
     } finally {

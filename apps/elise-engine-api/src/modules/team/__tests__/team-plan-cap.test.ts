@@ -1,7 +1,14 @@
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authUser, ensureTenantRoles, findTenantRole, partyRoles, platformMasterPlans, tenantSubscriptions } from "@repo/db-elise";
+import {
+  authUser,
+  ensureTenantRoles,
+  findTenantRole,
+  partyRoles,
+  platformMasterPlans,
+  tenantSubscriptions,
+} from "@repo/db-elise";
 import { TENANT_ADMIN_ROLE_KEY } from "@repo/contracts/elise";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { createInviteEffect } from "#/modules/team/queries";
@@ -19,11 +26,17 @@ const account = async (slug: string, planKey: string | null): Promise<Account> =
   const role = await findTenantRole(test.raw, seeded.tenantId, TENANT_ADMIN_ROLE_KEY);
   if (!role) throw new Error("tenant_admin role missing");
   const userId = `${slug}-admin`;
-  await test.raw.insert(authUser).values({ id: userId, name: "Ada Rossi", email: `${slug}@example.com`, partyId: seeded.partyId });
-  await test.raw.insert(partyRoles).values({ partyId: seeded.partyId, tenantId: seeded.tenantId, roleId: role.id, roleScope: "tenant" });
+  await test.raw
+    .insert(authUser)
+    .values({ id: userId, name: "Ada Rossi", email: `${slug}@example.com`, partyId: seeded.partyId });
+  await test.raw
+    .insert(partyRoles)
+    .values({ partyId: seeded.partyId, tenantId: seeded.tenantId, roleId: role.id, roleScope: "tenant" });
   if (planKey) {
     const [plan] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, planKey));
-    await test.raw.insert(tenantSubscriptions).values({ tenantId: seeded.tenantId, planId: plan.id, status: "active", source: "grant" });
+    await test.raw
+      .insert(tenantSubscriptions)
+      .values({ tenantId: seeded.tenantId, planId: plan.id, status: "active", source: "grant" });
   }
   return { tenantId: seeded.tenantId, userId };
 };
@@ -41,7 +54,9 @@ const invite = (from: Account, email: string): NewInvite => ({
 
 const attempt = (from: Account, email: string) =>
   Effect.runPromise(
-    createInviteEffect(test.pool, invite(from, email)).pipe(Effect.match({ onSuccess: () => "invited", onFailure: (failure) => failure.message })),
+    createInviteEffect(test.pool, invite(from, email)).pipe(
+      Effect.match({ onSuccess: () => "invited", onFailure: (failure) => failure.message }),
+    ),
   );
 
 beforeAll(async () => {
@@ -63,11 +78,11 @@ describe("createInviteEffect and the plan's member cap", () => {
   it("counts the invites still waiting with the people in the account", async () => {
     const team = await account("team", "team");
 
-    expect([await attempt(team, "one@example.com"), await attempt(team, "two@example.com"), await attempt(team, "three@example.com")]).toEqual([
-      "invited",
-      "invited",
-      expect.stringContaining("holds 3 people"),
-    ]);
+    expect([
+      await attempt(team, "one@example.com"),
+      await attempt(team, "two@example.com"),
+      await attempt(team, "three@example.com"),
+    ]).toEqual(["invited", "invited", expect.stringContaining("holds 3 people")]);
   });
 
   it("names the enabled plan that holds more people when a full account is refused", async () => {

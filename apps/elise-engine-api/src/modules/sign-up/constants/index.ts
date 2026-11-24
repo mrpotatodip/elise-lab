@@ -11,7 +11,8 @@ export const VERIFICATION_EMAIL_NOT_QUEUED_LOG = "Verification email not queued"
 // limit or bad input, so a caller cannot tell a
 // taken email from any other failure.
 // -----
-export const SIGN_UP_REFUSED = "We could not create this account. Check your details and try again, or sign in if you already have an account.";
+export const SIGN_UP_REFUSED =
+  "We could not create this account. Check your details and try again, or sign in if you already have an account.";
 
 // -----
 // Cloudflare Turnstile: the server-side check of the sign-up token

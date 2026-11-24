@@ -9,10 +9,16 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/budget/changes", getBudgetChangesDoc, requirePower("company:usage:budget:update"), zValidator("header", AccountHeaderSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(getBudgetChangesSvc(db, accountId)));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/budget/changes",
+  getBudgetChangesDoc,
+  requirePower("company:usage:budget:update"),
+  zValidator("header", AccountHeaderSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(getBudgetChangesSvc(db, accountId)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;
