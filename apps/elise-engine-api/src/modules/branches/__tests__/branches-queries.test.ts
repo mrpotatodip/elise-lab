@@ -19,19 +19,34 @@ const newRepo = async (tenant = tenantId, defaultBranch: string | null = null) =
   counter += 1;
   const [repo] = await test.raw
     .insert(scanRepos)
-    .values({ tenantId: tenant, canonical: `octo/repo-${counter}`, url: `https://github.com/octo/repo-${counter}`, defaultBranch })
+    .values({
+      tenantId: tenant,
+      canonical: `octo/repo-${counter}`,
+      url: `https://github.com/octo/repo-${counter}`,
+      defaultBranch,
+    })
     .returning();
   return repo.id;
 };
 
 const namesOf = async (repoId: string) =>
-  (await test.raw.select({ name: scanRepoBranches.name }).from(scanRepoBranches).where(eq(scanRepoBranches.repoId, repoId))).map((row) => row.name).toSorted();
+  (
+    await test.raw
+      .select({ name: scanRepoBranches.name })
+      .from(scanRepoBranches)
+      .where(eq(scanRepoBranches.repoId, repoId))
+  )
+    .map((row) => row.name)
+    .toSorted();
 
-const pointerOf = async (repoId: string) => (await test.raw.select({ pointer: scanRepos.defaultBranch }).from(scanRepos).where(eq(scanRepos.id, repoId)))[0].pointer;
+const pointerOf = async (repoId: string) =>
+  (await test.raw.select({ pointer: scanRepos.defaultBranch }).from(scanRepos).where(eq(scanRepos.id, repoId)))[0]
+    .pointer;
 
 const resolveOutcome = (repoId: string, name: string | null, ref: string | null, tenant = tenantId) =>
   run(resolveScanBranchEffect(test.http, tenant, repoId, { name, ref }));
-const resolve = async (repoId: string, name: string | null, ref: string | null, tenant = tenantId) => (await resolveOutcome(repoId, name, ref, tenant)).id;
+const resolve = async (repoId: string, name: string | null, ref: string | null, tenant = tenantId) =>
+  (await resolveOutcome(repoId, name, ref, tenant)).id;
 const filler = (count: number) => Array.from({ length: count }, (_, k) => `b${k}`);
 
 beforeAll(async () => {
@@ -63,8 +78,14 @@ describe("resolveScanBranchEffect", () => {
   it("says why a scan that read no branch has no History", async () => {
     const repoId = await newRepo();
 
-    expect(await resolveOutcome(repoId, null, null)).toEqual({ id: null, reason: "the clone was not on a branch, so this scan has no History" });
-    expect(await resolveOutcome(repoId, null, "v1.0.0")).toEqual({ id: null, reason: '"v1.0.0" is a tag or a commit, not a branch, so this scan has no History' });
+    expect(await resolveOutcome(repoId, null, null)).toEqual({
+      id: null,
+      reason: "the clone was not on a branch, so this scan has no History",
+    });
+    expect(await resolveOutcome(repoId, null, "v1.0.0")).toEqual({
+      id: null,
+      reason: '"v1.0.0" is a tag or a commit, not a branch, so this scan has no History',
+    });
     expect(await namesOf(repoId)).toEqual([]);
   });
 
@@ -75,7 +96,9 @@ describe("resolveScanBranchEffect", () => {
     const seedTip = async (repoId: string, branch: string, commit: string, createdAt: string) => {
       seeded += 1;
       const branchId = await resolve(repoId, branch, null);
-      await test.raw.insert(scans).values(scanValues(tenantId, repoId, `tip-${seeded}`, createdAt, { branchId, branch, commitSha: commit }));
+      await test.raw
+        .insert(scans)
+        .values(scanValues(tenantId, repoId, `tip-${seeded}`, createdAt, { branchId, branch, commitSha: commit }));
       return branchId;
     };
 
@@ -84,7 +107,11 @@ describe("resolveScanBranchEffect", () => {
       const branchId = await seedTip(repoId, "main", TIP, "2026-11-01T00:00:00Z");
 
       expect(await resolveOutcome(repoId, null, TIP)).toEqual({ id: branchId, name: "main", reason: null });
-      expect(await resolveOutcome(repoId, null, TIP.toUpperCase())).toEqual({ id: branchId, name: "main", reason: null });
+      expect(await resolveOutcome(repoId, null, TIP.toUpperCase())).toEqual({
+        id: branchId,
+        name: "main",
+        reason: null,
+      });
       expect(await namesOf(repoId)).toEqual(["main"]);
     });
 
@@ -93,14 +120,24 @@ describe("resolveScanBranchEffect", () => {
       await seedTip(repoId, "main", OLD, "2026-11-01T00:00:00Z");
       await seedTip(repoId, "main", TIP, "2026-11-02T00:00:00Z");
 
-      expect(await resolveOutcome(repoId, null, OLD)).toEqual({ id: null, reason: "this commit is not the latest of a tracked branch, so this scan has no History" });
+      expect(await resolveOutcome(repoId, null, OLD)).toEqual({
+        id: null,
+        reason: "this commit is not the latest of a tracked branch, so this scan has no History",
+      });
     });
 
     it("ignores a scan that failed, because it read nothing the History can use", async () => {
       const repoId = await newRepo();
       await seedTip(repoId, "main", OLD, "2026-11-01T00:00:00Z");
       const branchId = await resolve(repoId, "main", null);
-      await test.raw.insert(scans).values(scanValues(tenantId, repoId, "failed-newer", "2026-11-02T00:00:00Z", { branchId, branch: "main", commitSha: TIP, status: "failed" }));
+      await test.raw.insert(scans).values(
+        scanValues(tenantId, repoId, "failed-newer", "2026-11-02T00:00:00Z", {
+          branchId,
+          branch: "main",
+          commitSha: TIP,
+          status: "failed",
+        }),
+      );
 
       expect((await resolveOutcome(repoId, null, TIP)).id).toBeNull();
       expect((await resolveOutcome(repoId, null, OLD)).id).toBe(branchId);
@@ -111,7 +148,10 @@ describe("resolveScanBranchEffect", () => {
       await seedTip(repoId, "main", TIP, "2026-11-01T00:00:00Z");
       await seedTip(repoId, "release", TIP, "2026-11-01T01:00:00Z");
 
-      expect(await resolveOutcome(repoId, null, TIP)).toEqual({ id: null, reason: "this commit is the latest of 2 tracked branches (main, release), so this scan has no History" });
+      expect(await resolveOutcome(repoId, null, TIP)).toEqual({
+        id: null,
+        reason: "this commit is the latest of 2 tracked branches (main, release), so this scan has no History",
+      });
     });
 
     it("does not look at a repo of another account", async () => {
@@ -188,7 +228,10 @@ describe("resolveScanBranchEffect", () => {
     const repoId = await newRepo();
     await run(addBranchesEffect(test.pool, tenantId, repoId, filler(REPO_BRANCH_LIMIT)));
 
-    expect(await resolveOutcome(repoId, "develop", null)).toEqual({ id: null, reason: `the repo already tracks ${REPO_BRANCH_LIMIT} branches, so this scan has no History` });
+    expect(await resolveOutcome(repoId, "develop", null)).toEqual({
+      id: null,
+      reason: `the repo already tracks ${REPO_BRANCH_LIMIT} branches, so this scan has no History`,
+    });
     expect(await resolve(repoId, "feature/y", "feature/y")).toBeNull();
     expect(await pointerOf(repoId)).toBe("develop");
     expect(await namesOf(repoId)).toEqual(filler(REPO_BRANCH_LIMIT).toSorted());
@@ -219,14 +262,21 @@ describe("addBranchesEffect", () => {
 
     const error = await fail(addBranchesEffect(test.pool, tenantId, repoId, ["x", "y"]));
 
-    expect(error).toMatchObject({ _tag: "Conflict", message: `A repo can track at most ${REPO_BRANCH_LIMIT} branches; it tracks ${filler(REPO_BRANCH_LIMIT - 1).toSorted().join(", ")}` });
+    expect(error).toMatchObject({
+      _tag: "Conflict",
+      message: `A repo can track at most ${REPO_BRANCH_LIMIT} branches; it tracks ${filler(REPO_BRANCH_LIMIT - 1)
+        .toSorted()
+        .join(", ")}`,
+    });
     expect(await namesOf(repoId)).toEqual(filler(REPO_BRANCH_LIMIT - 1).toSorted());
   });
 
   it("is NotFound for a repo of another account", async () => {
     const repoId = await newRepo();
 
-    expect(await fail(addBranchesEffect(test.pool, otherTenantId, repoId, ["main"]))).toMatchObject({ _tag: "NotFound" });
+    expect(await fail(addBranchesEffect(test.pool, otherTenantId, repoId, ["main"]))).toMatchObject({
+      _tag: "NotFound",
+    });
   });
 
   it("is found by exact name", async () => {
@@ -243,7 +293,9 @@ describe("addRepoEffect", () => {
 
   it("adds a repo with its branches, and the same repo in another spelling is the repo already there", async () => {
     const id = await run(addRepoEffect(test.pool, tenantId, URL, ["main", "release"]));
-    const again = await run(addRepoEffect(test.pool, tenantId, "https://github.com/OCTOCAT/hello-world.git/", ["develop"]));
+    const again = await run(
+      addRepoEffect(test.pool, tenantId, "https://github.com/OCTOCAT/hello-world.git/", ["develop"]),
+    );
 
     expect(again).toBe(id);
     expect(await namesOf(id)).toEqual(["develop", "main", "release"]);
@@ -259,7 +311,9 @@ describe("addRepoEffect", () => {
   it("leaves no repo behind when its branches are refused", async () => {
     const before = (await test.raw.select().from(scanRepos).where(eq(scanRepos.tenantId, tenantId))).length;
 
-    const error = await fail(addRepoEffect(test.pool, tenantId, "https://github.com/octocat/refused", filler(REPO_BRANCH_LIMIT + 1)));
+    const error = await fail(
+      addRepoEffect(test.pool, tenantId, "https://github.com/octocat/refused", filler(REPO_BRANCH_LIMIT + 1)),
+    );
 
     expect(error).toMatchObject({ _tag: "Conflict" });
     expect((await test.raw.select().from(scanRepos).where(eq(scanRepos.tenantId, tenantId))).length).toBe(before);
@@ -267,9 +321,13 @@ describe("addRepoEffect", () => {
 
   it(`refuses a repo past ${REPO_LIMIT_PER_TENANT} for the account, but still answers one it has`, async () => {
     const full = (await seedTenant(test, "full")).tenantId;
-    await test.raw
-      .insert(scanRepos)
-      .values(Array.from({ length: REPO_LIMIT_PER_TENANT }, (_, k) => ({ tenantId: full, canonical: `octo/full-${k}`, url: `https://github.com/octo/full-${k}` })));
+    await test.raw.insert(scanRepos).values(
+      Array.from({ length: REPO_LIMIT_PER_TENANT }, (_, k) => ({
+        tenantId: full,
+        canonical: `octo/full-${k}`,
+        url: `https://github.com/octo/full-${k}`,
+      })),
+    );
 
     const refused = await fail(addRepoEffect(test.pool, full, "https://github.com/octo/one-too-many", []));
     const existing = await run(addRepoEffect(test.pool, full, "https://github.com/octo/full-0", ["main"]));

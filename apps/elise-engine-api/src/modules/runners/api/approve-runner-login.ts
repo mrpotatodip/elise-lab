@@ -11,14 +11,29 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/login/approve", approveRunnerLoginDoc, requirePower("company:runners:create"), zValidator("header", AccountHeaderSchema), zValidator("json", ApproveRunnerLoginBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const body = c.req.valid("json");
-  const ip = c.req.header("cf-connecting-ip") ?? "local";
-  const actorUserId = userIdOf(c);
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(approveRunnerLoginSvc(db, accountId, actorUserId, ip, body)));
-  await notifyRunnerChange(c, { kind: "runner-added", power: "company:runners:create", accountId, runnerId: data.runnerId, actorUserId });
-  return c.json({ data, error: null });
-});
+app.post(
+  "/login/approve",
+  approveRunnerLoginDoc,
+  requirePower("company:runners:create"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", ApproveRunnerLoginBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const body = c.req.valid("json");
+    const ip = c.req.header("cf-connecting-ip") ?? "local";
+    const actorUserId = userIdOf(c);
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(approveRunnerLoginSvc(db, accountId, actorUserId, ip, body)));
+    await notifyRunnerChange(c, {
+      kind: "runner-added",
+      power: "company:runners:create",
+      accountId,
+      runnerId: data.runnerId,
+      actorUserId,
+    });
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

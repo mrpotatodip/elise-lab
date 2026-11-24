@@ -37,7 +37,11 @@ export function ScanActivityChart({ days }: ScanActivityChartProps) {
             In progress
           </span>
         </div>
-        <div className="flex flex-col justify-between text-right text-xs tabular-nums text-muted-foreground" style={{ height: PLOT_HEIGHT }} aria-hidden="true">
+        <div
+          className="flex flex-col justify-between text-right text-xs tabular-nums text-muted-foreground"
+          style={{ height: PLOT_HEIGHT }}
+          aria-hidden="true"
+        >
           {ticks.map((tick) => (
             <span key={tick} className="leading-none">
               {tick}
@@ -64,9 +68,24 @@ export function ScanActivityChart({ days }: ScanActivityChartProps) {
                       style={day.total === 0 ? undefined : { height: `${(day.total / peak) * 100}%` }}
                     >
                       {day.total === 0 && <span className="block h-1 w-full rounded-md bg-muted" />}
-                      {day.succeeded > 0 && <span className="block w-full bg-mark-success transition-opacity group-hover:opacity-80" style={{ flexGrow: day.succeeded }} />}
-                      {day.failed > 0 && <span className="block w-full bg-mark-danger transition-opacity group-hover:opacity-80" style={{ flexGrow: day.failed }} />}
-                      {day.active > 0 && <span className="block w-full bg-mark-info transition-opacity group-hover:opacity-80" style={{ flexGrow: day.active }} />}
+                      {day.succeeded > 0 && (
+                        <span
+                          className="block w-full bg-mark-success transition-opacity group-hover:opacity-80"
+                          style={{ flexGrow: day.succeeded }}
+                        />
+                      )}
+                      {day.failed > 0 && (
+                        <span
+                          className="block w-full bg-mark-danger transition-opacity group-hover:opacity-80"
+                          style={{ flexGrow: day.failed }}
+                        />
+                      )}
+                      {day.active > 0 && (
+                        <span
+                          className="block w-full bg-mark-info transition-opacity group-hover:opacity-80"
+                          style={{ flexGrow: day.active }}
+                        />
+                      )}
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="font-medium">{day.label}</p>
@@ -93,7 +112,9 @@ export function ScanActivityChart({ days }: ScanActivityChartProps) {
           </div>
         </div>
       </CardContent>
-      <p className="sr-only">{total} scans in the last {days.length} days.</p>
+      <p className="sr-only">
+        {total} scans in the last {days.length} days.
+      </p>
     </Card>
   );
 }

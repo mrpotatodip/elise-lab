@@ -58,7 +58,8 @@ export class Outbound extends WorkerEntrypoint<Bindings, OutboundProps> {
   // added to the request.
   // -----
   async #github(request: Request, url: URL): Promise<Response> {
-    if (repoOfGitPath(url.pathname) !== this.ctx.props.repo) return blocked(`${request.method} ${url.hostname}${url.pathname} is not this scan's repo`);
+    if (repoOfGitPath(url.pathname) !== this.ctx.props.repo)
+      return blocked(`${request.method} ${url.hostname}${url.pathname} is not this scan's repo`);
     return fetch(request);
   }
 
@@ -97,7 +98,9 @@ export class Outbound extends WorkerEntrypoint<Bindings, OutboundProps> {
 
     let upstream: Response;
     try {
-      upstream = await fetch(new Request(request.url, { method: "POST", headers, body: JSON.stringify({ ...body, max_tokens: maxTokens }) }));
+      upstream = await fetch(
+        new Request(request.url, { method: "POST", headers, body: JSON.stringify({ ...body, max_tokens: maxTokens }) }),
+      );
     } catch (error) {
       release();
       throw error;

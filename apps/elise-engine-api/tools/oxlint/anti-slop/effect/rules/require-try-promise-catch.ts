@@ -25,9 +25,7 @@ export const requireTryPromiseCatchRule = defineRule({
           options?.type === "ObjectExpression" &&
           options.properties.some(
             (property) =>
-              property.type === "Property" &&
-              property.key.type === "Identifier" &&
-              property.key.name === "catch",
+              property.type === "Property" && property.key.type === "Identifier" && property.key.name === "catch",
           );
         if (!hasCatch) context.report({ node, messageId: "missingCatch" });
       },

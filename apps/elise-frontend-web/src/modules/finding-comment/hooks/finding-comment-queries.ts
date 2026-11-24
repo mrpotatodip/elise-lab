@@ -7,6 +7,9 @@ export const findingCommentKeys = {
 };
 
 export const findingThreadQuery = (repo: string, fingerprint: string) =>
-  queryOptions({ queryKey: findingCommentKeys.thread(repo, fingerprint), queryFn: () => fetchFindingThread({ data: { repo, fingerprint } }) });
+  queryOptions({
+    queryKey: findingCommentKeys.thread(repo, fingerprint),
+    queryFn: () => fetchFindingThread({ data: { repo, fingerprint } }),
+  });
 
 export const useFindingThread = (repo: string, fingerprint: string) => useQuery(findingThreadQuery(repo, fingerprint));

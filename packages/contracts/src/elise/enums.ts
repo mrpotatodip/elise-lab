@@ -137,7 +137,16 @@ export const RUNNER_JOB_PHASE_VALUES = ["recon", "hunt", "check", "report"] as c
 // it does not know is calling_tool. Twin of the CHECK on
 // scan_trace_entries.label.
 // -----
-export const TRACE_LABEL_VALUES = ["reasoning", "reading_files", "searching", "running_command", "writing", "calling_tool", "phase_started", "phase_ended"] as const;
+export const TRACE_LABEL_VALUES = [
+  "reasoning",
+  "reading_files",
+  "searching",
+  "running_command",
+  "writing",
+  "calling_tool",
+  "phase_started",
+  "phase_ended",
+] as const;
 
 // -----
 // Why a failed scan failed, as the engine reads it from the error text it

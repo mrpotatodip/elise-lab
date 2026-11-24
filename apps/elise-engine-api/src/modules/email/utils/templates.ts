@@ -1,4 +1,11 @@
-import type { AnthropicKeyChangedEmail, BudgetChangedEmail, PasswordResetDoneEmail, PasswordResetEmail, TeamInviteEmail, VerifyEmail } from "#/modules/email/types";
+import type {
+  AnthropicKeyChangedEmail,
+  BudgetChangedEmail,
+  PasswordResetDoneEmail,
+  PasswordResetEmail,
+  TeamInviteEmail,
+  VerifyEmail,
+} from "#/modules/email/types";
 import { renderEmailLayout } from "./layout";
 
 export const renderTeamInvite = (mail: TeamInviteEmail) => {
@@ -9,7 +16,9 @@ export const renderTeamInvite = (mail: TeamInviteEmail) => {
     heading: `Join ${mail.accountName} on EliseLAB`,
     intro: [
       { text: mail.inviterName, strong: true },
-      { text: ` invited you to join ${mail.accountName}. Accept the invite to see its repositories and audit results.` },
+      {
+        text: ` invited you to join ${mail.accountName}. Accept the invite to see its repositories and audit results.`,
+      },
     ],
     facts: [
       { label: "Account", value: mail.accountName },
@@ -22,25 +31,40 @@ export const renderTeamInvite = (mail: TeamInviteEmail) => {
 };
 
 export const renderPasswordResetDone = (mail: PasswordResetDoneEmail) => {
-  const when = new Date(mail.changedAt).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" });
+  const when = new Date(mail.changedAt).toLocaleString("en-US", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "UTC",
+  });
   return renderEmailLayout({
     subject: "Your EliseLAB password was changed",
     preheader: "The password for your EliseLAB account was just changed.",
     heading: "Your password was changed",
-    intro: [{ text: "The password for your EliseLAB account was changed with a password reset, and you were signed out everywhere." }],
+    intro: [
+      {
+        text: "The password for your EliseLAB account was changed with a password reset, and you were signed out everywhere.",
+      },
+    ],
     facts: [{ label: "Changed", value: `${when} (UTC)` }],
     button: { label: "Reset your password again", url: mail.link },
-    footer: "If this was not you, reset your password again now with the button above, then check your Account's Runners and Anthropic key.",
+    footer:
+      "If this was not you, reset your password again now with the button above, then check your Account's Runners and Anthropic key.",
   });
 };
 
 export const renderVerifyEmail = (mail: VerifyEmail) => {
-  const expires = new Date(mail.expiresAt).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" });
+  const expires = new Date(mail.expiresAt).toLocaleString("en-US", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "UTC",
+  });
   return renderEmailLayout({
     subject: "Verify your email for EliseLAB",
     preheader: "Confirm this address to finish creating your EliseLAB account.",
     heading: "Verify your email",
-    intro: [{ text: "Confirm that this address is yours to finish creating your EliseLAB account. The link signs you in." }],
+    intro: [
+      { text: "Confirm that this address is yours to finish creating your EliseLAB account. The link signs you in." },
+    ],
     facts: [],
     button: { label: "Verify email", url: mail.link },
     footer: `The link works once and expires on ${expires} (UTC). If you did not sign up, ignore this email: nothing happens until the link is opened.`,
@@ -53,14 +77,17 @@ export const renderPasswordReset = (mail: PasswordResetEmail) => {
     subject: "Reset your EliseLAB password",
     preheader: "Choose a new password for your EliseLAB account.",
     heading: "Reset your password",
-    intro: [{ text: "Someone asked to reset the password for your EliseLAB account. Choose a new one to get back in." }],
+    intro: [
+      { text: "Someone asked to reset the password for your EliseLAB account. Choose a new one to get back in." },
+    ],
     facts: [],
     button: { label: "Choose a new password", url: mail.link },
     footer: `The link works once and expires at ${expires} UTC. If you did not ask for this, ignore this email: your password stays the same.`,
   });
 };
 
-const noticeTime = (iso: string) => `${new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} (UTC)`;
+const noticeTime = (iso: string) =>
+  `${new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} (UTC)`;
 
 const usd = (value: number) => `$${value.toFixed(2)}`;
 
@@ -96,7 +123,9 @@ export const renderBudgetChanged = (mail: BudgetChangedEmail) =>
     heading: "Monthly budget changed",
     intro: [
       { text: mail.actorName, strong: true },
-      { text: ` changed the Monthly budget for ${mail.accountName} from ${usd(mail.previousBudgetUsd)} to ${usd(mail.budgetUsd)}.` },
+      {
+        text: ` changed the Monthly budget for ${mail.accountName} from ${usd(mail.previousBudgetUsd)} to ${usd(mail.budgetUsd)}.`,
+      },
     ],
     facts: [
       { label: "Account", value: mail.accountName },

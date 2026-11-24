@@ -6,13 +6,22 @@ type Sent = { url: string; auth: string | null; body: unknown };
 const answering = (response: Response) => {
   const sent: Sent[] = [];
   const fetcher = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    sent.push({ url: String(input), auth: new Headers(init?.headers).get("authorization"), body: JSON.parse(String(init?.body)) });
+    sent.push({
+      url: String(input),
+      auth: new Headers(init?.headers).get("authorization"),
+      body: JSON.parse(String(init?.body)),
+    });
     return response;
   };
   return { sent, gateway: typesafeGateway("tsk_test", fetcher) };
 };
 
-const ok = (noul: number) => Response.json({ model: "jev-1.14.0", answers: { q: { type: "noul", noul } }, usage: { input_tokens: 10, output_tokens: 2 } });
+const ok = (noul: number) =>
+  Response.json({
+    model: "jev-1.14.0",
+    answers: { q: { type: "noul", noul } },
+    usage: { input_tokens: 10, output_tokens: 2 },
+  });
 
 describe("typesafeGateway.noul", () => {
   it("asks one yes/no question against the pinned model and returns the raw probability", async () => {
@@ -25,7 +34,11 @@ describe("typesafeGateway.noul", () => {
       {
         url: "https://api.typesafe.ai/v1/systemone",
         auth: "Bearer tsk_test",
-        body: { model: "jev-1.14.0", state: { title: "SQL injection" }, questions: { q: { type: "noul", instructions: "Is this a duplicate?" } } },
+        body: {
+          model: "jev-1.14.0",
+          state: { title: "SQL injection" },
+          questions: { q: { type: "noul", instructions: "Is this a duplicate?" } },
+        },
       },
     ]);
   });

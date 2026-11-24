@@ -27,7 +27,11 @@ const MetadataTextSchema = z
   })
   .pipe(z.object({ incomplete_reason: z.string().optional() }));
 
-export const isPartialScan = (report: string | null, ledgerText: string | null, metadataText: string | null): boolean => {
+export const isPartialScan = (
+  report: string | null,
+  ledgerText: string | null,
+  metadataText: string | null,
+): boolean => {
   if (report !== null && report.replace(/^[﻿\s]+/, "").startsWith(SCAN_RECORDS_MONEY_FIRST_LINE)) return true;
   if (ledgerText !== null) {
     const ledger = LedgerTextSchema.safeParse(ledgerText);

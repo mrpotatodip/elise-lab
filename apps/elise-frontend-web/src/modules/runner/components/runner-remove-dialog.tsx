@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 import type { Runner } from "../schemas";
 
 type RunnerRemoveDialogProps = {
@@ -14,8 +23,10 @@ type RunnerRemoveDialogProps = {
 // working, a waiting code stops working.
 // -----
 const consequence = (runner: Runner): string => {
-  if (runner.state === "connected") return `${runner.name} stops running scans for this account at once. A scan running on it stops too, with no report and no findings. The Runner says it was removed. To use it again, add it again with a new code.`;
-  if (runner.state === "waiting") return "The code you made stops working. You can add the computer again with a new code.";
+  if (runner.state === "connected")
+    return `${runner.name} stops running scans for this account at once. A scan running on it stops too, with no report and no findings. The Runner says it was removed. To use it again, add it again with a new code.`;
+  if (runner.state === "waiting")
+    return "The code you made stops working. You can add the computer again with a new code.";
   return "This clears the expired entry from the list. You can add the computer again with a new code.";
 };
 
@@ -24,7 +35,18 @@ export function RunnerRemoveDialog({ runner, pending, onConfirm }: RunnerRemoveD
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={`Remove ${runner.name}`} className="text-status-danger hover:text-status-danger" />}>Remove</DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Remove ${runner.name}`}
+            className="text-status-danger hover:text-status-danger"
+          />
+        }
+      >
+        Remove
+      </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Remove this runner?</DialogTitle>

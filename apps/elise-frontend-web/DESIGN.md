@@ -14,31 +14,31 @@ A premium near-white dashboard with a dark-gray primary. One cool neutral ramp (
 
 All tokens are CSS variables in `src/styles/globals.css` (`:root`), mapped to Tailwind in `@theme inline`. **Verified**. There are five themes, picked in a dialog that a button in the sidebar footer opens, above the account block (`ShellThemeSwitch`: one preview tile per theme, the chosen one marked; picking a tile applies it and closes the dialog; the collapsed rail shows the current theme's icon as the button, so a longer list costs no footer space) and kept in `localStorage` (`elise.theme`); `themeInitScript` in `__root.tsx` applies it before first paint as `data-theme` on `<html>`. **Default** is the soft-gray light theme in the table below and sets no attribute. **Daylight** (`data-theme="daylight"`) is brighter and firmer, on a white page with a painted sky at the top (the pictures in `public/theme-bgs/`, `bg-daylight-1.jpeg` to `-3.jpeg`, each 1778 by 592, rotating exactly as Moonlight's do (below), shown at 1.5 times their size and centred, their sides and bottom fading into white). The zoom is a choice: at 1.5 times the image is softer than at its natural size, so a larger source image is the way to a sharper sky. **Greenfields** (`data-theme="greenfields"`) is Daylight's structure and glass on a warm green ramp (hue 150), with its own sky pictures (`bg-greenfields-1.jpeg` to `-3.jpeg` in `public/theme-bgs/`, listed in `THEME_SKIES`, rotating like the others). It keeps Default's status, severity and mark colours. **Moonlight** (`data-theme="moonlight"`) is dark (`color-scheme: dark`) on a deep navy page with a night sky at the top (the pictures in `public/theme-bgs/`, each 1778 by 592, listed per theme in `THEME_SKIES` in `modules/shell/constants/theme-skies.ts`, which is the one place to edit to add a sky or change the timing (hold, fade, idle), for Daylight and Moonlight alike; `themeInitScript` picks one at random per theme on every page load (`data-sky-<theme>` is its index, `--<theme>-sky` its url) and preloads them all; `useSkyRotation` then crossfades through the list, but only while the page is idle: after 10s without input it plays, and it pauses, wherever it is, on the next input. `<html data-sky-state>` reads `playing` or `paused` for debugging. It stays still under `prefers-reduced-motion`. It is shown at 1.1 times the viewport, capped at 1950px, so it is barely enlarged and stays sharp; it starts below the 3.5rem top bar so the bar never clips the moon, and the art is left untouched (no veil or tint over it), so its colour and detail show as painted; the text halo on the page header keeps the title and description readable. Its sides and bottom fade into the page with the same eased mask as Daylight). Daylight and Moonlight make `--background`, `--sidebar`, `--card` and `--popover` translucent and blur what is behind `.bg-sidebar`, `.bg-card` and `.bg-popover`. Dialogs and sheets (`data-slot` `dialog-content` and `sheet-content`) use the card fill with a much stronger blur (32px, against 10px on cards), and the dialog body inside is clear; menus and tooltips keep the stronger popover fill so they stay legible over page text. **Midnight** (`data-theme="midnight"`) is Default turned dark: the same cool gray ramp, solid surfaces, no sky and no glass. It shares Moonlight's dark ink, status, mark and shadow tokens (one selector list in `globals.css`) and overrides only the surfaces. The table lists Default values. A new token must be defined for every theme in `globals.css`; the dark ones can share a block.
 
-| Role | Token | Value (oklch) |
-|---|---|---|
-| Sidebar | `bg-sidebar` | 0.93 |
-| Page | `bg-background` | 0.958 |
-| Card | `bg-card` | 0.99 |
-| Popover, toast | `bg-popover` | 0.998 |
-| Muted fill | `bg-muted` | 0.94 |
-| Text | `text-foreground` | 0.22 |
-| Secondary text | `text-muted-foreground` | 0.36 |
-| Border | `border-border` | black at 9% |
-| Field border | `border-input` | black at 16% |
-| Hover fill, active nav | `bg-accent` | black at 5.5% |
-| Primary | `bg-primary` | 0.27, a deep dark gray, text on it near-white |
-| Accent as text or tint | `text-primary-ink` | 0.30 |
+| Role                   | Token                   | Value (oklch)                                 |
+| ---------------------- | ----------------------- | --------------------------------------------- |
+| Sidebar                | `bg-sidebar`            | 0.93                                          |
+| Page                   | `bg-background`         | 0.958                                         |
+| Card                   | `bg-card`               | 0.99                                          |
+| Popover, toast         | `bg-popover`            | 0.998                                         |
+| Muted fill             | `bg-muted`              | 0.94                                          |
+| Text                   | `text-foreground`       | 0.22                                          |
+| Secondary text         | `text-muted-foreground` | 0.36                                          |
+| Border                 | `border-border`         | black at 9%                                   |
+| Field border           | `border-input`          | black at 16%                                  |
+| Hover fill, active nav | `bg-accent`             | black at 5.5%                                 |
+| Primary                | `bg-primary`            | 0.27, a deep dark gray, text on it near-white |
+| Accent as text or tint | `text-primary-ink`      | 0.30                                          |
 
-- **Rule** Use semantic classes. No hex values and no raw palette classes (`bg-zinc-800`, `text-red-500`) in a feature module. *(lint: `no-raw-colors`)*
+- **Rule** Use semantic classes. No hex values and no raw palette classes (`bg-zinc-800`, `text-red-500`) in a feature module. _(lint: `no-raw-colors`)_
 - **Rule** Status colour is a pair: `text-status-x` on `bg-status-x-soft` with a `border-status-x/25` edge. The soft fill is the same hue at about 13% alpha, so it works on any surface. States: `success`, `danger`, `warning`, `info`, `neutral`.
 - **Rule** Severity has its own five tokens (`severity-critical`, `-high`, `-medium`, `-low`, `-informational`): red, orange, yellow, blue, gray. Use them for severity only.
-- **Rule** Ink and mark are two different jobs. A status or severity colour that carries **text** is an ink (`text-status-x`, `text-severity-x`) and has to clear 4.5:1. A colour used as a **shape** (a chart bar, a ring, a progress fill, a dot) is a mark (`bg-mark-success`, `-danger`, `-warning`, `-info`, `-neutral`, `-critical`, `-high`, `-medium`, `-low`, `-informational`): brighter and more saturated, opaque, and clearing 3:1 against a card. Never fill a shape with an ink at partial opacity: in Daylight that is what made the charts muddy. *(lint: `no-off-design-classes` catches a solid `bg-status-x`, a mark at partial opacity and `text-mark-x`; the contrast numbers stay a browser check)* Measured 2026-11-09: marks are 3.09 or better in Default, 3.17 in Daylight and 6.13 in Moonlight; inks are 8.3 or better in all three. Daylight and Default share the marks (a teal-leaning green and a rose-leaning red that sit well on the pastel sky); Moonlight has its own, lighter set. Colour is never the only signal: every mark has a label or number beside it.
+- **Rule** Ink and mark are two different jobs. A status or severity colour that carries **text** is an ink (`text-status-x`, `text-severity-x`) and has to clear 4.5:1. A colour used as a **shape** (a chart bar, a ring, a progress fill, a dot) is a mark (`bg-mark-success`, `-danger`, `-warning`, `-info`, `-neutral`, `-critical`, `-high`, `-medium`, `-low`, `-informational`): brighter and more saturated, opaque, and clearing 3:1 against a card. Never fill a shape with an ink at partial opacity: in Daylight that is what made the charts muddy. _(lint: `no-off-design-classes` catches a solid `bg-status-x`, a mark at partial opacity and `text-mark-x`; the contrast numbers stay a browser check)_ Measured 2026-11-09: marks are 3.09 or better in Default, 3.17 in Daylight and 6.13 in Moonlight; inks are 8.3 or better in all three. Daylight and Default share the marks (a teal-leaning green and a rose-leaning red that sit well on the pastel sky); Moonlight has its own, lighter set. Colour is never the only signal: every mark has a label or number beside it.
 - **Verified** Contrast: body text on a card is above 9:1, muted text above 5:1, and the primary button is near-white on dark gray at well above 4.5:1 (Lighthouse reports 100 for accessibility). Status and severity inks are deliberately dark (lightness 0.38 to 0.44) so they read on the light surfaces and on their own tinted fills.
 - **Verified** System font stacks only. No web fonts. Code, file paths, model names and report text use `font-mono`.
 - **Verified** Radius `--radius: 0.75rem`. Cards use `rounded-xl`, controls `rounded-lg`, pills `rounded-full`.
 - **Verified** Elevation tokens: `shadow-card` (cards), `shadow-raised` (the auth card, toasts), `shadow-control` (outline buttons, inputs), `shadow-primary` (the accent button, with a soft accent glow).
 - **Verified** One soft white glow at the top right of the page (`body` background).
-- **Verified** Icons are `lucide-react` at one thin stroke (1.5), set once for every `svg.lucide` in `globals.css`. *(lint: `no-off-design-classes` rejects any other `strokeWidth`, and raw or arbitrary shadows, arbitrary radius and off-scale `text-[Npx]`)*
+- **Verified** Icons are `lucide-react` at one thin stroke (1.5), set once for every `svg.lucide` in `globals.css`. _(lint: `no-off-design-classes` rejects any other `strokeWidth`, and raw or arbitrary shadows, arbitrary radius and off-scale `text-[Npx]`)_
 
 ## Layout
 
@@ -99,7 +99,7 @@ All tokens are CSS variables in `src/styles/globals.css` (`:root`), mapped to Ta
 ## Text and spacing
 
 - **Rule** Reading text (a hint, an explanation, an impact line) is 14px or larger, has a line height of 1.5 or more, and runs at most about 65 characters per line (`max-w-copy`, 52ch: Tailwind's `max-w-prose` is 65ch, which fits 71 to 80 letters of this font). 12px is for labels, table headers, badges, timestamps and file paths.
-- **Rule** A link or control is at least 24px tall (`min-h-6`), a button or select at least 32px. *(lint: `require-link-target-size` for a link outside a sentence; `no-off-design-classes` bans `max-w-prose` for `max-w-copy`)* Space follows one scale: 6px from a heading to its hint, 12px from a hint to its object, 24px between groups, 32px between cards. Measure it with `measure.js` in the `chrome-review` skill, and do not judge it by eye.
+- **Rule** A link or control is at least 24px tall (`min-h-6`), a button or select at least 32px. _(lint: `require-link-target-size` for a link outside a sentence; `no-off-design-classes` bans `max-w-prose` for `max-w-copy`)_ Space follows one scale: 6px from a heading to its hint, 12px from a hint to its object, 24px between groups, 32px between cards. Measure it with `measure.js` in the `chrome-review` skill, and do not judge it by eye.
 
 ## Design standard
 

@@ -10,11 +10,21 @@ import { scanFileHeaders } from "#/modules/scans/utils";
 
 const app = new Hono<AppEnv>();
 
-app.get("/:scanId/files/:file", readScanFileDoc, zValidator("header", AccountHeaderSchema), zValidator("param", ScanFileParamSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { scanId, file } = c.req.valid("param");
-  const { body, contentType } = await c.get("deps").withTenant(c, accountId, (db) => runEffect(readScanFileSvc(c.env.REPORTS, scanReads(db), accountId, scanId, file)));
-  return new Response(body.body, { headers: scanFileHeaders(file, contentType) });
-});
+app.get(
+  "/:scanId/files/:file",
+  readScanFileDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", ScanFileParamSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { scanId, file } = c.req.valid("param");
+    const { body, contentType } = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) =>
+        runEffect(readScanFileSvc(c.env.REPORTS, scanReads(db), accountId, scanId, file)),
+      );
+    return new Response(body.body, { headers: scanFileHeaders(file, contentType) });
+  },
+);
 
 export default app;

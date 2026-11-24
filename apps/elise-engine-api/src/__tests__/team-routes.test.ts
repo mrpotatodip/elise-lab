@@ -7,7 +7,9 @@ import { testDeps } from "./test-deps";
 let signedInUser: string | undefined;
 let managesAccount = false;
 
-const app = buildApp(testDeps({ sessionUserId: async () => signedInUser, userHasPower: async () => managesAccount })).app;
+const app = buildApp(
+  testDeps({ sessionUserId: async () => signedInUser, userHasPower: async () => managesAccount }),
+).app;
 
 const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const ID = "9b2f6c1e-3a4d-4e5f-8a7b-1c2d3e4f5a6b";
@@ -23,7 +25,11 @@ const call = (path: string, init: RequestInit = {}, headers: Record<string, stri
 };
 
 const callWith = (env: Bindings, path: string, init: RequestInit, headers: Record<string, string>) =>
-  app.fetch(new Request(`http://localhost${path}`, { ...init, headers: { ...headers, "content-type": "application/json" } }), env, testExecutionContext);
+  app.fetch(
+    new Request(`http://localhost${path}`, { ...init, headers: { ...headers, "content-type": "application/json" } }),
+    env,
+    testExecutionContext,
+  );
 
 const MANAGER_ROUTES: Array<[string, string, string | undefined]> = [
   ["GET", "/team", undefined],
@@ -73,7 +79,10 @@ describe("validation, after the admin check", () => {
   it("rejects a bad invite body", async () => {
     signedInUser = "admin";
     managesAccount = true;
-    const res = await call("/team/invites", { method: "POST", body: JSON.stringify({ email: "not-an-email", role: "workspace_member" }) });
+    const res = await call("/team/invites", {
+      method: "POST",
+      body: JSON.stringify({ email: "not-an-email", role: "workspace_member" }),
+    });
 
     expect(res.status).toBe(400);
   });

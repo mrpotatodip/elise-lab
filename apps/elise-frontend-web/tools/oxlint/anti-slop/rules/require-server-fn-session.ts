@@ -10,7 +10,8 @@ export const requireServerFnSessionRule = defineRule({
       description: "Require a `createServerFn` handler to call `engineAuth()` or `requireSession()`.",
     },
     messages: {
-      missingSession: "This server function never checks the session. Call `engineAuth()` (or `requireSession()`) in the handler: a route guard does not protect a server function.",
+      missingSession:
+        "This server function never checks the session. Call `engineAuth()` (or `requireSession()`) in the handler: a route guard does not protect a server function.",
     },
   },
   createOnce(context) {

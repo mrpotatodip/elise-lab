@@ -9,7 +9,11 @@ import type { TraceRow } from "#/modules/scan-trace/types";
 
 const cursorOf = sql<string>`to_char(${scanTraceEntries.updatedAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
 
-export const findJobRunnerEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<string | null, DbError> =>
+export const findJobRunnerEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scanId: string,
+): Effect.Effect<string | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -20,7 +24,11 @@ export const findJobRunnerEffect = (db: AppDbType, tenantId: string, scanId: str
     catch: toDbError,
   });
 
-export const findTraceScanEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<{ candidateFindings: number | null } | undefined, DbError> =>
+export const findTraceScanEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scanId: string,
+): Effect.Effect<{ candidateFindings: number | null } | undefined, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -42,7 +50,11 @@ export const countTraceEntriesEffect = (db: AppDbType, scanId: string): Effect.E
     catch: toDbError,
   });
 
-export const knownTraceIdsEffect = (db: AppDbType, scanId: string, ids: readonly string[]): Effect.Effect<Set<string>, DbError> =>
+export const knownTraceIdsEffect = (
+  db: AppDbType,
+  scanId: string,
+  ids: readonly string[],
+): Effect.Effect<Set<string>, DbError> =>
   ids.length === 0
     ? Effect.succeed(new Set<string>())
     : Effect.tryPromise({
@@ -55,7 +67,12 @@ export const knownTraceIdsEffect = (db: AppDbType, scanId: string, ids: readonly
         catch: toDbError,
       });
 
-export const upsertTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId: string, entries: readonly TraceEntry[]): Effect.Effect<void, DbError> =>
+export const upsertTraceEntriesEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scanId: string,
+  entries: readonly TraceEntry[],
+): Effect.Effect<void, DbError> =>
   entries.length === 0
     ? Effect.void
     : Effect.tryPromise({
@@ -89,7 +106,12 @@ export const upsertTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId
         catch: toDbError,
       }).pipe(Effect.asVoid);
 
-export const setCandidateFindingsEffect = (db: AppDbType, tenantId: string, scanId: string, candidateFindings: number): Effect.Effect<void, DbError> =>
+export const setCandidateFindingsEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scanId: string,
+  candidateFindings: number,
+): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -99,7 +121,12 @@ export const setCandidateFindingsEffect = (db: AppDbType, tenantId: string, scan
     catch: toDbError,
   }).pipe(Effect.asVoid);
 
-export const readTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId: string, after: string | undefined): Effect.Effect<TraceRow[], DbError> =>
+export const readTraceEntriesEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scanId: string,
+  after: string | undefined,
+): Effect.Effect<TraceRow[], DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -117,7 +144,12 @@ export const readTraceEntriesEffect = (db: AppDbType, tenantId: string, scanId: 
           and(
             eq(scanTraceEntries.tenantId, tenantId),
             eq(scanTraceEntries.scanId, scanId),
-            after === undefined ? undefined : gt(scanTraceEntries.updatedAt, sql`${after}::timestamptz - make_interval(secs => ${SCAN_TRACE_CURSOR_OVERLAP_SECONDS})`),
+            after === undefined
+              ? undefined
+              : gt(
+                  scanTraceEntries.updatedAt,
+                  sql`${after}::timestamptz - make_interval(secs => ${SCAN_TRACE_CURSOR_OVERLAP_SECONDS})`,
+                ),
           ),
         )
         .orderBy(asc(scanTraceEntries.startedAt), asc(scanTraceEntries.id)),

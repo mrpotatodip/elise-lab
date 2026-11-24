@@ -18,7 +18,9 @@ beforeAll(async () => {
   const acme = await seedTenant(test, "acme");
   tenantId = acme.tenantId;
   otherTenantId = (await seedTenant(test, "other")).tenantId;
-  await test.raw.insert(authUser).values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: acme.partyId });
+  await test.raw
+    .insert(authUser)
+    .values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: acme.partyId });
 });
 
 afterAll(async () => {

@@ -6,7 +6,7 @@ const chime = {
   reverb: { mix: 0.2, decay: 1.1, predelay: 0.01, damp: 6000 },
   layers: [
     {
-      type: 'tone',
+      type: "tone",
       freq: 659.26,
       at: 0,
       gain: 0,
@@ -14,12 +14,12 @@ const chime = {
       partials: [
         [1, 1, 1],
         [2, 0.16, 0.55],
-        [3, 0.04, 0.35]
+        [3, 0.04, 0.35],
       ],
-      env: { attack: 0.004, decay: 0.8, curve: 6 }
+      env: { attack: 0.004, decay: 0.8, curve: 6 },
     },
     {
-      type: 'tone',
+      type: "tone",
       freq: 830.61,
       at: 0.11,
       gain: 0,
@@ -27,23 +27,23 @@ const chime = {
       partials: [
         [1, 1, 1],
         [2, 0.16, 0.55],
-        [3, 0.04, 0.35]
+        [3, 0.04, 0.35],
       ],
-      env: { attack: 0.004, decay: 0.9, curve: 6 }
+      env: { attack: 0.004, decay: 0.9, curve: 6 },
     },
     {
-      type: 'tone',
+      type: "tone",
       freq: 987.77,
       at: 0.22,
       gain: 0,
       partials: [
         [1, 1, 1],
         [2, 0.16, 0.55],
-        [3, 0.04, 0.35]
+        [3, 0.04, 0.35],
       ],
-      env: { attack: 0.004, decay: 1.2, curve: 6 }
-    }
-  ]
+      env: { attack: 0.004, decay: 1.2, curve: 6 },
+    },
+  ],
 };
 
 export default chime;

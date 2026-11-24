@@ -16,5 +16,6 @@ export const runnersQuery = () =>
   queryOptions({
     queryKey: runnerKeys.list(),
     queryFn: () => fetchRunners(),
-    refetchInterval: (query) => (query.state.data?.some((runner) => runner.state === "waiting") ? RUNNER_WAITING_POLL_MS : false),
+    refetchInterval: (query) =>
+      query.state.data?.some((runner) => runner.state === "waiting") ? RUNNER_WAITING_POLL_MS : false,
   });

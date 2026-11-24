@@ -8,7 +8,8 @@ export const noTemplateLiteralClassNameRule = defineRule({
       description: "Disallow a template literal with `${}` in `className`.",
     },
     messages: {
-      templateClassName: "Combine classes with `cn(\"base\", cond && \"active\", className)`. `cn` also merges conflicting Tailwind classes.",
+      templateClassName:
+        'Combine classes with `cn("base", cond && "active", className)`. `cn` also merges conflicting Tailwind classes.',
     },
   },
   createOnce(context) {

@@ -1,15 +1,5 @@
 import { sql } from "drizzle-orm";
-import {
-  bigint,
-  check,
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { bigint, check, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // -----
 // The engine's four tables. They name no host
@@ -50,7 +40,9 @@ export function createChatBotTables(prefix = "chat_bot") {
       scopeId: text("scope_id").notNull(),
       userId: text("user_id"),
       anonymousId: text("anonymous_id"),
-      attrs: jsonb("attrs").notNull().default(sql`'{}'::jsonb`),
+      attrs: jsonb("attrs")
+        .notNull()
+        .default(sql`'{}'::jsonb`),
       expiresAt: timestamp("expires_at", { withTimezone: true }),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     },
@@ -83,15 +75,8 @@ export function createChatBotTables(prefix = "chat_bot") {
       startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (t) => ({
-      statusKnown: check(
-        `${prefix}_runs_status_known`,
-        sql`${t.status} IN ('running', 'completed', 'failed')`,
-      ),
-      idxThreadStatus: index(`idx_${prefix}_runs_thread_status`).on(
-        t.threadId,
-        t.status,
-        t.startedAt,
-      ),
+      statusKnown: check(`${prefix}_runs_status_known`, sql`${t.status} IN ('running', 'completed', 'failed')`),
+      idxThreadStatus: index(`idx_${prefix}_runs_thread_status`).on(t.threadId, t.status, t.startedAt),
     }),
   );
 
@@ -110,7 +95,10 @@ export function createChatBotTables(prefix = "chat_bot") {
       scopeId: text("scope_id").notNull(),
       role: text("role").notNull(),
       content: text("content").notNull(),
-      toolsUsed: text("tools_used").array().notNull().default(sql`'{}'::text[]`),
+      toolsUsed: text("tools_used")
+        .array()
+        .notNull()
+        .default(sql`'{}'::text[]`),
       structure: jsonb("structure"),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     },

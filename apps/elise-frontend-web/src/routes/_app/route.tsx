@@ -19,7 +19,9 @@ export const Route = createFileRoute("/_app")({
     if (isWatcher(powers)) return null;
     return Promise.all([
       context.queryClient.query({ ...scansQuery(), staleTime: "static" }),
-      hasAccessPower(powers, "company:runners:create") ? context.queryClient.query({ ...runnersQuery(), staleTime: "static" }) : null,
+      hasAccessPower(powers, "company:runners:create")
+        ? context.queryClient.query({ ...runnersQuery(), staleTime: "static" })
+        : null,
     ]);
   },
   component: AppLayout,
@@ -40,8 +42,14 @@ function AppLayout() {
   const runnersRunning = pairedRunners.filter((runner) => runnerShownState(runner, now) === "connected").length;
   const [gitSkipped] = useGettingStartedFlag(user?.accountId ?? "", "git-skipped");
   const [, setDismissed] = useGettingStartedFlag(user?.accountId ?? "", "dismissed");
-  const showGettingStarted = showRunners && !!runners && !!data && gettingStarted({ runners, scans: data.scans, gitSkipped, dismissed: false }).show;
-  const pageHasOwnScanButton = useRouterState({ select: (state) => state.location.pathname.startsWith("/repos/") || state.location.pathname.startsWith("/scans/") });
+  const showGettingStarted =
+    showRunners &&
+    !!runners &&
+    !!data &&
+    gettingStarted({ runners, scans: data.scans, gitSkipped, dismissed: false }).show;
+  const pageHasOwnScanButton = useRouterState({
+    select: (state) => state.location.pathname.startsWith("/repos/") || state.location.pathname.startsWith("/scans/"),
+  });
 
   return (
     <ShellFrame

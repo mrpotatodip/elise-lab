@@ -1,5 +1,13 @@
 import type { scans } from "@repo/db-elise/schema";
-import type { FindingOriginValue, FindingSeverityValue, FindingStatusValue, ScanArchiveRef, ScanArtifact, ScanRunner, ScanSummary } from "@repo/contracts/elise";
+import type {
+  FindingOriginValue,
+  FindingSeverityValue,
+  FindingStatusValue,
+  ScanArchiveRef,
+  ScanArtifact,
+  ScanRunner,
+  ScanSummary,
+} from "@repo/contracts/elise";
 import { ScanStatusSchema, type ScanStatus } from "#/schemas";
 import { failureCodeOf } from "./failure-code";
 
@@ -18,50 +26,55 @@ export const scanRowToStatus = (
   archive: ScanArchiveRef | null = null,
 ): ScanStatus =>
   ScanStatusSchema.parse({
-  scanId: row.id,
-  accountId: row.tenantId,
-  repo: row.repo,
-  repoId: row.repoId,
-  isPrivate: row.isPrivate,
-  commitSha: row.commitSha,
-  ref: row.ref,
-  branch: row.branch,
-  branchId: row.branchId,
-  untrackedReason: row.untrackedReason,
-  profileMet: row.profileMet,
-  signalPairsSkipped: row.signalPairsSkipped,
-  skill: row.skill,
-  model: row.model,
-  effort: row.effort,
-  profile: row.profile,
-  maxBudgetUsd: Number(row.maxBudgetUsd),
-  status: row.status,
-  step: row.step,
-  createdAt: row.createdAt.toISOString(),
-  updatedAt: row.updatedAt.toISOString(),
-  finishedAt: row.finishedAt?.toISOString() ?? null,
-  error: row.error,
-  failureCode: row.status === "failed" ? failureCodeOf(row.error) : null,
-  files: artifacts.length > 0 ? artifacts.map((artifact) => artifact.name) : null,
-  artifacts,
-  summary,
-  runner,
-  archive,
-  usage:
-    row.costUsd === null
-      ? null
-      : {
-          inputTokens: row.inputTokens ?? 0,
-          outputTokens: row.outputTokens ?? 0,
-          cacheReadTokens: row.cacheReadTokens ?? 0,
-          cacheWriteTokens: row.cacheWriteTokens ?? 0,
-          costUsd: Number(row.costUsd),
-          turns: row.turns,
-          durationMs: row.durationMs,
-        },
+    scanId: row.id,
+    accountId: row.tenantId,
+    repo: row.repo,
+    repoId: row.repoId,
+    isPrivate: row.isPrivate,
+    commitSha: row.commitSha,
+    ref: row.ref,
+    branch: row.branch,
+    branchId: row.branchId,
+    untrackedReason: row.untrackedReason,
+    profileMet: row.profileMet,
+    signalPairsSkipped: row.signalPairsSkipped,
+    skill: row.skill,
+    model: row.model,
+    effort: row.effort,
+    profile: row.profile,
+    maxBudgetUsd: Number(row.maxBudgetUsd),
+    status: row.status,
+    step: row.step,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    finishedAt: row.finishedAt?.toISOString() ?? null,
+    error: row.error,
+    failureCode: row.status === "failed" ? failureCodeOf(row.error) : null,
+    files: artifacts.length > 0 ? artifacts.map((artifact) => artifact.name) : null,
+    artifacts,
+    summary,
+    runner,
+    archive,
+    usage:
+      row.costUsd === null
+        ? null
+        : {
+            inputTokens: row.inputTokens ?? 0,
+            outputTokens: row.outputTokens ?? 0,
+            cacheReadTokens: row.cacheReadTokens ?? 0,
+            cacheWriteTokens: row.cacheWriteTokens ?? 0,
+            costUsd: Number(row.costUsd),
+            turns: row.turns,
+            durationMs: row.durationMs,
+          },
   });
 
-type FindingCount = { status: FindingStatusValue; severity: FindingSeverityValue | null; origin: FindingOriginValue; total: number };
+type FindingCount = {
+  status: FindingStatusValue;
+  severity: FindingSeverityValue | null;
+  origin: FindingOriginValue;
+  total: number;
+};
 
 // -----
 // Counts only for a succeeded scan whose findings are
@@ -78,8 +91,20 @@ export const summaryOf = (row: ScanRow, counts: FindingCount[]): ScanSummary | n
   const recheck =
     row.priorsGiven === null
       ? null
-      : { given: row.priorsGiven, carried: row.priorsCarried ?? 0, closed: row.priorsClosed ?? 0, unchecked: row.priorsUnchecked ?? 0 };
-  const summary: ScanSummary = { total: 0, severity: { critical: 0, high: 0, medium: 0, low: 0, informational: 0 }, needsValidation: 0, new: 0, carried: 0, recheck };
+      : {
+          given: row.priorsGiven,
+          carried: row.priorsCarried ?? 0,
+          closed: row.priorsClosed ?? 0,
+          unchecked: row.priorsUnchecked ?? 0,
+        };
+  const summary: ScanSummary = {
+    total: 0,
+    severity: { critical: 0, high: 0, medium: 0, low: 0, informational: 0 },
+    needsValidation: 0,
+    new: 0,
+    carried: 0,
+    recheck,
+  };
   for (const { status, severity, origin, total } of counts) {
     summary.total += total;
     summary[origin] += total;

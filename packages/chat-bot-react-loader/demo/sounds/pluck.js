@@ -6,7 +6,7 @@ const pluck = {
   reverb: { mix: 0.1, decay: 0.4, predelay: 0.01, damp: 5000 },
   layers: [
     {
-      type: 'tone',
+      type: "tone",
       freq: 587.33,
       at: 0,
       gain: 0,
@@ -15,11 +15,11 @@ const pluck = {
         [2, 0.32, 0.55],
         [3, 0.128, 0.35],
         [4, 0.056, 0.22],
-        [5, 0.024, 0.15]
+        [5, 0.024, 0.15],
       ],
-      env: { attack: 0.0015, decay: 0.28, curve: 6 }
-    }
-  ]
+      env: { attack: 0.0015, decay: 0.28, curve: 6 },
+    },
+  ],
 };
 
 export default pluck;

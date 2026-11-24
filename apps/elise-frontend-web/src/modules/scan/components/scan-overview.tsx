@@ -37,7 +37,10 @@ function RunningNow({ scans }: { scans: readonly ScanStatus[] }) {
       <CardContent>
         <ul className="-mx-2 grid">
           {scans.map((scan) => (
-            <li key={scan.scanId} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-accent">
+            <li
+              key={scan.scanId}
+              className="flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-accent"
+            >
               <div className="grid min-w-0 gap-0.5">
                 <ScanRepoLink scanId={scan.scanId} repo={scan.repo} isPrivate={scan.isPrivate} />
                 <ScanOrigin scan={scan} />
@@ -73,7 +76,10 @@ export function ScanOverview({ brief }: ScanOverviewProps) {
 
   return (
     <>
-      <ShellPageHeader title="Overview" description="What needs your attention across your repositories, what to do about it, and how your scans are going." />
+      <ShellPageHeader
+        title="Overview"
+        description="What needs your attention across your repositories, what to do about it, and how your scans are going."
+      />
 
       {brief}
 
@@ -86,7 +92,10 @@ export function ScanOverview({ brief }: ScanOverviewProps) {
               <CardTitle>Recent scans</CardTitle>
               <p className="text-sm leading-relaxed text-muted-foreground">The latest scans, newest first.</p>
             </div>
-            <Link to="/scans" className="inline-flex min-h-6 items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Link
+              to="/scans"
+              className="inline-flex min-h-6 items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               View all
               <ArrowUpRight className="size-3.5" />
             </Link>
@@ -105,7 +114,10 @@ export function ScanOverview({ brief }: ScanOverviewProps) {
             ) : (
               <ul className="-mx-2 grid">
                 {list.scans.slice(0, RECENT).map((scan) => (
-                  <li key={scan.scanId} className="flex min-h-14 items-center justify-between gap-4 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-accent">
+                  <li
+                    key={scan.scanId}
+                    className="flex min-h-14 items-center justify-between gap-4 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-accent"
+                  >
                     <div className="grid min-w-0 gap-0.5">
                       <ScanRepoLink scanId={scan.scanId} repo={scan.repo} isPrivate={scan.isPrivate} />
                       <ScanOrigin scan={scan} />

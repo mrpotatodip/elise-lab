@@ -78,7 +78,12 @@ describe("Security notices for the Anthropic key and the Monthly budget", () => 
 
     expect(res.status).toBe(200);
     expect(sent.map((mail) => mail.kind)).toEqual(["anthropic-key-changed"]);
-    expect(sent[0]).toMatchObject({ to: "owner@example.com", change: "set", actorName: "Name owner", link: "https://app.example.com/settings/budget" });
+    expect(sent[0]).toMatchObject({
+      to: "owner@example.com",
+      change: "set",
+      actorName: "Name owner",
+      link: "https://app.example.com/settings/budget",
+    });
     expect(JSON.stringify(sent)).not.toContain("w3Zq");
   });
 
@@ -112,7 +117,15 @@ describe("Security notices for the Anthropic key and the Monthly budget", () => 
     const res = await call("/usage/budget", { method: "PATCH", body: { monthlyBudgetUsd: 15 } });
 
     expect(res.status).toBe(200);
-    expect(sent).toMatchObject([{ kind: "budget-changed", to: "owner@example.com", previousBudgetUsd: 20, budgetUsd: 15, actorName: "Name owner" }]);
+    expect(sent).toMatchObject([
+      {
+        kind: "budget-changed",
+        to: "owner@example.com",
+        previousBudgetUsd: 20,
+        budgetUsd: 15,
+        actorName: "Name owner",
+      },
+    ]);
   });
 
   it("sends no notice when the budget is set to the value it already has", async () => {

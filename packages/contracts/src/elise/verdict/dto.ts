@@ -9,7 +9,13 @@ export const VERDICT_VALUES = ["pass", "fail", "cannot_tell"] as const;
 // makes it fail when the scans can be trusted, and is listed
 // beside the others when they cannot.
 // -----
-export const VERDICT_REASON_VALUES = ["not_scanned", "too_few_scans", "unchecked_priors", "too_many_priors", "over_limit"] as const;
+export const VERDICT_REASON_VALUES = [
+  "not_scanned",
+  "too_few_scans",
+  "unchecked_priors",
+  "too_many_priors",
+  "over_limit",
+] as const;
 
 // -----
 // A git commit (40 hex digits), or for an upload app the SHA-256

@@ -14,10 +14,12 @@ export const requireImportedServerFnSchemaRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "Require the schema of `engineJson(...)` and `.validator(...)` to be imported from contracts or `../schemas`.",
+      description:
+        "Require the schema of `engineJson(...)` and `.validator(...)` to be imported from contracts or `../schemas`.",
     },
     messages: {
-      localSchema: "Import this schema from `@repo/contracts/elise` (a shape the engine also uses) or from the module's `../schemas`. Don't build or declare it in the `api/` file (React 3.5).",
+      localSchema:
+        "Import this schema from `@repo/contracts/elise` (a shape the engine also uses) or from the module's `../schemas`. Don't build or declare it in the `api/` file (React 3.5).",
     },
   },
   createOnce(context) {
@@ -35,7 +37,12 @@ export const requireImportedServerFnSchemaRule = defineRule({
       CallExpression(node) {
         const { callee } = node;
         if (callee.type === "Identifier" && callee.name === "engineJson") checkSchema(node.arguments[0]);
-        if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && (callee.property.name === "validator" || callee.property.name === "inputValidator")) {
+        if (
+          callee.type === "MemberExpression" &&
+          !callee.computed &&
+          callee.property.type === "Identifier" &&
+          (callee.property.name === "validator" || callee.property.name === "inputValidator")
+        ) {
           checkSchema(node.arguments[0]);
         }
       },

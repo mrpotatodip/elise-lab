@@ -2,7 +2,8 @@ import { SCAN_MODEL_OPTIONS, SCAN_PROFILE_OPTIONS } from "../constants";
 import { CreateScanInputSchema, type CreateScanInput } from "../schemas";
 import { scanRepoName } from "./scan-repo-name";
 
-const labelOf = (options: readonly { value: string; label: string }[], value: string) => options.find((option) => option.value === value)?.label ?? value;
+const labelOf = (options: readonly { value: string; label: string }[], value: string) =>
+  options.find((option) => option.value === value)?.label ?? value;
 
 export function scanPlanSummary(input: CreateScanInput, runnerName?: string, archiveLabel?: string) {
   if (!CreateScanInputSchema.safeParse(input).success) return null;

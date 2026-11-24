@@ -13,7 +13,8 @@ type FindingStatusProps = {
 
 const whoOf = (triage: FindingTriage | null) => triage?.decidedBy ?? "a team member";
 
-const isExpired = (triage: FindingTriage | null) => triage?.status === "accepted_risk" && triage.acceptedUntil !== null && new Date(triage.acceptedUntil) < new Date();
+const isExpired = (triage: FindingTriage | null) =>
+  triage?.status === "accepted_risk" && triage.acceptedUntil !== null && new Date(triage.acceptedUntil) < new Date();
 
 export function FindingStatusBadge({ state, triage }: Pick<FindingStatusProps, "state" | "triage">) {
   const badge = FINDING_STATUS_BADGE[findingStatusKey(state, triage)];
@@ -29,7 +30,14 @@ export function FindingDecisionNote({ state, triage, fixedOn }: FindingStatusPro
   const key = findingStatusKey(state, triage);
   if (key === "open" || key === "came_back") return null;
 
-  const verb = key === "accepted_risk" ? "Accepted" : key === "false_positive" ? "Dismissed" : key === "duplicate" ? "Marked duplicate" : "Marked fixed";
+  const verb =
+    key === "accepted_risk"
+      ? "Accepted"
+      : key === "false_positive"
+        ? "Dismissed"
+        : key === "duplicate"
+          ? "Marked duplicate"
+          : "Marked fixed";
   let first: ReactNode = `${verb} by ${whoOf(triage)}`;
   let second: ReactNode = <ScanTime value={triage?.updatedAt} />;
   if (key === "fixed_by_scan") {
@@ -76,7 +84,18 @@ function bannerOf({ state, triage, fixedOn }: FindingStatusProps): Banner {
       return {
         tone: "success",
         title: "Fixed by a scan",
-        body: <>A scan{fixedOn ? <> on <ScanTime value={fixedOn} /></> : null} checked the code and the problem is gone. No decision is needed.</>,
+        body: (
+          <>
+            A scan
+            {fixedOn ? (
+              <>
+                {" "}
+                on <ScanTime value={fixedOn} />
+              </>
+            ) : null}{" "}
+            checked the code and the problem is gone. No decision is needed.
+          </>
+        ),
       };
     case "marked_fixed":
       return {
@@ -85,25 +104,50 @@ function bannerOf({ state, triage, fixedOn }: FindingStatusProps): Banner {
         body: <>{when}. No scan has confirmed it yet. If a later scan finds it again, it will show as Came back.</>,
       };
     case "false_positive":
-      return { tone: "neutral", title: `Dismissed as a false positive by ${who}`, body: <>{when}. It no longer counts as open.</> };
+      return {
+        tone: "neutral",
+        title: `Dismissed as a false positive by ${who}`,
+        body: <>{when}. It no longer counts as open.</>,
+      };
     case "duplicate":
-      return { tone: "neutral", title: `Marked a duplicate by ${who}`, body: <>{when}. Another finding carries this problem, so this one no longer counts.</> };
+      return {
+        tone: "neutral",
+        title: `Marked a duplicate by ${who}`,
+        body: <>{when}. Another finding carries this problem, so this one no longer counts.</>,
+      };
     case "accepted_risk":
       return isExpired(triage)
         ? {
             tone: "danger",
             title: "The accepted risk has run out",
-            body: <>{who} accepted it until <ScanTime value={triage?.acceptedUntil} />. The Verdict counts it as open again. Decide again to extend it.</>,
+            body: (
+              <>
+                {who} accepted it until <ScanTime value={triage?.acceptedUntil} />. The Verdict counts it as open again.
+                Decide again to extend it.
+              </>
+            ),
           }
         : {
             tone: "warning",
             title: `Risk accepted by ${who}`,
-            body: <>Until <ScanTime value={triage?.acceptedUntil} />. After that it blocks the Verdict again.</>,
+            body: (
+              <>
+                Until <ScanTime value={triage?.acceptedUntil} />. After that it blocks the Verdict again.
+              </>
+            ),
           };
     case "came_back":
-      return { tone: "danger", title: "Came back", body: "It was fixed before and a scan reported it again. Find what reintroduced it, then decide below." };
+      return {
+        tone: "danger",
+        title: "Came back",
+        body: "It was fixed before and a scan reported it again. Find what reintroduced it, then decide below.",
+      };
     default:
-      return { tone: "neutral", title: "Open: waiting for a decision", body: "Choose a decision below. Marking it fixed does not confirm the fix: only a scan can do that." };
+      return {
+        tone: "neutral",
+        title: "Open: waiting for a decision",
+        body: "Choose a decision below. Marking it fixed does not confirm the fix: only a scan can do that.",
+      };
   }
 }
 

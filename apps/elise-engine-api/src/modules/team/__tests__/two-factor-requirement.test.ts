@@ -15,7 +15,10 @@ let otherTenantId: string;
 let ownerPartyId: string;
 let held: ReadonlySet<AccessPower>;
 
-const OWNER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:team:members:read", "company:team:two_factor_requirement:update"]);
+const OWNER: ReadonlySet<AccessPower> = new Set<AccessPower>([
+  "company:team:members:read",
+  "company:team:two_factor_requirement:update",
+]);
 const WORKSPACE_ADMIN: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:team:members:read"]);
 
 const app = tenantRouteApp(() => test, {
@@ -28,11 +31,18 @@ const call = (path: string, init: { method?: string; body?: unknown } = {}) => {
   const headers = new Headers({ authorization: "Bearer session-token", "x-account-id": tenantId });
   if (init.body !== undefined) headers.set("content-type", "application/json");
   const body = init.body === undefined ? undefined : JSON.stringify(init.body);
-  return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers, body }), env, testExecutionContext);
+  return app.fetch(
+    new Request(`http://localhost${path}`, { method: init.method, headers, body }),
+    env,
+    testExecutionContext,
+  );
 };
 
 const setRequired = (required: boolean) => call("/team/two-factor-requirement", { method: "PUT", body: { required } });
-const requiredNow = async () => TeamTwoFactorRequirementSchema.parse(z.object({ data: z.unknown() }).parse(await (await call("/team/two-factor-requirement")).json()).data).required;
+const requiredNow = async () =>
+  TeamTwoFactorRequirementSchema.parse(
+    z.object({ data: z.unknown() }).parse(await (await call("/team/two-factor-requirement")).json()).data,
+  ).required;
 const entries = () =>
   test.raw
     .select()
@@ -55,7 +65,13 @@ beforeAll(async () => {
   ownerPartyId = seeded.partyId;
   otherTenantId = (await seedTenant(test, "other")).tenantId;
   await ensureTenantRoles(test.raw, tenantId);
-  await test.raw.insert(authUser).values({ id: "owner", name: "Ada Rossi", email: "ada@example.com", partyId: ownerPartyId, twoFactorEnabled: true });
+  await test.raw.insert(authUser).values({
+    id: "owner",
+    name: "Ada Rossi",
+    email: "ada@example.com",
+    partyId: ownerPartyId,
+    twoFactorEnabled: true,
+  });
   await addMember("with-2fa", true);
   await addMember("without-2fa", false);
 });
@@ -79,7 +95,11 @@ describe("the Two-factor requirement", () => {
     const entry = (await entries()).at(-1);
 
     expect([res.status, await requiredNow()]).toEqual([200, true]);
-    expect(entry).toMatchObject({ actorPartyId: ownerPartyId, before: { required: false }, after: { tenantId, required: true } });
+    expect(entry).toMatchObject({
+      actorPartyId: ownerPartyId,
+      before: { required: false },
+      after: { tenantId, required: true },
+    });
   });
 
   it("refuses a member without the Power, who can still read it, and changes nothing", async () => {
@@ -112,6 +132,9 @@ describe("GET /team", () => {
     const res = await call("/team");
     const { members } = z.object({ data: TeamListSchema }).parse(await res.json()).data;
 
-    expect(Object.fromEntries(members.map((member) => [member.name, member.twoFactorEnabled]))).toMatchObject({ "with-2fa": true, "without-2fa": false });
+    expect(Object.fromEntries(members.map((member) => [member.name, member.twoFactorEnabled]))).toMatchObject({
+      "with-2fa": true,
+      "without-2fa": false,
+    });
   });
 });

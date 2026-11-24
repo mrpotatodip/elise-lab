@@ -25,9 +25,18 @@ export function FileDownloadButton({ scanId, name, description }: FileDownloadBu
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <Button variant="outline" size="sm" title="Saves this file to your computer" disabled={download.isPending} aria-label={`Download ${description}`} onClick={() => download.mutate()}>
+      <Button
+        variant="outline"
+        size="sm"
+        title="Saves this file to your computer"
+        disabled={download.isPending}
+        aria-label={`Download ${description}`}
+        onClick={() => download.mutate()}
+      >
         <Download aria-hidden="true" />
-        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">{download.isPending ? "Downloading" : "Download"}</span>
+        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+          {download.isPending ? "Downloading" : "Download"}
+        </span>
       </Button>
       {download.isError && (
         <span role="alert" className="text-xs text-status-danger">

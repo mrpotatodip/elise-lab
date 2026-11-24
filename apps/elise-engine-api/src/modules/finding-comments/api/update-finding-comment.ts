@@ -22,7 +22,9 @@ app.patch(
     const { commentId } = c.req.valid("param");
     const { body } = c.req.valid("json");
     const userId = userIdOf(c);
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(updateFindingCommentSvc(db, accountId, userId, commentId, body)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(updateFindingCommentSvc(db, accountId, userId, commentId, body)));
     return c.json({ data, error: null });
   },
 );

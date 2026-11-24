@@ -4,8 +4,7 @@ import type { Comment } from "@oxlint/plugins";
 
 const DIVIDER = /^\s*-{5,}\s*$/u;
 const SAFETY = /^\s*SAFETY:/u;
-const DIRECTIVE =
-  /^\s*(?:@ts-|eslint-|oxlint-|prettier-ignore|istanbul |c8 |v8 |biome-|@vitest-|vitest-environment)/u;
+const DIRECTIVE = /^\s*(?:@ts-|eslint-|oxlint-|prettier-ignore|istanbul |c8 |v8 |biome-|@vitest-|vitest-environment)/u;
 
 function isDirective(comment: Comment): boolean {
   return DIRECTIVE.test(comment.value);
@@ -45,14 +44,12 @@ export const noUnlistedCommentsRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description:
-        "Disallow comments other than `// SAFETY:`, wrapped `// -----` blocks and tool directives.",
+      description: "Disallow comments other than `// SAFETY:`, wrapped `// -----` blocks and tool directives.",
     },
     messages: {
       unlistedComment:
         "Remove this comment. Only `// SAFETY:`, a tool directive, or a block wrapped in `// -----` lines (for a reason another rule asks for) is allowed. Names, types and small functions should say what the code does.",
-      blockComment:
-        "Remove this block comment. Use the wrapped `// -----` form, with no `/** */` JSDoc.",
+      blockComment: "Remove this block comment. Use the wrapped `// -----` form, with no `/** */` JSDoc.",
     },
   },
   createOnce(context) {

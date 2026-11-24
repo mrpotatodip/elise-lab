@@ -1,9 +1,5 @@
 import type { StreamChunk } from "@tanstack/ai";
-import {
-  CHAT_BOT_TOOL_DISPLAY_EVENT,
-  type ChatBotStructure,
-  type ChatBotToolDisplayEventValue,
-} from "../contracts";
+import { CHAT_BOT_TOOL_DISPLAY_EVENT, type ChatBotStructure, type ChatBotToolDisplayEventValue } from "../contracts";
 import {
   ChatBotRunFinishedChunkSchema,
   type ChatBotRunFinishedChunk,
@@ -11,22 +7,14 @@ import {
   ChatBotToolCallResultChunkSchema,
   ChatBotToolCallStartChunkSchema,
 } from "../schemas";
-import type {
-  ChatBotCollectedTurn,
-  ChatBotServices,
-  ChatBotToolSpec,
-  ChatBotTurnUsage,
-} from "../types";
+import type { ChatBotCollectedTurn, ChatBotServices, ChatBotToolSpec, ChatBotTurnUsage } from "../types";
 import { appendChatBotToolResult, parseChatBotToolResultContent } from "../tools/tool-structure";
 
 // -----
 // One finished run's tokens, from either the
 // AG-UI usage[] or TanStack's own shape.
 // -----
-const addRunUsage = (
-  total: ChatBotTurnUsage | null,
-  chunk: ChatBotRunFinishedChunk,
-): ChatBotTurnUsage | null => {
+const addRunUsage = (total: ChatBotTurnUsage | null, chunk: ChatBotRunFinishedChunk): ChatBotTurnUsage | null => {
   const { usage } = chunk;
   if (!usage) return total;
   const run = Array.isArray(usage)

@@ -13,7 +13,17 @@ const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const OTHER_ACCOUNT = "5d1f0a9e-6b2c-4e3d-9a8b-1c2d3e4f5a6b";
 const repoOf = (name: string) => `https://github.com/octocat/${name}`;
 
-const NO_SPEND: MonthSpend = { spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: false, plan: null };
+const NO_SPEND: MonthSpend = {
+  spentUsd: 0,
+  scans: 0,
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  budgetOverrideUsd: null,
+  budgetAllowanceUsd: null,
+  platformSpentUsd: 0,
+  platformReservedUsd: 0,
+  ownKey: false,
+  plan: null,
+};
 const PRO: PlanState = {
   planKey: "pro",
   includedCreditUsd: 49,
@@ -49,7 +59,9 @@ const post = (env: Bindings, body: Body, account = ACCOUNT) =>
     testExecutionContext,
   );
 
-const QueuedSchema = z.object({ data: z.object({ scanId: z.string(), skill: z.string(), profile: z.string(), maxBudgetUsd: z.number() }) });
+const QueuedSchema = z.object({
+  data: z.object({ scanId: z.string(), skill: z.string(), profile: z.string(), maxBudgetUsd: z.number() }),
+});
 const ErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
 
 describe("POST /scans: every new Scan runs the full path", () => {
@@ -81,7 +93,11 @@ describe("POST /scans: every new Scan runs the full path", () => {
     const res = await post(env, sent);
 
     expect(res.status).toBe(201);
-    expect(QueuedSchema.parse(await res.json()).data).toMatchObject({ skill: "full", profile: "deep", maxBudgetUsd: 18 });
+    expect(QueuedSchema.parse(await res.json()).data).toMatchObject({
+      skill: "full",
+      profile: "deep",
+      maxBudgetUsd: 18,
+    });
     expect(createdFull).toHaveLength(1);
   });
 
@@ -108,7 +124,12 @@ describe("POST /scans: the limits of the full path", () => {
   });
 
   it("does not make Accounts refuse each other: a fourth Account's Scan starts", async () => {
-    const accounts = [OTHER_ACCOUNT, "6e2a1b0f-7c3d-4f4e-8b9c-2d3e4f5a6b7c", "7f3b2c1a-8d4e-4a5f-9cad-3e4f5a6b7c8d", "8a4c3d2b-9e5f-4b60-8dbe-4f5a6b7c8d9e"];
+    const accounts = [
+      OTHER_ACCOUNT,
+      "6e2a1b0f-7c3d-4f4e-8b9c-2d3e4f5a6b7c",
+      "7f3b2c1a-8d4e-4a5f-9cad-3e4f5a6b7c8d",
+      "8a4c3d2b-9e5f-4b60-8dbe-4f5a6b7c8d9e",
+    ];
     const { env, createdFull } = fakeBindings();
     const answers: Response[] = [];
     for (const [index, account] of accounts.entries()) {

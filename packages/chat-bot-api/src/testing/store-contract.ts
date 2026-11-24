@@ -42,10 +42,7 @@ const tagOf = <A, E extends { readonly _tag: string }>(result: Either.Either<A, 
 // a thread is visible to its owner alone, a run id
 // is taken once, a delete takes everything with it.
 // -----
-export function describeChatBotStoreContract(
-  name: string,
-  makeHarness: () => Promise<ChatBotStoreHarness>,
-): void {
+export function describeChatBotStoreContract(name: string, makeHarness: () => Promise<ChatBotStoreHarness>): void {
   describe(`ChatBotStore contract: ${name}`, () => {
     const setup = async () => {
       const harness = await makeHarness();
@@ -56,9 +53,7 @@ export function describeChatBotStoreContract(
       const guest: ChatBotOwner = { kind: "anonymous", scopeId: scopes.a, anonymousId: crypto.randomUUID() };
       const startThread = async (owner: ChatBotOwner, title = "Hello") => {
         const runId = crypto.randomUUID();
-        const thread = await ok(
-          store.insertThreadWithRun({ owner, title, runId, ...start }),
-        );
+        const thread = await ok(store.insertThreadWithRun({ owner, title, runId, ...start }));
         return { threadId: thread.id, runId };
       };
       return { ...harness, userOne, userTwo, userOneElsewhere, guest, startThread };
@@ -80,9 +75,7 @@ export function describeChatBotStoreContract(
       const { store, userOne, start, startThread } = await setup();
       const { runId, threadId } = await startThread(userOne);
 
-      const again = await run(
-        store.insertThreadWithRun({ owner: userOne, title: "Again", runId, ...start }),
-      );
+      const again = await run(store.insertThreadWithRun({ owner: userOne, title: "Again", runId, ...start }));
       const onThread = await run(store.insertRun({ runId, threadId }));
 
       expect(tagOf(again)).toBe("Conflict");
@@ -98,9 +91,7 @@ export function describeChatBotStoreContract(
       await ok(store.insertRun({ runId: second, threadId }));
 
       expect(await ok(store.lookupRun(userOne, second))).toEqual({ id: second, threadId });
-      const missing = await run(
-        store.insertRun({ runId: crypto.randomUUID(), threadId: crypto.randomUUID() }),
-      );
+      const missing = await run(store.insertRun({ runId: crypto.randomUUID(), threadId: crypto.randomUUID() }));
       expect(tagOf(missing)).toBe("NotFound");
     });
 
@@ -217,9 +208,7 @@ export function describeChatBotStoreContract(
 
       expect(await ok(store.findActiveRun(threadId))).toEqual({ id: runId });
 
-      await ok(
-        store.recordRunUsage(runId, { model: "m", inputTokens: 1, cachedTokens: 0, outputTokens: 2 }),
-      );
+      await ok(store.recordRunUsage(runId, { model: "m", inputTokens: 1, cachedTokens: 0, outputTokens: 2 }));
       await ok(store.closeRun(runId, "completed"));
 
       expect(await ok(store.findActiveRun(threadId))).toBeNull();

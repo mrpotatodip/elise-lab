@@ -20,7 +20,8 @@ const account = (overrides: Partial<NewAccount> = {}): NewAccount => ({
   ...overrides,
 });
 
-const count = async (table: typeof authUser | typeof tenants | typeof parties) => (await test.raw.select().from(table)).length;
+const count = async (table: typeof authUser | typeof tenants | typeof parties) =>
+  (await test.raw.select().from(table)).length;
 
 beforeAll(async () => {
   test = await openTestDb();
@@ -34,10 +35,18 @@ describe("insertAccountEffect", () => {
   it("creates the person, login, credential, tenant and admin role with no invite code", async () => {
     const result = await Effect.runPromise(insertAccountEffect(test.pool, account()));
 
-    expect(result.tenant).toMatchObject({ name: "Acme Labs", slug: "acme-labs", timezone: "UTC", role: "tenant_admin" });
+    expect(result.tenant).toMatchObject({
+      name: "Acme Labs",
+      slug: "acme-labs",
+      timezone: "UTC",
+      role: "tenant_admin",
+    });
     const [login] = await test.raw.select().from(authUser).where(eq(authUser.id, result.userId));
     expect(login).toMatchObject({ email: "ada@example.com", name: "Ada Rossi", emailVerified: false });
-    expect((await test.raw.select().from(authAccount).where(eq(authAccount.userId, result.userId)))[0]).toMatchObject({ providerId: "credential", password: "hash" });
+    expect((await test.raw.select().from(authAccount).where(eq(authAccount.userId, result.userId)))[0]).toMatchObject({
+      providerId: "credential",
+      password: "hash",
+    });
     const [tenant] = await test.raw.select().from(tenants).where(eq(tenants.id, result.tenant.id));
     expect(tenant.partyId).toBe(login.partyId);
     expect(await test.raw.select().from(partyRoles).where(eq(partyRoles.partyId, login.partyId))).toHaveLength(1);
@@ -48,11 +57,15 @@ describe("insertAccountEffect", () => {
     const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, account({ slug: "another" }))));
 
     expect(error).toMatchObject({ _tag: "Conflict", message: SIGN_UP_REFUSED });
-    expect({ users: await count(authUser), tenants: await count(tenants), parties: await count(parties) }).toEqual(before);
+    expect({ users: await count(authUser), tenants: await count(tenants), parties: await count(parties) }).toEqual(
+      before,
+    );
   });
 
   it("tells a taken slug apart so the caller can pick another", async () => {
-    const error = await Effect.runPromise(Effect.flip(insertAccountEffect(test.pool, account({ email: "slug@example.com" }))));
+    const error = await Effect.runPromise(
+      Effect.flip(insertAccountEffect(test.pool, account({ email: "slug@example.com" }))),
+    );
 
     expect(error._tag).toBe("SlugTaken");
   });

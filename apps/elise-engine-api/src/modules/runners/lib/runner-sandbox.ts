@@ -19,7 +19,12 @@ const FilesSchema = z.record(z.string(), z.string());
 // files, usage and commit are what the Runner reported. Nothing is
 // cloned or run here: the Runner does that on its own computer.
 // -----
-export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: string, now: () => Date = () => new Date()): SandboxPort => {
+export const runnerSandbox = (
+  db: DbConnectType,
+  params: ScanParams,
+  runnerId: string,
+  now: () => Date = () => new Date(),
+): SandboxPort => {
   const read = () => runEffect(readRunnerJobEffect(db, params.scanId));
   return {
     prepare: async () => ({ commitSha: null, branch: null }),
@@ -58,7 +63,8 @@ export const runnerSandbox = (db: DbConnectType, params: ScanParams, runnerId: s
       if (job.state === "failed") return { state: "failed", error: job.error ?? "the runner reported a failure" };
       if (job.state === "cancelled") return { state: "failed", error: "the scan ended before the runner reported" };
       const waited = now().getTime() - job.createdAt.getTime();
-      if (job.state === "queued" && waited > RUNNER_JOB_QUEUE_TIMEOUT_MS) return { state: "failed", error: RUNNER_JOB_NOT_PICKED_UP };
+      if (job.state === "queued" && waited > RUNNER_JOB_QUEUE_TIMEOUT_MS)
+        return { state: "failed", error: RUNNER_JOB_NOT_PICKED_UP };
       return { state: "running" };
     },
 

@@ -5,13 +5,7 @@ import { ChatBotOutputSchema } from "@repo/contracts/chat-bots";
 import { ChatBotModelError, runChatBot, toChatBotSpecialistPrompt } from "../run-chat-bot";
 import { CHAT_BOT_CONTRACT_PROMPT } from "../contract-prompt";
 import { CHAT_BOT_MAIN_ROUTE } from "../constants";
-import type {
-  ChatBotChat,
-  ChatBotChatOptions,
-  ChatBotInput,
-  ChatBotRouter,
-  ChatBotSubagentInput,
-} from "../types";
+import type { ChatBotChat, ChatBotChatOptions, ChatBotInput, ChatBotRouter, ChatBotSubagentInput } from "../types";
 import type { ChatBotRuntime, ChatBotToolSpec } from "../../lib";
 
 const addTwo: ChatBotToolSpec = {
@@ -101,11 +95,7 @@ describe("runChatBot", () => {
     const chat = fakeChat();
     await drain(runChatBot(input({ prompts: ["persona v2", "guard v1"] }), chat));
 
-    expect(mainOptions(chat)?.systemPrompts).toEqual([
-      "persona v2",
-      "guard v1",
-      CHAT_BOT_CONTRACT_PROMPT,
-    ]);
+    expect(mainOptions(chat)?.systemPrompts).toEqual(["persona v2", "guard v1", CHAT_BOT_CONTRACT_PROMPT]);
     expect(mainOptions(chat)?.outputSchema).toBe(ChatBotOutputSchema);
     expect(mainOptions(chat)?.stream).toBe(true);
     expect(mainOptions(chat)?.adapter.supportsCombinedToolsAndSchema?.()).toBe(false);
@@ -181,9 +171,7 @@ describe("runChatBot", () => {
       const chat = fakeChat(childReply);
       const route = vi.fn<ChatBotRouter>(() => Effect.succeed("calculator"));
 
-      const chunks = await drain(
-        runChatBot(input({ tools: [], subagents: [calculator], route }), chat),
-      );
+      const chunks = await drain(runChatBot(input({ tools: [], subagents: [calculator], route }), chat));
 
       // -----
       // The child's own chat(): its prompts,
@@ -202,8 +190,7 @@ describe("runChatBot", () => {
       expect(types).not.toContain(EventType.RUN_STARTED);
       expect(types).not.toContain(EventType.RUN_FINISHED);
       const started = chunks[0];
-      const subagentRunId =
-        started?.type === EventType.SUBAGENT_STARTED ? started.subagentRunId : undefined;
+      const subagentRunId = started?.type === EventType.SUBAGENT_STARTED ? started.subagentRunId : undefined;
       expect(subagentRunId).toBeTruthy();
       for (const chunk of chunks.slice(1, -1)) {
         expect(chunk).toHaveProperty("subagentRunId", subagentRunId);
@@ -214,9 +201,7 @@ describe("runChatBot", () => {
       // system prompt, never a chat message.
       // -----
       expect(mainOptions(chat)?.outputSchema).toBe(ChatBotOutputSchema);
-      expect(mainOptions(chat)?.messages).toEqual([
-        { role: "user", content: "What is 2 plus 3?" },
-      ]);
+      expect(mainOptions(chat)?.messages).toEqual([{ role: "user", content: "What is 2 plus 3?" }]);
       expect(mainOptions(chat)?.systemPrompts).toEqual([
         ...MAIN_PROMPTS,
         toChatBotSpecialistPrompt("calculator", "2 + 3 = 5"),
@@ -231,14 +216,9 @@ describe("runChatBot", () => {
       const chat = fakeChat([{ type: EventType.RUN_ERROR, message: "model down", timestamp: 1 }]);
       const route = vi.fn<ChatBotRouter>(() => Effect.succeed("calculator"));
 
-      const chunks = await drain(
-        runChatBot(input({ tools: [], subagents: [calculator], route }), chat),
-      );
+      const chunks = await drain(runChatBot(input({ tools: [], subagents: [calculator], route }), chat));
 
-      expect(chunks.map((chunk) => chunk.type)).toEqual([
-        EventType.SUBAGENT_STARTED,
-        EventType.SUBAGENT_ERROR,
-      ]);
+      expect(chunks.map((chunk) => chunk.type)).toEqual([EventType.SUBAGENT_STARTED, EventType.SUBAGENT_ERROR]);
       expect(chunks[1]).toHaveProperty("message", "model down");
       expect(chat).toHaveBeenCalledTimes(2);
       expect(mainOptions(chat)?.systemPrompts).toEqual([...MAIN_PROMPTS, CHAT_BOT_CONTRACT_PROMPT]);

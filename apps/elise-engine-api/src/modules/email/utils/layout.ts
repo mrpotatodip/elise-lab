@@ -14,7 +14,12 @@ const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, 
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
 export const escapeEmailHtml = (text: string) =>
-  text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 export type EmailSegment = { text: string; strong?: true };
 
@@ -31,7 +36,9 @@ export type EmailContent = {
 const segmentText = (segment: EmailSegment) => segment.text;
 
 const segmentHtml = (segment: EmailSegment) =>
-  segment.strong ? `<strong style="color:${COLOR.text};">${escapeEmailHtml(segment.text)}</strong>` : escapeEmailHtml(segment.text);
+  segment.strong
+    ? `<strong style="color:${COLOR.text};">${escapeEmailHtml(segment.text)}</strong>`
+    : escapeEmailHtml(segment.text);
 
 const factRow = (fact: { label: string; value: string }) =>
   `<tr><td style="padding:10px 16px;font-size:13px;color:${COLOR.muted};width:110px;">${escapeEmailHtml(fact.label)}</td><td style="padding:10px 16px;font-size:15px;font-weight:600;color:${COLOR.text};">${escapeEmailHtml(fact.value)}</td></tr>`;

@@ -18,7 +18,16 @@ export type S = {
   repos: number;
 };
 
-export const initial: S = { page: "scans", added: false, done: false, open: false, decide: false, live: false, tab: "all", repos: 0 };
+export const initial: S = {
+  page: "scans",
+  added: false,
+  done: false,
+  open: false,
+  decide: false,
+  live: false,
+  tab: "all",
+  repos: 0,
+};
 
 // The still for reduced motion: the Scans page with the finding open.
 export const poster: S = { ...initial, added: true, done: true, open: true };

@@ -110,7 +110,11 @@ export function ScanDiffCard({ scanId }: { scanId: string }) {
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
         <div className="grid gap-1.5">
           <CardTitle>What changed since the previous scan</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{data.previousScanId === null ? "This is the first scan of the repository. Later scans will show what is new, fixed or still open." : summaryLine(data)}</p>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+            {data.previousScanId === null
+              ? "This is the first scan of the repository. Later scans will show what is new, fixed or still open."
+              : summaryLine(data)}
+          </p>
         </div>
         {data.previousScanId !== null && (
           <Link
@@ -123,18 +127,27 @@ export function ScanDiffCard({ scanId }: { scanId: string }) {
         )}
       </CardHeader>
       {data.previousScanId !== null && (
-      <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-4">
-        {groups.map((group) => (
-            <Collapsible key={group.key} defaultOpen={group.openByDefault} className={cn("rounded-xl border", TONE[group.tone])}>
+        <CardContent className="grid grid-cols-[minmax(0,1fr)] gap-4">
+          {groups.map((group) => (
+            <Collapsible
+              key={group.key}
+              defaultOpen={group.openByDefault}
+              className={cn("rounded-xl border", TONE[group.tone])}
+            >
               <div className="grid gap-1 px-4 pt-3 pb-3">
                 <h3 className="text-sm font-semibold">
                   <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    {group.key === "notRechecked" || group.key === "regressed" ? <TriangleAlert aria-hidden="true" className="size-4 shrink-0" /> : null}
+                    {group.key === "notRechecked" || group.key === "regressed" ? (
+                      <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
+                    ) : null}
                     <span>{group.title}</span>
                     <Badge variant="outline" className="tabular-nums">
                       {data[group.key].length}
                     </Badge>
-                    <ChevronUp aria-hidden="true" className="ml-auto size-4 shrink-0 rotate-180 transition-transform group-data-[panel-open]:rotate-0" />
+                    <ChevronUp
+                      aria-hidden="true"
+                      className="ml-auto size-4 shrink-0 rotate-180 transition-transform group-data-[panel-open]:rotate-0"
+                    />
                   </CollapsibleTrigger>
                 </h3>
                 <p className="text-xs text-muted-foreground">{group.note}</p>
@@ -148,8 +161,8 @@ export function ScanDiffCard({ scanId }: { scanId: string }) {
                 </ul>
               </CollapsiblePanel>
             </Collapsible>
-        ))}
-      </CardContent>
+          ))}
+        </CardContent>
       )}
     </Card>
   );

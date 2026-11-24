@@ -17,7 +17,12 @@ type CurrentRoom = { key: string; threadId?: string };
 // current one on the right. Point it at your route:
 //   <ChatBot endpoint="/api/chat" />
 // -----
-export function ChatBot({ threads: showThreads = true, room: Room = ChatBotRoom, className, ...roomProps }: ChatBotProps) {
+export function ChatBot({
+  threads: showThreads = true,
+  room: Room = ChatBotRoom,
+  className,
+  ...roomProps
+}: ChatBotProps) {
   const { endpoint, headers, credentials, fetch } = roomProps;
   const list = useChatBotThreads({ endpoint, headers, credentials, fetch });
   const [current, setCurrent] = useState<CurrentRoom>({ key: "new-0" });

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { BILLING_INTERVAL_VALUES, CREDIT_ENTRY_KIND_VALUES, SCAN_KEY_SOURCE_VALUES, SUBSCRIPTION_SOURCE_VALUES, SUBSCRIPTION_STATUS_VALUES } from "../enums";
+import {
+  BILLING_INTERVAL_VALUES,
+  CREDIT_ENTRY_KIND_VALUES,
+  SCAN_KEY_SOURCE_VALUES,
+  SUBSCRIPTION_SOURCE_VALUES,
+  SUBSCRIPTION_STATUS_VALUES,
+} from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 import { CREDIT_DEFAULT_PLAN_KEY } from "./constants";
 
@@ -98,7 +104,10 @@ export type PlanCheckoutBody = z.infer<typeof PlanCheckoutBodySchema>;
 // so. Refused with a Conflict when the target holds fewer people
 // than the Account has (people plus pending invites).
 // -----
-export const PlanChangeBodySchema = z.object({ planKey: z.string().min(1), interval: z.enum(BILLING_INTERVAL_VALUES).optional() });
+export const PlanChangeBodySchema = z.object({
+  planKey: z.string().min(1),
+  interval: z.enum(BILLING_INTERVAL_VALUES).optional(),
+});
 export const PlanChangeResultSchema = z.object({ planKey: z.string() });
 
 export type PlanChangeBody = z.infer<typeof PlanChangeBodySchema>;

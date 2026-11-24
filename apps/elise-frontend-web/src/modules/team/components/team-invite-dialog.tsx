@@ -4,7 +4,16 @@ import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-q
 import { Copy, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
@@ -57,12 +66,17 @@ export function TeamInviteDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Invite someone</DialogTitle>
-          <DialogDescription>We email them a one-time link. You also get a copy, shown only once, in case the email does not arrive.</DialogDescription>
+          <DialogDescription>
+            We email them a one-time link. You also get a copy, shown only once, in case the email does not arrive.
+          </DialogDescription>
         </DialogHeader>
         {sent ? (
           <>
             <DialogBody className="grid gap-2">
-              <p className="text-sm">We are emailing {sent.email}. Check the spam folder if it does not arrive, or send them this link yourself.</p>
+              <p className="text-sm">
+                We are emailing {sent.email}. Check the spam folder if it does not arrive, or send them this link
+                yourself.
+              </p>
               <Label htmlFor="invite-link">Invite link</Label>
               <Input id="invite-link" readOnly value={sent.link} onFocus={(event) => event.target.select()} />
             </DialogBody>
@@ -120,7 +134,9 @@ export function TeamInviteDialog() {
                     <Select
                       value={field.state.value}
                       items={roles.map((r) => ({ value: r.key, label: teamRoleLabel(r.key, r.label) }))}
-                      onValueChange={(next) => field.handleChange(roles.find((r) => r.key === next)?.key ?? field.state.value)}
+                      onValueChange={(next) =>
+                        field.handleChange(roles.find((r) => r.key === next)?.key ?? field.state.value)
+                      }
                     >
                       <SelectTrigger id="invite-role" {...fieldAria(field, "invite-role")}>
                         <SelectValue placeholder="Choose a role" />

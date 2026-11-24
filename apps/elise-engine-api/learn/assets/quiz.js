@@ -20,7 +20,9 @@ document.querySelectorAll(".quiz").forEach(function (quiz) {
         done += 1;
         if (right) score += 1;
         var label = quiz.querySelector(".score");
-        if (label) label.textContent = "Score: " + score + " / " + questions.length + (done === questions.length ? " (done)" : "");
+        if (label)
+          label.textContent =
+            "Score: " + score + " / " + questions.length + (done === questions.length ? " (done)" : "");
       });
     });
   });

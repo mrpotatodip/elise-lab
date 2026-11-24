@@ -1,6 +1,16 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 
 type TeamConfirmDialogProps = {
   triggerLabel: string;
@@ -13,12 +23,32 @@ type TeamConfirmDialogProps = {
   children?: ReactNode;
 };
 
-export function TeamConfirmDialog({ triggerLabel, triggerAriaLabel, title, description, confirmLabel, pending, onConfirm, children }: TeamConfirmDialogProps) {
+export function TeamConfirmDialog({
+  triggerLabel,
+  triggerAriaLabel,
+  title,
+  description,
+  confirmLabel,
+  pending,
+  onConfirm,
+  children,
+}: TeamConfirmDialogProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" aria-label={triggerAriaLabel} className="text-status-danger hover:text-status-danger" />}>{triggerLabel}</DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={triggerAriaLabel}
+            className="text-status-danger hover:text-status-danger"
+          />
+        }
+      >
+        {triggerLabel}
+      </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

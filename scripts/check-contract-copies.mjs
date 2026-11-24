@@ -15,7 +15,8 @@ const EXPORTED_SCHEMA = /^export const (\w+Schema)\b/gm;
 const sourceFiles = (dir) =>
   fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((entry) => {
     const relative = `${dir}/${entry.name}`;
-    if (entry.isDirectory()) return entry.name === "__tests__" || entry.name === "node_modules" ? [] : sourceFiles(relative);
+    if (entry.isDirectory())
+      return entry.name === "__tests__" || entry.name === "node_modules" ? [] : sourceFiles(relative);
     return /\.tsx?$/.test(entry.name) ? [relative] : [];
   });
 
@@ -29,8 +30,13 @@ export function findContractCopies() {
     const text = read(file);
     for (const name of exportedSchemas(text)) {
       if (!contractNames.has(name)) continue;
-      const importsContract = new RegExp(`import\\s*(?:type\\s*)?\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*"@repo/contracts`).test(text);
-      if (!importsContract) copies.push(`${file}: ${name} is already in @repo/contracts. Import it, or import it as a base and extend it; don't write a second one (Contracts 1.5, 3.7).`);
+      const importsContract = new RegExp(
+        `import\\s*(?:type\\s*)?\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*"@repo/contracts`,
+      ).test(text);
+      if (!importsContract)
+        copies.push(
+          `${file}: ${name} is already in @repo/contracts. Import it, or import it as a base and extend it; don't write a second one (Contracts 1.5, 3.7).`,
+        );
     }
   }
   return copies;

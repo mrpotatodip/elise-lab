@@ -12,11 +12,22 @@ import { findingRepoIdEffect } from "#/modules/findings/queries";
 // login that requirePower let in; a login with no Party has no
 // author to show, so it is a 403.
 // -----
-export const createFindingCommentSvc = (db: AppDbType, accountId: string, userId: string, body: CreateFindingCommentBody): Effect.Effect<FindingComment, NotFound | Forbidden | DbError> =>
+export const createFindingCommentSvc = (
+  db: AppDbType,
+  accountId: string,
+  userId: string,
+  body: CreateFindingCommentBody,
+): Effect.Effect<FindingComment, NotFound | Forbidden | DbError> =>
   Effect.gen(function* () {
     const repoId = yield* findingRepoIdEffect(db, accountId, body.repo, body.fingerprint);
     if (!repoId) return yield* new NotFound({ message: "Finding not found" });
     const authorPartyId = yield* Effect.tryPromise({ try: () => actorPartyOf(db, userId), catch: toDbError });
     if (!authorPartyId) return yield* new Forbidden({ message: "A comment needs an author" });
-    return yield* createFindingCommentEffect(db, { tenantId: accountId, repoId, fingerprint: body.fingerprint, authorPartyId, body: body.body });
+    return yield* createFindingCommentEffect(db, {
+      tenantId: accountId,
+      repoId,
+      fingerprint: body.fingerprint,
+      authorPartyId,
+      body: body.body,
+    });
   });

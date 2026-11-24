@@ -31,12 +31,15 @@ export function UsageBudgetCard() {
       <CardHeader>
         <CardTitle>Monthly budget</CardTitle>
         <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-          The most this account spends on scans in {usageMonthLabel(data.month)}. New scans are refused once spent money plus what running scans may still spend would pass it.
+          The most this account spends on scans in {usageMonthLabel(data.month)}. New scans are refused once spent money
+          plus what running scans may still spend would pass it.
         </p>
       </CardHeader>
       <CardContent className="grid gap-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">{usageUsd(data.budgetUsd)}</p>
+          <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
+            {usageUsd(data.budgetUsd)}
+          </p>
           {!editing && (
             <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
               <Pencil aria-hidden="true" />
@@ -65,7 +68,9 @@ export function UsageBudgetCard() {
           </div>
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-muted-foreground">Remaining</dt>
-            <dd className={cn("font-medium tabular-nums", data.remainingUsd <= 0 && "text-status-danger")}>{usageUsd(Math.max(0, data.remainingUsd))}</dd>
+            <dd className={cn("font-medium tabular-nums", data.remainingUsd <= 0 && "text-status-danger")}>
+              {usageUsd(Math.max(0, data.remainingUsd))}
+            </dd>
           </div>
           {data.allowanceUsd !== undefined && (
             <div className="flex items-baseline justify-between gap-4">

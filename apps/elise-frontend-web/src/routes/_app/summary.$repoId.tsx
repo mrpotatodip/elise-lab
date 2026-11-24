@@ -13,7 +13,10 @@ export const Route = createFileRoute("/_app/summary/$repoId")({
     const { repos } = await context.queryClient.query({ ...reposQuery(), staleTime: "static" });
     const repo = repos.find((candidate) => candidate.id === params.repoId);
     if (!repo) throw notFound();
-    await context.queryClient.infiniteQuery({ ...repoFindingsQuery(repo.id, { branch: repo.defaultBranch ?? undefined, triage: "open" }), staleTime: "static" });
+    await context.queryClient.infiniteQuery({
+      ...repoFindingsQuery(repo.id, { branch: repo.defaultBranch ?? undefined, triage: "open" }),
+      staleTime: "static",
+    });
     return { name: repoName(repo.url) };
   },
   head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? "Repository"} · Security status · Elise` }] }),

@@ -26,10 +26,7 @@ export const accessMasterPowers = pgTable(
   (t) => ({
     uqPower: uniqueIndex("uq_access_master_powers_power").on(t.power),
     uqIdScope: uniqueIndex("uq_access_master_powers_id_scope").on(t.id, t.scope),
-    chkScope: check(
-      "access_master_powers_scope",
-      sql`(${t.scope} = 'platform') = (${t.power} like 'platform:%')`,
-    ),
+    chkScope: check("access_master_powers_scope", sql`(${t.scope} = 'platform') = (${t.power} like 'platform:%')`),
   }),
 );
 

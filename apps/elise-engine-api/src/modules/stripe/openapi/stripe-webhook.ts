@@ -13,7 +13,16 @@ export const stripeWebhookDoc = describeRoute({
       "The Worker reads the subscription the event names back from Stripe and finds its Account by the Account ID the checkout stamped on it, then by the Stripe customer.",
       "The Worker stores the Account's Subscription row from it, in one statement, so a repeated event changes nothing.",
     ],
-    example: ["Stripe sends (the CLI can forward test events):", bash(`stripe listen --forward-to ${EXAMPLE_BASE_URL}/stripe/webhook`)],
+    example: [
+      "Stripe sends (the CLI can forward test events):",
+      bash(`stripe listen --forward-to ${EXAMPLE_BASE_URL}/stripe/webhook`),
+    ],
   }),
-  responses: { 200: jsonResponse("The event was read; handled says whether it changed a Subscription.", envelope(z.object({ handled: z.boolean() }))), ...errorResponses(400) },
+  responses: {
+    200: jsonResponse(
+      "The event was read; handled says whether it changed a Subscription.",
+      envelope(z.object({ handled: z.boolean() })),
+    ),
+    ...errorResponses(400),
+  },
 });

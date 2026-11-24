@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { repoNotFullScanIds } from "#/modules/repo/utils/repo-full-scan";
 
-const scan = (scanId: string, branchId: string | null, status: "succeeded" | "failed" = "succeeded") => ({ scanId, branchId, status });
+const scan = (scanId: string, branchId: string | null, status: "succeeded" | "failed" = "succeeded") => ({
+  scanId,
+  branchId,
+  status,
+});
 
-const newestFirst = [scan("s4", "b1"), scan("s3", "b1", "failed"), scan("s2", null), scan("s1", "b1"), scan("s0", "b1")];
+const newestFirst = [
+  scan("s4", "b1"),
+  scan("s3", "b1", "failed"),
+  scan("s2", null),
+  scan("s1", "b1"),
+  scan("s0", "b1"),
+];
 
 describe("repoNotFullScanIds", () => {
   it.each([

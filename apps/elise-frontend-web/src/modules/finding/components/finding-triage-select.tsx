@@ -21,7 +21,13 @@ type FindingTriageSelectProps = {
 
 export type PossibleDuplicate = { fingerprint: string; title: string; onDismiss: () => void };
 
-type Decision = { status: FindingTriageStatus; acceptDays?: number; note?: string | null; duplicateOf?: string; signalId?: string };
+type Decision = {
+  status: FindingTriageStatus;
+  acceptDays?: number;
+  note?: string | null;
+  duplicateOf?: string;
+  signalId?: string;
+};
 
 type RiskWarning = { input: RiskInput; signalId: string };
 
@@ -33,7 +39,13 @@ const SAVED_COPY = {
   duplicate: "Marked as a duplicate. The finding you picked carries the problem now.",
 } as const satisfies Record<FindingTriageStatus, string>;
 
-export function FindingTriageSelect({ finding, also = [], candidates = [], onSaved, possibleDuplicate }: FindingTriageSelectProps) {
+export function FindingTriageSelect({
+  finding,
+  also = [],
+  candidates = [],
+  onSaved,
+  possibleDuplicate,
+}: FindingTriageSelectProps) {
   const { user } = useRouteContext({ from: "/_app" });
   const canAcceptRisk = hasAccessPower(user?.powers ?? [], "company:findings:accepted_risk:update");
   const queryClient = useQueryClient();
@@ -44,7 +56,17 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
 
   const save = useMutation({
     mutationFn: ({ status, acceptDays, note, duplicateOf, signalId }: Decision) =>
-      setFindingTriage({ data: { repo: finding.repo, fingerprint: finding.fingerprint, status, note: note === undefined ? (finding.triage?.note ?? null) : note, acceptDays, duplicateOf, signalId } }),
+      setFindingTriage({
+        data: {
+          repo: finding.repo,
+          fingerprint: finding.fingerprint,
+          status,
+          note: note === undefined ? (finding.triage?.note ?? null) : note,
+          acceptDays,
+          duplicateOf,
+          signalId,
+        },
+      }),
     onSuccess: (saved, decision) => {
       setAccepting(false);
       setWarning(null);
@@ -53,13 +75,20 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
       toast.success(SAVED_COPY[decision.status]);
       void Promise.all(also.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
     },
-    onError: (error) => toast.error(error.message === "Forbidden" ? "Only account admins can accept a risk." : `We couldn't save that decision. ${error.message}`),
+    onError: (error) =>
+      toast.error(
+        error.message === "Forbidden"
+          ? "Only account admins can accept a risk."
+          : `We couldn't save that decision. ${error.message}`,
+      ),
   });
 
   const check = useMutation({
     mutationFn: async (input: RiskInput) => {
       try {
-        return (await checkAcceptedRisk({ data: { repo: finding.repo, fingerprint: finding.fingerprint, note: input.note } })).signal;
+        return (
+          await checkAcceptedRisk({ data: { repo: finding.repo, fingerprint: finding.fingerprint, note: input.note } })
+        ).signal;
       } catch {
         return null;
       }
@@ -93,10 +122,16 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
         </SelectTrigger>
         <SelectContent>
           {FINDING_TRIAGE_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value} disabled={option.value === "accepted_risk" && !canAcceptRisk}>
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              disabled={option.value === "accepted_risk" && !canAcceptRisk}
+            >
               <span className="grid">
                 <span>{option.label}</span>
-                {option.value === "accepted_risk" && !canAcceptRisk && <span className="text-xs text-muted-foreground">Account admins only</span>}
+                {option.value === "accepted_risk" && !canAcceptRisk && (
+                  <span className="text-xs text-muted-foreground">Account admins only</span>
+                )}
               </span>
             </SelectItem>
           ))}
@@ -148,7 +183,15 @@ export function FindingTriageSelect({ finding, also = [], candidates = [], onSav
         open={warning !== null}
         onOpenChange={(open) => !open && setWarning(null)}
         pending={save.isPending}
-        onSaveAnyway={() => warning && save.mutate({ status: "accepted_risk", note: warning.input.note, acceptDays: warning.input.days, signalId: warning.signalId })}
+        onSaveAnyway={() =>
+          warning &&
+          save.mutate({
+            status: "accepted_risk",
+            note: warning.input.note,
+            acceptDays: warning.input.days,
+            signalId: warning.signalId,
+          })
+        }
       />
     </>
   );

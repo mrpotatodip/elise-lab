@@ -1,8 +1,19 @@
 import { Effect } from "effect";
-import { Invalid, RateLimited, toExternalError, type Conflict, type DbError, type ExternalError } from "#/lib/effect-query";
+import {
+  Invalid,
+  RateLimited,
+  toExternalError,
+  type Conflict,
+  type DbError,
+  type ExternalError,
+} from "#/lib/effect-query";
 import { ScanOptionsSchema, type ScanParams } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { RUNNER_ARCHIVE_UNSUPPORTED, RUNNER_JOB_NOT_CONNECTED, RUNNER_PLAN_HOSTED_MESSAGE } from "#/modules/runners/constants";
+import {
+  RUNNER_ARCHIVE_UNSUPPORTED,
+  RUNNER_JOB_NOT_CONNECTED,
+  RUNNER_PLAN_HOSTED_MESSAGE,
+} from "#/modules/runners/constants";
 import { newScanId } from "#/modules/scan-store";
 import type { ScanRepo } from "#/modules/scan-ledger";
 import type { CreateScanBody, ScanQueued } from "#/modules/scans/schemas";
@@ -35,7 +46,8 @@ export const queueScanSvc = (
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
     const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
-    if (!provider.capabilities.cloudScans && input.runner_id === undefined) return yield* new Invalid({ message: SCANS_RUNNER_ONLY_MESSAGE });
+    if (!provider.capabilities.cloudScans && input.runner_id === undefined)
+      return yield* new Invalid({ message: SCANS_RUNNER_ONLY_MESSAGE });
 
     // -----
     // The per-scan ceiling follows who pays. A scan on a Runner runs
@@ -50,12 +62,14 @@ export const queueScanSvc = (
     // it runs the full Skill on the person's computer, takes no credit
     // and stops at the Runner's own ceiling. No profile means quick.
     // -----
-    const ownKeyScan = input.runner_id !== undefined || (spend.plan ? spend.plan.keySource === "account" : spend.ownKey);
+    const ownKeyScan =
+      input.runner_id !== undefined || (spend.plan ? spend.plan.keySource === "account" : spend.ownKey);
     const profile = input.profile ?? "quick";
     const cap = budgetCapOf(env, { profile, onRunner: input.runner_id !== undefined });
     if (!cap.ok) return yield* new Invalid({ message: cap.message });
     const maxBudgetUsd = input.max_budget_usd ?? cap.defaultUsd;
-    if (maxBudgetUsd > cap.ceilingUsd) return yield* new Invalid({ message: `max_budget_usd: must be at most ${cap.ceilingUsd}` });
+    if (maxBudgetUsd > cap.ceilingUsd)
+      return yield* new Invalid({ message: `max_budget_usd: must be at most ${cap.ceilingUsd}` });
 
     const options = yield* Effect.try(() =>
       ScanOptionsSchema.parse({
@@ -81,7 +95,11 @@ export const queueScanSvc = (
     // key, because the plan's keySource would send it down the
     // own-key path.
     // -----
-    const block = scanBlockOf(spend.plan, env.BILLING_ENFORCED === "true" || !ownKeyScan || input.runner_id !== undefined, new Date());
+    const block = scanBlockOf(
+      spend.plan,
+      env.BILLING_ENFORCED === "true" || !ownKeyScan || input.runner_id !== undefined,
+      new Date(),
+    );
     if (block) return yield* new RateLimited(block);
     if (spend.plan?.hostedScansAllowed === false && input.runner_id === undefined) {
       return yield* new RateLimited({ code: "RUNNER_PLAN_HOSTED", message: RUNNER_PLAN_HOSTED_MESSAGE });
@@ -93,7 +111,10 @@ export const queueScanSvc = (
     // only MAX_ACTIVE_SCANS, and the live Scans on a Runner are counted
     // there too, never against the full limit.
     // -----
-    const limitPath = limitPathOf({ skill: options.skill, runner: input.runner_id === undefined ? null : { id: input.runner_id } });
+    const limitPath = limitPathOf({
+      skill: options.skill,
+      runner: input.runner_id === undefined ? null : { id: input.runner_id },
+    });
     const nowMs = Date.now();
     const activeScans = yield* repo.activeSince(accountId, nowMs);
     const refusal = scanRefusalOf(env, limitPath, activeScans.filter((scan) => limitPathOf(scan) === limitPath).length);
@@ -111,7 +132,8 @@ export const queueScanSvc = (
     if (runnerId !== undefined) {
       const sources = runnerSources ? yield* runnerSources(runnerId) : null;
       if (sources === null) return yield* new Invalid({ message: RUNNER_JOB_NOT_CONNECTED });
-      if (provider.capabilities.isArchive && !sources.includes("archive")) return yield* new Invalid({ message: RUNNER_ARCHIVE_UNSUPPORTED });
+      if (provider.capabilities.isArchive && !sources.includes("archive"))
+        return yield* new Invalid({ message: RUNNER_ARCHIVE_UNSUPPORTED });
     }
     const onRunner = runnerId !== undefined;
 
@@ -124,7 +146,10 @@ export const queueScanSvc = (
     const plan = spend.plan;
     const usesOwnKey = onRunner || (plan ? plan.keySource === "account" : spend.ownKey);
     if (!onRunner && plan?.keySource === "account" && !spend.ownKey) {
-      return yield* new RateLimited({ code: "OWN_KEY_REQUIRED", message: "This plan runs scans on your own Anthropic key. Add it in Settings to run scans." });
+      return yield* new RateLimited({
+        code: "OWN_KEY_REQUIRED",
+        message: "This plan runs scans on your own Anthropic key. Add it in Settings to run scans.",
+      });
     }
     if (!onRunner && plan && plan.monthlyScanAllowance !== null && spend.scans >= plan.monthlyScanAllowance) {
       return yield* new RateLimited({
@@ -187,8 +212,14 @@ export const queueScanSvc = (
     // -----
     const { fixedBranch } = provider;
     if (fixedBranch !== null || input.archive_id !== undefined) {
-      if (!linkArchive || fixedBranch === null || input.archive_id === undefined) return yield* new Invalid({ message: ARCHIVE_NOT_LINKED });
-      yield* linkArchive({ scanId: params.scanId, repoId: record.id, archiveId: input.archive_id, branch: fixedBranch });
+      if (!linkArchive || fixedBranch === null || input.archive_id === undefined)
+        return yield* new Invalid({ message: ARCHIVE_NOT_LINKED });
+      yield* linkArchive({
+        scanId: params.scanId,
+        repoId: record.id,
+        archiveId: input.archive_id,
+        branch: fixedBranch,
+      });
     }
     // -----
     // The check above read the balance; this takes it, under a lock.
@@ -198,7 +229,9 @@ export const queueScanSvc = (
       if (!hold) return yield* Effect.die(new Error("a platform plan needs a credit hold"));
       const held = yield* hold(params.scanId, holdUsd);
       if (!held.held) {
-        yield* repo.mark(accountId, params.scanId, { status: "failed", error: "not enough credit for this scan" }).pipe(Effect.ignore);
+        yield* repo
+          .mark(accountId, params.scanId, { status: "failed", error: "not enough credit for this scan" })
+          .pipe(Effect.ignore);
         return yield* new RateLimited({
           code: "INSUFFICIENT_CREDIT",
           message: `This scan could take up to $${holdUsd.toFixed(2)} of credit, but the balance is $${Math.max(0, held.balanceUsd).toFixed(2)}. Top up in Settings`,
@@ -212,7 +245,12 @@ export const queueScanSvc = (
 // A scan whose workflow never starts is never settled by one: it
 // is marked failed and its hold is given back.
 // -----
-export const abandonScanSvc = (repo: Pick<ScanRepo, "mark">, queued: QueuedScan, error: string, release?: ReleaseCredit): Effect.Effect<void> =>
+export const abandonScanSvc = (
+  repo: Pick<ScanRepo, "mark">,
+  queued: QueuedScan,
+  error: string,
+  release?: ReleaseCredit,
+): Effect.Effect<void> =>
   Effect.all(
     [
       repo.mark(queued.params.accountId, queued.params.scanId, { status: "failed", error }).pipe(Effect.ignore),
@@ -226,8 +264,15 @@ export const abandonScanSvc = (repo: Pick<ScanRepo, "mark">, queued: QueuedScan,
 // Scan row and its hold, so it starts only once they are
 // committed; abandon runs when it will not start.
 // -----
-export const startScanSvc = (env: CreateScanEnv, queued: QueuedScan, abandon: (error: string) => Effect.Effect<void>): Effect.Effect<ScanQueued, ExternalError> =>
-  Effect.tryPromise({ try: () => env.SCAN_WORKFLOW_FULL.create({ id: queued.params.scanId, params: queued.params }), catch: toExternalError }).pipe(
+export const startScanSvc = (
+  env: CreateScanEnv,
+  queued: QueuedScan,
+  abandon: (error: string) => Effect.Effect<void>,
+): Effect.Effect<ScanQueued, ExternalError> =>
+  Effect.tryPromise({
+    try: () => env.SCAN_WORKFLOW_FULL.create({ id: queued.params.scanId, params: queued.params }),
+    catch: toExternalError,
+  }).pipe(
     Effect.tapError((error) => abandon(`could not start the workflow: ${String(error.cause)}`)),
     Effect.as({ scanId: queued.params.scanId, status: "queued" as const, ...queued.params.options }),
   );
@@ -281,7 +326,9 @@ export const submitScanSvc = (
   ).pipe(
     Effect.flatMap((queued) =>
       startScanSvc(env, queued, (error) =>
-        tenant((db) => abandonScanSvc(deps.scanRepo(env, db), queued, error, (scanId) => deps.releaseCredit(db, accountId, scanId))).pipe(Effect.ignore),
+        tenant((db) =>
+          abandonScanSvc(deps.scanRepo(env, db), queued, error, (scanId) => deps.releaseCredit(db, accountId, scanId)),
+        ).pipe(Effect.ignore),
       ),
     ),
   );

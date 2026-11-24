@@ -7,7 +7,9 @@ import { ANTHROPIC_API_VERSION, ANTHROPIC_MODELS_URL } from "#/modules/anthropic
 // so an outage is never taken for a bad key.
 // -----
 export const checkAnthropicKey = async (apiKey: string): Promise<boolean> => {
-  const response = await fetch(ANTHROPIC_MODELS_URL, { headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_API_VERSION } });
+  const response = await fetch(ANTHROPIC_MODELS_URL, {
+    headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_API_VERSION },
+  });
   if (response.ok) return true;
   if (response.status === 401 || response.status === 403) return false;
   throw new Error(`Anthropic answered ${response.status}`);

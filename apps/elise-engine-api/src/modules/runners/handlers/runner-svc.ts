@@ -11,14 +11,26 @@ import {
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { Forbidden, NotFound, type DbError } from "#/lib/effect-query";
 import { RUNNER_NOT_FOUND, RUNNER_PAIRING_INVALID } from "#/modules/runners/constants";
-import { claimPairingEffect, createRunnerEffect, findRunnerByTokenEffect, listRunnersEffect, removeRunnerEffect, revokeRunnerByTokenEffect } from "#/modules/runners/queries";
+import {
+  claimPairingEffect,
+  createRunnerEffect,
+  findRunnerByTokenEffect,
+  listRunnersEffect,
+  removeRunnerEffect,
+  revokeRunnerByTokenEffect,
+} from "#/modules/runners/queries";
 import { generatePairingCode, generateRunnerToken, hashPairingCode, hashRunnerToken } from "#/modules/runners/utils";
 
 // -----
 // The code is made here and returned once. Only its
 // hash reaches the database.
 // -----
-export const createRunnerSvc = (db: AppDbType, accountId: string, userId: string, body: CreateRunnerBody): Effect.Effect<CreatedRunner, Forbidden | DbError> =>
+export const createRunnerSvc = (
+  db: AppDbType,
+  accountId: string,
+  userId: string,
+  body: CreateRunnerBody,
+): Effect.Effect<CreatedRunner, Forbidden | DbError> =>
   Effect.gen(function* () {
     const pairingCode = generatePairingCode();
     const codeHash = yield* Effect.promise(() => hashPairingCode(pairingCode));
@@ -36,29 +48,41 @@ export const createRunnerSvc = (db: AppDbType, accountId: string, userId: string
 // The token is made here and returned once. A code that
 // does not match gets the same answer whatever the reason.
 // -----
-export const enrollRunnerSvc = (db: DbConnectType, body: EnrollRunnerBody): Effect.Effect<EnrolledRunner, Forbidden | DbError> =>
+export const enrollRunnerSvc = (
+  db: DbConnectType,
+  body: EnrollRunnerBody,
+): Effect.Effect<EnrolledRunner, Forbidden | DbError> =>
   Effect.gen(function* () {
     const token = generateRunnerToken();
-    const [codeHash, tokenHash] = yield* Effect.promise(() => Promise.all([hashPairingCode(body.code), hashRunnerToken(token)]));
+    const [codeHash, tokenHash] = yield* Effect.promise(() =>
+      Promise.all([hashPairingCode(body.code), hashRunnerToken(token)]),
+    );
     const identity = yield* claimPairingEffect(db, { codeHash, tokenHash, now: new Date() });
     if (!identity) return yield* Effect.fail(new Forbidden({ message: RUNNER_PAIRING_INVALID }));
     return { ...identity, token };
   });
 
-export const listRunnersSvc = (db: AppDbType, accountId: string): Effect.Effect<Runners, DbError> => listRunnersEffect(db, accountId, new Date());
+export const listRunnersSvc = (db: AppDbType, accountId: string): Effect.Effect<Runners, DbError> =>
+  listRunnersEffect(db, accountId, new Date());
 
-export const removeRunnerSvc = (db: AppDbType, accountId: string, runnerId: string): Effect.Effect<{ removed: true }, NotFound | DbError> =>
+export const removeRunnerSvc = (
+  db: AppDbType,
+  accountId: string,
+  runnerId: string,
+): Effect.Effect<{ removed: true }, NotFound | DbError> =>
   removeRunnerEffect(db, accountId, runnerId, new Date()).pipe(
-    Effect.flatMap((removed) => (removed ? Effect.succeed({ removed: true as const }) : Effect.fail(new NotFound({ message: RUNNER_NOT_FOUND })))),
+    Effect.flatMap((removed) =>
+      removed ? Effect.succeed({ removed: true as const }) : Effect.fail(new NotFound({ message: RUNNER_NOT_FOUND })),
+    ),
   );
 
-export const disconnectRunnerSvc =(db: DbConnectType, token: string): Effect.Effect<boolean, DbError> =>
+export const disconnectRunnerSvc = (db: DbConnectType, token: string): Effect.Effect<boolean, DbError> =>
   Effect.gen(function* () {
     const tokenHash = yield* Effect.promise(() => hashRunnerToken(token));
     return yield* revokeRunnerByTokenEffect(db, tokenHash, new Date());
   });
 
-export const runnerIdentitySvc =(db: DbConnectType, token: string): Effect.Effect<RunnerIdentity | null, DbError> =>
+export const runnerIdentitySvc = (db: DbConnectType, token: string): Effect.Effect<RunnerIdentity | null, DbError> =>
   Effect.gen(function* () {
     const tokenHash = yield* Effect.promise(() => hashRunnerToken(token));
     return yield* findRunnerByTokenEffect(db, tokenHash, new Date());

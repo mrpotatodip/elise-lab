@@ -17,7 +17,8 @@ const app = buildApp(
     scanRepo: () => ledger.repo,
     sessionUserId: async () => signedInUser,
     userHasAccount: async () => userHoldsRole,
-    userHasPower: async (_c, _userId, _accountId, power) => userHoldsRole && (!userIsWatcher || power === "company:summary:read"),
+    userHasPower: async (_c, _userId, _accountId, power) =>
+      userHoldsRole && (!userIsWatcher || power === "company:summary:read"),
   }),
 ).app;
 
@@ -28,7 +29,7 @@ beforeEach(() => {
   userIsWatcher = false;
 });
 
-const REPO ="https://github.com/octocat/Hello-World";
+const REPO = "https://github.com/octocat/Hello-World";
 const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const OTHER = "5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6";
 const auth = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": ACCOUNT };
@@ -39,12 +40,17 @@ const QueuedBodySchema = z.object({ data: z.object({ scanId: z.string() }) });
 
 const queuedScanId = async (res: Response): Promise<string> => QueuedBodySchema.parse(await res.json()).data.scanId;
 
-const call = (env: Bindings, path: string, init: RequestInit = {}) => app.fetch(new Request(`http://localhost${path}`, init), env, testExecutionContext);
+const call = (env: Bindings, path: string, init: RequestInit = {}) =>
+  app.fetch(new Request(`http://localhost${path}`, init), env, testExecutionContext);
 type AddBody = { repo?: string; branches?: string[]; name?: string };
 const REPO_ID = "5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6";
 
 const post = (env: Bindings, body: ScanRequestBody, headers: Record<string, string> = auth) =>
-  call(env, "/scans", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(body) });
+  call(env, "/scans", {
+    method: "POST",
+    headers: { ...headers, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
 describe("auth", () => {
   it("rejects a request with no token", async () => {
@@ -126,7 +132,10 @@ describe("POST /scans", () => {
     const body = await res.json();
 
     expect(res.status).toBe(201);
-    expect(body).toMatchObject({ data: { status: "queued", model: "claude-haiku-5-5", skill: "full", maxBudgetUsd: 1 }, error: null });
+    expect(body).toMatchObject({
+      data: { status: "queued", model: "claude-haiku-5-5", skill: "full", maxBudgetUsd: 1 },
+      error: null,
+    });
     expect(createdFull).toHaveLength(1);
     expect(createdFull[0].params.accountId).toBe(ACCOUNT);
     expect(ledger.rows.get(createdFull[0].params.scanId)).toMatchObject({ accountId: ACCOUNT, status: "queued" });
@@ -155,7 +164,10 @@ describe("POST /scans", () => {
     const res = await post(env, { repo: `${REPO.replace("octocat/Hello-World", "OCTOCAT/hello-world")}.git/` });
 
     expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ data: null, error: { code: "CONFLICT", message: `This repo already has an active scan: ${running}` } });
+    expect(await res.json()).toMatchObject({
+      data: null,
+      error: { code: "CONFLICT", message: `This repo already has an active scan: ${running}` },
+    });
   });
 
   it("takes a ref, and refuses one that could pass as a git option", async () => {
@@ -189,7 +201,9 @@ describe("signed-in session", () => {
   it("refuses a login that holds no role in the account", async () => {
     const { env } = fakeBindings();
     signedInUser = "user-1";
-    const res = await call(env, "/scans", { headers: { authorization: "Bearer session-token", "x-account-id": ACCOUNT } });
+    const res = await call(env, "/scans", {
+      headers: { authorization: "Bearer session-token", "x-account-id": ACCOUNT },
+    });
 
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ data: null, error: { code: "FORBIDDEN" } });
@@ -213,7 +227,11 @@ describe("signed-in session", () => {
 });
 
 describe("watcher session", () => {
-  const session = { authorization: "Bearer session-token", "x-account-id": ACCOUNT, "content-type": "application/json" };
+  const session = {
+    authorization: "Bearer session-token",
+    "x-account-id": ACCOUNT,
+    "content-type": "application/json",
+  };
 
   const asWatcher = () => {
     signedInUser = "user-1";
@@ -277,15 +295,26 @@ describe("rate limits", () => {
 
   it("answers 429 with its own message to a limited sign-up", async () => {
     const { env } = fakeBindings({ SIGN_UP_LIMITER: limiter(false) });
-    const res = await call(env, "/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: signUpBody });
+    const res = await call(env, "/sign-up", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: signUpBody,
+    });
 
     expect(res.status).toBe(429);
-    expect(await res.json()).toMatchObject({ data: null, error: { code: "SIGN_UP_RATE_LIMITED", message: "Too many sign-up attempts. Wait a minute and try again." } });
+    expect(await res.json()).toMatchObject({
+      data: null,
+      error: { code: "SIGN_UP_RATE_LIMITED", message: "Too many sign-up attempts. Wait a minute and try again." },
+    });
   });
 
   it("answers 429 to a sign-up when the total limit is spent, whatever the IP", async () => {
     const { env } = fakeBindings({ SIGN_UP_LIMITER: limiter(true), SIGN_UP_TOTAL_LIMITER: limiter(false) });
-    const res = await call(env, "/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: signUpBody });
+    const res = await call(env, "/sign-up", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: signUpBody,
+    });
 
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ error: { code: "SIGN_UP_RATE_LIMITED" } });
@@ -293,7 +322,11 @@ describe("rate limits", () => {
 
   it("answers 429 to a limited sign-in", async () => {
     const { env } = fakeBindings({ SIGN_IN_LIMITER: limiter(false) });
-    const res = await call(env, "/auth/sign-in/email", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const res = await call(env, "/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
 
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ error: { code: "SIGN_IN_RATE_LIMITED" } });
@@ -301,14 +334,22 @@ describe("rate limits", () => {
 
   it("answers 404 to change-password, so a password changes only through reset", async () => {
     const { env } = fakeBindings();
-    const res = await call(env, "/auth/change-password", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const res = await call(env, "/auth/change-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
 
     expect(res.status).toBe(404);
   });
 
   it("lets a request through while the limit holds", async () => {
     const { env } = fakeBindings({ SIGN_UP_LIMITER: limiter(true) });
-    const res = await call(env, "/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: signUpBody });
+    const res = await call(env, "/sign-up", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: signUpBody,
+    });
 
     expect(res.status).toBe(400);
   });
@@ -318,12 +359,13 @@ describe("usage", () => {
   it("refuses a signed-in login that holds no role in the account", async () => {
     const { env } = fakeBindings();
     signedInUser = "user-1";
-    const res = await call(env, "/usage", { headers: { authorization: "Bearer session-token", "x-account-id": ACCOUNT } });
+    const res = await call(env, "/usage", {
+      headers: { authorization: "Bearer session-token", "x-account-id": ACCOUNT },
+    });
 
     expect(res.status).toBe(403);
   });
 });
-
 
 describe("repo history routes", () => {
   it.each([
@@ -332,30 +374,41 @@ describe("repo history routes", () => {
     "/repos/5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6/findings",
     `/repos/5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6/verdict?commit=${"a".repeat(40)}`,
     "/scans/abc/diff",
-  ])(
-    "answers 401 on %s with no token",
-    async (path) => {
-      const { env } = fakeBindings();
+  ])("answers 401 on %s with no token", async (path) => {
+    const { env } = fakeBindings();
 
-      expect((await call(env, path, { headers: { "x-account-id": ACCOUNT } })).status).toBe(401);
-    },
-  );
+    expect((await call(env, path, { headers: { "x-account-id": ACCOUNT } })).status).toBe(401);
+  });
 
   it("answers 401 on the two routes that add a repo or a branch with no token", async () => {
     const { env } = fakeBindings();
     const headers = { "x-account-id": ACCOUNT, "content-type": "application/json" };
 
-    expect((await call(env, "/repos", { method: "POST", headers, body: JSON.stringify({ repo: REPO }) })).status).toBe(401);
-    expect((await call(env, `/repos/${REPO_ID}/branches`, { method: "POST", headers, body: JSON.stringify({ name: "release" }) })).status).toBe(401);
+    expect((await call(env, "/repos", { method: "POST", headers, body: JSON.stringify({ repo: REPO }) })).status).toBe(
+      401,
+    );
+    expect(
+      (
+        await call(env, `/repos/${REPO_ID}/branches`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ name: "release" }),
+        })
+      ).status,
+    ).toBe(401);
   });
 
   it("answers 400 for a repo or a branch that is not valid", async () => {
     const { env } = fakeBindings();
     const headers = { ...auth, "content-type": "application/json" };
-    const send = (path: string, body: AddBody) => call(env, path, { method: "POST", headers, body: JSON.stringify(body) });
+    const send = (path: string, body: AddBody) =>
+      call(env, path, { method: "POST", headers, body: JSON.stringify(body) });
 
     expect((await send("/repos", { repo: "https://example.com/octocat/Hello-World" })).status).toBe(400);
-    expect((await send("/repos", { repo: REPO, branches: Array.from({ length: REPO_BRANCH_LIMIT + 1 }, (_, k) => `b${k}`) })).status).toBe(400);
+    expect(
+      (await send("/repos", { repo: REPO, branches: Array.from({ length: REPO_BRANCH_LIMIT + 1 }, (_, k) => `b${k}`) }))
+        .status,
+    ).toBe(400);
     expect((await send("/repos", { repo: REPO, branches: ["--upload-pack=evil"] })).status).toBe(400);
     expect((await send(`/repos/${REPO_ID}/branches`, { name: "--evil" })).status).toBe(400);
     expect((await send(`/repos/not-an-id/branches`, { name: "release" })).status).toBe(400);
@@ -365,8 +418,12 @@ describe("repo history routes", () => {
     const { env } = fakeBindings();
 
     expect((await call(env, "/repos/not-an-id", { headers: auth })).status).toBe(400);
-    expect((await call(env, "/repos/5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6/verdict", { headers: auth })).status).toBe(400);
-    expect((await call(env, "/repos/5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6/verdict?commit=main", { headers: auth })).status).toBe(400);
+    expect((await call(env, "/repos/5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6/verdict", { headers: auth })).status).toBe(
+      400,
+    );
+    expect(
+      (await call(env, "/repos/5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6/verdict?commit=main", { headers: auth })).status,
+    ).toBe(400);
     expect((await call(env, "/scans?repoId=nope", { headers: auth })).status).toBe(400);
     expect((await call(env, "/scans?limit=500", { headers: auth })).status).toBe(400);
   });

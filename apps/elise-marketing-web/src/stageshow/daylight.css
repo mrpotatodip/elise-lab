@@ -3,7 +3,9 @@
    status and severity colours, the sky (`--sky`, none in Default and Midnight) and the glass. */
 .dl {
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
 }
 
 /* The cursor is drawn dark on a light surface; on the two dark themes it is light, as the stage
@@ -26,26 +28,106 @@
   font-weight: 500;
   line-height: 16px;
 }
-.dl .dl-pill i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.dl .dl-pill[data-pulse] i { animation: dl-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-.dl .dl-pill[data-tone="success"] { border-color: color-mix(in oklch, var(--status-success) 25%, transparent); background: var(--status-success-soft); color: var(--status-success); }
-.dl .dl-pill[data-tone="danger"] { border-color: color-mix(in oklch, var(--status-danger) 25%, transparent); background: var(--status-danger-soft); color: var(--status-danger); }
-.dl .dl-pill[data-tone="warning"] { border-color: color-mix(in oklch, var(--status-warning) 25%, transparent); background: var(--status-warning-soft); color: var(--status-warning); }
-.dl .dl-pill[data-tone="info"] { border-color: color-mix(in oklch, var(--status-info) 25%, transparent); background: var(--status-info-soft); color: var(--status-info); }
-.dl .dl-pill[data-tone="neutral"] { border-color: color-mix(in oklch, var(--status-neutral) 20%, transparent); background: var(--status-neutral-soft); color: var(--status-neutral); }
-.dl .dl-pill[data-tone="outline"] { border-color: var(--input); color: var(--muted-foreground); }
-.dl .dl-pill[data-tone="high"] { border-color: color-mix(in oklch, var(--severity-high) 30%, transparent); background: color-mix(in oklch, var(--severity-high) 12%, transparent); color: var(--severity-high); }
-.dl .dl-pill[data-tone="medium"] { border-color: color-mix(in oklch, var(--severity-medium) 30%, transparent); background: color-mix(in oklch, var(--severity-medium) 12%, transparent); color: var(--severity-medium); }
-.dl .dl-pill[data-tone="low"] { border-color: color-mix(in oklch, var(--severity-low) 30%, transparent); background: color-mix(in oklch, var(--severity-low) 12%, transparent); color: var(--severity-low); }
+.dl .dl-pill i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.dl .dl-pill[data-pulse] i {
+  animation: dl-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.dl .dl-pill[data-tone="success"] {
+  border-color: color-mix(in oklch, var(--status-success) 25%, transparent);
+  background: var(--status-success-soft);
+  color: var(--status-success);
+}
+.dl .dl-pill[data-tone="danger"] {
+  border-color: color-mix(in oklch, var(--status-danger) 25%, transparent);
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
+}
+.dl .dl-pill[data-tone="warning"] {
+  border-color: color-mix(in oklch, var(--status-warning) 25%, transparent);
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
+}
+.dl .dl-pill[data-tone="info"] {
+  border-color: color-mix(in oklch, var(--status-info) 25%, transparent);
+  background: var(--status-info-soft);
+  color: var(--status-info);
+}
+.dl .dl-pill[data-tone="neutral"] {
+  border-color: color-mix(in oklch, var(--status-neutral) 20%, transparent);
+  background: var(--status-neutral-soft);
+  color: var(--status-neutral);
+}
+.dl .dl-pill[data-tone="outline"] {
+  border-color: var(--input);
+  color: var(--muted-foreground);
+}
+.dl .dl-pill[data-tone="high"] {
+  border-color: color-mix(in oklch, var(--severity-high) 30%, transparent);
+  background: color-mix(in oklch, var(--severity-high) 12%, transparent);
+  color: var(--severity-high);
+}
+.dl .dl-pill[data-tone="medium"] {
+  border-color: color-mix(in oklch, var(--severity-medium) 30%, transparent);
+  background: color-mix(in oklch, var(--severity-medium) 12%, transparent);
+  color: var(--severity-medium);
+}
+.dl .dl-pill[data-tone="low"] {
+  border-color: color-mix(in oklch, var(--severity-low) 30%, transparent);
+  background: color-mix(in oklch, var(--severity-low) 12%, transparent);
+  color: var(--severity-low);
+}
 
 /* The dashboard's Card: a muted header strip and an inset body whose curved top overlaps it. */
-.dl .dl-card { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-card); -webkit-backdrop-filter: blur(10px) saturate(1.4); backdrop-filter: blur(10px) saturate(1.4); }
-.dl .dl-card__head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 32px; background: var(--muted); }
-.dl .dl-card__title { font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: -0.025em; }
-.dl .dl-card__count { font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
-.dl .dl-card__body { position: relative; margin-top: -16px; overflow: hidden; border-top: 1px solid var(--border); border-radius: 12px 12px 0 0; background: transparent; }
+.dl .dl-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+  backdrop-filter: blur(10px) saturate(1.4);
+}
+.dl .dl-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 32px;
+  background: var(--muted);
+}
+.dl .dl-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+.dl .dl-card__count {
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+.dl .dl-card__body {
+  position: relative;
+  margin-top: -16px;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+}
 
-@keyframes dl-pulse { 50% { opacity: 0.5; } }
+@keyframes dl-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .dl .dl-pill[data-pulse] i { animation: none; }
+  .dl .dl-pill[data-pulse] i {
+    animation: none;
+  }
 }

@@ -4,9 +4,7 @@ export const DEFAULT_LOADING_TEXTS_KEY = "default";
 export const WAITING_LOADING_TEXTS_KEY = "waiting";
 export const STOPPED_LOADING_TEXTS_KEY = "stopped";
 
-export type AGUILoadingStatusKey =
-  | typeof WAITING_LOADING_TEXTS_KEY
-  | typeof STOPPED_LOADING_TEXTS_KEY;
+export type AGUILoadingStatusKey = typeof WAITING_LOADING_TEXTS_KEY | typeof STOPPED_LOADING_TEXTS_KEY;
 
 // -----
 // TEvent defaults to the real @ag-ui/core EventType,
@@ -36,118 +34,22 @@ export type AGUILoadingTextsByEvent<TEvent extends string = EventType> = Partial
 // this map's fallback entry.
 // -----
 export const LOADING_TEXTS_BY_EVENT = {
-  [EventType.RUN_STARTED]: [
-    "Reaching",
-    "Knocking",
-    "Unlocking",
-    "Summoning",
-    "Tuning",
-  ],
-  [EventType.RUN_FINISHED]: [
-    "Wrapping up",
-    "Closing out",
-    "Finishing",
-    "Concluding",
-    "Tying off",
-  ],
-  [EventType.RUN_ERROR]: [
-    "Hitting a snag",
-    "Running into trouble",
-    "Stumbling",
-    "Faltering",
-    "Struggling",
-  ],
-  [EventType.STEP_STARTED]: [
-    "Starting",
-    "Beginning",
-    "Kicking off",
-    "Launching",
-    "Setting off",
-  ],
-  [EventType.STEP_FINISHED]: [
-    "Wrapping step",
-    "Finishing step",
-    "Closing step",
-    "Completing",
-    "Checking off",
-  ],
-  [EventType.TOOL_CALL_START]: [
-    "Calling",
-    "Dispatching",
-    "Querying",
-    "Fetching",
-    "Invoking",
-  ],
-  [EventType.TOOL_CALL_ARGS]: [
-    "Preparing",
-    "Configuring",
-    "Filling in",
-    "Specifying",
-    "Detailing",
-  ],
-  [EventType.TOOL_CALL_CHUNK]: [
-    "Streaming",
-    "Relaying",
-    "Piecing together",
-    "Assembling",
-    "Threading",
-  ],
-  [EventType.TOOL_CALL_END]: [
-    "Wrapping up",
-    "Closing out",
-    "Finalizing",
-    "Concluding",
-    "Tying off",
-  ],
-  [EventType.TOOL_CALL_RESULT]: [
-    "Ingesting",
-    "Absorbing",
-    "Unpacking",
-    "Weighing",
-    "Unfolding",
-  ],
-  [EventType.TEXT_MESSAGE_START]: [
-    "Drafting",
-    "Sketching",
-    "Noodling",
-    "Sharpening",
-    "Stirring",
-  ],
-  [EventType.TEXT_MESSAGE_CONTENT]: [
-    "Writing",
-    "Narrating",
-    "Phrasing",
-    "Polishing",
-    "Sailing",
-  ],
-  [EventType.TEXT_MESSAGE_CHUNK]: [
-    "Streaming",
-    "Relaying",
-    "Piecing together",
-    "Assembling",
-    "Threading",
-  ],
-  [EventType.TEXT_MESSAGE_END]: [
-    "Wrapping",
-    "Finishing",
-    "Sealing",
-    "Tidying",
-    "Settling",
-  ],
-  [EventType.REASONING_START]: [
-    "Thinking",
-    "Pondering",
-    "Mulling",
-    "Reasoning",
-    "Considering",
-  ],
-  [EventType.REASONING_MESSAGE_START]: [
-    "Thinking",
-    "Pondering",
-    "Mulling",
-    "Reasoning",
-    "Considering",
-  ],
+  [EventType.RUN_STARTED]: ["Reaching", "Knocking", "Unlocking", "Summoning", "Tuning"],
+  [EventType.RUN_FINISHED]: ["Wrapping up", "Closing out", "Finishing", "Concluding", "Tying off"],
+  [EventType.RUN_ERROR]: ["Hitting a snag", "Running into trouble", "Stumbling", "Faltering", "Struggling"],
+  [EventType.STEP_STARTED]: ["Starting", "Beginning", "Kicking off", "Launching", "Setting off"],
+  [EventType.STEP_FINISHED]: ["Wrapping step", "Finishing step", "Closing step", "Completing", "Checking off"],
+  [EventType.TOOL_CALL_START]: ["Calling", "Dispatching", "Querying", "Fetching", "Invoking"],
+  [EventType.TOOL_CALL_ARGS]: ["Preparing", "Configuring", "Filling in", "Specifying", "Detailing"],
+  [EventType.TOOL_CALL_CHUNK]: ["Streaming", "Relaying", "Piecing together", "Assembling", "Threading"],
+  [EventType.TOOL_CALL_END]: ["Wrapping up", "Closing out", "Finalizing", "Concluding", "Tying off"],
+  [EventType.TOOL_CALL_RESULT]: ["Ingesting", "Absorbing", "Unpacking", "Weighing", "Unfolding"],
+  [EventType.TEXT_MESSAGE_START]: ["Drafting", "Sketching", "Noodling", "Sharpening", "Stirring"],
+  [EventType.TEXT_MESSAGE_CONTENT]: ["Writing", "Narrating", "Phrasing", "Polishing", "Sailing"],
+  [EventType.TEXT_MESSAGE_CHUNK]: ["Streaming", "Relaying", "Piecing together", "Assembling", "Threading"],
+  [EventType.TEXT_MESSAGE_END]: ["Wrapping", "Finishing", "Sealing", "Tidying", "Settling"],
+  [EventType.REASONING_START]: ["Thinking", "Pondering", "Mulling", "Reasoning", "Considering"],
+  [EventType.REASONING_MESSAGE_START]: ["Thinking", "Pondering", "Mulling", "Reasoning", "Considering"],
   [EventType.REASONING_MESSAGE_CONTENT]: [
     "Reasoning through",
     "Working it out",
@@ -169,115 +71,22 @@ export const LOADING_TEXTS_BY_EVENT = {
     "Finishing thought",
     "Concluding",
   ],
-  [EventType.REASONING_END]: [
-    "Landing on it",
-    "Settling",
-    "Wrapping thought",
-    "Finishing thought",
-    "Concluding",
-  ],
-  [EventType.REASONING_ENCRYPTED_VALUE]: [
-    "Securing",
-    "Sealing",
-    "Encrypting",
-    "Locking",
-    "Safeguarding",
-  ],
-  [EventType.SUBAGENT_STARTED]: [
-    "Delegating",
-    "Handing off",
-    "Calling in help",
-    "Briefing",
-    "Dispatching",
-  ],
-  [EventType.SUBAGENT_FINISHED]: [
-    "Collecting",
-    "Regrouping",
-    "Taking it back",
-    "Gathering results",
-    "Merging",
-  ],
-  [EventType.SUBAGENT_ERROR]: [
-    "Recovering",
-    "Rerouting",
-    "Regrouping",
-    "Adjusting",
-    "Retrying",
-  ],
-  [EventType.STATE_SNAPSHOT]: [
-    "Capturing",
-    "Snapshotting",
-    "Recording",
-    "Freezing",
-    "Mapping",
-  ],
-  [EventType.STATE_DELTA]: [
-    "Updating",
-    "Adjusting",
-    "Patching",
-    "Syncing",
-    "Refreshing",
-  ],
-  [EventType.MESSAGES_SNAPSHOT]: [
-    "Reviewing",
-    "Gathering",
-    "Collecting",
-    "Compiling",
-    "Assembling",
-  ],
-  [EventType.ACTIVITY_SNAPSHOT]: [
-    "Checking in",
-    "Surveying",
-    "Scanning",
-    "Observing",
-    "Taking stock",
-  ],
-  [EventType.ACTIVITY_DELTA]: [
-    "Tracking",
-    "Noting",
-    "Logging",
-    "Recording",
-    "Watching",
-  ],
-  [EventType.RAW]: [
-    "Passing through",
-    "Relaying",
-    "Forwarding",
-    "Routing",
-    "Handling",
-  ],
-  [EventType.CUSTOM]: [
-    "Finishing up",
-    "Putting it together",
-    "Wrapping up",
-    "Finalizing",
-    "Polishing off",
-  ],
-  [WAITING_LOADING_TEXTS_KEY]: [
-    "Waiting",
-    "Waiting on you",
-    "Standing by",
-    "Holding",
-    "Needs your input",
-  ],
-  [STOPPED_LOADING_TEXTS_KEY]: [
-    "Stopped",
-    "Halted",
-    "Called off",
-    "Cut short",
-    "Ended early",
-  ],
-  [DEFAULT_LOADING_TEXTS_KEY]: [
-    "Working",
-    "Processing",
-    "Preparing",
-    "Loading",
-    "In progress",
-  ],
-} satisfies Record<
-  EventType | AGUILoadingStatusKey | typeof DEFAULT_LOADING_TEXTS_KEY,
-  readonly string[]
->;
+  [EventType.REASONING_END]: ["Landing on it", "Settling", "Wrapping thought", "Finishing thought", "Concluding"],
+  [EventType.REASONING_ENCRYPTED_VALUE]: ["Securing", "Sealing", "Encrypting", "Locking", "Safeguarding"],
+  [EventType.SUBAGENT_STARTED]: ["Delegating", "Handing off", "Calling in help", "Briefing", "Dispatching"],
+  [EventType.SUBAGENT_FINISHED]: ["Collecting", "Regrouping", "Taking it back", "Gathering results", "Merging"],
+  [EventType.SUBAGENT_ERROR]: ["Recovering", "Rerouting", "Regrouping", "Adjusting", "Retrying"],
+  [EventType.STATE_SNAPSHOT]: ["Capturing", "Snapshotting", "Recording", "Freezing", "Mapping"],
+  [EventType.STATE_DELTA]: ["Updating", "Adjusting", "Patching", "Syncing", "Refreshing"],
+  [EventType.MESSAGES_SNAPSHOT]: ["Reviewing", "Gathering", "Collecting", "Compiling", "Assembling"],
+  [EventType.ACTIVITY_SNAPSHOT]: ["Checking in", "Surveying", "Scanning", "Observing", "Taking stock"],
+  [EventType.ACTIVITY_DELTA]: ["Tracking", "Noting", "Logging", "Recording", "Watching"],
+  [EventType.RAW]: ["Passing through", "Relaying", "Forwarding", "Routing", "Handling"],
+  [EventType.CUSTOM]: ["Finishing up", "Putting it together", "Wrapping up", "Finalizing", "Polishing off"],
+  [WAITING_LOADING_TEXTS_KEY]: ["Waiting", "Waiting on you", "Standing by", "Holding", "Needs your input"],
+  [STOPPED_LOADING_TEXTS_KEY]: ["Stopped", "Halted", "Called off", "Cut short", "Ended early"],
+  [DEFAULT_LOADING_TEXTS_KEY]: ["Working", "Processing", "Preparing", "Loading", "In progress"],
+} satisfies Record<EventType | AGUILoadingStatusKey | typeof DEFAULT_LOADING_TEXTS_KEY, readonly string[]>;
 
 // -----
 // LOADING_TEXTS_BY_EVENT only ever holds real AG-UI
@@ -297,10 +106,7 @@ export function textsForEventType<TEvent extends string>(
     [DEFAULT_LOADING_TEXTS_KEY]: readonly string[];
   };
   return (
-    overrides?.[key] ??
-    builtIn[key] ??
-    overrides?.[DEFAULT_LOADING_TEXTS_KEY] ??
-    builtIn[DEFAULT_LOADING_TEXTS_KEY]
+    overrides?.[key] ?? builtIn[key] ?? overrides?.[DEFAULT_LOADING_TEXTS_KEY] ?? builtIn[DEFAULT_LOADING_TEXTS_KEY]
   );
 }
 

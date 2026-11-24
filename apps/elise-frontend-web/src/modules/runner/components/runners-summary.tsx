@@ -43,21 +43,37 @@ export function RunnersSummary() {
         >
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {paired.length}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{paired.length === 1 ? "computer" : "computers"} paired</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              {paired.length === 1 ? "computer" : "computers"} paired
+            </span>
           </p>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             Each scan runs on a computer you pair, with its own Claude and git login. Elise charges nothing per scan.
-            {waiting > 0 ? ` ${waiting} ${waiting === 1 ? "computer is" : "computers are"} waiting for a pairing code.` : ""}
+            {waiting > 0
+              ? ` ${waiting} ${waiting === 1 ? "computer is" : "computers are"} waiting for a pairing code.`
+              : ""}
           </p>
         </Column>
 
         <Column label="Right now">
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {running}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {paired.length} running</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              of {paired.length} running
+            </span>
           </p>
-          <Progress value={percent} indicatorClassName="bg-primary/55" aria-label={`Running: ${running} of ${paired.length}`} />
-          <p className={paired.length > 0 && running === 0 ? "max-w-copy text-sm leading-relaxed text-status-warning" : "max-w-copy text-sm leading-relaxed text-muted-foreground"}>
+          <Progress
+            value={percent}
+            indicatorClassName="bg-primary/55"
+            aria-label={`Running: ${running} of ${paired.length}`}
+          />
+          <p
+            className={
+              paired.length > 0 && running === 0
+                ? "max-w-copy text-sm leading-relaxed text-status-warning"
+                : "max-w-copy text-sm leading-relaxed text-muted-foreground"
+            }
+          >
             {paired.length === 0
               ? "Pair a computer to start your first scan."
               : running === 0
@@ -69,17 +85,24 @@ export function RunnersSummary() {
         <Column label="Connect a computer">
           <ol className="grid gap-3 text-sm leading-relaxed">
             <li className="grid grid-cols-[1.5rem_1fr] gap-2">
-              <span aria-hidden="true" className="text-muted-foreground tabular-nums">1</span>
+              <span aria-hidden="true" className="text-muted-foreground tabular-nums">
+                1
+              </span>
               <span>Install the Elise Runner and sign in to Claude Code on that computer.</span>
             </li>
             <li className="grid grid-cols-[1.5rem_1fr] gap-2">
-              <span aria-hidden="true" className="text-muted-foreground tabular-nums">2</span>
+              <span aria-hidden="true" className="text-muted-foreground tabular-nums">
+                2
+              </span>
               <span>
-                Run <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{RUNNER_LOGIN_COMMAND}</code> and approve it here.
+                Run <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{RUNNER_LOGIN_COMMAND}</code> and
+                approve it here.
               </span>
             </li>
             <li className="grid grid-cols-[1.5rem_1fr] gap-2">
-              <span aria-hidden="true" className="text-muted-foreground tabular-nums">3</span>
+              <span aria-hidden="true" className="text-muted-foreground tabular-nums">
+                3
+              </span>
               <span>Keep it open while scans run.</span>
             </li>
           </ol>

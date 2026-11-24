@@ -15,7 +15,9 @@ export const resendVerificationDoc = describeRoute({
     ],
     example: [
       "Ask for a new link:",
-      bash(`curl -X POST ${EXAMPLE_BASE_URL}/sign-up/resend-verification -H "Content-Type: application/json" -d '{"email":"ada@example.com"}'`),
+      bash(
+        `curl -X POST ${EXAMPLE_BASE_URL}/sign-up/resend-verification -H "Content-Type: application/json" -d '{"email":"ada@example.com"}'`,
+      ),
       json(`{\n  "data": { "requested": true },\n  "error": null\n}`),
     ],
   }),

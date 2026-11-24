@@ -1,6 +1,15 @@
 import { Hono } from "hono";
 import type { AppEnv } from "#/types/variables";
-import { acceptTeamInviteAPI, createTeamInviteAPI, listTeamAPI, listTeamRolesAPI, previewTeamInviteAPI, resetTeamMemberTwoFactorAPI, revokeTeamInviteAPI, twoFactorRequirementAPI } from "./api";
+import {
+  acceptTeamInviteAPI,
+  createTeamInviteAPI,
+  listTeamAPI,
+  listTeamRolesAPI,
+  previewTeamInviteAPI,
+  resetTeamMemberTwoFactorAPI,
+  revokeTeamInviteAPI,
+  twoFactorRequirementAPI,
+} from "./api";
 
 const app = new Hono<AppEnv>();
 

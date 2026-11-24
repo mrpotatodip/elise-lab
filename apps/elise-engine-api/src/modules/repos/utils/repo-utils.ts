@@ -1,4 +1,10 @@
-import type { FindingTriageStatusValue, RepoFinding, RepoFindingStateValue, RepoOpen, SeverityCounts } from "@repo/contracts/elise";
+import type {
+  FindingTriageStatusValue,
+  RepoFinding,
+  RepoFindingStateValue,
+  RepoOpen,
+  SeverityCounts,
+} from "@repo/contracts/elise";
 
 // -----
 // The state of a Branch's finding: the frozen History's, or open
@@ -7,15 +13,26 @@ import type { FindingTriageStatusValue, RepoFinding, RepoFindingStateValue, Repo
 // again. A person's decision is not part of the state: it always
 // stands.
 // -----
-export const branchStateOf = ({ history }: { history: { state: RepoFindingStateValue } | null }): RepoFindingStateValue => history?.state ?? "open";
+export const branchStateOf = ({
+  history,
+}: {
+  history: { state: RepoFindingStateValue } | null;
+}): RepoFindingStateValue => history?.state ?? "open";
 
 // -----
 // The columns the open counts need, so a count does not
 // have to load the words of every finding.
 // -----
-export type OpenCountRow = Pick<RepoFinding, "state" | "unchecked" | "severity"> & { triage: { status: FindingTriageStatusValue } | null };
+export type OpenCountRow = Pick<RepoFinding, "state" | "unchecked" | "severity"> & {
+  triage: { status: FindingTriageStatusValue } | null;
+};
 
-const RESOLVED_BY_PERSON: ReadonlySet<FindingTriageStatusValue> = new Set(["fixed", "false_positive", "accepted_risk", "duplicate"]);
+const RESOLVED_BY_PERSON: ReadonlySet<FindingTriageStatusValue> = new Set([
+  "fixed",
+  "false_positive",
+  "accepted_risk",
+  "duplicate",
+]);
 
 // -----
 // Still a problem to work on: the history has not closed
@@ -23,7 +40,8 @@ const RESOLVED_BY_PERSON: ReadonlySet<FindingTriageStatusValue> = new Set(["fixe
 // positive, an accepted risk or a duplicate.
 // -----
 export const isUnresolved = (finding: OpenCountRow): boolean =>
-  (finding.state === "open" || finding.state === "regressed") && !(finding.triage && RESOLVED_BY_PERSON.has(finding.triage.status));
+  (finding.state === "open" || finding.state === "regressed") &&
+  !(finding.triage && RESOLVED_BY_PERSON.has(finding.triage.status));
 
 const emptySeverity = (): SeverityCounts => ({ critical: 0, high: 0, medium: 0, low: 0, informational: 0 });
 
@@ -41,4 +59,5 @@ export const openCountsOf = (findings: OpenCountRow[]): RepoOpen => {
 
 const SEVERITY_ORDER = ["critical", "high", "medium", "low", "informational"] as const;
 
-export const severityRank = (severity: RepoFinding["severity"]): number => (severity === null ? SEVERITY_ORDER.length : SEVERITY_ORDER.indexOf(severity));
+export const severityRank = (severity: RepoFinding["severity"]): number =>
+  severity === null ? SEVERITY_ORDER.length : SEVERITY_ORDER.indexOf(severity);

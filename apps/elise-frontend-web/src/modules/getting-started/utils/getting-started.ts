@@ -17,7 +17,9 @@ export type GettingStartedResult = {
 };
 
 const hasReport = (scan: GettingStartedInput["scans"][number]): boolean =>
-  scan.status === "succeeded" && ((scan.files ?? []).includes(REPORT_FILE) || (scan.artifacts ?? []).some((artifact) => artifact.name === REPORT_FILE));
+  scan.status === "succeeded" &&
+  ((scan.files ?? []).includes(REPORT_FILE) ||
+    (scan.artifacts ?? []).some((artifact) => artifact.name === REPORT_FILE));
 
 export function gettingStarted({ runners, scans, gitSkipped, dismissed }: GettingStartedInput): GettingStartedResult {
   const paired = runners.some((runner) => runner.pairedAt !== null);

@@ -12,10 +12,7 @@ export type UseChatBotThreadsOptions = Omit<ChatBotRequestOptions, "endpoint"> &
 // -----
 export function useChatBotThreads(options: UseChatBotThreadsOptions = {}) {
   const { endpoint = DEFAULT_ENDPOINT, headers, credentials, fetch } = options;
-  const request = useMemo(
-    () => ({ endpoint, headers, credentials, fetch }),
-    [endpoint, headers, credentials, fetch],
-  );
+  const request = useMemo(() => ({ endpoint, headers, credentials, fetch }), [endpoint, headers, credentials, fetch]);
   const [threads, setThreads] = useState<ChatBotThreadListItem[]>([]);
   const [error, setError] = useState<Error | undefined>(undefined);
 

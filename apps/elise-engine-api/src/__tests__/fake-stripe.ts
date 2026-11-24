@@ -14,7 +14,14 @@ const intervalOf = (priceId: string): "month" | "year" => (priceId.includes("_ye
 export const fakeStripe = () => {
   const subscriptions = new Map<string, StripeSubscription>();
   const customers: { id: string; name: string; email: string | null; accountId: string }[] = [];
-  const checkouts: { customerId: string; accountId: string; priceId: string; interval: "month" | "year"; successUrl: string; cancelUrl: string }[] = [];
+  const checkouts: {
+    customerId: string;
+    accountId: string;
+    priceId: string;
+    interval: "month" | "year";
+    successUrl: string;
+    cancelUrl: string;
+  }[] = [];
   const portals: { customerId: string; returnUrl: string }[] = [];
   const changes: { subscriptionId: string; priceId: string; interval: "month" | "year" }[] = [];
 

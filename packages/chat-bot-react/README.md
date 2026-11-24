@@ -19,19 +19,19 @@ It talks to the routes the engine serves: `POST {endpoint}` to send a message, `
 
 ## Props (`<ChatBot />`)
 
-| Prop | |
-|---|---|
-| `endpoint` | Your route. Default `"/api/chat"`. |
-| `headers` | Extra request headers, or a function returning them (called on every request, for a fresh token). |
-| `credentials` | `fetch` credentials, e.g. `"include"`. |
-| `fetch` | Your own `fetch`. |
-| `threads` | `false` hides the list of past chats. |
-| `tools` | Tool cards, by tool name (below). |
-| `placeholder`, `emptyText`, `className` | Text and styling hooks. |
-| `room` | Swap the conversation view for your own component (it receives the room's props). `ChatBotRoomWithProgress` from `chat-bot-react-loader` is one. |
-| `onChunk` | Called with every event of the answer stream as it arrives. |
-| `onTurnStart` | Called when a message is sent, before anything streams. |
-| `progress` (on `ChatBotRoom`) | A node shown under the messages in place of the three typing dots. |
+| Prop                                    |                                                                                                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `endpoint`                              | Your route. Default `"/api/chat"`.                                                                                                               |
+| `headers`                               | Extra request headers, or a function returning them (called on every request, for a fresh token).                                                |
+| `credentials`                           | `fetch` credentials, e.g. `"include"`.                                                                                                           |
+| `fetch`                                 | Your own `fetch`.                                                                                                                                |
+| `threads`                               | `false` hides the list of past chats.                                                                                                            |
+| `tools`                                 | Tool cards, by tool name (below).                                                                                                                |
+| `placeholder`, `emptyText`, `className` | Text and styling hooks.                                                                                                                          |
+| `room`                                  | Swap the conversation view for your own component (it receives the room's props). `ChatBotRoomWithProgress` from `chat-bot-react-loader` is one. |
+| `onChunk`                               | Called with every event of the answer stream as it arrives.                                                                                      |
+| `onTurnStart`                           | Called when a message is sent, before anything streams.                                                                                          |
+| `progress` (on `ChatBotRoom`)           | A node shown under the messages in place of the three typing dots.                                                                               |
 
 ## Tool results
 

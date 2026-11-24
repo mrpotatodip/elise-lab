@@ -65,7 +65,10 @@ const columns = column.columns([
   column.display({
     id: "branch",
     header: "Branch",
-    meta: { head: "hidden whitespace-nowrap md:table-cell", cell: "hidden min-w-48 break-words text-muted-foreground md:table-cell" },
+    meta: {
+      head: "hidden whitespace-nowrap md:table-cell",
+      cell: "hidden min-w-48 break-words text-muted-foreground md:table-cell",
+    },
     cell: ({ row }) => row.original.branch ?? "Default branch",
   }),
   column.display({
@@ -77,7 +80,10 @@ const columns = column.columns([
   column.display({
     id: "size",
     header: "Size",
-    meta: { head: "hidden whitespace-nowrap text-right lg:table-cell", cell: "hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell" },
+    meta: {
+      head: "hidden whitespace-nowrap text-right lg:table-cell",
+      cell: "hidden whitespace-nowrap text-right tabular-nums text-muted-foreground lg:table-cell",
+    },
     cell: ({ row }) => scanBytes(row.original.sizeBytes),
   }),
   column.display({
@@ -90,7 +96,13 @@ const columns = column.columns([
     id: "download",
     header: () => <span className="sr-only">Download</span>,
     meta: { head: "px-3 text-right sm:px-5", cell: "whitespace-nowrap px-3 text-right sm:px-5" },
-    cell: ({ row }) => <FileDownloadButton scanId={row.original.scanId} name={row.original.name} description={downloadLabel(row.original)} />,
+    cell: ({ row }) => (
+      <FileDownloadButton
+        scanId={row.original.scanId}
+        name={row.original.name}
+        description={downloadLabel(row.original)}
+      />
+    ),
   }),
 ]);
 
@@ -115,49 +127,71 @@ function FileListView({ filters, onChange }: FileListViewProps) {
 
   return (
     <>
-    <FileListSummary files={files} counts={data.counts} more={Boolean(nextCursor)} />
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <div className="grid gap-1.5">
-          <CardTitle>All files</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Reports and finding lists saved by each scan. Filter by type, repository or date.</p>
-        </div>
-        <ShellListCount shown={files.length} total={files.length} more={Boolean(nextCursor)} noun="file" plural="files" />
-      </CardHeader>
-      <CardContent className="overflow-hidden p-0">
-        <FileFilters filters={filters} counts={data.counts} showClear={filtered && files.length > 0} onChange={onChange} />
-        {files.length === 0 ? (
-          <Empty className="py-14">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">{filtered ? <Search /> : <FileText />}</EmptyMedia>
-              <EmptyTitle>{filtered ? "No files match" : "No files yet"}</EmptyTitle>
-              <EmptyDescription>{filtered ? "Try another repository, file type or date range, or clear the filters." : "The reports of your scans show up here once a scan saves them."}</EmptyDescription>
-            </EmptyHeader>
-            {filtered && (
-              <EmptyContent>
-                <Button variant="outline" onClick={() => onChange({})}>
-                  Clear filters
-                </Button>
-              </EmptyContent>
-            )}
-          </Empty>
-        ) : (
-          <DataTable table={table} />
-        )}
-        {nextCursor && (
-          <div className="flex flex-col items-center gap-2 border-t p-4">
-            {loadMore.isError && (
-              <p role="alert" className="text-xs text-status-danger">
-                We could not load more files. Try again.
-              </p>
-            )}
-            <Button variant="outline" size="sm" disabled={loadMore.isPending} onClick={() => loadMore.mutate(nextCursor)}>
-              {loadMore.isPending ? "Loading" : "Load more files"}
-            </Button>
+      <FileListSummary files={files} counts={data.counts} more={Boolean(nextCursor)} />
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <div className="grid gap-1.5">
+            <CardTitle>All files</CardTitle>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Reports and finding lists saved by each scan. Filter by type, repository or date.
+            </p>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <ShellListCount
+            shown={files.length}
+            total={files.length}
+            more={Boolean(nextCursor)}
+            noun="file"
+            plural="files"
+          />
+        </CardHeader>
+        <CardContent className="overflow-hidden p-0">
+          <FileFilters
+            filters={filters}
+            counts={data.counts}
+            showClear={filtered && files.length > 0}
+            onChange={onChange}
+          />
+          {files.length === 0 ? (
+            <Empty className="py-14">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">{filtered ? <Search /> : <FileText />}</EmptyMedia>
+                <EmptyTitle>{filtered ? "No files match" : "No files yet"}</EmptyTitle>
+                <EmptyDescription>
+                  {filtered
+                    ? "Try another repository, file type or date range, or clear the filters."
+                    : "The reports of your scans show up here once a scan saves them."}
+                </EmptyDescription>
+              </EmptyHeader>
+              {filtered && (
+                <EmptyContent>
+                  <Button variant="outline" onClick={() => onChange({})}>
+                    Clear filters
+                  </Button>
+                </EmptyContent>
+              )}
+            </Empty>
+          ) : (
+            <DataTable table={table} />
+          )}
+          {nextCursor && (
+            <div className="flex flex-col items-center gap-2 border-t p-4">
+              {loadMore.isError && (
+                <p role="alert" className="text-xs text-status-danger">
+                  We could not load more files. Try again.
+                </p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loadMore.isPending}
+                onClick={() => loadMore.mutate(nextCursor)}
+              >
+                {loadMore.isPending ? "Loading" : "Load more files"}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }
@@ -168,7 +202,11 @@ export function FileList() {
 
   return (
     <Suspense fallback={<FileListSkeleton />}>
-      <FileListView key={JSON.stringify(filters)} filters={filters} onChange={(next) => void navigate({ search: next, replace: true })} />
+      <FileListView
+        key={JSON.stringify(filters)}
+        filters={filters}
+        onChange={(next) => void navigate({ search: next, replace: true })}
+      />
     </Suspense>
   );
 }

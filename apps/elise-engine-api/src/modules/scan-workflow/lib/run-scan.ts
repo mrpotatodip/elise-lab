@@ -30,10 +30,14 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     });
 
   const recordStep = (status: ScanState, error: string | null, usage: ScanUsage | null) =>
-    step.do(`record-scan-${status}`, { retries: SCAN_WORKFLOW_RECORD_RETRY, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT }, async () => {
-      await deps.recordScan(params, status, error, usage);
-      return true;
-    });
+    step.do(
+      `record-scan-${status}`,
+      { retries: SCAN_WORKFLOW_RECORD_RETRY, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT },
+      async () => {
+        await deps.recordScan(params, status, error, usage);
+        return true;
+      },
+    );
 
   const record = async (status: ScanState, error: string | null, usage: ScanUsage | null) => {
     try {
@@ -50,10 +54,14 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
   // -----
   const settle = async (status: "succeeded" | "failed", spent: ScanUsage | null) => {
     try {
-      await step.do(`settle-credit-${status}`, { retries: SCAN_WORKFLOW_RECORD_RETRY, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT }, async () => {
-        await deps.settleCredit(params, status, spent);
-        return true;
-      });
+      await step.do(
+        `settle-credit-${status}`,
+        { retries: SCAN_WORKFLOW_RECORD_RETRY, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT },
+        async () => {
+          await deps.settleCredit(params, status, spent);
+          return true;
+        },
+      );
     } catch (cause) {
       console.error("scan: could not settle the credit", cause instanceof Error ? cause.message : cause);
     }
@@ -61,10 +69,14 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
 
   const detectSignals = async () => {
     try {
-      await step.do("signals-duplicate", { retries: { limit: 0, delay: "1 second" }, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT }, async () => {
-        await deps.detectSignals(params);
-        return true;
-      });
+      await step.do(
+        "signals-duplicate",
+        { retries: { limit: 0, delay: "1 second" }, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT },
+        async () => {
+          await deps.detectSignals(params);
+          return true;
+        },
+      );
     } catch (cause) {
       console.error("scan: could not look for possible duplicates", cause instanceof Error ? cause.message : cause);
     }
@@ -90,11 +102,15 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
   // outruns its time slot, fails the Scan.
   // -----
   const runPhase = async (phase: FullPhase) => {
-    await step.do(`launch-${phase}`, { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_LAUNCH_TIMEOUT }, async () => {
-      await runEffect(ledger.mark(params.accountId, params.scanId, { step: "auditing" }));
-      await sandbox.launchPhase(params.options, phase);
-      return true;
-    });
+    await step.do(
+      `launch-${phase}`,
+      { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_LAUNCH_TIMEOUT },
+      async () => {
+        await runEffect(ledger.mark(params.accountId, params.scanId, { step: "auditing" }));
+        await sandbox.launchPhase(params.options, phase);
+        return true;
+      },
+    );
     const minutes = SCAN_WORKFLOW_FULL_PHASE_MINUTES[phase];
     let outcome: PollResult = { state: "running" };
     for (let i = 0; i < (minutes * 60) / SCAN_WORKFLOW_POLL_SECONDS && outcome.state === "running"; i++) {
@@ -117,7 +133,10 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     }
     if (outcome.state !== "failed") return;
     const reached = await step.do(`cap-${phase}`, () => sandbox.capReached());
-    if (reached) throw new Error(`the budget cap of $${params.options.maxBudgetUsd} was reached during the ${phase} phase: ${outcome.error ?? "the agent stopped"}`);
+    if (reached)
+      throw new Error(
+        `the budget cap of $${params.options.maxBudgetUsd} was reached during the ${phase} phase: ${outcome.error ?? "the agent stopped"}`,
+      );
     throw new Error(outcome.error ?? `the ${phase} phase failed`);
   };
 
@@ -132,40 +151,52 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
 
   try {
     await mark("status-running", { status: "running", step: "cloning" });
-    await step.do("prepare", { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_PREPARE_TIMEOUT }, async () => {
-      // -----
-      // Read inside the step, so the sealed key is never kept in the
-      // Workflow's saved state, and a key set or removed before a
-      // retry is the one the retry uses.
-      // -----
-      const sealed = params.keySource === "account" ? await deps.sealedKeyFor(params.accountId) : null;
-      const checkout = await sandbox.prepare(
-        params.repo,
-        params.ref,
-        sealed === null ? undefined : { accountId: params.accountId, sealed },
-      );
-      await runEffect(ledger.mark(params.accountId, params.scanId, checkout));
-      return checkout;
-    });
+    await step.do(
+      "prepare",
+      { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_PREPARE_TIMEOUT },
+      async () => {
+        // -----
+        // Read inside the step, so the sealed key is never kept in the
+        // Workflow's saved state, and a key set or removed before a
+        // retry is the one the retry uses.
+        // -----
+        const sealed = params.keySource === "account" ? await deps.sealedKeyFor(params.accountId) : null;
+        const checkout = await sandbox.prepare(
+          params.repo,
+          params.ref,
+          sealed === null ? undefined : { accountId: params.accountId, sealed },
+        );
+        await runEffect(ledger.mark(params.accountId, params.scanId, checkout));
+        return checkout;
+      },
+    );
     if (deps.phases === undefined) {
-      await step.do("launch-agent", { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_LAUNCH_TIMEOUT }, async () => {
-        await runEffect(ledger.mark(params.accountId, params.scanId, { step: "auditing" }));
-        await sandbox.launchAgent(params.options);
-        return true;
-      });
+      await step.do(
+        "launch-agent",
+        { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_LAUNCH_TIMEOUT },
+        async () => {
+          await runEffect(ledger.mark(params.accountId, params.scanId, { step: "auditing" }));
+          await sandbox.launchAgent(params.options);
+          return true;
+        },
+      );
 
       let outcome: PollResult = { state: "running" };
       for (let i = 0; i < deps.maxPolls && outcome.state === "running"; i++) {
         await step.sleep(`wait-${i}`, `${SCAN_WORKFLOW_POLL_SECONDS} seconds`);
         outcome = await step.do(`poll-${i}`, async () => {
           const polled = await sandbox.pollAgent();
-          return polled.state === "failed" ? { state: "failed" as const, error: polled.error } : { state: polled.state };
+          return polled.state === "failed"
+            ? { state: "failed" as const, error: polled.error }
+            : { state: polled.state };
         });
       }
       await readUsage();
       if (outcome.state === "running") {
         const tail = await step.do("log-tail", () => sandbox.agentLogTail());
-        throw new Error(`the agent timed out after ${(deps.maxPolls * SCAN_WORKFLOW_POLL_SECONDS) / 60} minutes: ${tail}`);
+        throw new Error(
+          `the agent timed out after ${(deps.maxPolls * SCAN_WORKFLOW_POLL_SECONDS) / 60} minutes: ${tail}`,
+        );
       }
       if (outcome.state === "failed") throw new Error(outcome.error ?? "the agent failed");
     } else {
@@ -177,7 +208,9 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
       await runEffect(ledger.mark(params.accountId, params.scanId, { step: "saving" }));
       const checkout = await sandbox.readCheckout();
       if (checkout) await runEffect(ledger.mark(params.accountId, params.scanId, checkout));
-      const saved = await runEffect(saveScanFilesEffect(reports, params.accountId, params.scanId, await sandbox.readFiles()));
+      const saved = await runEffect(
+        saveScanFilesEffect(reports, params.accountId, params.scanId, await sandbox.readFiles()),
+      );
       await runEffect(ledger.addFiles(params.accountId, params.scanId, saved));
       return saved.map((file) => file.name);
     });
@@ -189,7 +222,10 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
     try {
       await recordStep("succeeded", null, usage);
     } catch (cause) {
-      throw new Error(`the results were saved but could not be recorded: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+      throw new Error(
+        `the results were saved but could not be recorded: ${cause instanceof Error ? cause.message : String(cause)}`,
+        { cause },
+      );
     }
     await mark("status-succeeded", { status: "succeeded", error: null, usage });
     await settle("succeeded", usage);

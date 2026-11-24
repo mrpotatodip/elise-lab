@@ -3,14 +3,28 @@ import { getRequestHeader } from "@tanstack/react-start/server";
 import { MeSchema } from "@repo/contracts/elise";
 import { EngineError, engineJson, jsonPost } from "#/lib/engine-client";
 import { requireSession } from "#/modules/auth/server/session";
-import { ApprovedRunnerLoginSchema, DeniedRunnerLoginSchema, DeviceApproveInputSchema, DeviceDenyInputSchema, PendingRunnerLoginSchema, RunnerLoginLookupQuerySchema, type DeviceLoginView, type PendingRunnerLogin } from "../schemas";
+import {
+  ApprovedRunnerLoginSchema,
+  DeniedRunnerLoginSchema,
+  DeviceApproveInputSchema,
+  DeviceDenyInputSchema,
+  PendingRunnerLoginSchema,
+  RunnerLoginLookupQuerySchema,
+  type DeviceLoginView,
+  type PendingRunnerLogin,
+} from "../schemas";
 import { runnerAccounts } from "../utils";
 
 const UNUSABLE_CODE_STATUSES = new Set([400, 403, 404]);
 
 async function lookupLogin(token: string, code: string): Promise<PendingRunnerLogin | null> {
   try {
-    return await engineJson(PendingRunnerLoginSchema, `/runners/login/lookup?code=${encodeURIComponent(code)}`, {}, { token });
+    return await engineJson(
+      PendingRunnerLoginSchema,
+      `/runners/login/lookup?code=${encodeURIComponent(code)}`,
+      {},
+      { token },
+    );
   } catch (error) {
     if (error instanceof EngineError && UNUSABLE_CODE_STATUSES.has(error.status)) return null;
     throw error;
@@ -26,7 +40,11 @@ export const fetchDeviceLogin = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<DeviceLoginView> => {
     const { token } = await requireSession();
     const me = await engineJson(MeSchema, "/me", {}, { token });
-    return { login: await lookupLogin(token, data.code), accounts: runnerAccounts(me.accounts), yourIp: getRequestHeader("cf-connecting-ip") ?? null };
+    return {
+      login: await lookupLogin(token, data.code),
+      accounts: runnerAccounts(me.accounts),
+      yourIp: getRequestHeader("cf-connecting-ip") ?? null,
+    };
   });
 
 // -----
@@ -38,9 +56,13 @@ export const approveDeviceLogin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { token } = await requireSession();
     const me = await engineJson(MeSchema, "/me", {}, { token });
-    if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId)) throw new Error("You can't add a Runner to this account.");
+    if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId))
+      throw new Error("You can't add a Runner to this account.");
     const body = JSON.stringify({ userCode: data.userCode, name: data.name });
-    return engineJson(ApprovedRunnerLoginSchema, "/runners/login/approve", jsonPost(body), { token, accountId: data.accountId });
+    return engineJson(ApprovedRunnerLoginSchema, "/runners/login/approve", jsonPost(body), {
+      token,
+      accountId: data.accountId,
+    });
   });
 
 // -----
@@ -52,7 +74,11 @@ export const denyDeviceLogin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { token } = await requireSession();
     const me = await engineJson(MeSchema, "/me", {}, { token });
-    if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId)) throw new Error("You can't deny a Runner login for this account.");
+    if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId))
+      throw new Error("You can't deny a Runner login for this account.");
     const body = JSON.stringify({ userCode: data.userCode });
-    return engineJson(DeniedRunnerLoginSchema, "/runners/login/deny", jsonPost(body), { token, accountId: data.accountId });
+    return engineJson(DeniedRunnerLoginSchema, "/runners/login/deny", jsonPost(body), {
+      token,
+      accountId: data.accountId,
+    });
   });

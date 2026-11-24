@@ -31,10 +31,12 @@ const rateLimitBy = (limiter: LimiterName, keyOf: (ip: string) => string, refusa
 // -----
 // Per IP. No IP: one key.
 // -----
-export const rateLimitByIp = (limiter: LimiterName, refusal: () => AppError) => rateLimitBy(limiter, (ip) => ip, refusal);
+export const rateLimitByIp = (limiter: LimiterName, refusal: () => AppError) =>
+  rateLimitBy(limiter, (ip) => ip, refusal);
 
 // -----
 // One count for every caller, so many IP addresses
 // share one limit.
 // -----
-export const rateLimitTotal = (limiter: LimiterName, refusal: () => AppError) => rateLimitBy(limiter, () => "all", refusal);
+export const rateLimitTotal = (limiter: LimiterName, refusal: () => AppError) =>
+  rateLimitBy(limiter, () => "all", refusal);

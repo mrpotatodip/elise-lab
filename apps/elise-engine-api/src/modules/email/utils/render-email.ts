@@ -1,7 +1,14 @@
 import type { QueuedEmail, RunnerNames } from "#/modules/email/types";
 import { renderRunnerAdded, renderRunnerRemoved } from "./runner-templates";
 import { renderTwoFactorNotice, renderTwoFactorRequirementChanged, renderTwoFactorReset } from "./two-factor-templates";
-import { renderAnthropicKeyChanged, renderBudgetChanged, renderPasswordReset, renderPasswordResetDone, renderTeamInvite, renderVerifyEmail } from "./templates";
+import {
+  renderAnthropicKeyChanged,
+  renderBudgetChanged,
+  renderPasswordReset,
+  renderPasswordResetDone,
+  renderTeamInvite,
+  renderVerifyEmail,
+} from "./templates";
 
 const unreachable = (mail: never): never => {
   throw new Error(`No email template for ${JSON.stringify(mail)}`);

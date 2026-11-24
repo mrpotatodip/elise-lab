@@ -84,7 +84,8 @@ export const AUTH_COPY = {
     expired: "This sign-in took too long. Sign in again with your password.",
     other: "We could not check the code. Try again.",
     wrongPassword: "That password is not right. Check it and try again.",
-    locked: (lockLasts: string, until: string) => `Too many wrong codes. Codes are locked for ${lockLasts}; try again after ${until} at the latest.`,
+    locked: (lockLasts: string, until: string) =>
+      `Too many wrong codes. Codes are locked for ${lockLasts}; try again after ${until} at the latest.`,
   },
   setup: {
     title: "Set up Two-factor sign-in",
@@ -101,7 +102,10 @@ export const TWO_FACTOR_LOCK_MINUTES = 15;
 export const AUTH_BRAND_COPY = {
   headline: "Security audits for your code, in plain words.",
   points: [
-    { title: "Audits your repositories", text: "Connect GitHub and an AI model reads your code for security problems, private repositories included." },
+    {
+      title: "Audits your repositories",
+      text: "Connect GitHub and an AI model reads your code for security problems, private repositories included.",
+    },
     { title: "Explains every finding", text: "Each problem comes with what it means and how to fix it." },
     { title: "Checks a commit before you ship", text: "A pass, a fail, or not enough scans yet, for each commit." },
   ],

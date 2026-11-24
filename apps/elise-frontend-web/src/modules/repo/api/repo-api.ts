@@ -1,9 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
-import { AddRepoInputSchema, RepoDetailSchema, RepoFindingListSchema, RepoFindingsPageInputSchema, RepoListSchema, RepoParamSchema } from "../schemas";
+import {
+  AddRepoInputSchema,
+  RepoDetailSchema,
+  RepoFindingListSchema,
+  RepoFindingsPageInputSchema,
+  RepoListSchema,
+  RepoParamSchema,
+} from "../schemas";
 import { engineJson, jsonPost } from "#/lib/engine-client";
 import { engineAuth } from "#/modules/auth/server/session";
 
-export const fetchRepos = createServerFn({ method: "GET" }).handler(async () => engineJson(RepoListSchema, "/repos", {}, await engineAuth()));
+export const fetchRepos = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(RepoListSchema, "/repos", {}, await engineAuth()),
+);
 
 export const fetchRepo = createServerFn({ method: "GET" })
   .validator(RepoParamSchema)
@@ -20,4 +29,6 @@ export const fetchRepoFindings = createServerFn({ method: "GET" })
 
 export const addRepo = createServerFn({ method: "POST" })
   .validator(AddRepoInputSchema)
-  .handler(async ({ data }) => engineJson(RepoDetailSchema, "/repos", jsonPost(JSON.stringify(data)), await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(RepoDetailSchema, "/repos", jsonPost(JSON.stringify(data)), await engineAuth()),
+  );

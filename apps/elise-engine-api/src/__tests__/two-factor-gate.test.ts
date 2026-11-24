@@ -36,23 +36,36 @@ const ErrorBody = z.object({ error: z.object({ code: z.string() }).nullable().op
 const codeOf = async (res: Response) => ErrorBody.parse(await res.json()).error?.code;
 
 describe("an admin session with no Two-factor", () => {
-  it.each(["/repos", "/scans", "/usage", "/team", "/groups", "/files", "/findings", "/runners"])("is refused on %s", async (path) => {
-    setupRequired = true;
-    const res = await call(path, SESSION);
+  it.each(["/repos", "/scans", "/usage", "/team", "/groups", "/files", "/findings", "/runners"])(
+    "is refused on %s",
+    async (path) => {
+      setupRequired = true;
+      const res = await call(path, SESSION);
 
-    expect(res.status).toBe(403);
-    expect(await codeOf(res)).toBe("TWO_FACTOR_SETUP_REQUIRED");
-  });
+      expect(res.status).toBe(403);
+      expect(await codeOf(res)).toBe("TWO_FACTOR_SETUP_REQUIRED");
+    },
+  );
 
-  it.each(["/auth/device/approve", "/stripe/checkout", "/stripe/portal", "/auth/two-factor/disable"])("is refused on %s", async (path) => {
-    setupRequired = true;
-    const res = await call(path, SESSION, "POST");
+  it.each(["/auth/device/approve", "/stripe/checkout", "/stripe/portal", "/auth/two-factor/disable"])(
+    "is refused on %s",
+    async (path) => {
+      setupRequired = true;
+      const res = await call(path, SESSION, "POST");
 
-    expect(res.status).toBe(403);
-    expect(await codeOf(res)).toBe("TWO_FACTOR_SETUP_REQUIRED");
-  });
+      expect(res.status).toBe(403);
+      expect(await codeOf(res)).toBe("TWO_FACTOR_SETUP_REQUIRED");
+    },
+  );
 
-  it.each(["/me", "/auth/two-factor/enable", "/auth/two-factor/verify-totp", "/auth/sign-out", "/sign-up", "/stripe/webhook"])("may still reach %s", async (path) => {
+  it.each([
+    "/me",
+    "/auth/two-factor/enable",
+    "/auth/two-factor/verify-totp",
+    "/auth/sign-out",
+    "/sign-up",
+    "/stripe/webhook",
+  ])("may still reach %s", async (path) => {
     setupRequired = true;
     const res = await call(path, SESSION, path === "/me" ? "GET" : "POST");
 

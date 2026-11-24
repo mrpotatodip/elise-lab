@@ -26,7 +26,14 @@ const out = path.join(os.tmpdir(), `live-get-${process.pid}.json`);
 const run = spawnSync("pnpm", ["exec", "vitest", "run", "-c", "vitest.live.config.ts", "--reporter=dot"], {
   cwd: appDir,
   encoding: "utf8",
-  env: { ...process.env, NODE_NO_WARNINGS: "1", LIVE_DATABASE_URL: databaseUrl(), LIVE_PATH: route, LIVE_ACCOUNT: account, LIVE_OUT: out },
+  env: {
+    ...process.env,
+    NODE_NO_WARNINGS: "1",
+    LIVE_DATABASE_URL: databaseUrl(),
+    LIVE_PATH: route,
+    LIVE_ACCOUNT: account,
+    LIVE_OUT: out,
+  },
 });
 if (run.status !== 0 || !fs.existsSync(out)) {
   console.error((run.stdout + run.stderr).trim().split("\n").slice(-25).join("\n"));

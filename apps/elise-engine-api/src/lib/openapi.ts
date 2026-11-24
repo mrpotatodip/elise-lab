@@ -33,7 +33,9 @@ const ERROR_DESCRIPTIONS = {
 export type ErrorStatus = keyof typeof ERROR_DESCRIPTIONS;
 
 export function errorResponses(...statuses: ErrorStatus[]) {
-  return Object.fromEntries(statuses.map((status) => [status, jsonResponse(ERROR_DESCRIPTIONS[status], ErrorEnvelopeSchema)]));
+  return Object.fromEntries(
+    statuses.map((status) => [status, jsonResponse(ERROR_DESCRIPTIONS[status], ErrorEnvelopeSchema)]),
+  );
 }
 
 export const SERVICE_SECURITY = [{ bearerAuth: [] }];

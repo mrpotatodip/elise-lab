@@ -10,7 +10,11 @@ type BudgetCap = { ok: true; defaultUsd: number; ceilingUsd: number } | { ok: fa
 // markup, fits in what is left (in credit dollars), or the sentence
 // that none does. It reads the same table as the caps.
 // -----
-export const budgetRefusalHintOf = (profile: (typeof SCAN_PROFILES)[number], leftUsd: number, markup: number): string => {
+export const budgetRefusalHintOf = (
+  profile: (typeof SCAN_PROFILES)[number],
+  leftUsd: number,
+  markup: number,
+): string => {
   const smaller = SCAN_PROFILES.slice(0, SCAN_PROFILES.indexOf(profile)).toReversed();
   const fits = smaller.find((name) => SCAN_PROFILE_CAPS_USD[name] * markup <= leftUsd);
   if (fits) return `The ${fits} profile would fit`;
@@ -34,7 +38,10 @@ export const budgetCapOf = (
   const profileCapUsd = SCAN_PROFILE_CAPS_USD[scan.profile];
   const fullCeilingUsd = Number(env.MAX_BUDGET_FULL_USD);
   if (!(profileCapUsd <= fullCeilingUsd)) {
-    return { ok: false, message: `The ${scan.profile} profile's cap of $${profileCapUsd} is above the ceiling of $${fullCeilingUsd} for full scans, so it cannot start` };
+    return {
+      ok: false,
+      message: `The ${scan.profile} profile's cap of $${profileCapUsd} is above the ceiling of $${fullCeilingUsd} for full scans, so it cannot start`,
+    };
   }
   return { ok: true, defaultUsd: profileCapUsd, ceilingUsd: profileCapUsd };
 };

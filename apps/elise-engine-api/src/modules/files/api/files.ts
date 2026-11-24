@@ -9,10 +9,18 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/", listFilesDoc, zValidator("header", AccountHeaderSchema), zValidator("query", FilesQuerySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listFilesSvc(db, accountId, c.req.valid("query"))));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/",
+  listFilesDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("query", FilesQuerySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(listFilesSvc(db, accountId, c.req.valid("query"))));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

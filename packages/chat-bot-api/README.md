@@ -6,15 +6,15 @@ It does **not** do auth, rate limits, widgets or any domain tool. Those stay in 
 
 ## The plug points
 
-| Plug | What the host gives | Where |
-|---|---|---|
-| Owner | `{ kind: "user" \| "anonymous", scopeId, userId \| anonymousId }`. `scopeId` is the host's unit of isolation (tenant, org, workspace). | per call |
-| Store | A `ChatBotStore`, already bound to the host's database | `createChatBot({ store })` |
-| Model | A `ChatBotRunner`: how a model name becomes an adapter, and an optional router | `createChatBotRunner({ adapterFor, route })` |
-| Stream log | `durableStream(init)`, from `@repo/chat-bot-durable-stream` | `createChatBot({ durableStream })` |
-| Services | Whatever a tool needs (db client, mailer, ...). Spread onto the runtime next to `owner` and `threadId`. | `createChatBot({ services })` |
-| Agents and tools | Plain data: prompts, tools, subagents | per call |
-| Failures | The engine fails with tagged errors (`DbError`, `NotFound`, `Invalid`, `Conflict`). The host maps them to HTTP. | the host's run point |
+| Plug             | What the host gives                                                                                                                    | Where                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Owner            | `{ kind: "user" \| "anonymous", scopeId, userId \| anonymousId }`. `scopeId` is the host's unit of isolation (tenant, org, workspace). | per call                                     |
+| Store            | A `ChatBotStore`, already bound to the host's database                                                                                 | `createChatBot({ store })`                   |
+| Model            | A `ChatBotRunner`: how a model name becomes an adapter, and an optional router                                                         | `createChatBotRunner({ adapterFor, route })` |
+| Stream log       | `durableStream(init)`, from `@repo/chat-bot-durable-stream`                                                                            | `createChatBot({ durableStream })`           |
+| Services         | Whatever a tool needs (db client, mailer, ...). Spread onto the runtime next to `owner` and `threadId`.                                | `createChatBot({ services })`                |
+| Agents and tools | Plain data: prompts, tools, subagents                                                                                                  | per call                                     |
+| Failures         | The engine fails with tagged errors (`DbError`, `NotFound`, `Invalid`, `Conflict`). The host maps them to HTTP.                        | the host's run point                         |
 
 ## A host in a page
 
@@ -26,9 +26,9 @@ type Services = { db: Db };
 const defineTool = createChatBotToolFactory<Services>();
 
 const chat = createChatBot<Services>({
-  store: createMemoryChatBotStore(),            // or your own, see below
+  store: createMemoryChatBotStore(), // or your own, see below
   runner: createChatBotRunner({ adapterFor: (model) => openai(model) }),
-  durableStream,                                // pg or memory, from @repo/chat-bot-durable-stream
+  durableStream, // pg or memory, from @repo/chat-bot-durable-stream
   services: { db },
   waitUntil: (job) => ctx.waitUntil(job),
 });
@@ -38,7 +38,10 @@ await Effect.runPromise(chat.stream({ agent, owner, body, request }));
 // GET: hydrate a thread, or rejoin a live run when the request has an offset
 await Effect.runPromise(chat.hydrateOrJoin({ owner, threadId, request }));
 // threads
-chat.threads.list(owner); chat.threads.get(owner, id); chat.threads.rename(owner, id, "x"); chat.threads.remove(owner, id);
+chat.threads.list(owner);
+chat.threads.get(owner, id);
+chat.threads.rename(owner, id, "x");
+chat.threads.remove(owner, id);
 ```
 
 Each call returns an `Effect`. Run it with your own run point and map the tagged failures the way your app already does.
@@ -48,14 +51,19 @@ Each call returns an `Effect`. Run it with your own run point and map the tagged
 ```ts
 import { createChatBotRoutes } from "@repo/chat-bot-api/hono";
 
-app.route("/chat-bot", createChatBotRoutes({
-  chat: (c) => chatFor(c),
-  owner: (c) => ownerFrom(c),
-  agent: () => mainAgent,
-  run: runEffect,
-  invalid: (message) => { throw new ValidationError(message); },
-  docs: { stream: streamDoc },   // optional OpenAPI text per route
-}));
+app.route(
+  "/chat-bot",
+  createChatBotRoutes({
+    chat: (c) => chatFor(c),
+    owner: (c) => ownerFrom(c),
+    agent: () => mainAgent,
+    run: runEffect,
+    invalid: (message) => {
+      throw new ValidationError(message);
+    },
+    docs: { stream: streamDoc }, // optional OpenAPI text per route
+  }),
+);
 ```
 
 Mount it behind your own auth. `hono` and `hono-openapi` are optional peers, needed only for this subpath.
@@ -95,7 +103,7 @@ describeChatBotStoreContract("my store", async () => ({
   scopes: { a: scopeA, b: scopeB },
   users: { one: userOne, two: userTwo },
   start: { trigger: "chat", module: "chat" },
-  refused: { trigger: "nope", module: "chat" },   // or null if you accept any
+  refused: { trigger: "nope", module: "chat" }, // or null if you accept any
 }));
 ```
 
@@ -114,15 +122,15 @@ hono  hono-openapi                   (peers, only for /hono)
 drizzle-orm                          (only if you use the Postgres stream log or tables)
 ```
 
-| Import | Brings in |
-|---|---|
-| `@repo/chat-bot-api` | The engine, plus the wire protocol (`ChatBotTurn`, `ChatBotStructure`, ...). No database, no HTTP framework. |
-| `@repo/chat-bot-api/contracts` | Only the wire protocol: Zod schemas and types. Safe for a browser bundle. |
-| `@repo/chat-bot-api/memory` | The in-memory store. |
-| `@repo/chat-bot-api/hono` | The optional routes. |
-| `@repo/chat-bot-api/drizzle` | The Postgres store (needs `drizzle-orm`). |
-| `@repo/chat-bot-api/drizzle/tables` | Only the four Drizzle tables, for your migrations. |
-| `@repo/chat-bot-api/testing` | The store contract (needs `vitest`). |
+| Import                              | Brings in                                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `@repo/chat-bot-api`                | The engine, plus the wire protocol (`ChatBotTurn`, `ChatBotStructure`, ...). No database, no HTTP framework. |
+| `@repo/chat-bot-api/contracts`      | Only the wire protocol: Zod schemas and types. Safe for a browser bundle.                                    |
+| `@repo/chat-bot-api/memory`         | The in-memory store.                                                                                         |
+| `@repo/chat-bot-api/hono`           | The optional routes.                                                                                         |
+| `@repo/chat-bot-api/drizzle`        | The Postgres store (needs `drizzle-orm`).                                                                    |
+| `@repo/chat-bot-api/drizzle/tables` | Only the four Drizzle tables, for your migrations.                                                           |
+| `@repo/chat-bot-api/testing`        | The store contract (needs `vitest`).                                                                         |
 
 Then write the five pieces from "A host in a page".
 These packages are workspace packages that ship TypeScript source, so they work as-is for another app in this repo and for any bundler (Workers, Vite). Using them from another repository means publishing them with a build step; nothing here does that yet.

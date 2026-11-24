@@ -12,7 +12,13 @@ import { judgeCommit } from "#/modules/verdict/utils";
 // from the scans and decisions on every call, so it cannot
 // disagree with them.
 // -----
-export const verdictSvc = (db: AppDbType, accountId: string, repoId: string, commit: string, now: Date): Effect.Effect<Verdict, NotFound | DbError> =>
+export const verdictSvc = (
+  db: AppDbType,
+  accountId: string,
+  repoId: string,
+  commit: string,
+  now: Date,
+): Effect.Effect<Verdict, NotFound | DbError> =>
   Effect.gen(function* () {
     yield* getRepoEffect(db, accountId, repoId);
     const evidence = yield* commitEvidenceEffect(db, accountId, repoId, commit);

@@ -26,20 +26,31 @@ export function UsageCard() {
       </CardHeader>
       <CardContent className="grid gap-5">
         <div className="flex items-end justify-between gap-4">
-          <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">{usageUsd(data.spentUsd)}</p>
+          <p className="text-[28px] font-semibold leading-none tracking-tight tabular-nums">
+            {usageUsd(data.spentUsd)}
+          </p>
           <p className="text-sm text-muted-foreground tabular-nums">of {usageUsd(data.budgetUsd)}</p>
         </div>
         {canManage && (
-          <Link to="/settings/budget" className={buttonVariants({ variant: "outline", size: "sm", className: "justify-self-start" })}>
+          <Link
+            to="/settings/budget"
+            className={buttonVariants({ variant: "outline", size: "sm", className: "justify-self-start" })}
+          >
             <Settings aria-hidden="true" />
             Manage budget
           </Link>
         )}
-        <Progress value={percent} aria-label="Share of the monthly budget spent or held by running scans" indicatorClassName={cn("bg-primary/80", tight && "bg-mark-danger")} />
+        <Progress
+          value={percent}
+          aria-label="Share of the monthly budget spent or held by running scans"
+          indicatorClassName={cn("bg-primary/80", tight && "bg-mark-danger")}
+        />
         <dl className="grid gap-3 border-t pt-5 text-sm">
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-muted-foreground">Remaining</dt>
-            <dd className={cn("font-medium tabular-nums", data.remainingUsd <= 0 && "text-status-danger")}>{usageUsd(Math.max(0, data.remainingUsd))}</dd>
+            <dd className={cn("font-medium tabular-nums", data.remainingUsd <= 0 && "text-status-danger")}>
+              {usageUsd(Math.max(0, data.remainingUsd))}
+            </dd>
           </div>
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-muted-foreground">Held by running scans</dt>
@@ -54,7 +65,9 @@ export function UsageCard() {
             <dd className="font-medium tabular-nums">{usageTokens(tokenTotal)}</dd>
           </div>
         </dl>
-        <p className="text-sm leading-relaxed text-muted-foreground">Cost is an estimate at list price, from each scan's own report.</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Cost is an estimate at list price, from each scan's own report.
+        </p>
       </CardContent>
     </Card>
   );

@@ -12,7 +12,11 @@ const dropRepoClaudeConfig = ["/.claude", "/CLAUDE.md", "/CLAUDE.local.md", "/.m
 // and its own cap. A Phase of a full Scan has files of its own and what
 // the Scan's pool still holds as its cap.
 // -----
-export function buildAgentScript(options: ScanOptions, files: AgentFiles = DEFAULT_AGENT_FILES, maxBudgetUsd: number = options.maxBudgetUsd): string {
+export function buildAgentScript(
+  options: ScanOptions,
+  files: AgentFiles = DEFAULT_AGENT_FILES,
+  maxBudgetUsd: number = options.maxBudgetUsd,
+): string {
   const agent = [
     "claude --print --output-format stream-json --verbose --dangerously-skip-permissions --no-session-persistence --setting-sources user",
     `--model ${options.model} --effort ${options.effort} --max-budget-usd ${maxBudgetUsd}`,

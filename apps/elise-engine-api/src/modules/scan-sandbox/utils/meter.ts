@@ -1,4 +1,8 @@
-import { SCAN_SANDBOX_DEFAULT_PRICE, SCAN_SANDBOX_METER_EPSILON, SCAN_SANDBOX_MODEL_PRICES } from "#/modules/scan-sandbox/constants";
+import {
+  SCAN_SANDBOX_DEFAULT_PRICE,
+  SCAN_SANDBOX_METER_EPSILON,
+  SCAN_SANDBOX_MODEL_PRICES,
+} from "#/modules/scan-sandbox/constants";
 import type { Meter, MeteredTokens } from "#/modules/scan-sandbox/types";
 
 // -----
@@ -10,7 +14,8 @@ export const sumOrNull = (values: (number | null)[]): number | null =>
 
 const NO_TOKENS: MeteredTokens = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
 
-const priceOf = (model: string) => new Map(Object.entries(SCAN_SANDBOX_MODEL_PRICES)).get(model) ?? SCAN_SANDBOX_DEFAULT_PRICE;
+const priceOf = (model: string) =>
+  new Map(Object.entries(SCAN_SANDBOX_MODEL_PRICES)).get(model) ?? SCAN_SANDBOX_DEFAULT_PRICE;
 
 export const priceUsage = (model: string, tokens: MeteredTokens): number => {
   const price = priceOf(model);
@@ -36,7 +41,8 @@ export const freshMeter = (budgetUsd: number): Meter => ({ budgetUsd, spentUsd: 
 // -----
 export const remainingUsd = (meter: Meter): number => Math.max(0, meter.budgetUsd - meter.spentUsd);
 
-export const reserveUsd = (model: string, maxTokens: number): number => priceUsage(model, { ...NO_TOKENS, outputTokens: maxTokens });
+export const reserveUsd = (model: string, maxTokens: number): number =>
+  priceUsage(model, { ...NO_TOKENS, outputTokens: maxTokens });
 
 export const withReserve = (meter: Meter, usd: number): Meter | null => {
   const reservedUsd = meter.reservedUsd ?? 0;
@@ -44,7 +50,10 @@ export const withReserve = (meter: Meter, usd: number): Meter | null => {
   return { ...meter, reservedUsd: reservedUsd + usd };
 };
 
-export const withoutReserve = (meter: Meter, usd: number): Meter => ({ ...meter, reservedUsd: Math.max(0, (meter.reservedUsd ?? 0) - usd) });
+export const withoutReserve = (meter: Meter, usd: number): Meter => ({
+  ...meter,
+  reservedUsd: Math.max(0, (meter.reservedUsd ?? 0) - usd),
+});
 
 export const withSpend = (meter: Meter, model: string, tokens: MeteredTokens): Meter => ({
   ...meter,

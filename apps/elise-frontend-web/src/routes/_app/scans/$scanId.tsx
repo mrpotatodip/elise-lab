@@ -7,7 +7,14 @@ export const Route = createFileRoute("/_app/scans/$scanId")({
     const scan = await context.queryClient.query({ ...scanQuery(params.scanId), staleTime: "static" });
     prefetchScanReport(context.queryClient, scan);
     const { owner, name } = scanRepoName(scan.repo, scan.scanId);
-    return { name: owner ? `${owner}/${name}` : name, repoId: scan.repoId, branch: scan.branch ?? undefined, branchId: scan.branchId ?? undefined, commit: scan.commitSha?.slice(0, 7), startedAt: scan.createdAt };
+    return {
+      name: owner ? `${owner}/${name}` : name,
+      repoId: scan.repoId,
+      branch: scan.branch ?? undefined,
+      branchId: scan.branchId ?? undefined,
+      commit: scan.commitSha?.slice(0, 7),
+      startedAt: scan.createdAt,
+    };
   },
   head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? "Scan"} report · Elise` }] }),
   component: ScanPage,

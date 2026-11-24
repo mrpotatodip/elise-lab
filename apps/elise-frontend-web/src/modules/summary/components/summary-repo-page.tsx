@@ -15,7 +15,11 @@ export function SummaryRepoPage({ repoId }: { repoId: string }) {
 
   return (
     <>
-      <ShellPageHeader title={repoName(repo.url)} description={`${repoSubtitle(repo)} Nothing here changes anything.`} badges={<Badge variant={status.variant}>{status.label}</Badge>} />
+      <ShellPageHeader
+        title={repoName(repo.url)}
+        description={`${repoSubtitle(repo)} Nothing here changes anything.`}
+        badges={<Badge variant={status.variant}>{status.label}</Badge>}
+      />
       <SummaryRepoOverview repo={repo} />
       <SummaryFindings repo={repo} />
     </>
