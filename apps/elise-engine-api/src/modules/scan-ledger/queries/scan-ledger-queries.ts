@@ -40,12 +40,22 @@ const runnersOf = (db: AppDbType, ids: string[]) =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ scanId: scanRunnerJobs.scanId, id: tenantRunners.id, name: tenantRunners.name })
+        .select({
+          scanId: scanRunnerJobs.scanId,
+          id: tenantRunners.id,
+          name: tenantRunners.name,
+          optionsJson: scanRunnerJobs.optionsJson,
+        })
         .from(scanRunnerJobs)
-        .innerJoin(tenantRunners, eq(tenantRunners.id, scanRunnerJobs.runnerId))
+        .leftJoin(tenantRunners, eq(tenantRunners.id, scanRunnerJobs.runnerId))
         .where(inArray(scanRunnerJobs.scanId, ids)),
     catch: toDbError,
   });
+
+type RunnerJob = { scanId: string; id: string | null; name: string | null; optionsJson: string };
+
+const runnerOfJob = (job: RunnerJob | undefined) =>
+  job?.id != null && job.name !== null ? { id: job.id, name: job.name } : null;
 
 // -----
 // An Account's live scans. Callers count these scans and add up
@@ -76,9 +86,10 @@ export const activeScansEffect = (
             db,
             rows.map((row) => row.id),
           );
-    return rows.map((row) =>
-      scanRowToStatus(row, [], null, runners.find((runner) => runner.scanId === row.id) ?? null),
-    );
+    return rows.map((row) => {
+      const job = runners.find((runner) => runner.scanId === row.id);
+      return scanRowToStatus(row, [], null, runnerOfJob(job), null, job?.optionsJson);
+    });
   });
 
 // -----
@@ -121,8 +132,9 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
         });
         const runners = yield* runnersOf(db, ids);
         const archives = yield* scanArchivesEffect(db, ids);
-        return rows.map((row) =>
-          scanRowToStatus(
+        return rows.map((row) => {
+          const job = runners.find((runner) => runner.scanId === row.id);
+          return scanRowToStatus(
             row,
             files
               .filter((file) => file.scanId === row.id)
@@ -131,10 +143,11 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
               row,
               counts.filter((count) => count.scanId === row.id),
             ),
-            runners.find((runner) => runner.scanId === row.id) ?? null,
+            runnerOfJob(job),
             archives.get(row.id) ?? null,
-          ),
-        );
+            job?.optionsJson,
+          );
+        });
       });
 
 // -----

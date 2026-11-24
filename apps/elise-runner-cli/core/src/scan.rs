@@ -129,6 +129,9 @@ pub struct Job {
     #[serde(default)]
     profile: Option<String>,
     max_budget_usd: f64,
+    // The folders of the repository the Scan is limited to, empty for a Scan of everything. An older engine sends none.
+    #[serde(default)]
+    scope_paths: Vec<String>,
     prompt: String,
     // The four Phase prompts in order, when the engine builds them. An older engine sends none and
     // the Scan is one run on `prompt`.
@@ -519,6 +522,7 @@ fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
 // -----
 async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
     strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
+    check_scope(&work.join("repo"), &job.scope_paths)?;
     install_skill(tools, skill_dir_of(job)?, work)?;
     write_agent_settings(work)?;
 
@@ -1628,6 +1632,35 @@ fn budget_of(asked: f64) -> f64 {
     }
 }
 
+fn safe_scope_path(path: &str) -> bool {
+    let part_ok = |part: &str| {
+        !part.is_empty() && part != "." && part != ".." && part.chars().all(|c| c.is_ascii_alphanumeric() || "._@+=~-".contains(c))
+    };
+    !path.is_empty() && path.len() <= 200 && !path.starts_with('-') && path.split('/').all(part_ok)
+}
+
+fn check_scope(repo: &Path, scope_paths: &[String]) -> Result<(), String> {
+    let root = fs::canonicalize(repo).map_err(|e| format!("Could not read the cloned repository: {e}"))?;
+    let mut missing = Vec::new();
+    for path in scope_paths {
+        if !safe_scope_path(path) {
+            return Err(format!(
+                "This runner will not scan the folder \"{path}\": write folders from the repository's root, like apps/api."
+            ));
+        }
+        match fs::canonicalize(repo.join(path)) {
+            Ok(found) if found.is_dir() && found.starts_with(&root) => {}
+            _ => missing.push(path.as_str()),
+        }
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let names = missing.iter().map(|path| format!("\"{path}\"")).collect::<Vec<_>>().join(", ");
+    let which = if missing.len() == scope_paths.len() { "None of the folders you asked for is" } else { "These folders are not" };
+    Err(format!("{which} in this repository: {names}. Folder names are written from the repository's root, like apps/api, and the folder must exist at the branch or commit that is scanned. Fix the list and scan again."))
+}
+
 fn safe_ref(name: &str) -> bool {
     !name.is_empty() && name.len() <= 200 && !name.starts_with('-') && name.chars().all(|c| c.is_ascii_alphanumeric() || "._/-".contains(c))
 }
@@ -1672,6 +1705,7 @@ mod tests {
             profile_cap_usd: None,
             profile: None,
             max_budget_usd: 1.0,
+            scope_paths: Vec::new(),
             prompt: "Use the security-audit-lite skill".into(),
             phase_prompts: Vec::new(),
             priors_json: String::new(),
@@ -2041,6 +2075,35 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert!(said.contains("cap was reached") && said.contains("$5") && said.contains("check phase"), "{said}");
         assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 2);
         assert!(stage.work.join("out/hunt.md").is_file());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_scoped_scan_whose_folders_are_not_in_the_clone_fails_before_the_agent_runs() {
+        let stage = stage("scope-missing");
+        fs::create_dir_all(stage.work.join("repo/alpha")).unwrap();
+        let job = Job { scope_paths: vec!["beta".into()], ..plain_job() };
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "failed");
+        assert!(report.error.unwrap().starts_with("None of the folders you asked for is in this repository: \"beta\"."));
+        assert!(lines_of(stage.work.join("calls.txt")).is_empty());
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_scoped_scan_whose_folders_exist_runs_its_phases() {
+        let stage = stage("scope-present");
+        fs::create_dir_all(stage.work.join("repo/alpha")).unwrap();
+        let job = Job { scope_paths: vec!["alpha".into()], ..plain_job() };
+
+        let report = scan(&stage, &job);
+
+        assert_ne!(report.error.as_deref().map(|said| said.contains("folders")), Some(true));
+        assert_eq!(lines_of(stage.work.join("calls.txt")).len(), 4);
         let _ = fs::remove_dir_all(&stage.root);
     }
 
@@ -2732,6 +2795,60 @@ esac
         assert_eq!(AGENT_TIMEOUT, Duration::from_secs(40 * 60));
         // The repair run's 5 minutes are extra: they are not one of the 90.
         assert_eq!(REPAIR_MINUTES, 5);
+    }
+
+    fn scope_repo(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("eliselab-scope-test-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("alpha/inner")).unwrap();
+        fs::write(root.join("a-file"), "text").unwrap();
+        root
+    }
+
+    fn paths(list: &[&str]) -> Vec<String> {
+        list.iter().map(|path| path.to_string()).collect()
+    }
+
+    #[test]
+    fn a_scan_of_folders_that_exist_passes_the_check_and_a_scan_of_everything_needs_none() {
+        let root = scope_repo("exists");
+
+        assert_eq!(check_scope(&root, &paths(&["alpha", "alpha/inner"])), Ok(()));
+        assert_eq!(check_scope(&root, &[]), Ok(()));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_folder_that_is_missing_or_is_a_file_fails_the_scan_with_its_name() {
+        let root = scope_repo("missing");
+
+        let some = check_scope(&root, &paths(&["alpha", "beta", "a-file"])).unwrap_err();
+        let none = check_scope(&root, &paths(&["beta"])).unwrap_err();
+
+        assert!(some.starts_with("These folders are not in this repository: \"beta\", \"a-file\"."), "{some}");
+        assert!(none.starts_with("None of the folders you asked for is in this repository: \"beta\"."), "{none}");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_folder_name_that_could_leave_the_repository_is_refused_before_any_look() {
+        let root = scope_repo("unsafe");
+
+        for bad in ["../x", "/etc", "-x", "alpha//inner", "alpha/./inner", "a b", "a\\b", ""] {
+            let said = check_scope(&root, &paths(&[bad])).unwrap_err();
+            assert!(said.starts_with("This runner will not scan the folder"), "{bad}: {said}");
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_job_reads_with_or_without_folders() {
+        let base = r#""scanId":"s1","repo":"https://github.com/o/n","ref":null,"skill":"full","model":"m","effort":"high","maxBudgetUsd":50,"prompt":"p","priorsJson":"""#;
+        let old: Job = serde_json::from_str(&format!("{{{base}}}")).unwrap();
+        let new: Job = serde_json::from_str(&format!("{{{base},\"scopePaths\":[\"alpha\",\"beta/c\"]}}")).unwrap();
+
+        assert!(old.scope_paths.is_empty());
+        assert_eq!(new.scope_paths, ["alpha", "beta/c"]);
     }
 
     #[cfg(unix)]

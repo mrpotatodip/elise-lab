@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES } from "#/constants";
 import { documentFields } from "#/lib/document-fields";
-import { ScanQueuedSchema as ContractScanQueuedSchema } from "@repo/contracts/elise";
+import { checkScopePaths, ScanQueuedSchema as ContractScanQueuedSchema } from "@repo/contracts/elise";
 import { SCANS_GIT_REF, SCANS_PROVIDER } from "#/modules/scans/constants";
 import { checkArchiveSource, checkRepoAddress } from "./repo-address-schema";
 
@@ -26,6 +26,14 @@ export const CreateScanBodySchema = z
       .regex(SCANS_GIT_REF)
       .optional()
       .meta({ example: "main", description: "A branch, tag or commit to scan. Leave it out for the default branch." }),
+    scope_paths: z
+      .array(z.string())
+      .optional()
+      .meta({
+        example: ["apps/api", "packages/db"],
+        description:
+          "Scan only these folders of the repository, written relative to its root, with no globs. At most 10. Runs on a Runner only. The Scan is a Partial Scan and never counts as a full pass in the Verdict. Leave it out to scan everything.",
+      }),
     archive_id: z.uuid().optional().meta({
       description:
         "For provider upload only: the zip of the app to scan. An upload Scan runs on a Runner and takes no ref.",
@@ -34,6 +42,13 @@ export const CreateScanBodySchema = z
   .superRefine((body, ctx) => {
     checkRepoAddress(body, ctx);
     checkArchiveSource(body, ctx);
+    const scope = body.scope_paths === undefined ? null : checkScopePaths(body.scope_paths);
+    if (scope?.ok === false)
+      ctx.addIssue({ code: "custom", path: ["scope_paths"], message: `scope_paths: ${scope.message}` });
+  })
+  .transform((body) => {
+    const scope = body.scope_paths === undefined ? null : checkScopePaths(body.scope_paths);
+    return scope?.ok ? { ...body, scope_paths: scope.paths } : body;
   });
 
 export const ScanQueuedSchema = documentFields(ContractScanQueuedSchema, {

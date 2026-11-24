@@ -18,6 +18,8 @@ export const SCANS_PROVIDER = z.enum(SOURCE_PROVIDER_IDS).optional().meta({
 // -----
 export const SCANS_RUNNER_ONLY_MESSAGE =
   "runner_id: Scans of this provider run only on a Runner, which clones with your own git login. Pick a connected Runner.";
+export const SCANS_SCOPE_RUNNER_ONLY_MESSAGE =
+  "scope_paths: a Scan of some folders runs only on a Runner. Pick a connected Runner, or leave the folders out.";
 // -----
 // A ref reaches git as an argument, so it cannot start
 // with a dash, and it holds only what a branch, tag or

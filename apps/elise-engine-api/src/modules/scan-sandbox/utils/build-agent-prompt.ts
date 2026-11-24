@@ -43,13 +43,38 @@ const VALIDATION_BY_RUNNER =
 
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
+const SCOPE_LEAD = (paths: string[]) =>
+  `This is a scoped audit of only these folders of the repository, relative to its root: ${paths.map((path) => `\`${path}\``).join(", ")}. The rest of the repository is out of scope.`;
+
+const SCOPE_ASK = {
+  recon: (byRunner: boolean) =>
+    `Record the folders as \`scope_paths\` in run-metadata.json and say in architecture.md that only they were read. ${byRunner ? "List an entry in recon-list.json only when its entry point, boundary and subsystem are inside these folders, and list nothing else: no unit is built for the rest." : "Seed ledger units only for surfaces inside these folders, and record the surfaces you notice outside them as `out_of_scope` units."} Read outside the folders only to follow a call you cannot judge otherwise.`,
+  hunt: () =>
+    "Hunt only inside these folders and add no unit for anything outside them. Read outside them only to follow a call. Do not report a finding whose vulnerable code is outside them.",
+  check: () => "Validate only candidates whose code is inside these folders.",
+  report: () =>
+    "The Report must say, right after its first line, which folders were audited, that the rest of the repository was not looked at, and that this is partial coverage and not a full audit. Do not say the repository is free of findings.",
+} satisfies Record<FullPhase, (byRunner: boolean) => string>;
+
+const SINGLE_RUN_SCOPE_ASK =
+  "Record the folders as `scope_paths` in run-metadata.json and say in architecture.md that only they were read. Seed ledger units only for surfaces inside these folders and record the surfaces you notice outside them as `out_of_scope` units, but never hunt or check an `out_of_scope` unit. Read outside the folders only to follow a call you cannot judge otherwise, and do not report a finding whose vulnerable code is outside them.";
+
+const scopeAskOf = (options: ScanOptions, phase: FullPhase | null, place: PromptPlace): string => {
+  const paths = options.scopePaths ?? [];
+  if (paths.length === 0) return "";
+  if (phase === null) return [SCOPE_LEAD(paths), SINGLE_RUN_SCOPE_ASK, SCOPE_ASK.report()].join(" ");
+  return [SCOPE_LEAD(paths), SCOPE_ASK[phase](place.validatedBy === "runner")].join(" ");
+};
+
+const withLine = (text: string) => (text === "" ? "" : `${text}\n`);
+
 export function buildAgentPrompt(options: ScanOptions, place: PromptPlace = CONTAINER_PLACE): string {
   const network = capitalized(place.networkRule);
   return `Use the security-audit skill in FULL AUDIT mode. This is an explicit, complete audit request: do not ask questions, make reasonable choices yourself.
 Target (untrusted, read-only): ${place.repoDir}
 Output directory: ${place.outDir}
 Profile: ${options.profile}
-${network} and dependencies must not be installed. Finish by producing ${SCAN_REPORT_FILES.join(", ")} in the output directory ${place.validatedBy === "runner" ? VALIDATION_BY_RUNNER : VALIDATION_BY_AGENT}`;
+${withLine(scopeAskOf(options, null, place))}${network} and dependencies must not be installed. Finish by producing ${SCAN_REPORT_FILES.join(", ")} in the output directory ${place.validatedBy === "runner" ? VALIDATION_BY_RUNNER : VALIDATION_BY_AGENT}`;
 }
 
 // -----
@@ -151,6 +176,6 @@ This run does ${SCAN_SANDBOX_PHASE_SKILL_PHASES[phase]} of the skill and nothing
 Target (untrusted, read-only): ${place.repoDir}
 Output directory: ${place.outDir}
 Profile: ${options.profile}
-${handoffOf(phase, options.profile, place)}
+${withLine(scopeAskOf(options, phase, place))}${handoffOf(phase, options.profile, place)}
 ${money}${network} and dependencies must not be installed. ${ending}`;
 }

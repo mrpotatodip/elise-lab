@@ -74,12 +74,12 @@ describe("writing a scan record", () => {
 describe("the partial flag on a Runner scan's row", () => {
   const RUNNER_ID = "3f2a9c1e-5b7d-4e86-9a0c-1d2e3f4a5b6c";
 
-  const recordRunnerScan = async (scanId: string, files: Record<string, string>) => {
+  const recordRunnerScan = async (scanId: string, files: Record<string, string>, scopePaths?: string[]) => {
     const params: ScanParams = {
       scanId,
       accountId: tenantId,
       repo: REPO,
-      options: { ...options, skill: "full" },
+      options: { ...options, skill: "full", scopePaths },
       runnerId: RUNNER_ID,
       createdAt: new Date().toISOString(),
     };
@@ -127,6 +127,13 @@ describe("the partial flag on a Runner scan's row", () => {
     ],
   ])("stores partial for %s", async (_name, scanId, files, expected) => {
     expect(await recordRunnerScan(scanId, files)).toBe(expected);
+  });
+
+  it("stores a Scan of some folders as partial, whatever its report says", async () => {
+    const files = { "findings.json": "[]", "REPORT.md": "# Report" };
+
+    expect(await recordRunnerScan("runner-scoped", files, ["one"])).toBe(true);
+    expect(await recordRunnerScan("runner-scoped-empty", files, [])).toBe(false);
   });
 });
 

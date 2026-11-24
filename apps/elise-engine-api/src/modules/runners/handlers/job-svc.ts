@@ -106,6 +106,7 @@ const claimNextJob = (
       profile: options.value.profile,
       profileCapUsd: options.value.maxBudgetUsd,
       maxBudgetUsd: options.value.maxBudgetUsd,
+      scopePaths: options.value.scopePaths,
       prompt: row.prompt,
       phasePrompts: SCAN_SANDBOX_FULL_PHASES.map((phase) => ({
         phase,

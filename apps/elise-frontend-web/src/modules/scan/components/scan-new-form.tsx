@@ -13,6 +13,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Segmented } from "#/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
+import { Textarea } from "#/components/ui/textarea";
 import { fieldAria, fieldMessage, fieldMessageAria } from "#/lib/form-field";
 import { cn } from "#/lib/utils";
 import { RUNNER_SPEND_LIMIT_MAX_USD } from "@repo/contracts/elise";
@@ -44,6 +45,8 @@ import {
   scanRepoLinkPick,
   scanRepoPickSame,
   scanRepoPicks,
+  SCAN_SCOPE_PATHS_LIMIT,
+  scanScopePathsOf,
   scanSpendLimitOf,
   scanSpendLimitTextAfterProfileChange,
   scanStartProblem,
@@ -216,9 +219,12 @@ export function ScanNewForm({
   const [limitText, setLimitText] = useState<string | null>(null);
   const spendLimit = scanSpendLimitOf(limitText);
   const limitShown = limitText ?? (profileCapUsd === undefined ? "" : String(profileCapUsd));
+  const [scopeText, setScopeText] = useState("");
+  const scope = scanScopePathsOf(scopeText);
   const plan: CreateScanInput = {
     ...values,
     maxBudgetUsd: spendLimit.usd,
+    scopePaths: scope.paths,
     provider: providerId,
     runnerId: runner?.id,
     repo: selected?.url ?? "",
@@ -485,6 +491,27 @@ export function ScanNewForm({
                   The audit stops when it has spent this much of your Claude. It starts at the cap of the Coverage you
                   picked, and you can set any amount from $1 up to ${RUNNER_SPEND_LIMIT_MAX_USD}.
                 </p>
+                <div className="grid gap-1.5 pt-3">
+                  <Label htmlFor="scope-paths" className="text-xs text-muted-foreground">
+                    Folders to scan (optional)
+                  </Label>
+                  <Textarea
+                    id="scope-paths"
+                    rows={3}
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={scopeText}
+                    placeholder={"One folder for each line, like\napps/api\npackages/db"}
+                    onChange={(event) => setScopeText(event.target.value)}
+                    {...fieldMessageAria(scope.problem ?? undefined, "scope-paths", "scope-paths-help")}
+                  />
+                  <FieldError id="scope-paths" message={scope.problem ?? undefined} />
+                </div>
+                <p id="scope-paths-help" className="pt-3 text-sm leading-relaxed text-muted-foreground">
+                  Leave it empty to scan the whole repository. With folders, the audit reads only those, up to{" "}
+                  {SCAN_SCOPE_PATHS_LIMIT}, written from the repository's root with no wildcards. It is faster, but it
+                  is a partial Scan: the report names the folders, and the Verdict never counts it as a full pass.
+                </p>
                 <p className="pt-3 text-sm leading-relaxed text-muted-foreground">
                   More effort can find more issues, but takes longer. The Elise Runner must be running on that computer,
                   with Claude Code signed in.
@@ -510,7 +537,12 @@ export function ScanNewForm({
           <Button
             type="submit"
             disabled={
-              start.isPending || selected === null || selected.running || noRunner || spendLimit.problem !== null
+              start.isPending ||
+              selected === null ||
+              selected.running ||
+              noRunner ||
+              spendLimit.problem !== null ||
+              scope.problem !== null
             }
           >
             {start.isPending ? "Starting…" : "Start audit"}

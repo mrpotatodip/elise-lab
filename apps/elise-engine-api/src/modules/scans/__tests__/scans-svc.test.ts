@@ -455,6 +455,45 @@ describe("createScanSvc: a Runner", () => {
     expect(createdFull).toHaveLength(1);
   });
 
+  it("keeps the folders a Scan is limited to on the Scan the Workflow starts with", async () => {
+    const { env, createdFull } = fakeBindings();
+    const queued = await Effect.runPromise(
+      createScanSvc(
+        env,
+        memoryScanRepo().repo,
+        "acme",
+        { ...onRunner, scope_paths: ["one", "two/sub"] },
+        RUNNER_SPEND(),
+        hold,
+        connected,
+      ),
+    );
+
+    expect(queued.scopePaths).toEqual(["one", "two/sub"]);
+    expect(JSON.stringify(createdFull[0])).toContain('"scopePaths":["one","two/sub"]');
+  });
+
+  it.each([
+    ["no folders", []],
+    ["no field", undefined],
+  ])("starts a Scan with %s as a Scan of everything", async (_name, scope_paths) => {
+    const { env } = fakeBindings();
+    const queued = await Effect.runPromise(
+      createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, scope_paths }, RUNNER_SPEND(), hold, connected),
+    );
+
+    expect(queued.scopePaths).toBeUndefined();
+  });
+
+  it("refuses folders on a Scan in our cloud, which has nowhere to keep them", async () => {
+    const { env } = fakeBindings();
+    const failure = await Effect.runPromise(
+      Effect.flip(createScanSvc(env, memoryScanRepo().repo, "acme", { ...input, scope_paths: ["one"] }, OWN)),
+    );
+
+    expect(failure).toMatchObject({ _tag: "Invalid", message: expect.stringContaining("scope_paths") });
+  });
+
   it("keeps the Runner's own ceiling and takes no credit, no Plan and no monthly budget", async () => {
     held.length = 0;
     const { env, createdFull } = fakeBindings({ BILLING_ENFORCED: "true" });

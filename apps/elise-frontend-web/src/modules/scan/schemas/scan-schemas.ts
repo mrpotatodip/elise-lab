@@ -4,6 +4,7 @@ import {
   SCAN_EFFORTS,
   SCAN_MODELS,
   SCAN_PROFILES,
+  SCAN_SCOPE_PATHS_MAX,
   SourceProviderSchema,
   VerdictQuerySchema,
 } from "@repo/contracts/elise";
@@ -51,6 +52,7 @@ export const CreateScanInputSchema = z
     runnerId: z.uuid().optional(),
     archiveId: z.uuid().optional(),
     maxBudgetUsd: z.number().min(1).max(RUNNER_SPEND_LIMIT_MAX_USD).optional(),
+    scopePaths: z.array(z.string()).max(SCAN_SCOPE_PATHS_MAX).optional(),
   })
   .superRefine((input, ctx) => {
     const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);

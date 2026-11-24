@@ -24,7 +24,7 @@ import { holdOf, type HoldCredit, type ReleaseCredit } from "#/modules/credit";
 import { budgetUsdOf, reservedUsdOf, type MonthSpend } from "#/modules/usage";
 import type { TenantEffect } from "#/lib/tenant-effect";
 import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
-import { SCANS_RUNNER_ONLY_MESSAGE } from "#/modules/scans/constants";
+import { SCANS_RUNNER_ONLY_MESSAGE, SCANS_SCOPE_RUNNER_ONLY_MESSAGE } from "#/modules/scans/constants";
 import type { Bindings } from "#/types/variables";
 
 export const ARCHIVE_NOT_LINKED = "archive_id: this Scan cannot read a zip";
@@ -72,6 +72,10 @@ export const queueScanSvc = (
     if (maxBudgetUsd > cap.ceilingUsd)
       return yield* new Invalid({ message: `max_budget_usd: must be at most ${cap.ceilingUsd}` });
 
+    const scopePaths = input.scope_paths?.length ? input.scope_paths : undefined;
+    if (scopePaths !== undefined && input.runner_id === undefined)
+      return yield* new Invalid({ message: SCANS_SCOPE_RUNNER_ONLY_MESSAGE });
+
     const options = yield* Effect.try(() =>
       ScanOptionsSchema.parse({
         skill: "full",
@@ -79,6 +83,7 @@ export const queueScanSvc = (
         effort: input.effort ?? env.EFFORT,
         profile,
         maxBudgetUsd,
+        scopePaths,
       }),
     ).pipe(Effect.orDie);
 

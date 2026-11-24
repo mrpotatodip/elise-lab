@@ -11,7 +11,7 @@ import { ShellPageHeader } from "#/modules/shell";
 import { SCAN_STEP_COPY } from "../constants";
 import { isScanActive, scanFileQuery, scanQuery, useRefreshOnFinish } from "../hooks";
 import type { ScanStatus } from "../schemas";
-import { scanBytes, scanCost, scanFailure, scanPlural, scanProfileNote, scanRepoName } from "../utils";
+import { scanBytes, scanCost, scanFailure, scanPlural, scanProfileNote, scanRepoName, scanScopeNote } from "../utils";
 import { ScanBranchScans } from "./scan-branch-scans";
 import { ScanChangeAlerts } from "./scan-change-alerts";
 import { ScanDiffSkeleton, ScanFindingsTableSkeleton } from "./scan-detail-skeleton";
@@ -110,6 +110,18 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
     );
   }
   const note = scan.status === "succeeded" ? scanProfileNote(scan.profile, scan.profileMet) : null;
+  const scope = scanScopeNote(scan);
+  if (scope) {
+    return (
+      <Alert variant="warning">
+        <CircleAlert />
+        <div className="grid gap-1">
+          <AlertDescription className="font-medium">{scope.title}</AlertDescription>
+          <AlertDescription>{scope.detail}</AlertDescription>
+        </div>
+      </Alert>
+    );
+  }
   if (note) {
     return (
       <Alert variant="warning">
