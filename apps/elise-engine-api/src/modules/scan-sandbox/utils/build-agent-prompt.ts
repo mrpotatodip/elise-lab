@@ -95,6 +95,9 @@ const OUT_OF_MONEY = "The money for this run is limited. If it runs out, stop at
 const PHASE_VALIDATION_BY_RUNNER =
   "When findings.json and coverage-ledger.json are final, stop: the app that started you runs the skill's validators on them after this run ends. If a validator is refused to you, that is expected here: it is not a reason to set `run_status` to `incomplete`.";
 
+const PHASE_LEDGER_BY_RUNNER =
+  "The app that started you runs the skill's validators on coverage-ledger.json after this run ends, so do not run them, and do not run node or any other script. Write the ledger by hand, exactly to the skill's schema. A command refused to you is expected here: it is not a reason to set `run_status` to `incomplete`.";
+
 export function buildPhasePrompt(options: ScanOptions, phase: FullPhase, place: PromptPlace = CONTAINER_PLACE): string {
   const network = capitalized(place.networkRule);
   const byRunner = place.validatedBy === "runner";
@@ -104,7 +107,7 @@ export function buildPhasePrompt(options: ScanOptions, phase: FullPhase, place: 
       ? `Do not write the report files in this run. ${byRunner ? PHASE_VALIDATION_BY_RUNNER : `When findings.json is final, validate it ${VALIDATION_BY_AGENT}`}`
       : phase === "report"
         ? `${reportFiles}${byRunner ? "." : ` ${VALIDATION_BY_AGENT}`}`
-        : "Do not write REPORT.md in this run.";
+        : `Do not write REPORT.md in this run.${byRunner ? ` ${PHASE_LEDGER_BY_RUNNER}` : ""}`;
   const money = phase !== "report" && place.metered ? `${OUT_OF_MONEY}\n` : "";
   return `Use the security-audit skill in FULL AUDIT mode. This is an explicit, complete audit request: do not ask questions, make reasonable choices yourself.
 This run does ${SCAN_SANDBOX_PHASE_SKILL_PHASES[phase]} of the skill and nothing else. Other runs do the other phases, so stop when yours is done.
