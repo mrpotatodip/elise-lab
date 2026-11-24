@@ -1104,6 +1104,17 @@ async fn validate_full(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), Ch
     Ok(())
 }
 
+fn node_arguments(skill: &Path, script: &str, args: &[PathBuf], windows: bool) -> Vec<std::ffi::OsString> {
+    let mut all = Vec::new();
+    if windows {
+        all.push("--require".into());
+        all.push(skill.join("windows-input-shim.cjs").into_os_string());
+    }
+    all.push(skill.join(script).into_os_string());
+    all.extend(args.iter().map(|arg| arg.clone().into_os_string()));
+    all
+}
+
 async fn run_skill_script(
     tools: &Tools,
     work: &Path,
@@ -1124,8 +1135,7 @@ async fn run_skill_script(
     }
     let mut command = Command::new(node);
     command
-        .arg(skill.join(script))
-        .args(args)
+        .args(node_arguments(&skill, script, args, cfg!(windows)))
         .current_dir(work)
         .env_clear()
         .env("PATH", validator_path(node))
@@ -1500,6 +1510,20 @@ fn safe_ref(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Node on Windows lacks O_NOFOLLOW and O_NONBLOCK, so the upstream checks refuse every input
+    // unless the shim is loaded first.
+    #[test]
+    fn a_check_on_windows_loads_the_input_shim_before_the_script_and_elsewhere_does_not() {
+        let skill = Path::new("skill");
+        let args = [PathBuf::from("out/x.json")];
+        let on_windows = node_arguments(skill, "validate-coverage-ledger.cjs", &args, true);
+        let elsewhere = node_arguments(skill, "validate-coverage-ledger.cjs", &args, false);
+
+        assert_eq!(on_windows[..2], ["--require".into(), skill.join("windows-input-shim.cjs").into_os_string()]);
+        assert_eq!(on_windows[2..], elsewhere[..]);
+        assert_eq!(elsewhere[0], skill.join("validate-coverage-ledger.cjs").into_os_string());
+    }
 
     // A Bash entry that reads a file, writes one or starts another program would let a
     // repository's prompt injection reach outside the work folder.

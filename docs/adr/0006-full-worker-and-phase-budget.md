@@ -75,6 +75,8 @@ A headless Runner learns of the stop from the job-state route (#250). A Runner b
 
 Removing a Runner (#252) stops the Scan it is running in the same transaction as the revoke: the claimed job becomes `cancelled` and its Scan `stopped`. The Runner's next job-state check gets a 401, so it kills the agent, sends nothing, keeps its work folder and forgets its token.
 
+Node on Windows has no `O_NOFOLLOW` and no `O_NONBLOCK`, and the upstream checks (`validate-findings.cjs`, `validate-coverage-ledger.cjs`) reject every input when either is missing, so on Windows every check failed with "could not be read as a regular file" (the builder reads through the same function). The Runner app therefore starts each check on Windows with `node --require windows-input-shim.cjs`, our own file that defines both constants and makes the open fail on a symlink or junction. The upstream files stay untouched.
+
 ## Not built here
 
 - The numbers: the profile caps, `MAX_BUDGET_FULL_USD` and the Verdict weights are guesses until #142 measures real Scans.
