@@ -28,5 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # rustup reads apps/elise-runner-cli/rust-toolchain.toml and installs that channel on first use.
+      - uses: Swatinem/rust-cache@aa7c1c80a07a27a84c0aa76d0cef0aad3830e330
+        with:
+          workspaces: apps/elise-runner-cli
+          key: ${{ hashFiles('apps/elise-runner-cli/rust-toolchain.toml') }}
       - run: cargo build --locked -p elise-runner-cli
       - run: cargo test --locked -p elise-runner-cli
