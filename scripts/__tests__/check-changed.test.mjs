@@ -38,8 +38,8 @@ const makeFixture = (projects, dependencies = {}) => {
   return root;
 };
 
-const run = (root, { ci, args = [] }) => {
-  const env = { ...process.env };
+const run = (root, { ci, args = [], env: extra = {} }) => {
+  const env = { ...process.env, ...extra };
   delete env.CI;
   if (ci) env.CI = "true";
   const result = spawnSync("node", ["scripts/check-changed.mjs", ...args], { cwd: root, env, encoding: "utf8" });
@@ -207,12 +207,63 @@ describe("check-changed", () => {
     });
   });
 
-  it("runs slow projects at the same time", () => {
-    const slow = 'node -e "setTimeout(()=>{},1500)"';
-    const root = makeFixture({ "apps/s1": slow, "packages/s2": slow });
-    const begun = Date.now();
-    const { status } = run(root, { ci: false });
+  it("runs projects at the same time: each waits for the other's start marker", () => {
+    const marks = fs.mkdtempSync(path.join(os.tmpdir(), "check-marks-"));
+    fixtures.push(marks);
+    const meet = (mine, other) =>
+      `node -e "const fs=require('fs');const d=process.env.MARKS;fs.writeFileSync(d+'/${mine}','');const end=Date.now()+20000;while(!fs.existsSync(d+'/${other}')){if(Date.now()>end)process.exit(9);Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20)}"`;
+    const root = makeFixture({ "apps/s1": meet("one", "two"), "packages/s2": meet("two", "one") });
+    const { status } = run(root, { ci: false, env: { CHECK_CONCURRENCY: "2", MARKS: marks } });
     assert.equal(status, 0);
-    assert.ok(Date.now() - begun < 2900, "two 1.5s projects ran one after the other");
+  });
+
+  it("starts the engine and the runner first but prints timings in stable order", () => {
+    const marks = fs.mkdtempSync(path.join(os.tmpdir(), "check-order-"));
+    fixtures.push(marks);
+    const logFile = path.join(marks, "log");
+    const log = (name) => `node -e "require('fs').appendFileSync(process.env.LOG_FILE,'${name}\\n')"`;
+    const root = makeFixture({
+      "apps/aaa": log("aaa"),
+      "apps/elise-engine-api": log("engine"),
+      "apps/elise-runner-cli": log("runner"),
+      "packages/zzz": log("zzz"),
+    });
+    const { status, stdout } = run(root, { ci: true, env: { CHECK_CONCURRENCY: "1", LOG_FILE: logFile } });
+    assert.equal(status, 0);
+    assert.deepEqual(fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean), ["engine", "runner", "aaa", "zzz"]);
+    assert.deepEqual(ranProjects(stdout), [
+      "apps/aaa",
+      "apps/elise-engine-api",
+      "apps/elise-runner-cli",
+      "packages/zzz",
+    ]);
+  });
+
+  describe("--base cross-project file reads", () => {
+    const projects = {
+      "apps/elise-runner-cli": "node -e 0",
+      "apps/elise-engine-api": "node -e 0",
+      "apps/elise-marketing-web": "node -e 0",
+      "packages/contracts": "node -e 0",
+    };
+    for (const [name, file, expected] of [
+      [
+        "a contracts fixture diff selects the runner",
+        "packages/contracts/fixtures/trace-classifier/case.json",
+        ["apps/elise-runner-cli", "packages/contracts"],
+      ],
+      [
+        "a security-audit skill diff selects the runner",
+        "apps/elise-engine-api/skills/security-audit/SKILL.md",
+        ["apps/elise-engine-api", "apps/elise-runner-cli"],
+      ],
+    ]) {
+      it(name, () => {
+        const root = changedRepo(projects, {}, file);
+        const { status, stdout } = run(root, { ci: true, args: ["--base", "main~1"] });
+        assert.equal(status, 0);
+        assert.deepEqual(ranProjects(stdout), expected);
+      });
+    }
   });
 });
