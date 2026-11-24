@@ -6,6 +6,9 @@ import { SCAN_EFFORT_OPTIONS, SCAN_MODEL_NAMES, SCAN_PROFILE_OPTIONS, SCAN_SKILL
 import type { ScanStatus } from "../schemas";
 import { scanDuration } from "../utils";
 import { ScanTime } from "./scan-time";
+import { useQuery } from "@tanstack/react-query";
+import { creditQuery } from "#/modules/credit";
+import { scanSpendLimitShown } from "../utils";
 
 const labelOf = <T extends string>(options: readonly { value: T; label: string }[], value: T) =>
   options.find((o) => o.value === value)?.label ?? value;
@@ -34,6 +37,11 @@ function ScanSetupColumn({ label, children }: { label: string; children: ReactNo
 }
 
 export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
+  const { data: credit } = useQuery(creditQuery());
+  const profileCapUsd = credit?.profiles?.find((item) => item.profile === scan.profile)?.capUsd;
+  const spendLimit = scanSpendLimitShown(scan.maxBudgetUsd, profileCapUsd) ? (
+    <Fact label="Spend limit">${scan.maxBudgetUsd}</Fact>
+  ) : null;
   if (scan.status !== "succeeded") {
     const took = scanDuration(
       scan.usage?.durationMs ?? (scan.finishedAt ? Date.parse(scan.finishedAt) - Date.parse(scan.createdAt) : null),
@@ -58,7 +66,7 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
           </Fact>
           <Fact label="Model">{labelOf(SCAN_MODEL_NAMES, scan.model)}</Fact>
           <Fact label="Effort">{labelOf(SCAN_EFFORT_OPTIONS, scan.effort)}</Fact>
-          <Fact label="Spend limit">${scan.maxBudgetUsd}</Fact>
+          {spendLimit}
         </ScanSetupColumn>
         <ScanSetupColumn label="Where it ran">
           <Fact label="Computer">{scan.runner?.name ?? "Elise's cloud"}</Fact>
@@ -97,7 +105,7 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
               </Fact>
               <Fact label="Model">{labelOf(SCAN_MODEL_NAMES, scan.model)}</Fact>
               <Fact label="Effort">{labelOf(SCAN_EFFORT_OPTIONS, scan.effort)}</Fact>
-              <Fact label="Spend limit">${scan.maxBudgetUsd}</Fact>
+              {spendLimit}
             </dl>
           </CardContent>
         </CollapsiblePanel>

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { RUNNER_SPEND_LIMIT_MAX_USD } from "@repo/contracts/elise";
-import { scanSpendLimitOf } from "#/modules/scan/utils/scan-spend-limit";
+import {
+  scanSpendLimitOf,
+  scanSpendLimitShown,
+  scanSpendLimitTextAfterProfileChange,
+} from "#/modules/scan/utils/scan-spend-limit";
 import { scanCreateBodyOf } from "#/modules/scan/utils/scan-create-body";
 
 describe("scanSpendLimitOf", () => {
@@ -19,12 +23,41 @@ describe("scanSpendLimitOf", () => {
 
   it.each([
     ["", "Enter a dollar amount"],
-    ["abc", "Enter a dollar amount"],
+    ["abc", "Enter a dollar amount, like 12 or 12.50"],
     ["0.5", "The limit must be at least $1"],
     ["-3", "The limit must be at least $1"],
+    ["1e1", "Enter a dollar amount, like 12 or 12.50"],
+    ["0x1F", "Enter a dollar amount, like 12 or 12.50"],
+    ["0b11", "Enter a dollar amount, like 12 or 12.50"],
+    ["12.345", "Enter a dollar amount, like 12 or 12.50"],
     [String(RUNNER_SPEND_LIMIT_MAX_USD + 1), `The most one Scan may spend is $${RUNNER_SPEND_LIMIT_MAX_USD}`],
   ])("refuses %j with a message", (text, problem) => {
     expect(scanSpendLimitOf(text)).toEqual({ usd: undefined, problem });
+  });
+});
+
+describe("scanSpendLimitShown", () => {
+  it.each([
+    [12, 12, true],
+    [30, 12, true],
+    [50, 50, true],
+    [50, 12, false],
+    [50, undefined, false],
+    [12, undefined, true],
+  ])("a stored limit of $%s with a profile cap of %s is shown: %s", (stored, cap, shown) => {
+    expect(scanSpendLimitShown(stored, cap)).toBe(shown);
+  });
+});
+
+describe("scanSpendLimitTextAfterProfileChange", () => {
+  it.each([
+    [null, 12, null],
+    ["12", 12, null],
+    ["12.00", 12, null],
+    ["30", 12, "30"],
+    ["12", undefined, "12"],
+  ])("with %j typed over a previous default of %s the field then holds %j", (text, previousCap, expected) => {
+    expect(scanSpendLimitTextAfterProfileChange(text, previousCap)).toBe(expected);
   });
 });
 

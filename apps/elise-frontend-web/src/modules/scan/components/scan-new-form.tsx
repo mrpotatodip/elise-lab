@@ -13,7 +13,7 @@ import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { Segmented } from "#/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
-import { fieldAria, fieldMessage } from "#/lib/form-field";
+import { fieldAria, fieldMessage, fieldMessageAria } from "#/lib/form-field";
 import { cn } from "#/lib/utils";
 import { RUNNER_SPEND_LIMIT_MAX_USD } from "@repo/contracts/elise";
 import { creditQuery } from "#/modules/credit";
@@ -45,6 +45,7 @@ import {
   scanRepoPickSame,
   scanRepoPicks,
   scanSpendLimitOf,
+  scanSpendLimitTextAfterProfileChange,
   scanStartProblem,
   type ScanRepoPick,
 } from "../utils";
@@ -390,7 +391,10 @@ export function ScanNewForm({
                   label="How much of the codebase should the audit cover?"
                   value={values.profile}
                   options={SCAN_PROFILE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                  onChange={(next) => form.setFieldValue("profile", next)}
+                  onChange={(next) => {
+                    setLimitText(scanSpendLimitTextAfterProfileChange(limitText, profileCapUsd));
+                    form.setFieldValue("profile", next);
+                  }}
                   className="w-full sm:w-72"
                 />
               </div>
@@ -470,17 +474,13 @@ export function ScanNewForm({
                       inputMode="decimal"
                       autoComplete="off"
                       value={limitShown}
+                      placeholder="Profile default"
                       onChange={(event) => setLimitText(event.target.value)}
-                      aria-invalid={spendLimit.problem !== null}
-                      aria-describedby="spend-limit-help"
+                      {...fieldMessageAria(spendLimit.problem ?? undefined, "spend-limit", "spend-limit-help")}
                     />
+                    <FieldError id="spend-limit" message={spendLimit.problem ?? undefined} />
                   </div>
                 </div>
-                {spendLimit.problem !== null && (
-                  <div className="pt-3">
-                    <FieldError id="spend-limit" message={spendLimit.problem} />
-                  </div>
-                )}
                 <p id="spend-limit-help" className="pt-3 text-sm leading-relaxed text-muted-foreground">
                   The audit stops when it has spent this much of your Claude. It starts at the cap of the Coverage you
                   picked, and you can set any amount from $1 up to ${RUNNER_SPEND_LIMIT_MAX_USD}.

@@ -51,16 +51,17 @@ export const queueScanSvc = (
 
     // -----
     // The per-scan ceiling follows who pays. A scan on a Runner runs
-    // on the person's own Claude and has a safety cap. A scan on the
+    // on the person's own Claude and has a safety ceiling. A scan on the
     // account's own key is paid by that key, so it gets a higher
-    // ceiling than a scan on EliseLAB's key. A request may lower it.
+    // ceiling than a scan on EliseLAB's key. A request may set the limit
+    // anywhere up to that ceiling on a Runner, and only lower it in the cloud.
     //
     // The Skill is ours to choose, never the request's: every new Scan
     // runs the full Skill on the one Workflow and is stored `full`. The
     // request has no `skill` field, so one that sends it is stripped like
     // any unknown key. That holds for a Scan on a Runner too:
     // it runs the full Skill on the person's computer, takes no credit
-    // and stops at the Runner's own ceiling. No profile means quick.
+    // and stops at the Scan's spend limit. No profile means quick.
     // -----
     const ownKeyScan =
       input.runner_id !== undefined || (spend.plan ? spend.plan.keySource === "account" : spend.ownKey);
