@@ -74,7 +74,7 @@ export function fakeBindings(
     ENVIRONMENT: "production",
     MODEL: "claude-sonnet-5-5",
     EFFORT: "high",
-    MAX_BUDGET_FULL_USD: "18",
+    MAX_BUDGET_FULL_USD: "50",
     MAX_ACTIVE_SCANS: "3",
     MAX_ACTIVE_FULL_SCANS: "1",
     MONTHLY_BUDGET_USD: "20",

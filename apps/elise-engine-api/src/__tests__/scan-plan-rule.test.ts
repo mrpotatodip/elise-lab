@@ -60,8 +60,8 @@ const post = (env: Bindings, body: { repo: string; profile: string }) =>
 const ErrorBodySchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
 
 describe("POST /scans: a Monthly budget refusal names the profile that fits", () => {
-  it("refuses deep under a $20 Monthly budget, names standard and takes no hold", async () => {
-    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 20 };
+  it("refuses deep under a $40 Monthly budget, names standard and takes no hold", async () => {
+    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 40 };
     const { env, createdFull } = fakeBindings();
     const res = await post(env, { repo: REPO, profile: "deep" });
     const error = ErrorBodySchema.parse(await res.json()).error;
@@ -74,7 +74,7 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
   });
 
   it("names the biggest profile that fits after what the month already spent", async () => {
-    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 20, spentUsd: 6 };
+    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 40, spentUsd: 8 };
     const { env } = fakeBindings();
     const res = await post(env, { repo: REPO, profile: "deep" });
 

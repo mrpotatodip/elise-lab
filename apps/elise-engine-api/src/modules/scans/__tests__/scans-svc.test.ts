@@ -52,7 +52,7 @@ describe("createScanSvc", () => {
       skill: "full",
       profile: "quick",
       model: "claude-sonnet-5-5",
-      maxBudgetUsd: 6,
+      maxBudgetUsd: 12,
     });
     expect(createdFull).toHaveLength(1);
   });
@@ -89,7 +89,7 @@ describe("createScanSvc", () => {
   it("fails with Invalid when the dollar cap is above the profile's cap", async () => {
     const error = await Effect.runPromise(
       Effect.flip(
-        createScanSvc(fakeBindings().env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 7 }, OWN),
+        createScanSvc(fakeBindings().env, memoryScanRepo().repo, "acme", { ...input, max_budget_usd: 13 }, OWN),
       ),
     );
 
@@ -268,8 +268,8 @@ describe("createScanSvc: the plan", () => {
 
   it.each([
     ["a platform plan with credit for the hold", onPlan({ creditBalanceUsd: 49 }), "queued"],
-    ["a platform plan with exactly the hold left", onPlan({ creditBalanceUsd: 9 }), "queued"],
-    ["a platform plan a cent short of the hold", onPlan({ creditBalanceUsd: 8.99 }), "INSUFFICIENT_CREDIT"],
+    ["a platform plan with exactly the hold left", onPlan({ creditBalanceUsd: 18 }), "queued"],
+    ["a platform plan a cent short of the hold", onPlan({ creditBalanceUsd: 17.99 }), "INSUFFICIENT_CREDIT"],
     ["a platform plan with no credit", onPlan({ creditBalanceUsd: 0 }), "INSUFFICIENT_CREDIT"],
     ["a platform plan, whatever the month's spend", onPlan({}, { spentUsd: 500, platformSpentUsd: 500 }), "queued"],
     ["an account plan with the account's own key", onPlan(BYOK, { ownKey: true }), "queued"],
@@ -281,7 +281,7 @@ describe("createScanSvc: the plan", () => {
       onPlan({}, { spentUsd: 5, budgetOverrideUsd: 10 }),
       "MONTHLY_BUDGET_EXCEEDED",
     ],
-    ["a budget the admin set, with room in credit", onPlan({}, { spentUsd: 4, budgetOverrideUsd: 16 }), "queued"],
+    ["a budget the admin set, with room in credit", onPlan({}, { spentUsd: 4, budgetOverrideUsd: 25 }), "queued"],
   ])("with %s the scan is %s", async (_name, spend, expected) => {
     expect(await outcome(spend, "true")).toBe(expected);
   });
@@ -369,10 +369,10 @@ const outcomeOf = (spend: MonthSpend, body: CreateScanBody = input) => {
 
 describe("createScanSvc: the cap of a profile and the monthly budget by key", () => {
   it.each([
-    ["the platform's key, above the profile's cap", onPlan({}), 7, "Invalid"],
-    ["the platform's key, at the profile's cap", onPlan({}), 6, "queued"],
-    ["the account's own key, above the profile's cap", OWN, 7, "Invalid"],
-    ["the account's own key, at the profile's cap", OWN, 6, "queued"],
+    ["the platform's key, above the profile's cap", onPlan({}), 13, "Invalid"],
+    ["the platform's key, at the profile's cap", onPlan({}), 12, "queued"],
+    ["the account's own key, above the profile's cap", OWN, 13, "Invalid"],
+    ["the account's own key, at the profile's cap", OWN, 12, "queued"],
   ])("a request for a limit on %s: the scan is %s", async (_name, spend, limit, expected) => {
     expect(await outcomeOf(spend, { ...input, max_budget_usd: limit })).toBe(expected);
   });
@@ -381,7 +381,7 @@ describe("createScanSvc: the cap of a profile and the monthly budget by key", ()
     const { env, createdFull } = fakeBindings();
     await Effect.runPromise(createScanSvc(env, memoryScanRepo().repo, "acme", input, OWN));
 
-    expect(createdFull[0].params.options.maxBudgetUsd).toBe(6);
+    expect(createdFull[0].params.options.maxBudgetUsd).toBe(12);
   });
 
   it.each([

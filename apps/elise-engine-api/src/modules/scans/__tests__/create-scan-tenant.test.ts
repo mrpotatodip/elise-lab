@@ -89,7 +89,7 @@ describe("POST /scans as one Account", () => {
     expect({ status: res.status, rows: rows.length, holds: holds.map((hold) => hold.amountUsd), started }).toEqual({
       status: 201,
       rows: 1,
-      holds: ["-9.0000"],
+      holds: ["-18.0000"],
       started: 1,
     });
   });

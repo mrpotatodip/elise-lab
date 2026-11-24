@@ -75,7 +75,7 @@ describe("POST /scans: every new Scan runs the full path", () => {
     const queued = QueuedSchema.parse(await res.json()).data;
 
     expect(res.status).toBe(201);
-    expect(queued).toMatchObject({ skill: "full", profile: "standard", maxBudgetUsd: 12 });
+    expect(queued).toMatchObject({ skill: "full", profile: "standard", maxBudgetUsd: 24 });
     expect(store.rows.get(queued.scanId)?.skill).toBe("full");
     expect(createdFull).toHaveLength(1);
   });
@@ -84,7 +84,7 @@ describe("POST /scans: every new Scan runs the full path", () => {
     const { env } = fakeBindings();
     const queued = QueuedSchema.parse(await (await post(env, { repo: repoOf("a") })).json()).data;
 
-    expect(queued).toMatchObject({ skill: "full", profile: "quick", maxBudgetUsd: 6 });
+    expect(queued).toMatchObject({ skill: "full", profile: "quick", maxBudgetUsd: 12 });
   });
 
   it("answers a request that still sends skill as if the field were not there: queued, stored full", async () => {
@@ -96,7 +96,7 @@ describe("POST /scans: every new Scan runs the full path", () => {
     expect(QueuedSchema.parse(await res.json()).data).toMatchObject({
       skill: "full",
       profile: "deep",
-      maxBudgetUsd: 18,
+      maxBudgetUsd: 50,
     });
     expect(createdFull).toHaveLength(1);
   });

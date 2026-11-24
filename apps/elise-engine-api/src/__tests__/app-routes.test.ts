@@ -118,7 +118,7 @@ describe("envelope", () => {
 
   it("rejects a budget above the ceiling", async () => {
     const { env } = fakeBindings();
-    const res = await post(env, { repo: REPO, max_budget_usd: 7 });
+    const res = await post(env, { repo: REPO, max_budget_usd: 13 });
 
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
