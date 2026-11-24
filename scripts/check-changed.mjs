@@ -46,6 +46,32 @@ const jsonc = (text) =>
 const LOCAL_ADDRESS = /localhost|127\.0\.0\.1|0\.0\.0\.0/;
 
 const failures = [...findContractCopies(), ...findRatchetBreaks(), ...findAdrProblems()];
+
+// oxfmt: `--all` checks the whole tree; the hook checks only the staged files. A staged
+// file on the ignore list is no failure: oxfmt exits 2 with "Expected at least one target
+// file" when every path it was given is ignored.
+const FORMATTED_FILES = /\.(ts|tsx|js|mjs|css)$/;
+const formatTargets = all
+  ? ["**/*.{ts,tsx,js,mjs,css}"]
+  : git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+      .split("\n")
+      .filter((f) => FORMATTED_FILES.test(f));
+if (formatTargets.length > 0) {
+  const format = spawnSync("pnpm", ["exec", "oxfmt", "--list-different", ...formatTargets], { encoding: "utf8" });
+  const unformatted = format.stdout.split("\n").filter(Boolean);
+  const onlyIgnored = format.status === 2 && /Expected at least one target file/.test(format.stderr + format.stdout);
+  if (unformatted.length > 0) {
+    const shown = unformatted.slice(0, TAIL_LINES).map((l) => `  ${l.slice(0, LINE_WIDTH)}`);
+    const more = unformatted.length > TAIL_LINES ? [`  ...and ${unformatted.length - TAIL_LINES} more`] : [];
+    failures.push(
+      `format: ${unformatted.length} file(s) not formatted; run \`pnpm format\`\n${[...shown, ...more].join("\n")}`,
+    );
+  } else if (format.status !== 0 && !onlyIgnored) {
+    failures.push(
+      `format: oxfmt failed\n${(format.stderr || format.stdout).split("\n").filter(Boolean).slice(-TAIL_LINES).join("\n")}`,
+    );
+  }
+}
 for (const dir of folders("apps")) {
   const file = `${dir}/wrangler.jsonc`;
   if (!fs.existsSync(file)) continue;
