@@ -25,6 +25,7 @@ jobs:
           workspaces: apps/elise-runner-cli
           key: ${{ hashFiles('apps/elise-runner-cli/rust-toolchain.toml') }}
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test:scripts
       - run: node scripts/check-changed.mjs --all
 
   runner-windows:

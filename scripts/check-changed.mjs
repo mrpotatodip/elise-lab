@@ -93,9 +93,13 @@ for (const dir of folders("apps")) {
 }
 
 let ran = 0;
+const timings = [];
+const started = Date.now();
 for (const dir of projects) {
   if (!fs.existsSync(`${dir}/package.json`)) continue;
+  const projectStarted = Date.now();
   const run = spawnSync("pnpm", ["--dir", dir, "run", "--if-present", "check"], { encoding: "utf8" });
+  timings.push(`${dir}  ${((Date.now() - projectStarted) / 1000).toFixed(1)}s  ${run.status === 0 ? "ok" : "fail"}`);
   ran += 1;
   if (run.status !== 0) {
     const tail = (run.stdout + run.stderr)
@@ -105,6 +109,9 @@ for (const dir of projects) {
       .map((l) => l.slice(0, LINE_WIDTH));
     failures.push(`${dir}: check failed\n${tail.join("\n")}`);
   }
+}
+if (process.env.CI) {
+  console.log([...timings, `total  ${((Date.now() - started) / 1000).toFixed(1)}s`].join("\n"));
 }
 if (failures.length) {
   console.error(failures.join("\n\n"));
