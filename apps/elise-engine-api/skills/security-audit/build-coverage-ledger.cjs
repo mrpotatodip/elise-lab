@@ -45,6 +45,14 @@ const isRef = (value) => {
   }
 };
 const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const sameValue = (a, b) => {
+  if (isObject(a) && isObject(b)) {
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every((key) => key in b && sameValue(a[key], b[key]));
+  }
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((item, index) => sameValue(item, b[index]));
+  return a === b;
+};
 
 function readJson(file, what) {
   let text;
@@ -211,7 +219,7 @@ function merge(ledgerFile, updatesFile) {
     const unit = byId.get(update.coverage_id);
     if (unit !== undefined) {
       for (const field of FIXED_FIELDS) {
-        if (field !== "coverage_id" && field in update && JSON.stringify(update[field]) !== JSON.stringify(unit[field])) {
+        if (field !== "coverage_id" && field in update && !sameValue(update[field], unit[field])) {
           errors.push(`${base}.${field}: a run may not change this field of an existing unit`);
         }
       }
@@ -221,9 +229,17 @@ function merge(ledgerFile, updatesFile) {
     if (!isObject(refs) || !REF_FIELDS.every((field) => isRef(refs[field]))) {
       return errors.push(`${base}.coverage_id: no unit with this ID is in the ledger, and canonical_refs does not describe a new one`);
     }
+    const extra = Object.keys(refs).filter((field) => ![...REF_FIELDS, "lifecycle"].includes(field));
+    if (extra.length > 0) return errors.push(`${base}.canonical_refs: unexpected field ${extra.map((field) => JSON.stringify(field)).join(", ")}`);
+    if (refs.lifecycle !== undefined && !isRef(refs.lifecycle)) return errors.push(`${base}.canonical_refs.lifecycle: invalid canonical reference`);
     if (!Array.isArray(update.starting_paths)) return errors.push(`${base}.starting_paths: a new unit needs them`);
-    const { lifecycle, ...base_refs } = refs;
-    const unit_ = newUnit(base_refs, lifecycle === undefined ? null : lifecycle, update.starting_paths.map(cleanPath), update.ordinary_attack_class_block ?? null, update.selected_companion_blocks ?? []);
+    let unit_;
+    try {
+      const { lifecycle, ...base_refs } = refs;
+      unit_ = newUnit(base_refs, lifecycle === undefined ? null : lifecycle, update.starting_paths.map(cleanPath), update.ordinary_attack_class_block ?? null, update.selected_companion_blocks ?? []);
+    } catch (error) {
+      return errors.push(`${base}: cannot build a new unit from this update (${error instanceof Error ? error.message : String(error)})`);
+    }
     if (update.coverage_id !== unit_.coverage_id) return errors.push(`${base}.coverage_id: expected canonical ID ${JSON.stringify(unit_.coverage_id)}`);
     const added = { ...unit_, ...Object.fromEntries(Object.entries(update).filter(([field]) => !FIXED_FIELDS.includes(field))) };
     if ("agent_id" in added && added.agent_id !== null && !isSafeAgentId(added.agent_id)) {

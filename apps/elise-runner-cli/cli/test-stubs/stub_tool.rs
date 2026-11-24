@@ -26,6 +26,21 @@ const SHORT_LIST: &str = r#"{"entries":[
 const COVERED_UPDATE: &str = r#"[{"coverage_id":"src%2Fupload.ts%23POST%20%2Fupload::src%2Fupload.ts%23checkType::packages%2Fapi::ATTACK-CLASSES.md%23Resource%20and%20file%20handling","status":"covered","agent_id":"hunter-1","wave":1,"reviewed_paths":["src/upload.ts"],"local_checks":[{"agent_id":"hunter-1","reviewed_paths":["src/upload.ts"],"invariant":"only images are stored","method":"source","result":"the type is checked","artifact":null}]}]
 "#;
 
+const UPLOAD_ID: &str =
+    "src%2Fupload.ts%23POST%20%2Fupload::src%2Fupload.ts%23checkType::packages%2Fapi::ATTACK-CLASSES.md%23Resource%20and%20file%20handling";
+
+fn reordered_update() -> String {
+    format!(
+        r#"[{{"coverage_id":"{UPLOAD_ID}","canonical_refs":{{"attack_class":"ATTACK-CLASSES.md#Resource and file handling","subsystem":"packages/api","boundary":"src/upload.ts#checkType","surface":"src/upload.ts#POST /upload"}},"status":"covered","agent_id":"hunter-1","wave":1,"reviewed_paths":["src/upload.ts"],"local_checks":[{{"agent_id":"hunter-1","reviewed_paths":["src/upload.ts"],"invariant":"only images are stored","method":"source","result":"the type is checked","artifact":null}}]}}]"#
+    )
+}
+
+fn invalid_update() -> String {
+    format!(r#"[{{"coverage_id":"{UPLOAD_ID}","status":"covered","agent_id":"hunter-1"}}]"#)
+}
+
+const MALFORMED_NEW_UNIT: &str = r#"[{"coverage_id":"new","canonical_refs":{"surface":"src/a.ts#GET /a","boundary":"src/a.ts#guard","subsystem":"packages/api","attack_class":"ATTACK-CLASSES.md#Injection","lifecycle":5,"extra":"x"},"starting_paths":["src/a.ts"]}]"#;
+
 fn append(path: &Path, line: &str) {
     let mut file = OpenOptions::new().create(true).append(true).open(path).unwrap();
     writeln!(file, "{line}").unwrap();
@@ -138,6 +153,15 @@ fn claude(record: &Path, args: &[String]) {
     }
     if prompt.contains("phase=hunt") && prompt.contains("update=ok") {
         fs::write("out/ledger-updates.json", COVERED_UPDATE).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=reordered") {
+        fs::write("out/ledger-updates.json", reordered_update()).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=invalid") {
+        fs::write("out/ledger-updates.json", invalid_update()).unwrap();
+    }
+    if prompt.contains("phase=hunt") && prompt.contains("update=malformed") {
+        fs::write("out/ledger-updates.json", MALFORMED_NEW_UNIT).unwrap();
     }
     if prompt.contains("phase=check") && prompt.contains("real=1") {
         fs::write("out/findings.json", "[]\n").unwrap();
