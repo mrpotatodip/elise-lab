@@ -7,10 +7,10 @@
  *   node build-coverage-ledger.cjs build <short-list.json> <coverage-ledger.json> <quick|standard|deep>
  *   node build-coverage-ledger.cjs merge <coverage-ledger.json> <ledger-updates.json>
  *   node build-coverage-ledger.cjs assign <coverage-ledger.json> <hunter-assignments.json> <group-size> <hunters-at-once>
- * `assign` splits the planned units into even hunter groups. `build` turns the agent's short list into the full coverage ledger (RECONNAISSANCE.md, "Deterministic
- * coverage ledger"). `merge` applies the units a later run changed. Both print errors in the words of
- * the file the agent wrote, and write nothing when there is one. validate-coverage-ledger.cjs checks
- * the result afterwards.
+ * `build` turns the agent's short list into the full coverage ledger (RECONNAISSANCE.md, "Deterministic
+ * coverage ledger"). `merge` applies the units a later run changed. `assign` splits the planned units
+ * into even hunter groups. `build` and `merge` print errors in the words of the file the agent wrote,
+ * and write nothing when there is one. validate-coverage-ledger.cjs checks the result afterwards.
  */
 
 const fs = require("node:fs");
@@ -267,7 +267,7 @@ function merge(ledgerFile, updatesFile) {
 function groupCount(units, groupSize, atOnce) {
   const wanted = Math.max(1, Math.ceil(units / groupSize));
   const rounded = Math.ceil(wanted / atOnce) * atOnce;
-  return rounded <= units && units / rounded >= Math.floor(groupSize / 2) ? rounded : wanted;
+  return rounded <= units && units / rounded >= groupSize / 2 ? rounded : wanted;
 }
 
 function assign(ledgerFile, assignmentsFile, groupSizeText, atOnceText) {

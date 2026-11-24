@@ -124,6 +124,29 @@ fn a_large_ledger_is_split_into_even_groups_a_multiple_of_the_hunters_at_once_wi
 }
 
 #[test]
+fn the_group_count_rounds_up_to_the_hunters_at_once_unless_that_leaves_groups_under_half_the_target_size() {
+    for (units, groups) in [(43, 3), (44, 3), (45, 6)] {
+        let engine = Engine::start();
+        let mut runner = paired(&engine);
+        runner.stub_tools(&["claude", "real-node"]);
+        let recon = format!("phase=recon list=units{units} cost=1");
+        engine.queue_job(job_with_profile(
+            "scan_h",
+            "standard",
+            [&recon, "phase=hunt cost=1", "phase=check real=1 cost=1", "phase=report cost=1"],
+        ));
+
+        let output = runner.run(&["run", "--once"], "");
+
+        assert_eq!(output.code, 0, "{units}: {}{}", output.stdout, output.stderr);
+        let (_, result) = &engine.results()[0];
+        assert_eq!(result["state"], "succeeded", "{units}: {result}");
+        assert_eq!(ledger_of(result).len(), units, "{units}");
+        assert_eq!(assignments_of(result).len(), groups, "{units} units");
+    }
+}
+
+#[test]
 fn the_same_ledger_always_gives_the_same_assignments() {
     let mut files = Vec::new();
     for scan_id in ["scan_c1", "scan_c2"] {
@@ -135,8 +158,14 @@ fn the_same_ledger_always_gives_the_same_assignments() {
             "standard",
             ["phase=recon list=big cost=1", "phase=hunt cost=1", "phase=check real=1 cost=1", "phase=report cost=1"],
         ));
-        runner.run(&["run", "--once"], "");
-        files.push(engine.results()[0].1["files"]["hunter-assignments.json"].clone());
+        let output = runner.run(&["run", "--once"], "");
+        assert_eq!(output.code, 0, "{scan_id}: {}{}", output.stdout, output.stderr);
+        let (_, result) = &engine.results()[0];
+        assert_eq!(result["state"], "succeeded", "{scan_id}: {result}");
+        let file = result["files"]["hunter-assignments.json"].as_str().expect("the assignments file is a string");
+        let parsed: serde_json::Value = serde_json::from_str(file).unwrap();
+        assert!(!parsed["groups"].as_array().expect("groups is an array").is_empty(), "{scan_id}");
+        files.push(file.to_string());
     }
 
     assert_eq!(files[0], files[1]);

@@ -650,7 +650,11 @@ async fn check_after(tools: &Tools, job: &Job, work: &Path, phase: &str, stop: &
     }
     if changed || (after_repair && ledger.is_file()) {
         let failed = "coverage-ledger.json, built by this app from what the agent wrote, did not pass the audit skill's own check (validate-coverage-ledger.cjs)";
-        run_skill_script(tools, work, stop, "validate-coverage-ledger.cjs", &[ledger], "coverage-ledger.json", failed).await?;
+        run_skill_script(tools, work, stop, "validate-coverage-ledger.cjs", std::slice::from_ref(&ledger), "coverage-ledger.json", failed)
+            .await?;
+    }
+    if phase == "recon" && ledger.is_file() {
+        write_hunter_assignments(tools, work, stop).await?;
     }
     Ok(())
 }
@@ -663,9 +667,6 @@ async fn apply_phase_files(tools: &Tools, job: &Job, work: &Path, phase: &str, s
             vec![PathBuf::from("build"), list.to_path_buf(), ledger.clone(), PathBuf::from(job.profile.as_deref().unwrap_or("standard"))]
         })
         .await?;
-        if changed {
-            write_hunter_assignments(tools, work, stop).await?;
-        }
     } else if phase == "hunt" || phase == VALIDATED_AFTER {
         let applied = format!("ledger-updates-{phase}.applied.json");
         changed = apply_ledger_file(tools, work, stop, "ledger-updates.json", &applied, "build-coverage-ledger.cjs", |updates| {
@@ -1878,7 +1879,11 @@ case "$prompt" in
 esac
 case "$prompt" in
   *"updates=1"*) echo '[]' > out/ledger-updates.json ;;
+esac
+case "$prompt" in
   *"list=1"*) echo '{}' > out/recon-list.json ;;
+esac
+case "$prompt" in
   *"ledger=invalid"*) echo '[{"coverage_id":"a","status":"planned","INVALID":true}]' > out/coverage-ledger.json ;;
   *"ledger=done"*) echo '[{"coverage_id":"a","status":"covered","unresolved":[]}]' > out/coverage-ledger.json ;;
 esac
@@ -2154,14 +2159,34 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     #[test]
     fn the_app_splits_the_built_ledger_into_hunter_groups_before_the_hunt_starts() {
         let stage = stage("assign-after-build");
-        let job = phased_job(["phase=recon list=1 cost=1", "phase=hunt cost=1", "phase=check cost=1", "phase=report cost=1"]);
+        let job = phased_job(["phase=recon list=1 ledger=1 cost=1", "phase=hunt cost=1", "phase=check cost=1", "phase=report cost=1"]);
 
         let report = scan(&stage, &job);
 
         assert_eq!(report.state, "succeeded", "{:?}", report.error);
         let called = lines_of(stage.work.join("validated.txt"));
         let build = called.iter().position(|line| line == "build-coverage-ledger.cjs build |").unwrap();
-        assert_eq!(called[build + 1], "build-coverage-ledger.cjs assign |", "{called:?}");
+        assert_eq!(called[build + 1], "validate-coverage-ledger.cjs coverage-ledger.json |", "{called:?}");
+        assert_eq!(called[build + 2], "build-coverage-ledger.cjs assign |", "{called:?}");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_assignments_are_written_from_the_ledger_a_repair_run_leaves_valid() {
+        let stage = stage("assign-after-repair");
+        fs::write(stage.work.join("repair.txt"), "ledger=done cost=1").unwrap();
+        let job =
+            phased_job(["phase=recon list=1 ledger=invalid cost=1", "phase=hunt cost=1", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let called = lines_of(stage.work.join("validated.txt"));
+        let assigned = called.iter().rposition(|line| line == "build-coverage-ledger.cjs assign |").unwrap();
+        let validated = called[..assigned].iter().filter(|line| *line == "validate-coverage-ledger.cjs coverage-ledger.json |").count();
+        assert_eq!(validated, 2, "the check failed, then the repaired ledger passed, then the assignments: {called:?}");
+        assert_eq!(called[assigned - 1], "validate-coverage-ledger.cjs coverage-ledger.json |", "{called:?}");
         let _ = fs::remove_dir_all(&stage.root);
     }
 
@@ -2187,7 +2212,7 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     const LEDGER_NODE: &str = r#"#!/bin/sh
 case "$(basename "$1")" in
   build-coverage-ledger.cjs)
-    if [ -f merge-fails.txt ]; then cat merge-fails.txt >&2; exit 1; fi
+    if [ "$2" = merge ] && [ -f merge-fails.txt ]; then cat merge-fails.txt >&2; exit 1; fi
     if [ "$2" = merge ] && [ -f merged.json ]; then cp merged.json "$3"; fi ;;
   validate-coverage-ledger.cjs)
     if grep -q BAD "$2"; then cat errors.txt >&2; exit 1; fi ;;

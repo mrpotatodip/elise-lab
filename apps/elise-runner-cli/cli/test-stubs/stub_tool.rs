@@ -74,6 +74,17 @@ fn big_list() -> String {
     format!(r#"{{"entries":[{}]}}"#, entries.join(","))
 }
 
+fn list_of_units(count: usize) -> String {
+    let entries: Vec<String> = (0..count)
+        .map(|n| {
+            format!(
+                r#"{{"surface":"packages/api/route-{n}.ts#GET /r{n}","boundary":"packages/api/guard.ts#check","subsystem":"packages/api","paths":["packages/api/route-{n}.ts"],"classes":["Access control"]}}"#
+            )
+        })
+        .collect();
+    format!(r#"{{"entries":[{}]}}"#, entries.join(","))
+}
+
 fn append(path: &Path, line: &str) {
     let mut file = OpenOptions::new().create(true).append(true).open(path).unwrap();
     writeln!(file, "{line}").unwrap();
@@ -177,6 +188,9 @@ fn claude(record: &Path, args: &[String]) {
     }
     if prompt.contains("phase=recon") && prompt.contains("list=big") {
         fs::write("out/recon-list.json", big_list()).unwrap();
+    }
+    if let Some(count) = prompt.split("list=units").nth(1).and_then(|rest| rest.split_whitespace().next()).and_then(|n| n.parse().ok()) {
+        fs::write("out/recon-list.json", list_of_units(count)).unwrap();
     }
     if prompt.contains("phase=recon") && prompt.contains("list=bad") {
         fs::write("out/recon-list.json", SHORT_LIST.replace("src/upload.ts\"]", "../upload.ts\"]")).unwrap();

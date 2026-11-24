@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScanOptions } from "#/schemas";
 import { RUNNER_AGENTS_AT_ONCE, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
@@ -272,9 +273,21 @@ describe("buildAgentPrompt", () => {
     const full: ScanOptions = { ...options, skill: "full" };
 
     expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).toContain("hunter-assignments.json");
-    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).toContain("do not regroup");
+    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).toContain(
+      "If it is missing, group the planned units yourself",
+    );
+    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).not.toContain("do not regroup");
     expect(buildPhasePrompt(full, "hunt")).not.toContain("hunter-assignments");
     expect(buildPhasePrompt(full, "check", RUNNER_PROMPT_PLACE)).not.toContain("hunter-assignments");
+  });
+
+  it("keeps the Runner app's copy of the agents-at-once number equal to the engine's", () => {
+    const source = readFileSync(
+      new URL("../../../../../elise-runner-cli/core/src/scan.rs", import.meta.url).pathname,
+      "utf8",
+    );
+
+    expect(source.match(/const AGENTS_AT_ONCE: usize = (\d+);/)?.[1]).toBe(String(RUNNER_AGENTS_AT_ONCE));
   });
 
   it.each([
