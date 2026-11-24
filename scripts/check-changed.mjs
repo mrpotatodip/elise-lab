@@ -10,7 +10,15 @@ import { findRatchetBreaks } from "./check-ratchets.mjs";
 import { findAdrProblems } from "./check-adr.mjs";
 
 const git = (args) => spawnSync("git", args, { encoding: "utf8" }).stdout.trim();
-const all = process.argv.includes("--all");
+const baseFlag = process.argv.indexOf("--base");
+const base = baseFlag === -1 ? undefined : process.argv[baseFlag + 1];
+const baseDiff = (extra = []) => {
+  if (!base || base.startsWith("--")) return undefined;
+  const diff = spawnSync("git", ["diff", "--name-only", ...extra, `${base}...HEAD`], { encoding: "utf8" });
+  return diff.status === 0 ? diff.stdout.split("\n").filter(Boolean) : undefined;
+};
+const baseFiles = baseFlag === -1 ? undefined : baseDiff();
+const all = process.argv.includes("--all") || (baseFlag !== -1 && baseFiles === undefined);
 const TAIL_LINES = 25;
 const LINE_WIDTH = 180;
 
@@ -21,16 +29,52 @@ const folders = (root) =>
         .filter((e) => e.isDirectory())
         .map((e) => `${root}/${e.name}`)
     : [];
-const projects = all
-  ? [...folders("apps"), ...folders("packages")]
-  : [
-      ...new Set(
-        git(["diff", "--cached", "--name-only"])
-          .split("\n")
-          .map((f) => f.match(/^((?:apps|packages)\/[^/]+)\//)?.[1])
-          .filter(Boolean),
+const allProjects = [...folders("apps"), ...folders("packages")];
+const projectOf = (file) => file.match(/^((?:apps|packages)\/[^/]+)\//)?.[1];
+const DOCS_ONLY = /^docs\/|\.md$/;
+
+const withDependents = (changed) => {
+  const names = new Map();
+  const dependencies = new Map();
+  for (const dir of allProjects) {
+    const file = `${dir}/package.json`;
+    if (!fs.existsSync(file)) continue;
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    names.set(manifest.name, dir);
+    dependencies.set(
+      dir,
+      ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].flatMap((field) =>
+        Object.entries(manifest[field] ?? {})
+          .filter(([, range]) => String(range).startsWith("workspace:"))
+          .map(([name]) => name),
       ),
-    ];
+    );
+  }
+  const selected = new Set(changed);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const [dir, deps] of dependencies) {
+      if (selected.has(dir)) continue;
+      if (deps.some((name) => selected.has(names.get(name)))) {
+        selected.add(dir);
+        grew = true;
+      }
+    }
+  }
+  return allProjects.filter((dir) => selected.has(dir));
+};
+
+const selectFromBase = (files) =>
+  files.some((f) => !projectOf(f) && !DOCS_ONLY.test(f))
+    ? allProjects
+    : withDependents(new Set(files.map(projectOf).filter(Boolean)));
+
+const projects = all
+  ? allProjects
+  : baseFiles
+    ? selectFromBase(baseFiles)
+    : [...new Set(git(["diff", "--cached", "--name-only"]).split("\n").map(projectOf).filter(Boolean))];
 
 // A deploy writes the `vars` of wrangler.jsonc over the live Worker's variables, so a
 // variable that points only at this machine (a lone localhost URL) breaks production.
@@ -54,9 +98,10 @@ const failures = [...findContractCopies(), ...findRatchetBreaks(), ...findAdrPro
 const FORMATTED_FILES = /\.(ts|tsx|js|mjs|css)$/;
 const formatTargets = all
   ? ["**/*.{ts,tsx,js,mjs,css}"]
-  : git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
-      .split("\n")
-      .filter((f) => FORMATTED_FILES.test(f));
+  : (baseFiles
+      ? baseDiff(["--diff-filter=ACMR"])
+      : git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"]).split("\n")
+    ).filter((f) => FORMATTED_FILES.test(f));
 if (formatTargets.length > 0) {
   const format = spawnSync("pnpm", ["exec", "oxfmt", "--list-different", ...formatTargets], { encoding: "utf8" });
   if (format.error) failures.push(`format: could not run oxfmt: ${format.error.message}`);

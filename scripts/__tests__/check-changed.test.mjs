@@ -14,7 +14,7 @@ const STUBS = {
 };
 const fixtures = [];
 
-const makeFixture = (projects) => {
+const makeFixture = (projects, dependencies = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "check-changed-"));
   fixtures.push(root);
   fs.mkdirSync(path.join(root, "scripts"));
@@ -26,7 +26,11 @@ const makeFixture = (projects) => {
     fs.mkdirSync(path.join(root, dir), { recursive: true });
     fs.writeFileSync(
       path.join(root, dir, "package.json"),
-      JSON.stringify({ name: dir.replace("/", "-"), scripts: { check } }),
+      JSON.stringify({
+        name: dir.replace("/", "-"),
+        scripts: { check },
+        dependencies: Object.fromEntries((dependencies[dir] ?? []).map((d) => [d.replace("/", "-"), "workspace:*"])),
+      }),
     );
   }
   spawnSync("git", ["init", "-q"], { cwd: root });
@@ -34,13 +38,44 @@ const makeFixture = (projects) => {
   return root;
 };
 
-const run = (root, { ci }) => {
+const run = (root, { ci, args = [] }) => {
   const env = { ...process.env };
   delete env.CI;
   if (ci) env.CI = "true";
-  const result = spawnSync("node", ["scripts/check-changed.mjs"], { cwd: root, env, encoding: "utf8" });
+  const result = spawnSync("node", ["scripts/check-changed.mjs", ...args], { cwd: root, env, encoding: "utf8" });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 };
+
+const commitAll = (root, message) => {
+  const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: root });
+  git("add", "-A");
+  git("commit", "-q", "-m", message);
+};
+
+const changedRepo = (projects, dependencies, changedFile) => {
+  const root = makeFixture(projects, dependencies);
+  for (const file of ["pnpm-lock.yaml", "README.md"]) fs.writeFileSync(path.join(root, file), "a\n");
+  fs.writeFileSync(path.join(root, "package.json"), "{}\n");
+  fs.mkdirSync(path.join(root, "node_modules/.bin"), { recursive: true });
+  fs.writeFileSync(path.join(root, "node_modules/.bin/oxfmt"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  fs.writeFileSync(path.join(root, ".gitignore"), "node_modules\n");
+  fs.mkdirSync(path.join(root, "docs"));
+  fs.mkdirSync(path.join(root, ".github/workflows"), { recursive: true });
+  fs.writeFileSync(path.join(root, "docs/guide.md"), "a\n");
+  fs.writeFileSync(path.join(root, ".github/workflows/check.yml"), "a\n");
+  commitAll(root, "base");
+  spawnSync("git", ["branch", "-M", "main"], { cwd: root });
+  fs.mkdirSync(path.dirname(path.join(root, changedFile)), { recursive: true });
+  fs.appendFileSync(path.join(root, changedFile), "\n");
+  commitAll(root, "change");
+  return root;
+};
+
+const ranProjects = (stdout) =>
+  stdout
+    .split("\n")
+    .filter((l) => /^(apps|packages)\//.test(l))
+    .map((l) => l.split(/\s+/)[0]);
 
 after(() => {
   for (const root of fixtures) fs.rmSync(root, { recursive: true, force: true });
@@ -98,6 +133,78 @@ describe("check-changed", () => {
       lines.map((l) => l.split(/\s+/)[0]),
       ["apps/a", "apps/b", "apps/c", "packages/d"],
     );
+  });
+
+  describe("--base", () => {
+    const projects = {
+      "apps/marketing": "node -e 0",
+      "apps/engine": "node -e 0",
+      "apps/web": "node -e 0",
+      "packages/contracts": "node -e 0",
+      "packages/db": "node -e 0",
+    };
+    const dependencies = {
+      "apps/engine": ["packages/contracts", "packages/db"],
+      "apps/web": ["packages/contracts"],
+      "packages/db": ["packages/contracts"],
+    };
+    const everything = ["apps/engine", "apps/marketing", "apps/web", "packages/contracts", "packages/db"];
+
+    for (const [name, file, expected] of [
+      ["a marketing-only diff skips the other projects", "apps/marketing/src/page.astro", ["apps/marketing"]],
+      [
+        "a contracts change selects its dependents, transitively",
+        "packages/contracts/src/index.ts",
+        ["apps/engine", "apps/web", "packages/contracts", "packages/db"],
+      ],
+      [
+        "a change in a leaf package selects only that package and its dependents",
+        "packages/db/x.ts",
+        ["apps/engine", "packages/db"],
+      ],
+      ["a lockfile change selects all projects", "pnpm-lock.yaml", everything],
+      ["a root package.json change selects all projects", "package.json", everything],
+      ["a workflow change selects all projects", ".github/workflows/check.yml", everything],
+      ["a scripts change selects all projects", "scripts/other.mjs", everything],
+      ["a root tsconfig change selects all projects", "tsconfig.base.json", everything],
+      ["a docs-only change selects no project", "docs/guide.md", []],
+      ["a root markdown change selects no project", "README.md", []],
+    ]) {
+      it(name, () => {
+        const root = changedRepo(projects, dependencies, file);
+        const { status, stdout } = run(root, { ci: true, args: ["--base", "main~1"] });
+        assert.equal(status, 0);
+        assert.deepEqual(ranProjects(stdout), expected);
+      });
+    }
+
+    it("an unknown base ref selects all projects", () => {
+      const root = changedRepo(projects, dependencies, "docs/guide.md");
+      const { status, stdout } = run(root, { ci: true, args: ["--base", "origin/missing"] });
+      assert.equal(status, 0);
+      assert.deepEqual(ranProjects(stdout), everything);
+    });
+
+    it("fails the run when a selected project fails, and ignores a failing project that was not selected", () => {
+      const withBad = { ...projects, "apps/engine": 'node -e "process.exit(4)"' };
+      const skipped = run(changedRepo(withBad, dependencies, "apps/marketing/x.ts"), {
+        ci: false,
+        args: ["--base", "main~1"],
+      });
+      assert.equal(skipped.status, 0);
+      const selected = run(changedRepo(withBad, dependencies, "packages/contracts/x.ts"), {
+        ci: false,
+        args: ["--base", "main~1"],
+      });
+      assert.notEqual(selected.status, 0);
+      assert.match(selected.stderr, /apps\/engine: check failed/);
+    });
+
+    it("--all still runs every project whatever the diff", () => {
+      const root = changedRepo(projects, dependencies, "docs/guide.md");
+      const { stdout } = run(root, { ci: true, args: ["--all"] });
+      assert.deepEqual(ranProjects(stdout), everything);
+    });
   });
 
   it("runs slow projects at the same time", () => {
