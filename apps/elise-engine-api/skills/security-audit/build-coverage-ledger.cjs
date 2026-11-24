@@ -198,6 +198,13 @@ function build(listFile, ledgerFile, profile) {
   return [];
 }
 
+function ownReviewedPaths(unit) {
+  if (!isObject(unit) || !Array.isArray(unit.local_checks)) return;
+  if (!unit.local_checks.every((check) => isObject(check) && Array.isArray(check.reviewed_paths))) return;
+  const paths = unit.local_checks.flatMap((check) => check.reviewed_paths).filter((path) => typeof path === "string");
+  unit.reviewed_paths = [...new Set(paths)];
+}
+
 function merge(ledgerFile, updatesFile) {
   let ledger;
   let updates;
@@ -249,6 +256,9 @@ function merge(ledgerFile, updatesFile) {
     ledger.push(added);
   });
   if (errors.length > 0) return errors.slice(0, MAX_ERRORS).map((error) => `ledger-updates.json: ${error}`);
+  for (const update of updates) {
+    if (isObject(update)) ownReviewedPaths(byId.get(update.coverage_id));
+  }
   writeJson(ledgerFile, ledger.sort((a, b) => compare(String(a.coverage_id), String(b.coverage_id))));
   return [];
 }
