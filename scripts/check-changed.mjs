@@ -3,7 +3,8 @@
 // package with staged changes (`--all`: every one). Silent output on success
 // except one line; on failure, the tail of each failing project, lines cut.
 import fs from "node:fs";
-import { spawnSync } from "node:child_process";
+import os from "node:os";
+import { spawn, spawnSync } from "node:child_process";
 import { findContractCopies } from "./check-contract-copies.mjs";
 import { findRatchetBreaks } from "./check-ratchets.mjs";
 import { findAdrProblems } from "./check-adr.mjs";
@@ -92,23 +93,44 @@ for (const dir of folders("apps")) {
   }
 }
 
-let ran = 0;
-const timings = [];
+const runCheck = (dir) =>
+  new Promise((resolve) => {
+    const projectStarted = Date.now();
+    let output = "";
+    const child = spawn("pnpm", ["--dir", dir, "run", "--if-present", "check"], { stdio: ["ignore", "pipe", "pipe"] });
+    child.stdout.on("data", (chunk) => (output += chunk));
+    child.stderr.on("data", (chunk) => (output += chunk));
+    const finish = (status, extra = "") =>
+      resolve({ dir, status, output: output + extra, ms: Date.now() - projectStarted });
+    child.on("error", (error) => finish(1, `\n${error.message}`));
+    child.on("close", (status) => finish(status));
+  });
+
+const runAll = async (dirs) => {
+  const results = new Array(dirs.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < dirs.length) {
+      const index = next++;
+      results[index] = await runCheck(dirs[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(os.availableParallelism(), dirs.length) }, worker));
+  return results;
+};
+
 const started = Date.now();
-for (const dir of projects) {
-  if (!fs.existsSync(`${dir}/package.json`)) continue;
-  const projectStarted = Date.now();
-  const run = spawnSync("pnpm", ["--dir", dir, "run", "--if-present", "check"], { encoding: "utf8" });
-  timings.push(`${dir}  ${((Date.now() - projectStarted) / 1000).toFixed(1)}s  ${run.status === 0 ? "ok" : "fail"}`);
-  ran += 1;
-  if (run.status !== 0) {
-    const tail = (run.stdout + run.stderr)
-      .split("\n")
-      .filter(Boolean)
-      .slice(-TAIL_LINES)
-      .map((l) => l.slice(0, LINE_WIDTH));
-    failures.push(`${dir}: check failed\n${tail.join("\n")}`);
-  }
+const results = await runAll(projects.filter((dir) => fs.existsSync(`${dir}/package.json`)));
+const ran = results.length;
+const timings = results.map((r) => `${r.dir}  ${(r.ms / 1000).toFixed(1)}s  ${r.status === 0 ? "ok" : "fail"}`);
+for (const r of results) {
+  if (r.status === 0) continue;
+  const tail = r.output
+    .split("\n")
+    .filter(Boolean)
+    .slice(-TAIL_LINES)
+    .map((l) => l.slice(0, LINE_WIDTH));
+  failures.push(`${r.dir}: check failed\n${tail.join("\n")}`);
 }
 if (process.env.CI) {
   console.log([...timings, `total  ${((Date.now() - started) / 1000).toFixed(1)}s`].join("\n"));
