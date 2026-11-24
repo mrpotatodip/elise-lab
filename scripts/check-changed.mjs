@@ -65,10 +65,16 @@ const withDependents = (changed) => {
   return allProjects.filter((dir) => selected.has(dir));
 };
 
-const selectFromBase = (files) =>
-  files.some((f) => !projectOf(f) && !DOCS_ONLY.test(f))
-    ? allProjects
-    : withDependents(new Set(files.map(projectOf).filter(Boolean)));
+const FILE_READERS = [
+  ["packages/contracts/fixtures/trace-classifier/", "apps/elise-runner-cli"],
+  ["apps/elise-engine-api/skills/security-audit/", "apps/elise-runner-cli"],
+];
+
+const selectFromBase = (files) => {
+  if (files.some((f) => !projectOf(f) && !DOCS_ONLY.test(f))) return allProjects;
+  const readers = FILE_READERS.filter(([prefix]) => files.some((f) => f.startsWith(prefix))).map(([, dir]) => dir);
+  return withDependents(new Set([...files.map(projectOf).filter(Boolean), ...readers]));
+};
 
 const projects = all
   ? allProjects
@@ -151,16 +157,28 @@ const runCheck = (dir) =>
     child.on("close", (status) => finish(status));
   });
 
+const HEAVIEST = ["apps/elise-engine-api", "apps/elise-runner-cli"];
+const concurrency = () => {
+  const set = Number.parseInt(process.env.CHECK_CONCURRENCY ?? "", 10);
+  return set > 0 ? set : Math.max(2, Math.floor(os.availableParallelism() / 2));
+};
+
 const runAll = async (dirs) => {
   const results = new Array(dirs.length);
+  const order = dirs
+    .map((dir, index) => ({ dir, index, rank: HEAVIEST.indexOf(dir) }))
+    .sort(
+      (a, b) =>
+        (a.rank === -1 ? HEAVIEST.length : a.rank) - (b.rank === -1 ? HEAVIEST.length : b.rank) || a.index - b.index,
+    );
   let next = 0;
   const worker = async () => {
-    while (next < dirs.length) {
-      const index = next++;
-      results[index] = await runCheck(dirs[index]);
+    while (next < order.length) {
+      const { dir, index } = order[next++];
+      results[index] = await runCheck(dir);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(os.availableParallelism(), dirs.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency(), dirs.length) }, worker));
   return results;
 };
 
