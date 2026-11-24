@@ -121,7 +121,7 @@ Fix every structural and semantic error before continuing. The findings validato
 
 ### Phase 5: Verify the final records with fresh eyes
 
-Launch one fresh `research` verifier per final `confirmed` and `needs_validation` record, at most 3 at a time. This verifier checks the structured record, not the hunter write-up, and remains inside source/local boundaries.
+Launch one fresh `research` verifier per final `confirmed` and `needs_validation` record, within the limit on agents at once in `SKILL.md`. This verifier checks the structured record, not the hunter write-up, and remains inside source/local boundaries.
 
 In a `quick` run, Phase 3 and Phase 5 merge: the Phase 3 verifier also performs these record checks and returns the final schema-shaped record, so each candidate gets one fresh independent reviewer instead of two. Every other profile keeps the two passes separate. Never skip independent review of a `confirmed` record in any profile.
 
