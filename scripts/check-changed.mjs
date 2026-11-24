@@ -3,13 +3,22 @@
 // package with staged changes (`--all`: every one). Silent output on success
 // except one line; on failure, the tail of each failing project, lines cut.
 import fs from "node:fs";
-import { spawnSync } from "node:child_process";
+import os from "node:os";
+import { spawn, spawnSync } from "node:child_process";
 import { findContractCopies } from "./check-contract-copies.mjs";
 import { findRatchetBreaks } from "./check-ratchets.mjs";
 import { findAdrProblems } from "./check-adr.mjs";
 
 const git = (args) => spawnSync("git", args, { encoding: "utf8" }).stdout.trim();
-const all = process.argv.includes("--all");
+const baseFlag = process.argv.indexOf("--base");
+const base = baseFlag === -1 ? undefined : process.argv[baseFlag + 1];
+const baseDiff = (extra = []) => {
+  if (!base || base.startsWith("--")) return undefined;
+  const diff = spawnSync("git", ["diff", "--name-only", ...extra, `${base}...HEAD`], { encoding: "utf8" });
+  return diff.status === 0 ? diff.stdout.split("\n").filter(Boolean) : undefined;
+};
+const baseFiles = baseFlag === -1 ? undefined : baseDiff();
+const all = process.argv.includes("--all") || (baseFlag !== -1 && baseFiles === undefined);
 const TAIL_LINES = 25;
 const LINE_WIDTH = 180;
 
@@ -20,16 +29,58 @@ const folders = (root) =>
         .filter((e) => e.isDirectory())
         .map((e) => `${root}/${e.name}`)
     : [];
-const projects = all
-  ? [...folders("apps"), ...folders("packages")]
-  : [
-      ...new Set(
-        git(["diff", "--cached", "--name-only"])
-          .split("\n")
-          .map((f) => f.match(/^((?:apps|packages)\/[^/]+)\//)?.[1])
-          .filter(Boolean),
+const allProjects = [...folders("apps"), ...folders("packages")];
+const projectOf = (file) => file.match(/^((?:apps|packages)\/[^/]+)\//)?.[1];
+const DOCS_ONLY = /^docs\/|\.md$/;
+
+const withDependents = (changed) => {
+  const names = new Map();
+  const dependencies = new Map();
+  for (const dir of allProjects) {
+    const file = `${dir}/package.json`;
+    if (!fs.existsSync(file)) continue;
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    names.set(manifest.name, dir);
+    dependencies.set(
+      dir,
+      ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].flatMap((field) =>
+        Object.entries(manifest[field] ?? {})
+          .filter(([, range]) => String(range).startsWith("workspace:"))
+          .map(([name]) => name),
       ),
-    ];
+    );
+  }
+  const selected = new Set(changed);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const [dir, deps] of dependencies) {
+      if (selected.has(dir)) continue;
+      if (deps.some((name) => selected.has(names.get(name)))) {
+        selected.add(dir);
+        grew = true;
+      }
+    }
+  }
+  return allProjects.filter((dir) => selected.has(dir));
+};
+
+const FILE_READERS = [
+  ["packages/contracts/fixtures/trace-classifier/", "apps/elise-runner-cli"],
+  ["apps/elise-engine-api/skills/security-audit/", "apps/elise-runner-cli"],
+];
+
+const selectFromBase = (files) => {
+  if (files.some((f) => !projectOf(f) && !DOCS_ONLY.test(f))) return allProjects;
+  const readers = FILE_READERS.filter(([prefix]) => files.some((f) => f.startsWith(prefix))).map(([, dir]) => dir);
+  return withDependents(new Set([...files.map(projectOf).filter(Boolean), ...readers]));
+};
+
+const projects = all
+  ? allProjects
+  : baseFiles
+    ? selectFromBase(baseFiles)
+    : [...new Set(git(["diff", "--cached", "--name-only"]).split("\n").map(projectOf).filter(Boolean))];
 
 // A deploy writes the `vars` of wrangler.jsonc over the live Worker's variables, so a
 // variable that points only at this machine (a lone localhost URL) breaks production.
@@ -53,9 +104,10 @@ const failures = [...findContractCopies(), ...findRatchetBreaks(), ...findAdrPro
 const FORMATTED_FILES = /\.(ts|tsx|js|mjs|css)$/;
 const formatTargets = all
   ? ["**/*.{ts,tsx,js,mjs,css}"]
-  : git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
-      .split("\n")
-      .filter((f) => FORMATTED_FILES.test(f));
+  : (baseFiles
+      ? baseDiff(["--diff-filter=ACMR"])
+      : git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"]).split("\n")
+    ).filter((f) => FORMATTED_FILES.test(f));
 if (formatTargets.length > 0) {
   const format = spawnSync("pnpm", ["exec", "oxfmt", "--list-different", ...formatTargets], { encoding: "utf8" });
   if (format.error) failures.push(`format: could not run oxfmt: ${format.error.message}`);
@@ -92,19 +144,59 @@ for (const dir of folders("apps")) {
   }
 }
 
-let ran = 0;
-for (const dir of projects) {
-  if (!fs.existsSync(`${dir}/package.json`)) continue;
-  const run = spawnSync("pnpm", ["--dir", dir, "run", "--if-present", "check"], { encoding: "utf8" });
-  ran += 1;
-  if (run.status !== 0) {
-    const tail = (run.stdout + run.stderr)
-      .split("\n")
-      .filter(Boolean)
-      .slice(-TAIL_LINES)
-      .map((l) => l.slice(0, LINE_WIDTH));
-    failures.push(`${dir}: check failed\n${tail.join("\n")}`);
-  }
+const runCheck = (dir) =>
+  new Promise((resolve) => {
+    const projectStarted = Date.now();
+    let output = "";
+    const child = spawn("pnpm", ["--dir", dir, "run", "--if-present", "check"], { stdio: ["ignore", "pipe", "pipe"] });
+    child.stdout.on("data", (chunk) => (output += chunk));
+    child.stderr.on("data", (chunk) => (output += chunk));
+    const finish = (status, extra = "") =>
+      resolve({ dir, status, output: output + extra, ms: Date.now() - projectStarted });
+    child.on("error", (error) => finish(1, `\n${error.message}`));
+    child.on("close", (status) => finish(status));
+  });
+
+const HEAVIEST = ["apps/elise-engine-api", "apps/elise-runner-cli"];
+const concurrency = () => {
+  const set = Number.parseInt(process.env.CHECK_CONCURRENCY ?? "", 10);
+  return set > 0 ? set : Math.max(2, Math.floor(os.availableParallelism() / 2));
+};
+
+const runAll = async (dirs) => {
+  const results = new Array(dirs.length);
+  const order = dirs
+    .map((dir, index) => ({ dir, index, rank: HEAVIEST.indexOf(dir) }))
+    .sort(
+      (a, b) =>
+        (a.rank === -1 ? HEAVIEST.length : a.rank) - (b.rank === -1 ? HEAVIEST.length : b.rank) || a.index - b.index,
+    );
+  let next = 0;
+  const worker = async () => {
+    while (next < order.length) {
+      const { dir, index } = order[next++];
+      results[index] = await runCheck(dir);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency(), dirs.length) }, worker));
+  return results;
+};
+
+const started = Date.now();
+const results = await runAll(projects.filter((dir) => fs.existsSync(`${dir}/package.json`)));
+const ran = results.length;
+const timings = results.map((r) => `${r.dir}  ${(r.ms / 1000).toFixed(1)}s  ${r.status === 0 ? "ok" : "fail"}`);
+for (const r of results) {
+  if (r.status === 0) continue;
+  const tail = r.output
+    .split("\n")
+    .filter(Boolean)
+    .slice(-TAIL_LINES)
+    .map((l) => l.slice(0, LINE_WIDTH));
+  failures.push(`${r.dir}: check failed\n${tail.join("\n")}`);
+}
+if (process.env.CI) {
+  console.log([...timings, `total  ${((Date.now() - started) / 1000).toFixed(1)}s`].join("\n"));
 }
 if (failures.length) {
   console.error(failures.join("\n\n"));

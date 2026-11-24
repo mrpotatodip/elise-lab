@@ -5,19 +5,30 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+      - uses: Swatinem/rust-cache@aa7c1c80a07a27a84c0aa76d0cef0aad3830e330
+        with:
+          workspaces: apps/elise-runner-cli
+          key: ${{ hashFiles('apps/elise-runner-cli/rust-toolchain.toml') }}
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/check-changed.mjs --all
+      - run: pnpm test:scripts
+      - run: node scripts/check-changed.mjs ${{ github.event_name == 'pull_request' && format('--base origin/{0}', github.base_ref) || '--all' }}
 
   runner-windows:
     runs-on: windows-latest
@@ -27,6 +38,9 @@ jobs:
         working-directory: apps/elise-runner-cli
     steps:
       - uses: actions/checkout@v4
-      # rustup reads apps/elise-runner-cli/rust-toolchain.toml and installs that channel on first use.
+      - uses: Swatinem/rust-cache@aa7c1c80a07a27a84c0aa76d0cef0aad3830e330
+        with:
+          workspaces: apps/elise-runner-cli
+          key: ${{ hashFiles('apps/elise-runner-cli/rust-toolchain.toml') }}
       - run: cargo build --locked -p elise-runner-cli
       - run: cargo test --locked -p elise-runner-cli
