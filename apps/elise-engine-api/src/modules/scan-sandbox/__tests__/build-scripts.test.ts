@@ -175,7 +175,7 @@ describe("buildAgentPrompt", () => {
       expect(onRunner).toContain("./repo");
       expect(onRunner).not.toMatch(/node command|money|deferred/i);
       expect(onRunner).not.toMatch(/(do not|never|no|without)\s+(start\s+|use\s+|run\s+|spawn\s+)?sub-?agents?/i);
-      expect(sharedLines(onRunner).slice(0, 5)).toEqual(sharedLines(prompt).slice(0, 5));
+      expect(sharedLines(onRunner).slice(0, 3)).toEqual(sharedLines(prompt).slice(0, 3));
     },
   );
 
@@ -208,13 +208,40 @@ describe("buildAgentPrompt", () => {
     expect(buildPhasePrompt(full, "report")).toContain("Finish by producing REPORT.md");
   });
 
-  it.each(["recon", "hunt"] as const)("tells a Runner's %s run that the app validates the ledger and the agent runs no code", (phase) => {
+  it.each([
+    ["recon", "builds coverage-ledger.json from recon-list.json and runs the skill's validators on it"],
+    ["hunt", "merges ledger-updates.json into coverage-ledger.json and runs the skill's validators on it"],
+  ] as const)("tells a Runner's %s run that the app builds the ledger and the agent runs no code", (phase, appDoes) => {
     const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
 
-    expect(prompt).toContain("runs the skill's validators on coverage-ledger.json after this run ends");
+    expect(prompt).toContain(appDoes);
     expect(prompt).toContain("do not run node or any other script");
     expect(prompt).toContain("A command refused to you is expected here");
   });
+
+  it.each([
+    ["recon", "write recon-list.json, a short list of what you found", "Do not write coverage-ledger.json"],
+    [
+      "hunt",
+      "write ledger-updates.json, a JSON array of only the units you changed",
+      "Do not rewrite coverage-ledger.json",
+    ],
+    [
+      "check",
+      "write ledger-updates.json, a JSON array of only the units you changed",
+      "Do not rewrite coverage-ledger.json",
+    ],
+  ] as const)(
+    "asks a Runner's %s run for the short list or the changed units, and a cloud run does not",
+    (phase, asked, refused) => {
+      const onRunner = buildPhasePrompt({ ...options, skill: "full" }, phase, RUNNER_PLACE);
+      const inCloud = buildPhasePrompt({ ...options, skill: "full" }, phase);
+
+      expect(onRunner).toContain(asked);
+      expect(onRunner).toContain(refused);
+      expect(inCloud).not.toMatch(/recon-list|ledger-updates/);
+    },
+  );
 
   it("tells a Runner's check run that a refused validator is expected and that no candidates need no verifier", () => {
     const full: ScanOptions = { ...options, skill: "full" };

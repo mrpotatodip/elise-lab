@@ -212,6 +212,12 @@ pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
     job_at(scan_id, REPO_URL, phase_prompts)
 }
 
+pub fn job_with_profile(scan_id: &str, profile: &str, phase_prompts: [&str; 4]) -> String {
+    let mut job: serde_json::Value = serde_json::from_str(&job_at(scan_id, REPO_URL, phase_prompts)).unwrap();
+    job["profile"] = profile.into();
+    job.to_string()
+}
+
 pub fn job_at(scan_id: &str, repo: &str, phase_prompts: [&str; 4]) -> String {
     let phases: Vec<serde_json::Value> = ["recon", "hunt", "check", "report"]
         .iter()
@@ -580,8 +586,12 @@ impl Runner {
             install_stub(&bin, "git");
         }
         for tool in tools {
-            assert!(["claude", "node"].contains(tool), "no stub for {tool}");
-            install_stub(&bin, tool);
+            assert!(["claude", "node", "real-node"].contains(tool), "no stub for {tool}");
+            if *tool == "real-node" {
+                install_real_node(&bin);
+            } else {
+                install_stub(&bin, tool);
+            }
         }
         let rest = if with_git { system_path() } else { vec![] };
         self.env.push(("PATH", path_with(&bin, rest)));
@@ -703,6 +713,10 @@ impl Stubs {
         std::fs::read_to_string(self.record.join("git-helper.txt")).unwrap_or_default()
     }
 
+    pub fn repair_prompt(&self) -> String {
+        std::fs::read_to_string(self.record.join("repair-prompt.txt")).unwrap_or_default()
+    }
+
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
@@ -726,6 +740,19 @@ impl Stubs {
 
 fn install_stub(bin: &std::path::Path, tool: &str) {
     std::fs::copy(env!("CARGO_BIN_EXE_elise-stub-tool"), bin.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX))).unwrap();
+}
+
+fn install_real_node(bin: &std::path::Path) {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let node = std::env::split_paths(&path)
+        .map(|folder| folder.join(format!("node{}", std::env::consts::EXE_SUFFIX)))
+        .find(|candidate| candidate.is_file())
+        .expect("a test with the real validators needs node on PATH");
+    let target = bin.join(format!("node{}", std::env::consts::EXE_SUFFIX));
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&node, &target).unwrap();
+    #[cfg(not(unix))]
+    std::fs::copy(&node, &target).unwrap();
 }
 
 fn system_path() -> Vec<PathBuf> {
