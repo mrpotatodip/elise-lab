@@ -42,6 +42,9 @@ const ERROR_MAX: usize = 3800;
 const LOG_MAX: usize = 190_000;
 const FILE_MAX: u64 = 1_900_000;
 const LIVE_FINDINGS_FILE: &str = "live-findings.jsonl";
+const HUNTER_ASSIGNMENTS_FILE: &str = "hunter-assignments.json";
+const HUNTER_GROUP_UNITS: usize = 15;
+const AGENTS_AT_ONCE: usize = 6;
 
 // What the agent may do. The repository is untrusted, so this is the cloud's "no code
 // execution" rule as an allowlist. Bare `Read`, `Glob` and `Grep` are left out on purpose: a
@@ -660,6 +663,9 @@ async fn apply_phase_files(tools: &Tools, job: &Job, work: &Path, phase: &str, s
             vec![PathBuf::from("build"), list.to_path_buf(), ledger.clone(), PathBuf::from(job.profile.as_deref().unwrap_or("standard"))]
         })
         .await?;
+        if changed {
+            write_hunter_assignments(tools, work, stop).await?;
+        }
     } else if phase == "hunt" || phase == VALIDATED_AFTER {
         let applied = format!("ledger-updates-{phase}.applied.json");
         changed = apply_ledger_file(tools, work, stop, "ledger-updates.json", &applied, "build-coverage-ledger.cjs", |updates| {
@@ -668,6 +674,24 @@ async fn apply_phase_files(tools: &Tools, job: &Job, work: &Path, phase: &str, s
         .await?;
     }
     Ok(changed)
+}
+
+async fn write_hunter_assignments(tools: &Tools, work: &Path, stop: &Stop) -> Result<(), CheckFailure> {
+    let out = work.join("out");
+    let args = [
+        PathBuf::from("assign"),
+        out.join("coverage-ledger.json"),
+        out.join(HUNTER_ASSIGNMENTS_FILE),
+        PathBuf::from(HUNTER_GROUP_UNITS.to_string()),
+        PathBuf::from(AGENTS_AT_ONCE.to_string()),
+    ];
+    match skill_script_said(tools, work, stop, "build-coverage-ledger.cjs", &args, HUNTER_ASSIGNMENTS_FILE).await? {
+        Ok(()) => Ok(()),
+        Err(said) => Err(CheckFailure::Environment(format!(
+            "This app could not split the ledger into hunter assignments ({HUNTER_ASSIGNMENTS_FILE}). {}",
+            tail(said.trim(), 1500)
+        ))),
+    }
 }
 
 async fn apply_ledger_file(
@@ -1854,6 +1878,7 @@ case "$prompt" in
 esac
 case "$prompt" in
   *"updates=1"*) echo '[]' > out/ledger-updates.json ;;
+  *"list=1"*) echo '{}' > out/recon-list.json ;;
   *"ledger=invalid"*) echo '[{"coverage_id":"a","status":"planned","INVALID":true}]' > out/coverage-ledger.json ;;
   *"ledger=done"*) echo '[{"coverage_id":"a","status":"covered","unresolved":[]}]' > out/coverage-ledger.json ;;
 esac
@@ -2122,6 +2147,21 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
         assert_eq!(report.state, "succeeded", "{:?}", report.error);
         assert!(lines_of(stage.work.join("validated.txt")).contains(&"build-coverage-ledger.cjs merge |".to_string()));
         assert!(!report.files.contains_key("ledger-updates.json"), "applied once, set aside");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_app_splits_the_built_ledger_into_hunter_groups_before_the_hunt_starts() {
+        let stage = stage("assign-after-build");
+        let job = phased_job(["phase=recon list=1 cost=1", "phase=hunt cost=1", "phase=check cost=1", "phase=report cost=1"]);
+
+        let report = scan(&stage, &job);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let called = lines_of(stage.work.join("validated.txt"));
+        let build = called.iter().position(|line| line == "build-coverage-ledger.cjs build |").unwrap();
+        assert_eq!(called[build + 1], "build-coverage-ledger.cjs assign |", "{called:?}");
         let _ = fs::remove_dir_all(&stage.root);
     }
 

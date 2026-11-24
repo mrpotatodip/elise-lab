@@ -268,6 +268,15 @@ describe("buildAgentPrompt", () => {
     expect(onRunner).not.toContain("run the skill's validators");
   });
 
+  it("sends a Runner's hunt to the app's hunter-assignments.json and leaves the cloud hunt as it was", () => {
+    const full: ScanOptions = { ...options, skill: "full" };
+
+    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).toContain("hunter-assignments.json");
+    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).toContain("do not regroup");
+    expect(buildPhasePrompt(full, "hunt")).not.toContain("hunter-assignments");
+    expect(buildPhasePrompt(full, "check", RUNNER_PROMPT_PLACE)).not.toContain("hunter-assignments");
+  });
+
   it.each([
     ["hunt", "hunters"],
     ["check", "verifiers"],
