@@ -81,4 +81,31 @@ describe("check-changed", () => {
     assert.match(stdout, /apps\/bad\s+\d+\.\ds\s+fail/);
     assert.match(stdout, /apps\/one\s+\d+\.\ds\s+ok/);
   });
+
+  it("reports every failure in one run, one timing line per project in stable order", () => {
+    const projects = {
+      "apps/a": "node -e \"console.error('boom-a');process.exit(1)\"",
+      "apps/b": "node -e 0",
+      "apps/c": "node -e \"console.error('boom-c');process.exit(2)\"",
+      "packages/d": "node -e 0",
+    };
+    const { status, stdout, stderr } = run(makeFixture(projects), { ci: true });
+    assert.notEqual(status, 0);
+    assert.match(stderr, /boom-a/);
+    assert.match(stderr, /boom-c/);
+    const lines = stdout.split("\n").filter((l) => /^(apps|packages)\//.test(l));
+    assert.deepEqual(
+      lines.map((l) => l.split(/\s+/)[0]),
+      ["apps/a", "apps/b", "apps/c", "packages/d"],
+    );
+  });
+
+  it("runs slow projects at the same time", () => {
+    const slow = 'node -e "setTimeout(()=>{},1500)"';
+    const root = makeFixture({ "apps/s1": slow, "packages/s2": slow });
+    const begun = Date.now();
+    const { status } = run(root, { ci: false });
+    assert.equal(status, 0);
+    assert.ok(Date.now() - begun < 2900, "two 1.5s projects ran one after the other");
+  });
 });
