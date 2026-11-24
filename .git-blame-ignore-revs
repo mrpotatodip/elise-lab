@@ -1,0 +1,8 @@
+# Mechanical oxfmt reformats (spec #404). `git blame` skips these commits when
+# `git config blame.ignoreRevsFile .git-blame-ignore-revs` is set; GitHub reads this file by itself.
+# elise-frontend-web: reformat with oxfmt (#407)
+04d0d35f228e642c704ece2e59e005e66332dda3
+# elise-marketing-web: reformat with oxfmt (#408)
+909cc542f0e524ee2379af5afcf66d37a649dcb0
+# elise-engine-api, packages, scripts: reformat with oxfmt (#406)
+6efa322ded1e3f508dcb6f79a2e82597cbb7a5ad
