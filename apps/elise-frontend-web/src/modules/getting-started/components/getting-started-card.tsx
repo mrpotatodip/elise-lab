@@ -7,7 +7,7 @@ import { cn } from "#/lib/utils";
 import { RUNNER_LOGIN_COMMAND } from "#/modules/runner";
 import { ScanNewDialog } from "#/modules/scan";
 import { CopyCommand, INLINE_LINK_CLASS } from "#/modules/shared";
-import { GETTING_STARTED_RELEASES_URL,GETTING_STARTED_DOCTOR_COMMAND, GETTING_STARTED_INSTALL_COMMAND } from "../constants";
+import { GETTING_STARTED_RELEASES_URL,GETTING_STARTED_DOCTOR_COMMAND, GETTING_STARTED_INSTALL_COMMAND, GETTING_STARTED_WINDOWS_INSTALL_COMMAND } from "../constants";
 import { useGettingStarted, useGettingStartedFlag } from "../hooks";
 import type { GettingStartedTaskKey } from "../utils";
 
@@ -65,7 +65,10 @@ export function GettingStartedCard() {
       <CardContent>
         <ol className="flex flex-col divide-y">
           <Task done={done("install")} title="Install the Runner">
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">On macOS or Linux:</p>
             <CopyCommand command={GETTING_STARTED_INSTALL_COMMAND} />
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">On Windows, in PowerShell (new: it needs Git for Windows, and Windows may show a SmartScreen warning because the file is not signed yet):</p>
+            <CopyCommand command={GETTING_STARTED_WINDOWS_INSTALL_COMMAND} />
             <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Claude Code must be installed and signed in on that computer.</p>
           </Task>
           <Task done={done("login")} title="Log the Runner in">

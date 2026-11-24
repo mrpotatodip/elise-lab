@@ -6,7 +6,7 @@ Terms: `apps/elise-engine-api/GLOSSARY.md` (Git login). Agreed in spec #271.
 
 **A Runner reads private code with the person's own Git login, and Elise never holds a provider token.** Before it clones, the Runner asks the remote for its branch list. When that fails on login, the Scan fails at once and its error names the host and the fix for that Provider. The Runner prints the fix and never runs it. `elise-runner doctor` runs the same check ahead of time.
 
-A headless Runner with no keychain may take one opt-in token in `ELISE_GIT_TOKEN`. It is handed to git through a temporary credential helper that answers only for the host being cloned and is deleted afterwards.
+A headless Runner with no keychain may take one opt-in token in `ELISE_GIT_TOKEN`. It is handed to git through an inline credential helper in git's configuration that answers only for the host being cloned. No script file is written, and the token travels only in an environment variable (changed for Windows, ADR 0015).
 
 ## The dashboard has no Connections
 

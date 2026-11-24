@@ -92,7 +92,7 @@ export const STEPS = [
 // The site offers only the terminal Runner (the `elise-runner` binary), not the desktop app.
 // The download buttons point at one pinned release. When a new elise-runner-v* release is published,
 // change `version` (the file names come from .github/workflows/release-elise-runner.yml).
-const RUNNER_VERSION = "0.3.0";
+const RUNNER_VERSION = "0.4.0";
 const RUNNER_RELEASES = "https://github.com/mrpotatodip/elise-lab/releases";
 const runnerFile = (asset: string) => `${RUNNER_RELEASES}/download/elise-runner-v${RUNNER_VERSION}/${asset}`;
 
@@ -106,12 +106,16 @@ export const RUNNER = {
     { label: "macOS, Intel", href: runnerFile("elise-runner-darwin-x64") },
     { label: "Linux, x64", href: runnerFile("elise-runner-linux-x64") },
     { label: "Linux, arm64", href: runnerFile("elise-runner-linux-arm64") },
+    { label: "Windows, x64 (new)", href: runnerFile("elise-runner-windows-x64.exe") },
   ],
   // A note is a list of parts: a string is plain text, { code } is set in the mono font.
-  downloadNote: ["A downloaded file is not marked as runnable. Run ", { code: "chmod +x" }, " on it, and if macOS refuses to open it, run ", { code: "xattr -d com.apple.quarantine" }, " on it. Then move it onto your PATH as ", { code: "elise-runner" }, "."],
+  downloadNote: ["On macOS and Linux a downloaded file is not marked as runnable. Run ", { code: "chmod +x" }, " on it, and if macOS refuses to open it, run ", { code: "xattr -d com.apple.quarantine" }, " on it. Then move it onto your PATH as ", { code: "elise-runner" }, ". On Windows, rename the file to ", { code: "elise-runner.exe" }, " and put it in a folder on your PATH."],
   commandLabel: "Or install from a terminal, which does all of that for you",
   command: "curl -fsSL https://raw.githubusercontent.com/mrpotatodip/elise-lab/main/apps/elise-runner-cli/install.sh | sh",
-  after: ["With either option, run ", { code: "elise-runner login" }, " and then ", { code: "elise-runner doctor" }, ". The terminal install puts the Runner in ", { code: "~/.local/bin" }, " and takes the newest release for your system."],
+  windowsCommandLabel: "On Windows, in PowerShell",
+  windowsCommand: "irm https://raw.githubusercontent.com/mrpotatodip/elise-lab/main/apps/elise-runner-cli/install.ps1 | iex",
+  after: ["With either option, run ", { code: "elise-runner login" }, " and then ", { code: "elise-runner doctor" }, ". The macOS and Linux install puts the Runner in ", { code: "~/.local/bin" }, " and the Windows install in your user folder, and both take the newest release for your system."],
+  windowsNote: "The Windows Runner is new: if something fails, tell us. It needs Git for Windows installed and runs on 64-bit Windows (Windows on ARM runs it under emulation). Windows may show a SmartScreen warning because the file is not signed yet: choose More info, then Run anyway.",
   releasesUrl: RUNNER_RELEASES,
   releasesLabel: "All Runner releases on GitHub",
   needs: "The computer also needs your own AI tool installed and signed in, because the scan runs on that login.",

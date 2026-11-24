@@ -13,7 +13,7 @@ fail() {
 case "$(uname -s)" in
   Darwin) os=darwin ;;
   Linux) os=linux ;;
-  *) fail "unsupported system $(uname -s). The Runner supports macOS and Linux (arm64 and x64)." ;;
+  *) fail "unsupported system $(uname -s). This script supports macOS and Linux (arm64 and x64). On Windows, use install.ps1 in PowerShell." ;;
 esac
 
 case "$(uname -m)" in

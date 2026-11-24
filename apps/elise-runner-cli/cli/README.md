@@ -4,7 +4,7 @@
 
 It is a Runner like the desktop app (the folder above): both run Scans through one shared core, `core/` (`elise-runner-core`), so a Scan behaves the same whichever runs it. Its rules are in `docs/adr/0006-full-worker-and-phase-budget.md`, under "Runner Scans". To Elise the two are two Runners. On one computer each is paired with its own code and holds its own token, so neither reads or changes the other's. The desktop app runs one Scan at a time. The headless Runner runs one by default, and up to three with `--parallel`. The headless Runner shows in the Runners list in Elise like any other Runner, and removing it there stops it claiming Scans.
 
-It supports macOS and Linux. Windows is not supported.
+It supports macOS, Linux and Windows (x64). Windows is new: it needs Git for Windows (Claude Code needs it too) and is not signed yet, so Windows may show a SmartScreen warning on the first run. Windows on ARM runs the x64 build under emulation. Decision record: `docs/adr/0015-windows-runner.md`.
 
 ## What you need
 
@@ -58,8 +58,8 @@ When Elise rejects the token during `run` (an admin removed the Runner), the pro
 In this order:
 
 1. `ELISE_RUNNER_TOKEN`, if set. It is read only: `pair`, `login` and `unpair` refuse to manage a token that came from it, and say so.
-2. The system keychain (macOS Keychain, or a Secret Service on Linux), under the service name `com.eliselab.runner.headless`. The desktop app uses `com.eliselab.runner`, which is why the two are separate Runners.
-3. When the computer has no keychain service, as on many Linux servers, a file in your config folder (`~/.config/elise-runner/token` on Linux), created readable by you only.
+2. The system keychain (macOS Keychain, Windows Credential Manager, or a Secret Service on Linux), under the service name `com.eliselab.runner.headless`. The desktop app uses `com.eliselab.runner`, which is why the two are separate Runners.
+3. When the computer has no keychain service, as on many Linux servers, a file in your config folder (`~/.config/elise-runner/token` on Linux), created readable by you only (on Windows, in your user profile's config folder, `%APPDATA%\elise-runner\token`, where the default folder access rules apply).
 
 `status` names the store in use.
 
