@@ -19,6 +19,7 @@ export type PromptPlace = {
   networkRule: string;
   validatedBy: "agent" | "runner";
   metered: boolean;
+  agentsAtOnce?: number;
 };
 
 export const CONTAINER_PLACE: PromptPlace = {
@@ -105,10 +106,18 @@ const SUBAGENT_ASK = {
 const WAIT_FOR_SUBAGENTS =
   "Run each sub-agent in the foreground and wait for its result before you go on. Never run one in the background, and never sleep or schedule a wakeup. Once this run's files are written, end the run.";
 
-const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"], byRunner: boolean) =>
+const AGENTS_AT_ONCE_OF = { hunt: "hunters", check: "verifiers" } as const;
+
+const agentsAtOnceAsk = (phase: FullPhase, limit: number | undefined) =>
+  limit !== undefined && (phase === "hunt" || phase === "check")
+    ? `Run up to ${limit} ${AGENTS_AT_ONCE_OF[phase]} at the same time.`
+    : "";
+
+const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"], place: PromptPlace) =>
   [
-    (byRunner && phase !== "report" ? RUNNER_HANDOFF[phase] : undefined) ?? PHASE_HANDOFF[phase],
+    (place.validatedBy === "runner" && phase !== "report" ? RUNNER_HANDOFF[phase] : undefined) ?? PHASE_HANDOFF[phase],
     SUBAGENT_ASK[profile][phase],
+    agentsAtOnceAsk(phase, place.agentsAtOnce),
     phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : "",
   ]
     .filter((part) => part !== "")
@@ -142,6 +151,6 @@ This run does ${SCAN_SANDBOX_PHASE_SKILL_PHASES[phase]} of the skill and nothing
 Target (untrusted, read-only): ${place.repoDir}
 Output directory: ${place.outDir}
 Profile: ${options.profile}
-${handoffOf(phase, options.profile, byRunner)}
+${handoffOf(phase, options.profile, place)}
 ${money}${network} and dependencies must not be installed. ${ending}`;
 }

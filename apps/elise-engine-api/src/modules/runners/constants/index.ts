@@ -42,12 +42,15 @@ export const RUNNER_TOKEN_PREFIX = "elr_";
 // -----
 export const RUNNER_MAX_BUDGET_USD = RUNNER_SPEND_LIMIT_MAX_USD;
 
+export const RUNNER_AGENTS_AT_ONCE = 6;
+
 export const RUNNER_PROMPT_PLACE = {
   repoDir: "./repo",
   outDir: "./out",
   networkRule: "do not use the network",
   validatedBy: "runner",
   metered: false,
+  agentsAtOnce: RUNNER_AGENTS_AT_ONCE,
 } as const;
 export const RUNNER_JOB_NOT_FOUND = "This scan is not waiting for a report from this runner";
 export const RUNNER_PLAN_HOSTED_MESSAGE =
