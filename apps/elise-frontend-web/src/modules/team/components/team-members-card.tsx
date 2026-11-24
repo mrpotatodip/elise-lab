@@ -63,12 +63,18 @@ const columns = column.columns([
             {person.emailStatus === "sent" && <Badge variant="secondary">Sent</Badge>}
             {person.emailStatus === "failed" && <Badge variant="destructive">Not delivered</Badge>}
           </span>
-          <span className="block text-xs text-muted-foreground">Link expires {DATE.format(new Date(person.expiresAt))}</span>
+          <span className="block text-xs text-muted-foreground">
+            Link expires {DATE.format(new Date(person.expiresAt))}
+          </span>
         </>
       );
     },
   }),
-  column.display({ id: "role", header: "Role", cell: ({ row }) => <Badge variant="outline">{row.original.roleLabel}</Badge> }),
+  column.display({
+    id: "role",
+    header: "Role",
+    cell: ({ row }) => <Badge variant="outline">{row.original.roleLabel}</Badge>,
+  }),
   column.display({
     id: "groups",
     header: "Groups",
@@ -88,7 +94,8 @@ const columns = column.columns([
     header: "Two-factor",
     cell: ({ row }) => {
       const person = row.original;
-      if (person.kind === "invite" || person.twoFactorEnabled === undefined) return <span className="text-muted-foreground">-</span>;
+      if (person.kind === "invite" || person.twoFactorEnabled === undefined)
+        return <span className="text-muted-foreground">-</span>;
       return person.twoFactorEnabled ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>;
     },
   }),
@@ -114,7 +121,13 @@ const columns = column.columns([
       }
       return (
         <>
-          <Button variant="ghost" size="sm" aria-label={`Send the invite to ${person.email} again`} disabled={person.busy} onClick={person.resend}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Send the invite to ${person.email} again`}
+            disabled={person.busy}
+            onClick={person.resend}
+          >
             Resend
           </Button>
           <TeamConfirmDialog
@@ -178,7 +191,10 @@ export function TeamMembersCard({ email }: { email: string }) {
       expiresAt: "",
       emailStatus: undefined,
       twoFactorEnabled: member.twoFactorEnabled,
-      canReset: mayReset && member.twoFactorEnabled !== false && canResetTwoFactor(user?.role ?? "", member.role, member.email.toLowerCase() === email.toLowerCase()),
+      canReset:
+        mayReset &&
+        member.twoFactorEnabled !== false &&
+        canResetTwoFactor(user?.role ?? "", member.role, member.email.toLowerCase() === email.toLowerCase()),
       busy: resetTwoFactor.isPending,
       resend: noAction,
       revoke: async () => undefined,
@@ -212,7 +228,9 @@ export function TeamMembersCard({ email }: { email: string }) {
     <Card id="people">
       <CardHeader>
         <CardTitle>People</CardTitle>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Everyone on this account and any invite still waiting. A role sets what each person can do.</p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          Everyone on this account and any invite still waiting. A role sets what each person can do.
+        </p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         <DataTable table={table} />

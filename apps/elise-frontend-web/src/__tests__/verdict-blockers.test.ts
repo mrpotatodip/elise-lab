@@ -32,7 +32,13 @@ describe("verdictBlockers", () => {
   });
 
   it("blocks on any critical or high problem, since none are allowed", () => {
-    const found = verdictBlockers(verdict([open("c", "critical"), open("h", "high"), open("i", "informational")], { critical: 1, high: 1, informational: 1 }));
+    const found = verdictBlockers(
+      verdict([open("c", "critical"), open("h", "high"), open("i", "informational")], {
+        critical: 1,
+        high: 1,
+        informational: 1,
+      }),
+    );
 
     expect([...found].toSorted()).toEqual(["c", "h"]);
   });
@@ -53,8 +59,16 @@ describe("openProblemsSummary", () => {
     { open: 3, blocking: 3, text: "All of them block shipping." },
     { open: 1, blocking: 0, text: "It does not block shipping on its own." },
     { open: 2, blocking: 0, text: "None of them blocks shipping on its own." },
-    { open: 2, blocking: 1, text: "1 of them blocks shipping, marked in the list below. The rest are within the limits." },
-    { open: 4, blocking: 2, text: "2 of them block shipping, marked in the list below. The rest are within the limits." },
+    {
+      open: 2,
+      blocking: 1,
+      text: "1 of them blocks shipping, marked in the list below. The rest are within the limits.",
+    },
+    {
+      open: 4,
+      blocking: 2,
+      text: "2 of them block shipping, marked in the list below. The rest are within the limits.",
+    },
   ])("says $text for $blocking of $open", ({ open: total, blocking, text }) => {
     expect(openProblemsSummary(total, blocking)).toBe(text);
   });

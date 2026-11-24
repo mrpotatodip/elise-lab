@@ -26,7 +26,11 @@ describe("tallyTraceLabels", () => {
 
 describe("groupTraceByPhase", () => {
   it("starts a new group when the Phase changes, newest first", () => {
-    const groups = groupTraceByPhase([entry("a", "reasoning", "hunt"), entry("b", "writing", "hunt"), entry("c", "reasoning", "recon")]);
+    const groups = groupTraceByPhase([
+      entry("a", "reasoning", "hunt"),
+      entry("b", "writing", "hunt"),
+      entry("c", "reasoning", "recon"),
+    ]);
     expect(groups.map((group) => [group.title, group.entries.length])).toEqual([
       ["Hunt", 2],
       ["Recon", 1],

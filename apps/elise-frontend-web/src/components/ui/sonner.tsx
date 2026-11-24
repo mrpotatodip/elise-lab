@@ -1,13 +1,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import {
-  CircleCheck,
-  Info,
-  LoaderCircle,
-  OctagonX,
-  TriangleAlert,
-} from "lucide-react";
+import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from "lucide-react";
 import { Toaster as Sonner } from "sonner";
 import { isDarkTheme, useTheme } from "#/modules/shell/hooks/use-theme";
 
@@ -32,10 +26,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
           toast:
             "group toast group-[.toaster]:bg-popover group-[.toaster]:text-popover-foreground group-[.toaster]:border-border group-[.toaster]:shadow-raised",
           description: "group-[.toast]:text-muted-foreground",
-          actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
       }}
       {...props}

@@ -21,11 +21,25 @@ const nested = {
 
 describe("FindingsFileSchema", () => {
   it("reads the old flat finding", () => {
-    expect(FindingsFileSchema.parse([flat])).toEqual([{ title: "SQL injection in search", state: "confirmed", severity: "high", place: { file: "src/search.ts", line: 42 } }]);
+    expect(FindingsFileSchema.parse([flat])).toEqual([
+      {
+        title: "SQL injection in search",
+        state: "confirmed",
+        severity: "high",
+        place: { file: "src/search.ts", line: 42 },
+      },
+    ]);
   });
 
   it("reads the nested finding of a profile Scan", () => {
-    expect(FindingsFileSchema.parse([nested])).toEqual([{ title: "Open redirect after sign-in", state: "needs_validation", severity: "medium", place: { file: "src/auth/redirect.ts", line: 17 } }]);
+    expect(FindingsFileSchema.parse([nested])).toEqual([
+      {
+        title: "Open redirect after sign-in",
+        state: "needs_validation",
+        severity: "medium",
+        place: { file: "src/auth/redirect.ts", line: 17 },
+      },
+    ]);
   });
 
   it("keeps a rejected nested finding as rejected, so the list can leave it out", () => {
@@ -33,12 +47,18 @@ describe("FindingsFileSchema", () => {
   });
 
   it("reads both shapes from one file and keeps their order", () => {
-    expect(FindingsFileSchema.parse([nested, flat]).map((finding) => finding.title)).toEqual(["Open redirect after sign-in", "SQL injection in search"]);
+    expect(FindingsFileSchema.parse([nested, flat]).map((finding) => finding.title)).toEqual([
+      "Open redirect after sign-in",
+      "SQL injection in search",
+    ]);
   });
 
   it.each([
     ["a flat finding with no location", { status: "confirmed", severity: "low", title: "Weak hash" }],
-    ["a nested finding with no evidence", { verdict: "confirmed", title: "Weak hash", severity: { overall_severity: "low" } }],
+    [
+      "a nested finding with no evidence",
+      { verdict: "confirmed", title: "Weak hash", severity: { overall_severity: "low" } },
+    ],
   ])("gives %s no place", (_name, item) => {
     expect(FindingsFileSchema.parse([item])[0]?.place).toBeNull();
   });

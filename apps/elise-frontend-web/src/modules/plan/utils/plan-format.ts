@@ -10,41 +10,66 @@ type StatusView = { label: string; variant: "success" | "warning" | "destructive
 // -----
 export const PLAN_STATUS_VIEW = {
   active: { label: "Active", variant: "success", note: null },
-  past_due: { label: "Payment failed", variant: "warning", note: "Payment failed. Scans keep running for 7 days after the first failure, then pause." },
+  past_due: {
+    label: "Payment failed",
+    variant: "warning",
+    note: "Payment failed. Scans keep running for 7 days after the first failure, then pause.",
+  },
   unpaid: { label: "Unpaid", variant: "destructive", note: "Scans are paused until the plan is active again." },
   canceled: { label: "Canceled", variant: "destructive", note: "Scans are paused until the plan is active again." },
   incomplete: { label: "Not active yet", variant: "neutral", note: "The plan is not active yet." },
 } as const satisfies Record<NonNullable<PlanDetails["status"]>, StatusView>;
 
-export const planSourceLabel = (source: NonNullable<PlanDetails["source"]>) => (source === "grant" ? "Granted by Elise, no invoice" : "Card, through Stripe");
+export const planSourceLabel = (source: NonNullable<PlanDetails["source"]>) =>
+  source === "grant" ? "Granted by Elise, no invoice" : "Card, through Stripe";
 
 const PORTAL_STATUSES: ReadonlyArray<PlanDetails["status"]> = ["active", "past_due", "unpaid"];
 
 export const planBillingAction = (data: Pick<PlanDetails, "source" | "status">): "subscribe" | "manage" =>
   data.source === "stripe" && PORTAL_STATUSES.includes(data.status) ? "manage" : "subscribe";
 
-export const planSwitchOffers = (data: Pick<PlanDetails, "plan" | "source" | "status">, offers: ReadonlyArray<PlanOffer>) =>
-  data.source === "stripe" && data.status === "active" && data.plan !== null ? offers.filter((offer) => offer.key !== data.plan?.key) : [];
+export const planSwitchOffers = (
+  data: Pick<PlanDetails, "plan" | "source" | "status">,
+  offers: ReadonlyArray<PlanOffer>,
+) =>
+  data.source === "stripe" && data.status === "active" && data.plan !== null
+    ? offers.filter((offer) => offer.key !== data.plan?.key)
+    : [];
 
 export type PlanInterval = NonNullable<PlanDetails["interval"]>;
 
 export type PlanPriceView = { amount: string; unit: PlanInterval; perMonth: string | null };
 
-export const planPriceView = (offer: Pick<PlanOffer, "monthlyPriceUsd" | "yearlyPriceUsd">, interval: PlanInterval): PlanPriceView | null => {
+export const planPriceView = (
+  offer: Pick<PlanOffer, "monthlyPriceUsd" | "yearlyPriceUsd">,
+  interval: PlanInterval,
+): PlanPriceView | null => {
   if (interval === "month") return { amount: usageUsd(offer.monthlyPriceUsd), unit: "month", perMonth: null };
   if (offer.yearlyPriceUsd === null || offer.yearlyPriceUsd === undefined) return null;
-  return { amount: usageUsd(offer.yearlyPriceUsd), unit: "year", perMonth: `${usageUsd(offer.yearlyPriceUsd / 12)} per month` };
+  return {
+    amount: usageUsd(offer.yearlyPriceUsd),
+    unit: "year",
+    perMonth: `${usageUsd(offer.yearlyPriceUsd / 12)} per month`,
+  };
 };
 
-export const planYearlyOffered = (offers: ReadonlyArray<Pick<PlanOffer, "yearlyPriceUsd">>) => offers.some((offer) => offer.yearlyPriceUsd !== null && offer.yearlyPriceUsd !== undefined);
+export const planYearlyOffered = (offers: ReadonlyArray<Pick<PlanOffer, "yearlyPriceUsd">>) =>
+  offers.some((offer) => offer.yearlyPriceUsd !== null && offer.yearlyPriceUsd !== undefined);
 
 export const planYearlyLocked = (data: Pick<PlanDetails, "source" | "status" | "interval">) =>
   data.source === "stripe" && data.interval === "year" && (data.status === "active" || data.status === "past_due");
 
-export const planShownInterval = (data: Pick<PlanDetails, "source" | "status" | "interval">, chosen: PlanInterval): PlanInterval =>
-  planYearlyLocked(data) ? "year" : chosen;
+export const planShownInterval = (
+  data: Pick<PlanDetails, "source" | "status" | "interval">,
+  chosen: PlanInterval,
+): PlanInterval => (planYearlyLocked(data) ? "year" : chosen);
 
-export type PlanCardView = { offer: PlanOffer; current: boolean; action: "switch" | "switchInterval" | "subscribe" | "none"; blocked: string | null };
+export type PlanCardView = {
+  offer: PlanOffer;
+  current: boolean;
+  action: "switch" | "switchInterval" | "subscribe" | "none";
+  blocked: string | null;
+};
 
 export const planCardViews = (
   data: Pick<PlanDetails, "plan" | "source" | "status" | "seats" | "interval">,
@@ -64,7 +89,8 @@ export const planCardViews = (
   return offers.map((offer) => {
     const priced = planPriceView(offer, shown) !== null;
     const action = ((): PlanCardView["action"] => {
-      if (active && offer.key === data.plan?.key) return subInterval === "month" && chosen === "year" && priced ? "switchInterval" : "none";
+      if (active && offer.key === data.plan?.key)
+        return subInterval === "month" && chosen === "year" && priced ? "switchInterval" : "none";
       if (switchKeys.has(offer.key)) return priced && shown === subInterval ? "switch" : "none";
       return subscribes && priced ? "subscribe" : "none";
     })();
@@ -82,10 +108,14 @@ export const planCardViews = (
 export type PlanSwitchTarget = { planKey: string; interval?: PlanInterval };
 
 export const planSwitchPending = (target: PlanSwitchTarget | null, data: Pick<PlanDetails, "plan" | "interval">) =>
-  target !== null && (data.plan?.key !== target.planKey || (target.interval !== undefined && (data.interval ?? "month") !== target.interval));
+  target !== null &&
+  (data.plan?.key !== target.planKey ||
+    (target.interval !== undefined && (data.interval ?? "month") !== target.interval));
 
-export const planConfirmingPayment = (checkout: "success" | "cancelled" | undefined, data: Pick<PlanDetails, "source" | "status">) =>
-  checkout === "success" && !(data.source === "stripe" && data.status === "active");
+export const planConfirmingPayment = (
+  checkout: "success" | "cancelled" | undefined,
+  data: Pick<PlanDetails, "source" | "status">,
+) => checkout === "success" && !(data.source === "stripe" && data.status === "active");
 
 export const planKeyLabel = (keySource: NonNullable<PlanDetails["plan"]>["keySource"]) =>
   keySource === "account" ? "Your own Claude, through a Runner" : "Our key, paid with credit";
@@ -131,4 +161,5 @@ export const CREDIT_ENTRY_LABEL = {
 // -----
 // Credit added reads with a plus, credit taken with a minus.
 // -----
-export const creditAmountLabel = (amountUsd: number) => (amountUsd > 0 ? `+${usageUsd(amountUsd)}` : usageUsd(amountUsd));
+export const creditAmountLabel = (amountUsd: number) =>
+  amountUsd > 0 ? `+${usageUsd(amountUsd)}` : usageUsd(amountUsd);

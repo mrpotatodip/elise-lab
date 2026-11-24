@@ -1,5 +1,21 @@
 import { Link } from "@tanstack/react-router";
-import { Bot, ChevronUp, ClipboardCheck, CreditCard, FileText, FolderGit2, LayoutDashboard, ListChecks, PanelLeftClose, PanelLeftOpen, Radio, ScanSearch, ShieldCheck, Sparkles, Users } from "lucide-react";
+import {
+  Bot,
+  ChevronUp,
+  ClipboardCheck,
+  CreditCard,
+  FileText,
+  FolderGit2,
+  LayoutDashboard,
+  ListChecks,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Radio,
+  ScanSearch,
+  ShieldCheck,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "#/components/ui/avatar";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -9,7 +25,14 @@ import { AuthSignOutButton } from "#/modules/auth";
 import { cn } from "#/lib/utils";
 import { ShellBrand } from "./shell-brand";
 import { useSidebarSectionOpen } from "../hooks";
-import { NAV_ACTIVE as ACTIVE, NAV_CHEVRON as CHEVRON, NAV_ICON as ICON, NAV_ROW as ROW, NAV_TOGGLE as TOGGLE, NavHint as Hint } from "./shell-nav";
+import {
+  NAV_ACTIVE as ACTIVE,
+  NAV_CHEVRON as CHEVRON,
+  NAV_ICON as ICON,
+  NAV_ROW as ROW,
+  NAV_TOGGLE as TOGGLE,
+  NavHint as Hint,
+} from "./shell-nav";
 import { ShellRepoTree } from "./shell-repo-tree";
 import { ShellTeamTree } from "./shell-team-tree";
 import { ShellThemeSwitch } from "./shell-theme-switch";
@@ -56,32 +79,79 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ShellSidebar({ accountName, userName, email, scanCount, running, repos, repoCount, showTeam, memberCount, groupCount, showRunners, showPlan, showSignals, runnersPaired, runnersRunning, showDashboard, showGettingStarted, onReopenGettingStarted, collapsed, canToggle, onToggle }: ShellSidebarProps) {
+export function ShellSidebar({
+  accountName,
+  userName,
+  email,
+  scanCount,
+  running,
+  repos,
+  repoCount,
+  showTeam,
+  memberCount,
+  groupCount,
+  showRunners,
+  showPlan,
+  showSignals,
+  runnersPaired,
+  runnersRunning,
+  showDashboard,
+  showGettingStarted,
+  onReopenGettingStarted,
+  collapsed,
+  canToggle,
+  onToggle,
+}: ShellSidebarProps) {
   const { open: reposOpen, setOpen: setReposOpen } = useSidebarSectionOpen("repos");
   const { open: teamOpen, setOpen: setTeamOpen } = useSidebarSectionOpen("team");
   const showWorkspace = showRunners || showTeam || showSignals;
   const scansLabel = running > 0 ? `Scans, ${running} in progress` : "Scans";
   const runnersMark = runnersPaired === 0 ? null : runnersRunning > 0 ? "bg-mark-success" : "bg-mark-warning";
-  const runnersLabel = runnersPaired === 0 ? "Runners" : runnersRunning > 0 ? `Runners, ${runnersRunning} running` : "Runners, none running";
+  const runnersLabel =
+    runnersPaired === 0
+      ? "Runners"
+      : runnersRunning > 0
+        ? `Runners, ${runnersRunning} running`
+        : "Runners, none running";
   const hasRepoChildren = repoCount >= 2;
   const empty = scanCount === 0;
   const personName = userName || accountName;
   const personDetail = userName ? accountName : email;
 
   return (
-    <aside className={cn("sticky top-0 flex h-svh flex-col gap-6 overflow-y-auto overflow-x-hidden border-r bg-sidebar pb-4 pt-6", collapsed ? "px-2.5" : "px-3")}>
+    <aside
+      className={cn(
+        "sticky top-0 flex h-svh flex-col gap-6 overflow-y-auto overflow-x-hidden border-r bg-sidebar pb-4 pt-6",
+        collapsed ? "px-2.5" : "px-3",
+      )}
+    >
       <div className={cn("flex items-center", collapsed ? "flex-col gap-3" : "justify-between pl-2 pr-1")}>
-        <Link to={showDashboard ? "/overview" : "/summary"} aria-label={collapsed ? "Elise home" : undefined} className="min-h-6 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link
+          to={showDashboard ? "/overview" : "/summary"}
+          aria-label={collapsed ? "Elise home" : undefined}
+          className="min-h-6 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           {collapsed ? <span className="text-base font-semibold tracking-tight">E</span> : <ShellBrand />}
         </Link>
         {canToggle && (
           <Tooltip>
             <TooltipTrigger
-              render={<Button variant="ghost" size="icon-sm" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed} className="text-muted-foreground" onClick={onToggle} />}
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  aria-expanded={!collapsed}
+                  className="text-muted-foreground"
+                  onClick={onToggle}
+                />
+              }
             >
               {collapsed ? <PanelLeftOpen strokeWidth={1.5} /> : <PanelLeftClose strokeWidth={1.5} />}
             </TooltipTrigger>
-            <TooltipContent side={collapsed ? "right" : "bottom"}>{collapsed ? "Expand" : "Collapse"} sidebar (Ctrl B)</TooltipContent>
+            <TooltipContent side={collapsed ? "right" : "bottom"}>
+              {collapsed ? "Expand" : "Collapse"} sidebar (Ctrl B)
+            </TooltipContent>
           </Tooltip>
         )}
       </div>
@@ -89,7 +159,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
       <nav aria-label="Main" className="grid grid-cols-[minmax(0,1fr)] gap-1">
         {showDashboard && (
           <Hint label="Overview" collapsed={collapsed}>
-            <Link to="/overview" aria-label="Overview" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+            <Link
+              to="/overview"
+              aria-label="Overview"
+              className={cn(ROW, collapsed && "justify-center px-0")}
+              activeProps={ACTIVE}
+            >
               <LayoutDashboard className={ICON} strokeWidth={1.5} />
               {!collapsed && "Overview"}
             </Link>
@@ -98,7 +173,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
 
         {showDashboard && showGettingStarted && (
           <Hint label="Getting started" collapsed={collapsed}>
-            <Link to="/overview" aria-label="Getting started" className={cn(ROW, collapsed && "justify-center px-0")} onClick={onReopenGettingStarted}>
+            <Link
+              to="/overview"
+              aria-label="Getting started"
+              className={cn(ROW, collapsed && "justify-center px-0")}
+              onClick={onReopenGettingStarted}
+            >
               <ListChecks className={ICON} strokeWidth={1.5} />
               {!collapsed && "Getting started"}
             </Link>
@@ -106,7 +186,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
         )}
 
         <Hint label="Security status" collapsed={collapsed}>
-          <Link to="/summary" aria-label="Security status" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+          <Link
+            to="/summary"
+            aria-label="Security status"
+            className={cn(ROW, collapsed && "justify-center px-0")}
+            activeProps={ACTIVE}
+          >
             <ClipboardCheck className={ICON} strokeWidth={1.5} />
             {!collapsed && "Security status"}
           </Link>
@@ -116,7 +201,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
           <>
             {collapsed || !hasRepoChildren ? (
               <Hint label="Repositories" collapsed={collapsed}>
-                <Link to="/repos" aria-label="Repositories" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+                <Link
+                  to="/repos"
+                  aria-label="Repositories"
+                  className={cn(ROW, collapsed && "justify-center px-0")}
+                  activeProps={ACTIVE}
+                >
                   <FolderGit2 className={ICON} strokeWidth={1.5} />
                   {!collapsed && "Repositories"}
                 </Link>
@@ -128,7 +218,10 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
                     <FolderGit2 className={ICON} strokeWidth={1.5} />
                     Repositories
                   </Link>
-                  <CollapsibleTrigger aria-label={reposOpen ? "Hide recent repositories" : "Show recent repositories"} className={TOGGLE}>
+                  <CollapsibleTrigger
+                    aria-label={reposOpen ? "Hide recent repositories" : "Show recent repositories"}
+                    className={TOGGLE}
+                  >
                     <ChevronUp className={CHEVRON} strokeWidth={1.5} />
                   </CollapsibleTrigger>
                 </div>
@@ -139,10 +232,20 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
             )}
 
             <Hint label={scansLabel} collapsed={collapsed}>
-              <Link to="/scans" aria-label={collapsed ? scansLabel : undefined} className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <Link
+                to="/scans"
+                aria-label={collapsed ? scansLabel : undefined}
+                className={cn(ROW, collapsed && "justify-center px-0")}
+                activeProps={ACTIVE}
+              >
                 <ScanSearch className={ICON} strokeWidth={1.5} />
                 {collapsed ? (
-                  running > 0 && <span aria-hidden="true" className="absolute right-2.5 top-2 size-2 animate-pulse rounded-full bg-mark-info" />
+                  running > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute right-2.5 top-2 size-2 animate-pulse rounded-full bg-mark-info"
+                    />
+                  )
                 ) : (
                   <>
                     <span className="flex-1">Scans</span>
@@ -163,7 +266,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
             </Hint>
 
             <Hint label="Files" collapsed={collapsed}>
-              <Link to="/files" aria-label="Files" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+              <Link
+                to="/files"
+                aria-label="Files"
+                className={cn(ROW, collapsed && "justify-center px-0")}
+                activeProps={ACTIVE}
+              >
                 <FileText className={ICON} strokeWidth={1.5} />
                 {!collapsed && "Files"}
               </Link>
@@ -176,17 +284,35 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
         {showWorkspace && !collapsed && <div className={SECTION_LABEL}>Workspace</div>}
         {showRunners && (
           <Hint label={runnersLabel} collapsed={collapsed}>
-            <Link to="/settings/providers" aria-label={collapsed ? runnersLabel : undefined} className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+            <Link
+              to="/settings/providers"
+              aria-label={collapsed ? runnersLabel : undefined}
+              className={cn(ROW, collapsed && "justify-center px-0")}
+              activeProps={ACTIVE}
+            >
               <Bot className={ICON} strokeWidth={1.5} />
               {collapsed ? (
-                runnersMark && <span aria-hidden="true" className={cn("absolute right-2.5 top-2 size-2 rounded-full", runnersMark)} />
+                runnersMark && (
+                  <span
+                    aria-hidden="true"
+                    className={cn("absolute right-2.5 top-2 size-2 rounded-full", runnersMark)}
+                  />
+                )
               ) : (
                 <>
                   <span className="flex-1">Runners</span>
                   {runnersMark && (
                     <>
-                      {runnersRunning > 0 ? <span aria-hidden="true" className={cn("size-2 rounded-full", runnersMark)} /> : <span aria-hidden="true" className="text-xs font-normal">Off</span>}
-                      <span className="sr-only">{runnersRunning > 0 ? `${runnersRunning} running` : "none running"}</span>
+                      {runnersRunning > 0 ? (
+                        <span aria-hidden="true" className={cn("size-2 rounded-full", runnersMark)} />
+                      ) : (
+                        <span aria-hidden="true" className="text-xs font-normal">
+                          Off
+                        </span>
+                      )}
+                      <span className="sr-only">
+                        {runnersRunning > 0 ? `${runnersRunning} running` : "none running"}
+                      </span>
                     </>
                   )}
                 </>
@@ -221,7 +347,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
 
         {showSignals && (
           <Hint label="Signals" collapsed={collapsed}>
-            <Link to="/settings/signals" aria-label="Signals" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+            <Link
+              to="/settings/signals"
+              aria-label="Signals"
+              className={cn(ROW, collapsed && "justify-center px-0")}
+              activeProps={ACTIVE}
+            >
               <Radio className={ICON} strokeWidth={1.5} />
               {!collapsed && "Signals"}
             </Link>
@@ -231,7 +362,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
         {showPlan && !collapsed && showWorkspace && <div className={SECTION_LABEL}>Billing</div>}
         {showPlan && (
           <Hint label="Plan and billing" collapsed={collapsed}>
-            <Link to="/settings/plan" aria-label="Plan and billing" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+            <Link
+              to="/settings/plan"
+              aria-label="Plan and billing"
+              className={cn(ROW, collapsed && "justify-center px-0")}
+              activeProps={ACTIVE}
+            >
               <CreditCard className={ICON} strokeWidth={1.5} />
               {!collapsed && "Plan and billing"}
             </Link>
@@ -240,7 +376,12 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
 
         {showDashboard && (
           <Hint label="Security" collapsed={collapsed}>
-            <Link to="/settings/security" aria-label="Security" className={cn(ROW, collapsed && "justify-center px-0")} activeProps={ACTIVE}>
+            <Link
+              to="/settings/security"
+              aria-label="Security"
+              className={cn(ROW, collapsed && "justify-center px-0")}
+              activeProps={ACTIVE}
+            >
               <ShieldCheck className={ICON} strokeWidth={1.5} />
               {!collapsed && "Security"}
             </Link>
@@ -281,17 +422,17 @@ export function ShellSidebar({ accountName, userName, email, scanCount, running,
           </div>
         ) : (
           <>
-          <ShellThemeSwitch />
-          <div className="flex items-center gap-3 rounded-xl bg-card p-2.5 shadow-card" title={email}>
-            <Avatar className="size-10">
-              <AvatarFallback>{initials(personName)}</AvatarFallback>
-            </Avatar>
-            <div className="grid min-w-0 flex-1 leading-tight">
-              <span className="truncate text-sm font-medium">{personName}</span>
-              <span className="truncate text-xs text-muted-foreground">{personDetail}</span>
+            <ShellThemeSwitch />
+            <div className="flex items-center gap-3 rounded-xl bg-card p-2.5 shadow-card" title={email}>
+              <Avatar className="size-10">
+                <AvatarFallback>{initials(personName)}</AvatarFallback>
+              </Avatar>
+              <div className="grid min-w-0 flex-1 leading-tight">
+                <span className="truncate text-sm font-medium">{personName}</span>
+                <span className="truncate text-xs text-muted-foreground">{personDetail}</span>
+              </div>
+              <AuthSignOutButton />
             </div>
-            <AuthSignOutButton />
-          </div>
           </>
         )}
       </div>

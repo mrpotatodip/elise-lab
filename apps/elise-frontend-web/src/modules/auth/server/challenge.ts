@@ -4,7 +4,9 @@ const CHALLENGE_COOKIE = "elise_two_factor";
 const CHALLENGE_MAX_AGE = 60 * 10;
 
 export function saveChallenge(engineSetCookies: readonly string[]) {
-  const pairs = engineSetCookies.map((line) => line.split(";")[0] ?? "").filter((pair) => pair !== "" && !pair.endsWith("="));
+  const pairs = engineSetCookies
+    .map((line) => line.split(";")[0] ?? "")
+    .filter((pair) => pair !== "" && !pair.endsWith("="));
   setCookie(CHALLENGE_COOKIE, pairs.join("; "), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

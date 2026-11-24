@@ -21,7 +21,11 @@ function DataTable<TData extends RowData>({ table, rowProps, tableProps }: DataT
         {table.getHeaderGroups().map((group) => (
           <TableRow key={group.id}>
             {group.headers.map((header) => (
-              <TableHead key={header.id} className={header.column.columnDef.meta?.head} aria-hidden={header.column.columnDef.meta?.decorative ? true : undefined}>
+              <TableHead
+                key={header.id}
+                className={header.column.columnDef.meta?.head}
+                aria-hidden={header.column.columnDef.meta?.decorative ? true : undefined}
+              >
                 {header.isPlaceholder ? null : <table.FlexRender header={header} />}
               </TableHead>
             ))}
@@ -32,7 +36,11 @@ function DataTable<TData extends RowData>({ table, rowProps, tableProps }: DataT
         {table.getRowModel().rows.map((row) => (
           <TableRow key={row.id} {...rowProps?.(row)}>
             {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id} className={cell.column.columnDef.meta?.cell} aria-hidden={cell.column.columnDef.meta?.decorative ? true : undefined}>
+              <TableCell
+                key={cell.id}
+                className={cell.column.columnDef.meta?.cell}
+                aria-hidden={cell.column.columnDef.meta?.decorative ? true : undefined}
+              >
                 <table.FlexRender cell={cell} />
               </TableCell>
             ))}

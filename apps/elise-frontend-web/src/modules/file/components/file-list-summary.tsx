@@ -17,11 +17,16 @@ function Column({ label, children }: ColumnProps) {
   );
 }
 
-type FileListSummaryProps = { files: readonly FileEntry[]; counts: readonly { name: FileEntry["name"]; count: number }[] | undefined; more: boolean };
+type FileListSummaryProps = {
+  files: readonly FileEntry[];
+  counts: readonly { name: FileEntry["name"]; count: number }[] | undefined;
+  more: boolean;
+};
 
 export function FileListSummary({ files, counts, more }: FileListSummaryProps) {
   const names: FileEntry["name"][] = ["REPORT.md", "FINDINGS-DETAIL.md", "NEEDS-VALIDATION.md"];
-  const countOf = (name: FileEntry["name"]) => counts?.find((entry) => entry.name === name)?.count ?? files.filter((file) => file.name === name).length;
+  const countOf = (name: FileEntry["name"]) =>
+    counts?.find((entry) => entry.name === name)?.count ?? files.filter((file) => file.name === name).length;
   const total = counts ? counts.reduce((sum, entry) => sum + entry.count, 0) : files.length;
   const newest = files[0];
 
@@ -32,7 +37,9 @@ export function FileListSummary({ files, counts, more }: FileListSummaryProps) {
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {total}
             {more && !counts ? "+" : ""}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{total === 1 ? "file" : "files"}</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              {total === 1 ? "file" : "files"}
+            </span>
           </p>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {newest ? (
@@ -52,7 +59,9 @@ export function FileListSummary({ files, counts, more }: FileListSummaryProps) {
               <li key={name} className="grid grid-cols-[1fr_auto] items-baseline gap-x-4">
                 <span className="font-medium">{FILE_LABELS[name].label}</span>
                 <span className="font-semibold tabular-nums">{countOf(name)}</span>
-                <span className="col-span-2 text-xs leading-relaxed text-muted-foreground">{FILE_LABELS[name].hint}</span>
+                <span className="col-span-2 text-xs leading-relaxed text-muted-foreground">
+                  {FILE_LABELS[name].hint}
+                </span>
               </li>
             ))}
           </ul>
@@ -69,7 +78,11 @@ export function FileListSummary({ files, counts, more }: FileListSummaryProps) {
                     <span className="truncate text-sm font-medium">{FILE_LABELS[file.name].label}</span>
                     <span className="truncate text-xs text-muted-foreground">{repoName(file.repo)}</span>
                   </span>
-                  <FileDownloadButton scanId={file.scanId} name={file.name} description={`${FILE_LABELS[file.name].label} of ${repoName(file.repo)}`} />
+                  <FileDownloadButton
+                    scanId={file.scanId}
+                    name={file.name}
+                    description={`${FILE_LABELS[file.name].label} of ${repoName(file.repo)}`}
+                  />
                 </li>
               ))}
             </ul>

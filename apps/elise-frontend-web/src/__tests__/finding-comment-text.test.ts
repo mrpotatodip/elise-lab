@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { commentCountText, commentSegments } from "#/modules/finding-comment/utils/finding-comment-text";
 
-const linkTexts = (body: string) => commentSegments(body).flatMap((segment) => (segment.kind === "link" ? [segment.text] : []));
+const linkTexts = (body: string) =>
+  commentSegments(body).flatMap((segment) => (segment.kind === "link" ? [segment.text] : []));
 
 describe("commentSegments", () => {
   it.each([

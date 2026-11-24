@@ -38,9 +38,16 @@ type FileBranchSelectProps = {
 
 function FileBranchSelect({ repoId, branch, onPick }: FileBranchSelectProps) {
   const { data } = useSuspenseQuery(scanRepoBranchesQuery(repoId));
-  const items = [{ value: ALL, label: "All branches" }, ...data.branches.map((item) => ({ value: item.name, label: item.name }))];
+  const items = [
+    { value: ALL, label: "All branches" },
+    ...data.branches.map((item) => ({ value: item.name, label: item.name })),
+  ];
   return (
-    <Select value={branch ?? ALL} items={items} onValueChange={(next) => onPick(next === null || next === ALL ? undefined : next)}>
+    <Select
+      value={branch ?? ALL}
+      items={items}
+      onValueChange={(next) => onPick(next === null || next === ALL ? undefined : next)}
+    >
       <SelectTrigger id="file-branch" className="w-44">
         <SelectValue />
       </SelectTrigger>
@@ -57,7 +64,10 @@ function FileBranchSelect({ repoId, branch, onPick }: FileBranchSelectProps) {
 
 export function FileFilters({ filters, counts, showClear, onChange }: FileFiltersProps) {
   const { data: repoList } = useSuspenseQuery(scanReposQuery());
-  const repoItems = [{ value: ALL, label: "All repositories" }, ...repoList.repos.map((repo) => ({ value: repo.id, label: repoName(repo.url) }))];
+  const repoItems = [
+    { value: ALL, label: "All repositories" },
+    ...repoList.repos.map((repo) => ({ value: repo.id, label: repoName(repo.url) })),
+  ];
   const countOf = (name: string) => counts?.find((item) => item.name === name)?.count;
   const total = counts?.reduce((sum, item) => sum + item.count, 0);
 
@@ -96,7 +106,9 @@ export function FileFilters({ filters, counts, showClear, onChange }: FileFilter
           <Select
             value={filters.repoId ?? ALL}
             items={repoItems}
-            onValueChange={(next) => onChange({ ...filters, repoId: next === null || next === ALL ? undefined : next, branch: undefined })}
+            onValueChange={(next) =>
+              onChange({ ...filters, repoId: next === null || next === ALL ? undefined : next, branch: undefined })
+            }
           >
             <SelectTrigger id="file-repo" className="w-56">
               <SelectValue />
@@ -117,7 +129,11 @@ export function FileFilters({ filters, counts, showClear, onChange }: FileFilter
               Branch
             </Label>
             <Suspense fallback={<Skeleton className="h-9 w-44" />}>
-              <FileBranchSelect repoId={filters.repoId} branch={filters.branch} onPick={(branch) => onChange({ ...filters, branch })} />
+              <FileBranchSelect
+                repoId={filters.repoId}
+                branch={filters.branch}
+                onPick={(branch) => onChange({ ...filters, branch })}
+              />
             </Suspense>
           </div>
         )}
@@ -126,13 +142,27 @@ export function FileFilters({ filters, counts, showClear, onChange }: FileFilter
           <Label htmlFor="file-from" className="text-xs text-muted-foreground">
             From (UTC)
           </Label>
-          <Input id="file-from" type="date" value={filters.from ?? ""} max={filters.to} onChange={(event) => onChange({ ...filters, from: event.target.value || undefined })} className="w-40" />
+          <Input
+            id="file-from"
+            type="date"
+            value={filters.from ?? ""}
+            max={filters.to}
+            onChange={(event) => onChange({ ...filters, from: event.target.value || undefined })}
+            className="w-40"
+          />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="file-to" className="text-xs text-muted-foreground">
             To (UTC)
           </Label>
-          <Input id="file-to" type="date" value={filters.to ?? ""} min={filters.from} onChange={(event) => onChange({ ...filters, to: event.target.value || undefined })} className="w-40" />
+          <Input
+            id="file-to"
+            type="date"
+            value={filters.to ?? ""}
+            min={filters.from}
+            onChange={(event) => onChange({ ...filters, to: event.target.value || undefined })}
+            className="w-40"
+          />
         </div>
 
         <form
@@ -144,7 +174,14 @@ export function FileFilters({ filters, counts, showClear, onChange }: FileFilter
             onChange({ ...filters, q: text === "" ? undefined : text });
           }}
         >
-          <ShellSearchField id="file-search" name="q" label="Search files by repository" placeholder="Search repositories, press Enter" defaultValue={filters.q ?? ""} className="sm:w-full" />
+          <ShellSearchField
+            id="file-search"
+            name="q"
+            label="Search files by repository"
+            placeholder="Search repositories, press Enter"
+            defaultValue={filters.q ?? ""}
+            className="sm:w-full"
+          />
         </form>
 
         {showClear && (

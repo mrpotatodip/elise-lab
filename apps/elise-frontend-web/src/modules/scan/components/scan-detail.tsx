@@ -34,15 +34,22 @@ function ScanFileViewer({ scanId, file }: { scanId: string; file: string }) {
   if (error) {
     return error.message === "File not found" ? (
       <p className="p-5 text-sm leading-relaxed text-muted-foreground">
-        {file} is listed for this scan, but its contents could not be read from storage. Refresh to try again. If it keeps failing, run the scan again to regenerate it.
+        {file} is listed for this scan, but its contents could not be read from storage. Refresh to try again. If it
+        keeps failing, run the scan again to regenerate it.
       </p>
     ) : (
-      <p className="p-5 text-sm text-destructive">We could not load {file}: {error.message}. Refresh to try again.</p>
+      <p className="p-5 text-sm text-destructive">
+        We could not load {file}: {error.message}. Refresh to try again.
+      </p>
     );
   }
   if (data.trim() === "") return <p className="p-5 text-sm text-muted-foreground">{file} is empty.</p>;
   if (file.endsWith(".md")) return <ScanMarkdown source={data} />;
-  return <pre className="max-h-[70vh] overflow-auto bg-background/50 p-5 font-mono text-[13px] leading-relaxed whitespace-pre-wrap">{data}</pre>;
+  return (
+    <pre className="max-h-[70vh] overflow-auto bg-background/50 p-5 font-mono text-[13px] leading-relaxed whitespace-pre-wrap">
+      {data}
+    </pre>
+  );
 }
 
 function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
@@ -59,8 +66,12 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
           </AlertDescription>
           {failure.detail && (
             <details className="mt-1 text-xs">
-              <summary className="w-fit cursor-pointer rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Technical detail</summary>
-              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-background/60 p-3 font-mono [overflow-wrap:anywhere]">{failure.detail}</pre>
+              <summary className="w-fit cursor-pointer rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                Technical detail
+              </summary>
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-background/60 p-3 font-mono [overflow-wrap:anywhere]">
+                {failure.detail}
+              </pre>
             </details>
           )}
         </div>
@@ -73,7 +84,10 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
         <OctagonX />
         <div className="grid gap-1">
           <AlertDescription className="font-medium">You stopped this scan.</AlertDescription>
-          <AlertDescription>It kept no report and no findings, and it does not count toward a Verdict. Start a new scan when you are ready.</AlertDescription>
+          <AlertDescription>
+            It kept no report and no findings, and it does not count toward a Verdict. Start a new scan when you are
+            ready.
+          </AlertDescription>
         </div>
       </Alert>
     );
@@ -84,8 +98,13 @@ function ScanStatusNotice({ scan }: { scan: ScanStatus }) {
       <Alert variant="info">
         <LoaderCircle className="animate-spin" />
         <div className="grid gap-1">
-          <AlertDescription className="font-medium">{scan.status === "queued" ? "Waiting for a free slot to start." : (step?.label ?? "Scanning.")}</AlertDescription>
-          <AlertDescription className="max-w-copy">{step?.note ?? "A scan usually takes a few minutes."} This page updates by itself. You can leave and come back.</AlertDescription>
+          <AlertDescription className="font-medium">
+            {scan.status === "queued" ? "Waiting for a free slot to start." : (step?.label ?? "Scanning.")}
+          </AlertDescription>
+          <AlertDescription className="max-w-copy">
+            {step?.note ?? "A scan usually takes a few minutes."} This page updates by itself. You can leave and come
+            back.
+          </AlertDescription>
         </div>
       </Alert>
     );
@@ -128,7 +147,9 @@ export function ScanDetail({ scanId }: { scanId: string }) {
   const file = files.includes(picked) ? picked : (files[0] ?? DEFAULT_FILE);
   const { owner, name } = scanRepoName(scan.repo, scan.scanId);
   const sizes = new Map((scan.artifacts ?? []).map((artifact) => [artifact.name, artifact.sizeBytes]));
-  const showFindings = scan.status === "succeeded" && (scan.summary !== null && scan.summary !== undefined ? true : files.includes("findings.json"));
+  const showFindings =
+    scan.status === "succeeded" &&
+    (scan.summary !== null && scan.summary !== undefined ? true : files.includes("findings.json"));
   const succeeded = scan.status === "succeeded";
 
   return (
@@ -145,7 +166,14 @@ export function ScanDetail({ scanId }: { scanId: string }) {
       >
         {canStopScan(scan) && <ScanStopButton scanId={scan.scanId} onRunner={Boolean(scan.runner)} size="default" />}
         {scan.archive ? (
-          <ScanNewDialog label="Scan a zip again" size="default" variant="outline" repo={scan.repo} provider="upload" repoId={scan.repoId} />
+          <ScanNewDialog
+            label="Scan a zip again"
+            size="default"
+            variant="outline"
+            repo={scan.repo}
+            provider="upload"
+            repoId={scan.repoId}
+          />
         ) : (
           <ScanNewDialog
             label={scan.branch ? "Scan this branch again" : "Scan again"}
@@ -165,11 +193,19 @@ export function ScanDetail({ scanId }: { scanId: string }) {
           <Card>
             <CardHeader className="gap-1.5">
               <CardTitle>Findings so far</CardTitle>
-              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Found so far, still being checked. They can change before the Report.</p>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                Found so far, still being checked. They can change before the Report.
+              </p>
             </CardHeader>
             <CardContent className="overflow-hidden p-0">
               <Suspense fallback={<ScanFindingsTableSkeleton />}>
-                <ScanFindingsTable scanId={scanId} repoId={scan.repoId} repoLabel={owner ? `${owner}/${name}` : name} commit={scan.commitSha ?? undefined} live />
+                <ScanFindingsTable
+                  scanId={scanId}
+                  repoId={scan.repoId}
+                  repoLabel={owner ? `${owner}/${name}` : name}
+                  commit={scan.commitSha ?? undefined}
+                  live
+                />
               </Suspense>
             </CardContent>
           </Card>
@@ -191,7 +227,11 @@ export function ScanDetail({ scanId }: { scanId: string }) {
               <CardHeader className="gap-1.5">
                 <CardTitle>No history to compare with</CardTitle>
                 <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-                  {scan.untrackedReason ? `This scan has no History: ${scan.untrackedReason}` : scan.ref ? `Elise does not track ${scan.ref}, so this scan has no earlier scans to compare with.` : "This scan has no earlier scans to compare with."}
+                  {scan.untrackedReason
+                    ? `This scan has no History: ${scan.untrackedReason}`
+                    : scan.ref
+                      ? `Elise does not track ${scan.ref}, so this scan has no earlier scans to compare with.`
+                      : "This scan has no earlier scans to compare with."}
                 </p>
               </CardHeader>
             </Card>
@@ -204,7 +244,12 @@ export function ScanDetail({ scanId }: { scanId: string }) {
               </CardHeader>
               <CardContent className="overflow-hidden p-0">
                 <Suspense fallback={<ScanFindingsTableSkeleton />}>
-                  <ScanFindingsTable scanId={scanId} repoId={scan.repoId} repoLabel={owner ? `${owner}/${name}` : name} commit={scan.commitSha ?? undefined} />
+                  <ScanFindingsTable
+                    scanId={scanId}
+                    repoId={scan.repoId}
+                    repoLabel={owner ? `${owner}/${name}` : name}
+                    commit={scan.commitSha ?? undefined}
+                  />
                 </Suspense>
               </CardContent>
             </Card>
@@ -221,14 +266,18 @@ export function ScanDetail({ scanId }: { scanId: string }) {
             <CardHeader className="gap-3">
               <div className="grid gap-1.5">
                 <CardTitle>Files</CardTitle>
-                <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">What the scan saved. REPORT.md is the written summary; findings.json is the same findings as data.</p>
+                <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                  What the scan saved. REPORT.md is the written summary; findings.json is the same findings as data.
+                </p>
               </div>
               <TabsList aria-label="Report files">
                 {files.map((item) => (
                   <TabsTrigger key={item} value={item} className="font-mono">
                     <FileText />
                     {item}
-                    {sizes.has(item) && <span className="font-sans text-xs text-muted-foreground">{scanBytes(sizes.get(item) ?? 0)}</span>}
+                    {sizes.has(item) && (
+                      <span className="font-sans text-xs text-muted-foreground">{scanBytes(sizes.get(item) ?? 0)}</span>
+                    )}
                   </TabsTrigger>
                 ))}
               </TabsList>

@@ -25,7 +25,10 @@ function PanelCardSkeleton({ className }: { className?: string }) {
 export function ScanOverviewSkeleton() {
   return (
     <>
-      <ShellPageHeader title="Overview" description="What needs your attention across your repositories, what to do about it, and how your scans are going." />
+      <ShellPageHeader
+        title="Overview"
+        description="What needs your attention across your repositories, what to do about it, and how your scans are going."
+      />
       <output className="contents" aria-label="Loading">
         <SkeletonBar className="h-16 w-full rounded-xl" />
         <SkeletonStatStrip />

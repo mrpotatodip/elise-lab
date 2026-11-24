@@ -13,7 +13,10 @@ export const Route = createFileRoute("/_app/settings/plan")({
     if (!hasAccessPower(context.user?.powers ?? [], "company:plan:read")) throw redirect({ to: "/overview" });
   },
   loader: async ({ context }) => {
-    const [plan] = await Promise.all([context.queryClient.query({ ...planQuery(), staleTime: "static" }), context.queryClient.query({ ...planOffersQuery(), staleTime: "static" })]);
+    const [plan] = await Promise.all([
+      context.queryClient.query({ ...planQuery(), staleTime: "static" }),
+      context.queryClient.query({ ...planOffersQuery(), staleTime: "static" }),
+    ]);
     return plan;
   },
   component: SettingsPlanPage,

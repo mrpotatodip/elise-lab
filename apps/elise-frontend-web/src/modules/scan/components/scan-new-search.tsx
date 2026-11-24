@@ -71,11 +71,15 @@ export function ScanNewSearch({ provider, picks, onPick, hint }: ScanNewSearchPr
       </div>
       <div className="grid max-h-[min(24rem,50svh)] gap-0.5 overflow-y-auto">
         {rows.length === 0 && (
-          <p className="px-3 py-6 text-center text-sm leading-relaxed text-muted-foreground">{query.trim() === "" ? provider.address.emptyNote : `No repository matches. ${provider.address.emptyNote}`}</p>
+          <p className="px-3 py-6 text-center text-sm leading-relaxed text-muted-foreground">
+            {query.trim() === "" ? provider.address.emptyNote : `No repository matches. ${provider.address.emptyNote}`}
+          </p>
         )}
         {rows.map((row, index) => {
           const group = row.fromLink || !knowsPrivacy ? null : row.isPrivate ? "Private" : "Public";
-          const startsGroup = group !== null && rows.slice(0, index).every((item) => item.fromLink || (item.isPrivate ? "Private" : "Public") !== group);
+          const startsGroup =
+            group !== null &&
+            rows.slice(0, index).every((item) => item.fromLink || (item.isPrivate ? "Private" : "Public") !== group);
           return (
             <div key={row.url} className="grid gap-0.5">
               {startsGroup && <p className="px-3 pb-0.5 pt-2 text-xs text-muted-foreground">{group}</p>}
@@ -90,7 +94,9 @@ export function ScanNewSearch({ provider, picks, onPick, hint }: ScanNewSearchPr
                   <span className="truncate text-sm font-medium">{row.fromLink ? `Scan ${row.label}` : row.label}</span>
                   <span className="truncate text-xs text-muted-foreground">{row.note}</span>
                 </span>
-                {knowsPrivacy && <span className="text-xs text-muted-foreground">{row.isPrivate ? "Private" : "Public"}</span>}
+                {knowsPrivacy && (
+                  <span className="text-xs text-muted-foreground">{row.isPrivate ? "Private" : "Public"}</span>
+                )}
               </button>
             </div>
           );

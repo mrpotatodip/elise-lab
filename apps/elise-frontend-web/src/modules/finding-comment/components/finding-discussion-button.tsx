@@ -25,7 +25,14 @@ export function FindingDiscussionButton({ repo, fingerprint, finding, status }: 
 
   return (
     <>
-      <Button type="button" variant="ghost" size="sm" aria-haspopup="dialog" aria-label={`Discussion about ${finding.title}`} onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-haspopup="dialog"
+        aria-label={`Discussion about ${finding.title}`}
+        onClick={() => setOpen(true)}
+      >
         <MessageSquare aria-hidden="true" />
         Discussion
       </Button>

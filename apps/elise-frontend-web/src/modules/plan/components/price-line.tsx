@@ -1,7 +1,13 @@
 import type { PlanOffer } from "../schemas";
 import { planPriceView, type PlanInterval } from "../utils";
 
-export function PriceLine({ terms, interval }: { terms: Pick<PlanOffer, "monthlyPriceUsd" | "yearlyPriceUsd">; interval: PlanInterval }) {
+export function PriceLine({
+  terms,
+  interval,
+}: {
+  terms: Pick<PlanOffer, "monthlyPriceUsd" | "yearlyPriceUsd">;
+  interval: PlanInterval;
+}) {
   const shownView = planPriceView(terms, interval);
   const view = shownView ?? planPriceView(terms, "month");
   if (view === null) return null;

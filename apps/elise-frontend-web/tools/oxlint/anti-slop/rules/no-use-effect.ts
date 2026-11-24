@@ -42,7 +42,11 @@ export const noUseEffectRule = defineRule({
       MemberExpression(node) {
         if (node.computed || node.object.type !== "Identifier" || !reactNames.has(node.object.name)) return;
         if (node.property.type !== "Identifier" || !effectHooks.has(node.property.name)) return;
-        context.report({ node, messageId: "effectMember", data: { name: node.property.name, object: node.object.name } });
+        context.report({
+          node,
+          messageId: "effectMember",
+          data: { name: node.property.name, object: node.object.name },
+        });
       },
     };
   },

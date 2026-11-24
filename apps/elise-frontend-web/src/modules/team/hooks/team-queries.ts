@@ -11,10 +11,20 @@ export const teamKeys = {
 
 export const teamQuery = () => queryOptions({ queryKey: teamKeys.members(), queryFn: () => fetchTeam() });
 
-export const twoFactorRequirementQuery = () => queryOptions({ queryKey: [...teamKeys.all, "two-factor-requirement"] as const, queryFn: () => fetchTwoFactorRequirement() });
+export const twoFactorRequirementQuery = () =>
+  queryOptions({
+    queryKey: [...teamKeys.all, "two-factor-requirement"] as const,
+    queryFn: () => fetchTwoFactorRequirement(),
+  });
 
-export const teamRolesQuery = () => queryOptions({ queryKey: teamKeys.roles(), queryFn: () => fetchTeamRoles(), staleTime: Infinity });
+export const teamRolesQuery = () =>
+  queryOptions({ queryKey: teamKeys.roles(), queryFn: () => fetchTeamRoles(), staleTime: Infinity });
 
 export const groupsQuery = () => queryOptions({ queryKey: teamKeys.groups(), queryFn: () => fetchGroups() });
 
-export const inviteQuery = (token: string) => queryOptions({ queryKey: teamKeys.invite(token), queryFn: () => previewTeamInvite({ data: { token } }), retry: false });
+export const inviteQuery = (token: string) =>
+  queryOptions({
+    queryKey: teamKeys.invite(token),
+    queryFn: () => previewTeamInvite({ data: { token } }),
+    retry: false,
+  });

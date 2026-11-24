@@ -44,7 +44,9 @@ export function ScanListSummary({ scans }: { scans: readonly ScanStatus[] }) {
         <Column label="Scans" footer={<ScanNewDialog label="New scan" size="sm" variant="outline" />}>
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {scans.length}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{scans.length === 1 ? "scan" : "scans"}</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              {scans.length === 1 ? "scan" : "scans"}
+            </span>
           </p>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
             {latest ? (
@@ -63,9 +65,15 @@ export function ScanListSummary({ scans }: { scans: readonly ScanStatus[] }) {
             <Count label="Failed" value={failed} />
             <Count label="Stopped by a person" value={stopped} />
           </ul>
-          <Progress value={percent} indicatorClassName="bg-primary/55" aria-label={`Success rate: ${succeeded} of ${finished} finished scans`} />
+          <Progress
+            value={percent}
+            indicatorClassName="bg-primary/55"
+            aria-label={`Success rate: ${succeeded} of ${finished} finished scans`}
+          />
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-            {finished === 0 ? "No scan has finished yet." : `${percent}% of the ${scanPlural(finished, "scan", "scans")} that finished succeeded. A stopped scan is not counted.`}
+            {finished === 0
+              ? "No scan has finished yet."
+              : `${percent}% of the ${scanPlural(finished, "scan", "scans")} that finished succeeded. A stopped scan is not counted.`}
           </p>
         </Column>
 
@@ -75,7 +83,9 @@ export function ScanListSummary({ scans }: { scans: readonly ScanStatus[] }) {
             <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">in progress</span>
           </p>
           {active.length === 0 ? (
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Nothing is running. A new scan starts as soon as a Runner is open.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Nothing is running. A new scan starts as soon as a Runner is open.
+            </p>
           ) : (
             <ul className="divide-y rounded-lg border">
               {active.slice(0, 3).map((scan) => (

@@ -71,7 +71,16 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name={field.name} type="email" autoComplete="email" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "email")} />
+            <Input
+              id="email"
+              name={field.name}
+              type="email"
+              autoComplete="email"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "email")}
+            />
             <FieldError id="email" message={fieldMessage(field)} />
           </div>
         )}
@@ -80,7 +89,16 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name={field.name} type="password" autoComplete="current-password" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "password")} />
+            <Input
+              id="password"
+              name={field.name}
+              type="password"
+              autoComplete="current-password"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "password")}
+            />
             <FieldError id="password" message={fieldMessage(field)} />
           </div>
         )}
@@ -96,7 +114,10 @@ function SignInFields({ redirectTo }: { redirectTo: string | undefined }) {
       <Button type="submit" size="lg" className="mt-1 w-full" disabled={signInMutation.isPending}>
         {signInMutation.isPending ? "Please wait…" : AUTH_COPY.signin.submit}
       </Button>
-      <Link to={AUTH_COPY.signin.forgotTo} className="inline-flex min-h-6 items-center justify-self-start rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Link
+        to={AUTH_COPY.signin.forgotTo}
+        className="inline-flex min-h-6 items-center justify-self-start rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         {AUTH_COPY.signin.forgot}
       </Link>
     </form>
@@ -119,7 +140,15 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
     },
   });
   const form = useForm({
-    defaultValues: { firstName: "", lastName: "", accountName: "", email: "", password: "", timezone: browserTimezone(), turnstileToken: "" },
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      accountName: "",
+      email: "",
+      password: "",
+      timezone: browserTimezone(),
+      turnstileToken: "",
+    },
     validators: { onSubmit: SignUpInputSchema },
     onSubmit: ({ value }) => signUpMutation.mutate(value),
     onSubmitInvalid: focusFirstInvalidField,
@@ -141,7 +170,15 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
           {(field) => (
             <div className="grid content-start gap-2">
               <Label htmlFor="firstName">First name</Label>
-              <Input id="firstName" name={field.name} autoComplete="given-name" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "firstName")} />
+              <Input
+                id="firstName"
+                name={field.name}
+                autoComplete="given-name"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+                {...fieldAria(field, "firstName")}
+              />
               <FieldError id="firstName" message={fieldMessage(field)} />
             </div>
           )}
@@ -150,7 +187,15 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
           {(field) => (
             <div className="grid content-start gap-2">
               <Label htmlFor="lastName">Last name</Label>
-              <Input id="lastName" name={field.name} autoComplete="family-name" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "lastName")} />
+              <Input
+                id="lastName"
+                name={field.name}
+                autoComplete="family-name"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+                {...fieldAria(field, "lastName")}
+              />
               <FieldError id="lastName" message={fieldMessage(field)} />
             </div>
           )}
@@ -160,7 +205,15 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="accountName">Account name</Label>
-            <Input id="accountName" name={field.name} autoComplete="organization" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "accountName", "accountName-help")} />
+            <Input
+              id="accountName"
+              name={field.name}
+              autoComplete="organization"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "accountName", "accountName-help")}
+            />
             <p id="accountName-help" className="text-sm leading-relaxed text-muted-foreground">
               {AUTH_COPY.signup.accountNameHelp}
             </p>
@@ -172,7 +225,16 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name={field.name} type="email" autoComplete="email" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "email")} />
+            <Input
+              id="email"
+              name={field.name}
+              type="email"
+              autoComplete="email"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "email")}
+            />
             <FieldError id="email" message={fieldMessage(field)} />
           </div>
         )}
@@ -181,7 +243,16 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name={field.name} type="password" autoComplete="new-password" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "password", "password-hint")} />
+            <Input
+              id="password"
+              name={field.name}
+              type="password"
+              autoComplete="new-password"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "password", "password-hint")}
+            />
             <p id="password-hint" className="text-sm leading-relaxed text-muted-foreground">
               At least {SIGN_UP_PASSWORD_MIN} characters.
             </p>
@@ -192,7 +263,11 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
       <form.Field name="turnstileToken">
         {(field) => (
           <div className="grid gap-2">
-            {turnstileSiteKey ? <TurnstileWidget key={attempt} siteKey={turnstileSiteKey} onToken={setToken} /> : <p className="text-sm text-muted-foreground">{AUTH_COPY.signup.checkUnavailable}</p>}
+            {turnstileSiteKey ? (
+              <TurnstileWidget key={attempt} siteKey={turnstileSiteKey} onToken={setToken} />
+            ) : (
+              <p className="text-sm text-muted-foreground">{AUTH_COPY.signup.checkUnavailable}</p>
+            )}
             <FieldError id="turnstileToken" message={fieldMessage(field)} />
           </div>
         )}
@@ -207,7 +282,19 @@ function SignUpFields({ turnstileSiteKey }: { turnstileSiteKey: string | null })
 
 type AuthMode = "signin" | "signup" | "forgot" | "reset" | "checkEmail" | "verifyFailed" | "twoFactor" | "setup";
 
-function AuthFields({ mode, token, email, redirectTo, turnstileSiteKey }: { mode: AuthMode; token: string | undefined; email: string | undefined; redirectTo: string | undefined; turnstileSiteKey: string | null }) {
+function AuthFields({
+  mode,
+  token,
+  email,
+  redirectTo,
+  turnstileSiteKey,
+}: {
+  mode: AuthMode;
+  token: string | undefined;
+  email: string | undefined;
+  redirectTo: string | undefined;
+  turnstileSiteKey: string | null;
+}) {
   if (mode === "twoFactor") return <TwoFactorSecondStepFields redirectTo={redirectTo} />;
   if (mode === "setup") return <TwoFactorSetupFields />;
   if (mode === "checkEmail") return <CheckEmailFields email={email} />;
@@ -222,7 +309,19 @@ function AuthFields({ mode, token, email, redirectTo, turnstileSiteKey }: { mode
 // `token` is only read by the reset page: the one from the emailed link.
 // `redirectTo` is only read by sign-in: the page to open once signed in.
 // -----
-export function AuthForm({ mode, token, email, redirectTo, turnstileSiteKey = null }: { mode: AuthMode; token?: string; email?: string; redirectTo?: string; turnstileSiteKey?: string | null }) {
+export function AuthForm({
+  mode,
+  token,
+  email,
+  redirectTo,
+  turnstileSiteKey = null,
+}: {
+  mode: AuthMode;
+  token?: string;
+  email?: string;
+  redirectTo?: string;
+  turnstileSiteKey?: string | null;
+}) {
   const copy = AUTH_COPY[mode];
 
   return (
@@ -237,10 +336,18 @@ export function AuthForm({ mode, token, email, redirectTo, turnstileSiteKey = nu
           <CardHeader className="gap-1.5 px-8 pb-9 pt-8">
             <h1 className="text-xl font-semibold leading-none tracking-tight">{copy.title}</h1>
             <p className="text-sm leading-relaxed text-muted-foreground">{copy.hint}</p>
-            {mode === "signin" ? <output ref={showSignedOutNotice} className="text-sm leading-relaxed text-foreground empty:hidden" /> : null}
+            {mode === "signin" ? (
+              <output ref={showSignedOutNotice} className="text-sm leading-relaxed text-foreground empty:hidden" />
+            ) : null}
           </CardHeader>
           <CardContent className="p-8">
-            <AuthFields mode={mode} token={token} email={email} redirectTo={redirectTo} turnstileSiteKey={turnstileSiteKey} />
+            <AuthFields
+              mode={mode}
+              token={token}
+              email={email}
+              redirectTo={redirectTo}
+              turnstileSiteKey={turnstileSiteKey}
+            />
           </CardContent>
         </Card>
         {mode === "setup" ? (
@@ -251,7 +358,10 @@ export function AuthForm({ mode, token, email, redirectTo, turnstileSiteKey = nu
             </TooltipProvider>
           </div>
         ) : (
-          <Link to={AUTH_COPY[mode].to} className="inline-flex min-h-6 items-center justify-self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link
+            to={AUTH_COPY[mode].to}
+            className="inline-flex min-h-6 items-center justify-self-center rounded-sm text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             {AUTH_COPY[mode].swap}
           </Link>
         )}

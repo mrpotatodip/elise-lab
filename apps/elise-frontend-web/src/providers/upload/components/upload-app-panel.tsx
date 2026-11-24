@@ -27,7 +27,9 @@ export function UploadAppPanel({ repoId, name, onRemoved }: SourceRepoPanelProps
     <section aria-label="Zips of this app" className="grid gap-3 rounded-xl border bg-card p-4 shadow-control">
       <UploadZipList repoId={repoId} />
       <div className="flex items-center justify-between gap-3 border-t pt-3">
-        <p className="text-sm leading-relaxed text-muted-foreground">Remove the app and every zip under it. Its audits stay on the Scans page.</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Remove the app and every zip under it. Its audits stay on the Scans page.
+        </p>
         <UploadRemoveDialog
           trigger="Remove app"
           triggerLabel={`Remove the app ${name}`}

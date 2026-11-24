@@ -57,8 +57,11 @@ export function FindingCommentComposer({ onPost }: FindingCommentComposerProps) 
               <FieldError id="finding-comment-body" message={fieldMessage(field)} />
             ) : (
               <p id="finding-comment-help" className="text-sm leading-normal text-muted-foreground">
-                <span className="tabular-nums">{commentCountText(field.state.value.length, FINDING_COMMENT_BODY_MAX)}.</span> Everyone in this account can read it. It stays here and never goes to GitHub.
-                You can edit or delete it later. No one is notified.
+                <span className="tabular-nums">
+                  {commentCountText(field.state.value.length, FINDING_COMMENT_BODY_MAX)}.
+                </span>{" "}
+                Everyone in this account can read it. It stays here and never goes to GitHub. You can edit or delete it
+                later. No one is notified.
               </p>
             )}
           </div>
