@@ -30,6 +30,13 @@ export const SCAN_RECORDS_PRIOR_LIMIT = 50;
 export const SCAN_RECORDS_MONEY_FIRST_LINE = "PARTIAL: money ran out;";
 
 // -----
+// The first line a Runner writes itself when a Phase ran past its
+// time slot. A Runner that a Phase's Budget cap stopped writes the
+// money line above, so an engine from before this one reads it.
+// -----
+export const SCAN_RECORDS_TIME_FIRST_LINE = "PARTIAL: a phase ran out of time;";
+
+// -----
 // Profile check: two values of the Skill's own wording that the
 // engine reads. A Focused Scan's coarse subsystem identity, and the
 // reason on a unit it defers on purpose.

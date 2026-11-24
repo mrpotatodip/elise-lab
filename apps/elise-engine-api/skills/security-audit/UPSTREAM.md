@@ -15,6 +15,12 @@ These four differ from upstream `c1c8a8c`. Take upstream changes to them by hand
 - `RECONNAISSANCE.md`
 - `VALIDATION-AND-REPORTING.md`
 
+## Files that are not upstream's
+
+`build-coverage-ledger.cjs` is ours. The Runner app runs it beside `validate-coverage-ledger.cjs` and requires that file's exports, so a change to the ledger schema updates both together (ADR 0006).
+
+`windows-input-shim.cjs` is ours too. The Runner app preloads it when it runs a check on Windows, because Node there has no `O_NOFOLLOW` and the upstream checks refuse every input without it (ADR 0006).
+
 ## Files kept as upstream wrote them
 
 The other 14 files are byte-identical to `c1c8a8c`: 11 reference files (`AI-AND-LLM.md`, `ATTACK-CLASSES.md`, `CLIENT-SIDE.md`, `CLOUD-AND-DEPLOYMENT.md`, `DATA-ISOLATION-AND-LIFECYCLE.md`, `DESKTOP-MOBILE-AND-LOCAL-IPC.md`, `MEMORY-SAFETY-AND-BINARY.md`, `PROTOCOLS-RPC-AND-MESSAGING.md`, `RESOURCE-EXHAUSTION-AND-AVAILABILITY.md`, `SUPPLY-CHAIN-AND-RELEASE.md`, `WEB-PROTOCOL-AND-AUTH.md`), `report-schema.json`, `validate-coverage-ledger.cjs` and `validate-findings.cjs`. Overwrite them with upstream's version to take a fix. Do not edit them here.
