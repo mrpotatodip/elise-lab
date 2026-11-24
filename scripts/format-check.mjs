@@ -5,6 +5,10 @@ import { spawnSync } from "node:child_process";
 const result = spawnSync("pnpm", ["exec", "oxfmt", "--list-different", "**/*.{ts,tsx,js,mjs,css}"], {
   encoding: "utf8",
 });
+if (result.error) {
+  console.error(`format: could not run oxfmt: ${result.error.message}`);
+  process.exit(1);
+}
 const files = result.stdout.split("\n").filter(Boolean);
 if (files.length === 0 && result.status === 0) {
   console.log("format: every file is formatted");

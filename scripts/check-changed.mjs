@@ -58,7 +58,8 @@ const formatTargets = all
       .filter((f) => FORMATTED_FILES.test(f));
 if (formatTargets.length > 0) {
   const format = spawnSync("pnpm", ["exec", "oxfmt", "--list-different", ...formatTargets], { encoding: "utf8" });
-  const unformatted = format.stdout.split("\n").filter(Boolean);
+  if (format.error) failures.push(`format: could not run oxfmt: ${format.error.message}`);
+  const unformatted = (format.stdout ?? "").split("\n").filter(Boolean);
   const onlyIgnored = format.status === 2 && /Expected at least one target file/.test(format.stderr + format.stdout);
   if (unformatted.length > 0) {
     const shown = unformatted.slice(0, TAIL_LINES).map((l) => `  ${l.slice(0, LINE_WIDTH)}`);
