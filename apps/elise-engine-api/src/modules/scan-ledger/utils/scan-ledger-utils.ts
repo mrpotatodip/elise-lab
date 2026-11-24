@@ -27,8 +27,9 @@ const JobOptionsTextSchema = z
   .pipe(z.object({ scopePaths: z.array(z.string()).optional() }));
 
 const scopePathsOf = (optionsJson: string | undefined): string[] | undefined => {
-  const parsed = JobOptionsTextSchema.safeParse(optionsJson ?? "");
-  return parsed.success && parsed.data.scopePaths?.length ? parsed.data.scopePaths : undefined;
+  if (optionsJson === undefined) return undefined;
+  const { scopePaths } = JobOptionsTextSchema.parse(optionsJson);
+  return scopePaths?.length ? scopePaths : undefined;
 };
 
 // -----
@@ -40,8 +41,9 @@ export const scanRowToStatus = (
   row: ScanRow,
   artifacts: ScanArtifact[],
   summary: ScanSummary | null = null,
-  runner: (ScanRunner & { optionsJson?: string }) | null = null,
+  runner: ScanRunner | null = null,
   archive: ScanArchiveRef | null = null,
+  optionsJson?: string,
 ): ScanStatus =>
   ScanStatusSchema.parse({
     scanId: row.id,
@@ -61,7 +63,7 @@ export const scanRowToStatus = (
     effort: row.effort,
     profile: row.profile,
     maxBudgetUsd: Number(row.maxBudgetUsd),
-    scopePaths: scopePathsOf(runner?.optionsJson),
+    scopePaths: scopePathsOf(optionsJson),
     status: row.status,
     step: row.step,
     createdAt: row.createdAt.toISOString(),

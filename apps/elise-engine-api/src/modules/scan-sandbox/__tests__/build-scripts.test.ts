@@ -306,13 +306,22 @@ describe("a scoped Scan's prompts", () => {
     expect(buildPhasePrompt(scoped, "hunt", RUNNER_PROMPT_PLACE)).not.toContain("recon-list.json only");
   });
 
-  it("asks a single run for the ledger by hand, and the report to say it is partial", () => {
-    const single = buildAgentPrompt(scoped, RUNNER_PLACE);
+  it.each([
+    ["a Runner", RUNNER_PLACE],
+    ["our cloud", undefined],
+  ])(
+    "gives a single run on %s one consistent scope: units outside are out_of_scope and never hunted",
+    (_name, place) => {
+      const single = buildAgentPrompt(scoped, place);
 
-    expect(single).toContain(folders);
-    expect(single).toContain("out_of_scope");
-    expect(single).not.toContain("recon-list.json only");
-  });
+      expect(single).toContain(folders);
+      expect(single).toContain("record the surfaces you notice outside them as `out_of_scope` units");
+      expect(single).toContain("never hunt or check an `out_of_scope` unit");
+      expect(single).toContain("partial coverage and not a full audit");
+      expect(single).not.toContain("add no unit for anything outside them");
+      expect(single).not.toContain("recon-list.json");
+    },
+  );
 
   it.each([...SCAN_SANDBOX_FULL_PHASES])("leaves the %s prompt of a Scan of everything as it was", (phase) => {
     expect(buildPhasePrompt({ ...scoped, scopePaths: undefined }, phase, RUNNER_PROMPT_PLACE)).toBe(

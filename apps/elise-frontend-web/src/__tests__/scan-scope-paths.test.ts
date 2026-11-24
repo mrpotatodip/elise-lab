@@ -46,11 +46,15 @@ describe("a Scan of some folders", () => {
   });
 
   it("says in the page's notice which folders were covered and that the rest was not", () => {
-    const note = scanScopeNote({ scopePaths: ["one", "two"] });
+    const note = scanScopeNote({ status: "succeeded", scopePaths: ["one", "two"] });
 
     expect(note?.title).toContain("one, two");
     expect(note?.detail).toContain("partial");
-    expect(scanScopeNote({ scopePaths: [] })).toBeNull();
-    expect(scanScopeNote({})).toBeNull();
+    expect(scanScopeNote({ status: "succeeded", scopePaths: [] })).toBeNull();
+    expect(scanScopeNote({ status: "succeeded" })).toBeNull();
+  });
+
+  it.each(["queued", "running", "failed", "stopped"] as const)("shows no notice for a %s Scan", (status) => {
+    expect(scanScopeNote({ status, scopePaths: ["one"] })).toBeNull();
   });
 });

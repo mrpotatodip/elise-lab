@@ -56,12 +56,14 @@ const SCOPE_ASK = {
     "The Report must say, right after its first line, which folders were audited, that the rest of the repository was not looked at, and that this is partial coverage and not a full audit. Do not say the repository is free of findings.",
 } satisfies Record<FullPhase, (byRunner: boolean) => string>;
 
+const SINGLE_RUN_SCOPE_ASK =
+  "Record the folders as `scope_paths` in run-metadata.json and say in architecture.md that only they were read. Seed ledger units only for surfaces inside these folders and record the surfaces you notice outside them as `out_of_scope` units, but never hunt or check an `out_of_scope` unit. Read outside the folders only to follow a call you cannot judge otherwise, and do not report a finding whose vulnerable code is outside them.";
+
 const scopeAskOf = (options: ScanOptions, phase: FullPhase | null, place: PromptPlace): string => {
   const paths = options.scopePaths ?? [];
   if (paths.length === 0) return "";
-  const byRunner = place.validatedBy === "runner" && phase !== null;
-  const asks = phase === null ? Object.values(SCOPE_ASK) : [SCOPE_ASK[phase]];
-  return [SCOPE_LEAD(paths), ...asks.map((ask) => ask(byRunner))].join(" ");
+  if (phase === null) return [SCOPE_LEAD(paths), SINGLE_RUN_SCOPE_ASK, SCOPE_ASK.report()].join(" ");
+  return [SCOPE_LEAD(paths), SCOPE_ASK[phase](place.validatedBy === "runner")].join(" ");
 };
 
 const withLine = (text: string) => (text === "" ? "" : `${text}\n`);

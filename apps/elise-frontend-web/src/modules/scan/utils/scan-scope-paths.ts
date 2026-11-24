@@ -13,9 +13,9 @@ export function scanScopePathsOf(text: string) {
 
 export const SCAN_SCOPE_PATHS_LIMIT = SCAN_SCOPE_PATHS_MAX;
 
-export function scanScopeNote(scan: Pick<ScanStatus, "scopePaths">) {
+export function scanScopeNote(scan: Pick<ScanStatus, "scopePaths" | "status">) {
   const paths = scan.scopePaths ?? [];
-  if (paths.length === 0) return null;
+  if (scan.status !== "succeeded" || paths.length === 0) return null;
   return {
     title: `Only ${paths.length === 1 ? "this folder" : "these folders"} of the repository ${paths.length === 1 ? "was" : "were"} scanned: ${paths.join(", ")}`,
     detail:

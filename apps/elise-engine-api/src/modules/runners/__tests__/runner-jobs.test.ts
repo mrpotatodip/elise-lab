@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { authUser, scanArchiveLinks, scanRunnerJobs, scans, scanUploadArchives } from "@repo/db-elise";
+import { authUser, scanArchiveLinks, scanRunnerJobs, scans, scanUploadArchives, tenantRunners } from "@repo/db-elise";
 import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/elise";
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
@@ -172,6 +172,26 @@ describe("claiming a job", () => {
     expect(plain?.scopePaths).toBeUndefined();
     expect(plain?.prompt).not.toContain("scoped");
     expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({ scopePaths: ["one", "two/sub"] });
+  });
+
+  it("still reads a Scan's status after its Runner was removed, though the folders go with the job row", async () => {
+    const gone = await pair("gone");
+    const scoped: ScanOptions = { ...OPTIONS, skill: "full", scopePaths: ["one"] };
+    const scanId = await queue(await newScan(), { runnerId: gone }, NOW, scoped);
+    expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({ scopePaths: ["one"] });
+
+    await test.raw.delete(tenantRunners).where(eq(tenantRunners.id, gone));
+    const status = await run(neonScanRepo(test.http).get(tenantId, scanId));
+
+    expect(status).toMatchObject({ scanId, runner: null });
+    expect(status?.scopePaths).toBeUndefined();
+  });
+
+  it("refuses to show a Scan whose stored options cannot be read, so it never looks like a Scan of everything", async () => {
+    const scanId = await queue(await newScan());
+    await test.raw.update(scanRunnerJobs).set({ optionsJson: "not json" }).where(eq(scanRunnerJobs.scanId, scanId));
+
+    await expect(run(neonScanRepo(test.http).get(tenantId, scanId))).rejects.toThrow("options");
   });
 
   it("still parses a job from before profiles, with no profile or cap", () => {

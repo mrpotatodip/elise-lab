@@ -45,6 +45,10 @@ export const CreateScanBodySchema = z
     const scope = body.scope_paths === undefined ? null : checkScopePaths(body.scope_paths);
     if (scope?.ok === false)
       ctx.addIssue({ code: "custom", path: ["scope_paths"], message: `scope_paths: ${scope.message}` });
+  })
+  .transform((body) => {
+    const scope = body.scope_paths === undefined ? null : checkScopePaths(body.scope_paths);
+    return scope?.ok ? { ...body, scope_paths: scope.paths } : body;
   });
 
 export const ScanQueuedSchema = documentFields(ContractScanQueuedSchema, {
