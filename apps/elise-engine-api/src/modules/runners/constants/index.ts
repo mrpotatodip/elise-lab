@@ -1,3 +1,5 @@
+import { RUNNER_SPEND_LIMIT_MAX_USD } from "@repo/contracts/elise";
+
 // -----
 // Messages. A refused pairing code always reads the
 // same, so a guesser cannot tell a wrong code from an
@@ -32,13 +34,13 @@ export const RUNNER_TOKEN_PREFIX = "elr_";
 // is none.
 // -----
 // -----
-// The cap a scan on a Runner carries. It is a safety net, not a
-// price: the scan runs on the person's own Claude, so the agent's
-// estimate at API prices is only for them to read, and the 40
-// minute timeout in the Runner app is the real stop. The number
-// is far above what that time can reach.
+// The most a scan on a Runner may be given as its limit. It is a
+// ceiling, not a price: the scan runs on the person's own Claude,
+// so the agent's estimate at API prices is only for them to read.
+// The contracts hold the number, so the dashboard's field and the
+// engine's refusal read the same one.
 // -----
-export const RUNNER_MAX_BUDGET_USD = 50;
+export const RUNNER_MAX_BUDGET_USD = RUNNER_SPEND_LIMIT_MAX_USD;
 
 export const RUNNER_PROMPT_PLACE = {
   repoDir: "./repo",

@@ -3,7 +3,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { authUser, scanArchiveLinks, scanRunnerJobs, scans, scanUploadArchives } from "@repo/db-elise";
 import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/elise";
-import { SCAN_PROFILE_CAPS_USD } from "#/constants";
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
@@ -130,15 +129,15 @@ describe("claiming a job", () => {
     expect(again?.scanId).not.toBe(first);
   });
 
-  it("carries the Scan's profile and the cap the table gives it, next to the Runner's own ceiling", async () => {
-    await queue(await newScan(), {}, NOW, { ...OPTIONS, profile: "deep", maxBudgetUsd: RUNNER_MAX_BUDGET_USD });
+  it.each([
+    ["lowered below the profile's cap", 5],
+    ["raised above the profile's cap", 40],
+    ["at the Runner's ceiling", RUNNER_MAX_BUDGET_USD],
+  ])("carries the Scan's profile and its stored limit, %s, as both the cap and the limit", async (_name, limit) => {
+    await queue(await newScan(), {}, NOW, { ...OPTIONS, profile: "quick", maxBudgetUsd: limit });
     const claimed = await run(claimJobSvc(test.http, runnerId));
 
-    expect(claimed).toMatchObject({
-      profile: "deep",
-      profileCapUsd: SCAN_PROFILE_CAPS_USD.deep,
-      maxBudgetUsd: RUNNER_MAX_BUDGET_USD,
-    });
+    expect(claimed).toMatchObject({ profile: "quick", profileCapUsd: limit, maxBudgetUsd: limit });
   });
 
   it("hands over the single prompt as it was and the four Phase prompts in order, built for the Scan's profile and the Runner's place", async () => {

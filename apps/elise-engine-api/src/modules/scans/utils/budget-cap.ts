@@ -25,7 +25,8 @@ export const budgetRefusalHintOf = (
 // The Budget cap of a new Scan, read at this one point: what it gets
 // when the request names none (defaultUsd) and the most a request may
 // ask for (ceilingUsd).
-// A Scan on a Runner has its safety cap. Every other Scan, on either
+// A Scan on a Runner starts at the cap of its profile and a request
+// may raise it up to the Runner's ceiling. Every other Scan, on either
 // key, gets the cap of its profile, and a request may lower it only. A
 // profile whose cap is above MAX_BUDGET_FULL_USD is refused, so a
 // wrong table never starts a Scan.
@@ -34,8 +35,8 @@ export const budgetCapOf = (
   env: Pick<CreateScanEnv, "MAX_BUDGET_FULL_USD">,
   scan: { profile: (typeof SCAN_PROFILES)[number]; onRunner: boolean },
 ): BudgetCap => {
-  if (scan.onRunner) return { ok: true, defaultUsd: RUNNER_MAX_BUDGET_USD, ceilingUsd: RUNNER_MAX_BUDGET_USD };
   const profileCapUsd = SCAN_PROFILE_CAPS_USD[scan.profile];
+  if (scan.onRunner) return { ok: true, defaultUsd: profileCapUsd, ceilingUsd: RUNNER_MAX_BUDGET_USD };
   const fullCeilingUsd = Number(env.MAX_BUDGET_FULL_USD);
   if (!(profileCapUsd <= fullCeilingUsd)) {
     return {

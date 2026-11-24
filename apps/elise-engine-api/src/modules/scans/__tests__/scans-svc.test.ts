@@ -471,13 +471,40 @@ describe("createScanSvc: a Runner", () => {
     });
   });
 
-  it("gives a scan on a runner the safety cap by default and refuses a limit above it", async () => {
+  it.each([
+    ["quick", 12],
+    ["standard", 24],
+    ["deep", 50],
+  ] as const)("gives a %s scan on a runner its profile's cap by default, $%s", async (profile, cap) => {
     const { env, createdFull } = fakeBindings();
     await Effect.runPromise(
-      createScanSvc(env, memoryScanRepo().repo, "acme", onRunner, RUNNER_SPEND(), hold, connected),
+      createScanSvc(env, memoryScanRepo().repo, "acme", { ...onRunner, profile }, RUNNER_SPEND(), hold, connected),
     );
 
-    expect(createdFull[0].params.options.maxBudgetUsd).toBe(50);
+    expect(createdFull[0].params.options.maxBudgetUsd).toBe(cap);
+  });
+
+  it.each([1, 30, 50])(
+    "lets a scan on a runner ask for a limit of $%s, above its profile's cap or below",
+    async (limit) => {
+      const { env, createdFull } = fakeBindings();
+      await Effect.runPromise(
+        createScanSvc(
+          env,
+          memoryScanRepo().repo,
+          "acme",
+          { ...onRunner, profile: "quick", max_budget_usd: limit },
+          RUNNER_SPEND(),
+          hold,
+          connected,
+        ),
+      );
+
+      expect(createdFull[0].params.options.maxBudgetUsd).toBe(limit);
+    },
+  );
+
+  it("refuses a limit above the Runner's ceiling", async () => {
     expect(await outcome(RUNNER_SPEND(), connected, { ...onRunner, max_budget_usd: 60 })).toBe("Invalid");
   });
 

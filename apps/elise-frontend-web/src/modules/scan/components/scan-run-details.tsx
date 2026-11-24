@@ -58,6 +58,7 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
           </Fact>
           <Fact label="Model">{labelOf(SCAN_MODEL_NAMES, scan.model)}</Fact>
           <Fact label="Effort">{labelOf(SCAN_EFFORT_OPTIONS, scan.effort)}</Fact>
+          <Fact label="Spend limit">${scan.maxBudgetUsd}</Fact>
         </ScanSetupColumn>
         <ScanSetupColumn label="Where it ran">
           <Fact label="Computer">{scan.runner?.name ?? "Elise's cloud"}</Fact>
@@ -84,7 +85,7 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
             </CollapsibleTrigger>
           </CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-            The kind of review, the model and the effort this scan ran with.
+            The kind of review, the model, the effort and the spend limit this scan ran with.
           </p>
         </CardHeader>
         <CollapsiblePanel>
@@ -96,6 +97,7 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
               </Fact>
               <Fact label="Model">{labelOf(SCAN_MODEL_NAMES, scan.model)}</Fact>
               <Fact label="Effort">{labelOf(SCAN_EFFORT_OPTIONS, scan.effort)}</Fact>
+              <Fact label="Spend limit">${scan.maxBudgetUsd}</Fact>
             </dl>
           </CardContent>
         </CollapsiblePanel>
