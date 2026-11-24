@@ -283,3 +283,41 @@ describe("buildAgentPrompt", () => {
     expect(buildPhasePrompt(full, "report", RUNNER_PROMPT_PLACE)).not.toContain("at the same time");
   });
 });
+
+describe("a scoped Scan's prompts", () => {
+  const scoped: ScanOptions = { ...options, skill: "full", scopePaths: ["one", "two/sub"] };
+  const folders = "`one`, `two/sub`";
+
+  it.each(SCAN_SANDBOX_FULL_PHASES)("names the folders in the %s Phase", (phase) => {
+    expect(buildPhasePrompt(scoped, phase, RUNNER_PROMPT_PLACE)).toContain(folders);
+  });
+
+  it("has recon list only in-scope entries, hunt and check stay inside, and the report say it is partial", () => {
+    expect(buildPhasePrompt(scoped, "recon", RUNNER_PROMPT_PLACE)).toContain(
+      "List an entry in recon-list.json only when its entry point, boundary and subsystem are inside these folders",
+    );
+    expect(buildPhasePrompt(scoped, "hunt", RUNNER_PROMPT_PLACE)).toContain("Hunt only inside these folders");
+    expect(buildPhasePrompt(scoped, "check", RUNNER_PROMPT_PLACE)).toContain("Validate only candidates");
+    expect(buildPhasePrompt(scoped, "report", RUNNER_PROMPT_PLACE)).toContain("partial coverage and not a full audit");
+  });
+
+  it("asks only the run it is for, so recon says nothing of the report", () => {
+    expect(buildPhasePrompt(scoped, "recon", RUNNER_PROMPT_PLACE)).not.toContain("partial coverage");
+    expect(buildPhasePrompt(scoped, "hunt", RUNNER_PROMPT_PLACE)).not.toContain("recon-list.json only");
+  });
+
+  it("asks a single run for the ledger by hand, and the report to say it is partial", () => {
+    const single = buildAgentPrompt(scoped, RUNNER_PLACE);
+
+    expect(single).toContain(folders);
+    expect(single).toContain("out_of_scope");
+    expect(single).not.toContain("recon-list.json only");
+  });
+
+  it.each([...SCAN_SANDBOX_FULL_PHASES])("leaves the %s prompt of a Scan of everything as it was", (phase) => {
+    expect(buildPhasePrompt({ ...scoped, scopePaths: undefined }, phase, RUNNER_PROMPT_PLACE)).toBe(
+      buildPhasePrompt(options, phase, RUNNER_PROMPT_PLACE),
+    );
+    expect(buildPhasePrompt({ ...scoped, scopePaths: [] }, phase)).not.toContain("scoped");
+  });
+});

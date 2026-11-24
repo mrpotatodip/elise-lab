@@ -42,6 +42,8 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
   const spendLimit = scanSpendLimitShown(scan.maxBudgetUsd, profileCapUsd) ? (
     <Fact label="Spend limit">${scan.maxBudgetUsd}</Fact>
   ) : null;
+  const folders =
+    scan.scopePaths && scan.scopePaths.length > 0 ? <Fact label="Folders">{scan.scopePaths.join(", ")}</Fact> : null;
   if (scan.status !== "succeeded") {
     const took = scanDuration(
       scan.usage?.durationMs ?? (scan.finishedAt ? Date.parse(scan.finishedAt) - Date.parse(scan.createdAt) : null),
@@ -51,6 +53,7 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
         <ScanSetupColumn label="What was scanned">
           <Fact label="Repository">{scan.archive ? `Zip ${scan.archive.label}` : scan.repo}</Fact>
           <Fact label="Branch">{scan.branch ?? (scan.ref ? scan.ref : "Default branch")}</Fact>
+          {folders}
           <Fact label="Commit">
             {scan.commitSha ? (
               <span className="font-mono">{scan.commitSha.slice(0, 7)}</span>
@@ -106,6 +109,7 @@ export function ScanRunDetails({ scan }: { scan: ScanStatus }) {
               <Fact label="Model">{labelOf(SCAN_MODEL_NAMES, scan.model)}</Fact>
               <Fact label="Effort">{labelOf(SCAN_EFFORT_OPTIONS, scan.effort)}</Fact>
               {spendLimit}
+              {folders}
             </dl>
           </CardContent>
         </CollapsiblePanel>

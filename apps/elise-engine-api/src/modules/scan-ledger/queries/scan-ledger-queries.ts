@@ -40,7 +40,12 @@ const runnersOf = (db: AppDbType, ids: string[]) =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ scanId: scanRunnerJobs.scanId, id: tenantRunners.id, name: tenantRunners.name })
+        .select({
+          scanId: scanRunnerJobs.scanId,
+          id: tenantRunners.id,
+          name: tenantRunners.name,
+          optionsJson: scanRunnerJobs.optionsJson,
+        })
         .from(scanRunnerJobs)
         .innerJoin(tenantRunners, eq(tenantRunners.id, scanRunnerJobs.runnerId))
         .where(inArray(scanRunnerJobs.scanId, ids)),

@@ -158,6 +158,22 @@ describe("claiming a job", () => {
     expect(RunnerJobSchema.parse(claimed).phasePrompts).toHaveLength(4);
   });
 
+  it("carries the folders of a scoped Scan on the job and in every Phase prompt, and none for a Scan of everything", async () => {
+    const scoped: ScanOptions = { ...OPTIONS, skill: "full", scopePaths: ["one", "two/sub"] };
+    const scanId = await queue(await newScan(), {}, NOW, scoped);
+    await queue(await newScan());
+    const claimed = await run(claimJobSvc(test.http, runnerId));
+    const plain = await run(claimJobSvc(test.http, runnerId));
+
+    expect(claimed?.scopePaths).toEqual(["one", "two/sub"]);
+    expect(RunnerJobSchema.parse(claimed).scopePaths).toEqual(["one", "two/sub"]);
+    expect(claimed?.phasePrompts?.every((entry) => entry.prompt.includes("`one`, `two/sub`"))).toBe(true);
+    expect(claimed?.prompt).toContain("`one`, `two/sub`");
+    expect(plain?.scopePaths).toBeUndefined();
+    expect(plain?.prompt).not.toContain("scoped");
+    expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({ scopePaths: ["one", "two/sub"] });
+  });
+
   it("still parses a job from before profiles, with no profile or cap", () => {
     const oldJob = {
       scanId: "s1",

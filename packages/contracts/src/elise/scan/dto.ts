@@ -11,6 +11,7 @@ import {
   SCAN_STEP_VALUES,
   SOURCE_PROVIDER_VALUES,
 } from "../enums";
+import { SCAN_SCOPE_PATHS_MAX } from "./scope-paths";
 
 export const SCAN_MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"] as const;
 // Opus is not offered for new scans, but a stored scan may still carry it.
@@ -37,6 +38,7 @@ export const ScanOptionsSchema = z.object({
   effort: z.enum(SCAN_EFFORTS),
   profile: z.enum(SCAN_PROFILES),
   maxBudgetUsd: z.number().positive(),
+  scopePaths: z.array(z.string()).max(SCAN_SCOPE_PATHS_MAX).optional(),
 });
 
 // -----

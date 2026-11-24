@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { scans } from "@repo/db-elise/schema";
 import type {
   FindingOriginValue,
@@ -13,6 +14,23 @@ import { failureCodeOf } from "./failure-code";
 
 type ScanRow = typeof scans.$inferSelect;
 
+const JobOptionsTextSchema = z
+  .string()
+  .transform((text, ctx) => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      ctx.addIssue({ code: "custom", message: "the job's options are not JSON" });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.object({ scopePaths: z.array(z.string()).optional() }));
+
+const scopePathsOf = (optionsJson: string | undefined): string[] | undefined => {
+  const parsed = JobOptionsTextSchema.safeParse(optionsJson ?? "");
+  return parsed.success && parsed.data.scopePaths?.length ? parsed.data.scopePaths : undefined;
+};
+
 // -----
 // The scans row and its files, as the API shows them.
 // costUsd is numeric in Neon and arrives as text. A row that
@@ -22,7 +40,7 @@ export const scanRowToStatus = (
   row: ScanRow,
   artifacts: ScanArtifact[],
   summary: ScanSummary | null = null,
-  runner: ScanRunner | null = null,
+  runner: (ScanRunner & { optionsJson?: string }) | null = null,
   archive: ScanArchiveRef | null = null,
 ): ScanStatus =>
   ScanStatusSchema.parse({
@@ -43,6 +61,7 @@ export const scanRowToStatus = (
     effort: row.effort,
     profile: row.profile,
     maxBudgetUsd: Number(row.maxBudgetUsd),
+    scopePaths: scopePathsOf(runner?.optionsJson),
     status: row.status,
     step: row.step,
     createdAt: row.createdAt.toISOString(),

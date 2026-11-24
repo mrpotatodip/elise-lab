@@ -13,6 +13,7 @@ import {
 } from "../constants";
 import { RUNNER_JOB_PHASE_VALUES, RUNNER_JOB_STATE_VALUES, type RunnerJobSourceValue } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
+import { SCAN_SCOPE_PATHS_MAX } from "../scan/scope-paths";
 
 export const RunnerIdSchema = z.uuid();
 
@@ -129,6 +130,7 @@ export const RunnerJobSchema = z.object({
   profile: z.enum(SCAN_PROFILES).optional(),
   profileCapUsd: z.number().positive().optional(),
   maxBudgetUsd: z.number().positive(),
+  scopePaths: z.array(z.string()).max(SCAN_SCOPE_PATHS_MAX).optional(),
   prompt: z.string(),
   phasePrompts: z.array(RunnerPhasePromptSchema).optional(),
   priorsJson: z.string(),

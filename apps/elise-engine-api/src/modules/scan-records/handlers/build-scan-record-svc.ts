@@ -51,12 +51,14 @@ const readProfileScan = (
     const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE);
     const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE);
     const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE);
-    const check = params.runnerId
-      ? checkRunnerProfile(params.options.profile, { report, ledger, metadata, findings: findingsText })
-      : null;
+    const scoped = (params.options.scopePaths?.length ?? 0) > 0;
+    const check =
+      params.runnerId && !scoped
+        ? checkRunnerProfile(params.options.profile, { report, ledger, metadata, findings: findingsText })
+        : null;
     return {
       findings,
-      partial: isPartialScan(report, ledger, metadata),
+      partial: scoped || isPartialScan(report, ledger, metadata),
       profileMet: profileMetOf(params.options.profile, check),
     };
   });
