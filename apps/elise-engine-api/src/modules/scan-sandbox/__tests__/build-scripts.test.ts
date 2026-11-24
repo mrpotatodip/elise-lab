@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ScanOptions } from "#/schemas";
+import { RUNNER_AGENTS_AT_ONCE, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { SCAN_SANDBOX_FULL_PHASES, SCAN_SANDBOX_PHASE_SKILL_PHASES } from "#/modules/scan-sandbox/constants";
 import {
   buildAgentPrompt,
@@ -265,5 +266,20 @@ describe("buildAgentPrompt", () => {
     expect(buildAgentPrompt(full)).toContain("run the skill's validators");
     expect(onRunner).toContain("Do not run the validators or any node command");
     expect(onRunner).not.toContain("run the skill's validators");
+  });
+
+  it.each([
+    ["hunt", "hunters"],
+    ["check", "verifiers"],
+  ] as const)("gives a Runner's %s run its own limit on agents at once, and a cloud run none", (phase, agents) => {
+    const full: ScanOptions = { ...options, skill: "full" };
+
+    expect(RUNNER_AGENTS_AT_ONCE).toBe(6);
+    expect(buildPhasePrompt(full, phase, RUNNER_PROMPT_PLACE)).toContain(
+      `Run up to ${RUNNER_AGENTS_AT_ONCE} ${agents} at the same time.`,
+    );
+    expect(buildPhasePrompt(full, phase)).not.toContain("at the same time");
+    expect(buildPhasePrompt(full, "recon", RUNNER_PROMPT_PLACE)).not.toContain("at the same time");
+    expect(buildPhasePrompt(full, "report", RUNNER_PROMPT_PLACE)).not.toContain("at the same time");
   });
 });

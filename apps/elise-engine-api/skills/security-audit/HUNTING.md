@@ -2,7 +2,7 @@
 
 ### Phase 2: Run coverage-led hunting waves
 
-The parent assigns `planned` ledger units to `general` agents. Use enough focused hunters to cover the units without combining unrelated boundaries. One hunter may own closely related units in one subsystem; no unit may be silently unassigned: a unit that money ran out before reaching is explicitly `deferred` with reason `money_exhausted`. Run at most 3 hunters at the same time.
+The parent assigns `planned` ledger units to `general` agents. Use enough focused hunters to cover the units without combining unrelated boundaries. One hunter may own closely related units in one subsystem; no unit may be silently unassigned: a unit that money ran out before reaching is explicitly `deferred` with reason `money_exhausted`. Hunters at the same time are limited as `Agents at once, and running out of money` in `SKILL.md` says.
 
 When a profile caps hunter count or money may run out, assign units in priority order and record the ordering rationale in the ledger. Rank by: (1) unauthenticated or lowest-trust entry surfaces before authenticated ones; (2) boundaries protecting the most valuable resources (credentials, cross-tenant data, code execution, release authority); (3) prior-run gaps, revalidation targets, and changed source before same-source re-passes; (4) units whose class historically yields confirmed findings for this target type over speculative ones. Ties break lexicographically by `coverage_id` so runs stay deterministic.
 
