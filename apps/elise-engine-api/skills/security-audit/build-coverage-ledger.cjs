@@ -6,10 +6,11 @@
  * Usage:
  *   node build-coverage-ledger.cjs build <short-list.json> <coverage-ledger.json> <quick|standard|deep>
  *   node build-coverage-ledger.cjs merge <coverage-ledger.json> <ledger-updates.json>
+ *   node build-coverage-ledger.cjs assign <coverage-ledger.json> <hunter-assignments.json> <group-size> <hunters-at-once>
  * `build` turns the agent's short list into the full coverage ledger (RECONNAISSANCE.md, "Deterministic
- * coverage ledger"). `merge` applies the units a later run changed. Both print errors in the words of
- * the file the agent wrote, and write nothing when there is one. validate-coverage-ledger.cjs checks
- * the result afterwards.
+ * coverage ledger"). `merge` applies the units a later run changed. `assign` splits the planned units
+ * into even hunter groups. `build` and `merge` print errors in the words of the file the agent wrote,
+ * and write nothing when there is one. validate-coverage-ledger.cjs checks the result afterwards.
  */
 
 const fs = require("node:fs");
@@ -263,13 +264,55 @@ function merge(ledgerFile, updatesFile) {
   return [];
 }
 
+function groupCount(units, groupSize, atOnce) {
+  const wanted = Math.max(1, Math.ceil(units / groupSize));
+  const rounded = Math.ceil(wanted / atOnce) * atOnce;
+  return rounded <= units && units / rounded >= groupSize / 2 ? rounded : wanted;
+}
+
+function assign(ledgerFile, assignmentsFile, groupSizeText, atOnceText) {
+  const groupSize = Number(groupSizeText);
+  const atOnce = Number(atOnceText);
+  if (!Number.isInteger(groupSize) || groupSize < 1 || !Number.isInteger(atOnce) || atOnce < 1) {
+    return ["the group size and the number of hunters at once must be whole numbers above 0"];
+  }
+  let ledger;
+  try {
+    ledger = readJson(ledgerFile, "coverage-ledger.json");
+  } catch (error) {
+    return [error.message];
+  }
+  if (!Array.isArray(ledger)) return ["coverage-ledger.json: expected a top-level array"];
+  const planned = ledger
+    .filter((unit) => isObject(unit) && unit.status === "planned" && typeof unit.coverage_id === "string")
+    .sort((a, b) => compare(String(a.subsystem), String(b.subsystem)) || compare(a.coverage_id, b.coverage_id));
+  const count = planned.length === 0 ? 0 : groupCount(planned.length, groupSize, atOnce);
+  const groups = [];
+  let start = 0;
+  for (let index = 0; index < count; index += 1) {
+    const size = Math.floor(planned.length / count) + (index < planned.length % count ? 1 : 0);
+    const units = planned.slice(start, start + size);
+    start += size;
+    groups.push({
+      group: index + 1,
+      subsystems: [...new Set(units.map((unit) => unit.subsystem))],
+      coverage_ids: units.map((unit) => unit.coverage_id),
+    });
+  }
+  writeJson(assignmentsFile, { groups });
+  return [];
+}
+
 function run(args) {
-  const [command, first, second, third] = args;
+  const [command, first, second, third, fourth] = args;
   let errors;
   if (command === "build" && first && second && third) errors = build(first, second, third);
   else if (command === "merge" && first && second) errors = merge(first, second);
+  else if (command === "assign" && first && second && third && fourth) errors = assign(first, second, third, fourth);
   else {
-    console.error("Usage: node build-coverage-ledger.cjs build <list> <ledger> <profile> | merge <ledger> <updates>");
+    console.error(
+      "Usage: node build-coverage-ledger.cjs build <list> <ledger> <profile> | merge <ledger> <updates> | assign <ledger> <assignments> <group-size> <hunters-at-once>",
+    );
     return 1;
   }
   for (const message of errors) console.error("ERROR:", message);
@@ -277,7 +320,9 @@ function run(args) {
     console.error(`FAIL: ${errors.length} error(s)`);
     return 1;
   }
-  console.log(command === "build" ? "BUILT: coverage ledger written" : "MERGED: ledger updates applied");
+  console.log(
+    command === "build" ? "BUILT: coverage ledger written" : command === "merge" ? "MERGED: ledger updates applied" : "ASSIGNED: hunter assignments written",
+  );
   return 0;
 }
 

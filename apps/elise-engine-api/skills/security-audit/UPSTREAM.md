@@ -17,7 +17,7 @@ These four differ from upstream `c1c8a8c`. Take upstream changes to them by hand
 
 ## Files that are not upstream's
 
-`build-coverage-ledger.cjs` is ours. The Runner app runs it beside `validate-coverage-ledger.cjs` and requires that file's exports, so a change to the ledger schema updates both together (ADR 0006).
+`build-coverage-ledger.cjs` is ours (its `assign` command writes the hunter groups, ADR 0006). The Runner app runs it beside `validate-coverage-ledger.cjs` and requires that file's exports, so a change to the ledger schema updates both together (ADR 0006).
 
 `windows-input-shim.cjs` is ours too. The Runner app preloads it when it runs a check on Windows, because Node there has no `O_NOFOLLOW` and the upstream checks refuse every input without it (ADR 0006).
 

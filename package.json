@@ -12,6 +12,7 @@
     "engine:probe": "node scripts/engine-probe.mjs",
     "scan:run": "node scripts/scan-run.mjs",
     "rls:latency": "node scripts/rls-latency.mjs",
+    "test:scripts": "node --test \"scripts/__tests__/*.test.mjs\"",
     "check:apps": "node scripts/check-changed.mjs --all",
     "worktrees:prune": "node scripts/worktrees-prune.mjs",
     "format": "oxfmt --write \"**/*.{ts,tsx,js,mjs,css}\"",
