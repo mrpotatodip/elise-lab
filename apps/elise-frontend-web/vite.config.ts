@@ -5,10 +5,18 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { redact } from "@tanstack/redact/vite";
 
-const config = defineConfig({
+// Redact swaps React's runtime for a smaller one (spec #447). Production build only: dev keeps real React.
+const config = defineConfig(({ command }) => ({
   resolve: { tsconfigPaths: true },
-  plugins: [tailwindcss(), cloudflare({ viteEnvironment: { name: "ssr" } }), tanstackStart(), viteReact()],
-});
+  plugins: [
+    tailwindcss(),
+    cloudflare({ viteEnvironment: { name: "ssr" } }),
+    tanstackStart(),
+    viteReact(),
+    command === "build" ? redact() : null,
+  ],
+}));
 
 export default config;
