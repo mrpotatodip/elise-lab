@@ -4,6 +4,7 @@ import { RepoParamSchema, UPLOAD_ARCHIVE_MAX_MB, UploadArchiveParamSchema, Uploa
 import { runEffect } from "#/lib/effect-query";
 import { PayloadTooLargeError } from "#/lib/errors";
 import { ARCHIVE_TOO_LARGE, MB } from "#/modules/archives/constants";
+import { requirePower, userIdOf } from "#/lib/require-power";
 import { zValidator } from "#/lib/zod-validator";
 import { listArchivesSvc, removeArchiveSvc, removeUploadAppSvc, uploadArchiveSvc } from "#/modules/archives/handlers";
 import { listArchivesDoc, removeArchiveDoc, removeUploadAppDoc, uploadArchiveDoc } from "#/modules/archives/openapi";
@@ -48,10 +49,10 @@ app.delete("/:repoId/archives/:archiveId", removeArchiveDoc, zValidator("header"
   return c.json({ data, error: null });
 });
 
-app.delete("/:repoId", removeUploadAppDoc, zValidator("header", AccountHeaderSchema), zValidator("param", RepoParamSchema), async (c) => {
+app.delete("/:repoId", removeUploadAppDoc, requirePower("company:repos:delete"), zValidator("header", AccountHeaderSchema), zValidator("param", RepoParamSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
   const { repoId } = c.req.valid("param");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(removeUploadAppSvc(db, c.env.REPORTS, accountId, repoId)));
+  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(removeUploadAppSvc(db, c.env.REPORTS, accountId, repoId, userIdOf(c))));
   return c.json({ data, error: null });
 });
 

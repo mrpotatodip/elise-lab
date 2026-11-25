@@ -91,9 +91,9 @@ export const removeArchiveSvc = (
 // and findings keep their History, each Scan with its zip's label
 // and no file.
 // -----
-export const removeUploadAppSvc = (db: AppDbType, reports: R2Bucket, accountId: string, repoId: string): Effect.Effect<UploadArchiveRemoved, NotFound | DbError | ExternalError> =>
+export const removeUploadAppSvc = (db: AppDbType, reports: R2Bucket, accountId: string, repoId: string, userId: string): Effect.Effect<UploadArchiveRemoved, NotFound | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
-    const rowKeys = yield* removeUploadAppEffect(db, accountId, repoId);
+    const rowKeys = yield* removeUploadAppEffect(db, accountId, repoId, userId);
     const stored = yield* listObjectsEffect(reports, archivePrefixOf(accountId, repoId));
     yield* deleteObjectsEffect(reports, [...new Set([...rowKeys, ...stored.map((object) => object.key)])]);
     return { removed: true as const };

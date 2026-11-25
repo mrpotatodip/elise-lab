@@ -60,11 +60,12 @@ export const removeUploadAppDoc = describeRoute({
     context:
       "Soft-deletes a repo of any provider: it leaves the repo list, but its Scans and findings stay in the History. An upload app also loses every zip, bytes and records, and its Scans keep a note that their file is gone. Adding the repo again, or scanning it, brings it back.",
     steps: [
-      "The Worker finds the repo in the account, 404 if there is none or it is already removed.",
-      "It deletes the zips' records (an upload app only) and marks the repo removed.",
+      "The login must hold the Power `company:repos:delete` (a Tenant admin or Workspace admin), else 403. The service token alone is a 401.",
+      "The Worker finds the repo in the account, 404 if there is none or it is already removed, 409 while a Scan of it is queued or running.",
+      "It deletes the zips' records (an upload app only), marks the repo removed and writes `repo.removed` to the Audit trail.",
       "It deletes every object stored under the repo (an upload app only).",
     ],
     example: ["Remove a repo:", bash(`curl -X DELETE ${EXAMPLE_BASE_URL}/repos/${APP_ID} \\`, AUTH, ACCOUNT)],
   }),
-  responses: { 200: jsonResponse("The repo is removed.", envelope(UploadArchiveRemovedSchema)), ...errorResponses(400, 401, 403, 404) },
+  responses: { 200: jsonResponse("The repo is removed.", envelope(UploadArchiveRemovedSchema)), ...errorResponses(400, 401, 403, 404, 409) },
 });

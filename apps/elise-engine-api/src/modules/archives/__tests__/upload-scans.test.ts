@@ -9,7 +9,7 @@ import { tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { zipOf } from "#/__tests__/zip-fixture";
 
 let test: TestDb;
-const app = tenantRouteApp(() => test);
+const app = tenantRouteApp(() => test, { sessionUserId: async () => "ada", userHasPower: async () => true });
 const oldRunnerApp = tenantRouteApp(() => test, { connectedRunnerSources: () => Effect.succeed(["git"]) });
 const accountOf = new Map<string, string>();
 const { env, store } = fakeBindings();
@@ -145,6 +145,7 @@ describe("DELETE /repos/:repoId for an upload app", () => {
     const { scanId } = QueuedSchema.parse(await dataOf(await scanUpload("acme", { repo: "Gone", archive_id: archiveId })));
     const prefix = `accounts/${accountOf.get("acme")}/uploads/${appId}/`;
     store.set(`${prefix}left-behind.zip`, "an object whose upload never committed");
+    await test.raw.update(scans).set({ status: "succeeded" }).where(eq(scans.id, scanId));
 
     const removed = await send("acme", `/repos/${appId}`, { method: "DELETE" });
     const rows = await test.raw.select({ id: scanUploadArchives.id }).from(scanUploadArchives).where(eq(scanUploadArchives.repoId, appId));

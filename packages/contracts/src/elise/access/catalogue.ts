@@ -33,6 +33,7 @@ export const ACCESS_CATALOGUE = [
         ],
       },
       { key: "runners", label: "Runner", actions: ["create", "delete"] },
+      { key: "repos", label: "Repo", actions: ["delete"] },
       { key: "signals", label: "Signals", actions: ["update"] },
       {
         key: "findings",

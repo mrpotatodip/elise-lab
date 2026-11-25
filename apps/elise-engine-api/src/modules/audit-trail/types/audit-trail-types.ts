@@ -18,6 +18,7 @@ export type AuditAction =
   | "finding.triage.set"
   | "finding.risk.accepted"
   | "finding.comment.deleted"
+  | "repo.removed"
   | "usage.budget.updated"
   | "anthropic.key.set"
   | "anthropic.key.removed"

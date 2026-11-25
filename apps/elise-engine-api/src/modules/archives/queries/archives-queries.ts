@@ -3,8 +3,10 @@ import { Effect } from "effect";
 import type { ScanArchiveRef, UploadArchive } from "@repo/contracts/elise";
 import { scanArchiveLinks, scanRepos, scans, scanUploadArchives, type TScanUploadArchive } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
-import { Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 
+export const REPO_HAS_ACTIVE_SCAN = "A Scan of this Repo is queued or running; stop it or wait for it first";
 export const UPLOAD_APP_NOT_FOUND = "Upload app not found";
 export const REPO_NOT_FOUND = "Repo not found";
 export const UPLOAD_ARCHIVE_NOT_FOUND = "Upload not found";
@@ -49,11 +51,17 @@ export const findLiveRepoEffect = (db: AppDbType, tenantId: string, repoId: stri
 // row stays, so its Scans and findings keep their History; the
 // links of those Scans keep each zip's label and hash.
 // -----
-export const removeUploadAppEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<string[], NotFound | DbError> =>
+export const removeUploadAppEffect = (db: AppDbType, tenantId: string, repoId: string, userId: string): Effect.Effect<string[], NotFound | Conflict | DbError> =>
   Effect.gen(function* () {
     yield* findLiveRepoEffect(db, tenantId, repoId);
+    const [live] = yield* Effect.tryPromise({
+      try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"]))).limit(1),
+      catch: toDbError,
+    });
+    if (live) return yield* new Conflict({ message: REPO_HAS_ACTIVE_SCAN });
     return yield* Effect.tryPromise({
       try: async () => {
+        const actorPartyId = await actorPartyOf(db, userId);
         const deleted = await db
           .delete(scanUploadArchives)
           .where(and(eq(scanUploadArchives.tenantId, tenantId), eq(scanUploadArchives.repoId, repoId)))
@@ -62,6 +70,8 @@ export const removeUploadAppEffect = (db: AppDbType, tenantId: string, repoId: s
           .update(scanRepos)
           .set({ removedAt: new Date() })
           .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
+        // SAFETY: the tenant transaction's insert answers like the pool's one AuditDb names, and access_audit_log has no row-level security.
+        await insertAuditEntry(db as never, { actorPartyId, action: "repo.removed", subjectId: repoId, tenantId });
         return deleted.map((row) => row.r2Key);
       },
       catch: toDbError,

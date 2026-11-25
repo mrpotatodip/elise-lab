@@ -736,6 +736,13 @@
       "when": 1795400387772,
       "tag": "0104_grandfather_verified_logins",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1795637253535,
+      "tag": "0105_repo_delete_power",
+      "breakpoints": true
     }
   ]
 }
