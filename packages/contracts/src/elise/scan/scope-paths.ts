@@ -9,7 +9,8 @@ const SHOWN_ENTRY_LENGTH = 40;
 
 const shownEntry = (raw: string): string => {
   const flat = raw.trim().replace(/\s+/g, " ");
-  return flat.length > SHOWN_ENTRY_LENGTH ? `${flat.slice(0, SHOWN_ENTRY_LENGTH)}…` : flat;
+  const letters = Array.from(flat);
+  return letters.length > SHOWN_ENTRY_LENGTH ? `${letters.slice(0, SHOWN_ENTRY_LENGTH).join("")}…` : flat;
 };
 
 const refusalOf = (path: string): string | null => {
@@ -19,8 +20,7 @@ const refusalOf = (path: string): string | null => {
   if (path.includes("\\")) return "it has a backslash. Separate folders with /, like src/api.";
   if (path.startsWith("/") || /^[A-Za-z]:/.test(path))
     return "it starts at the computer's root. Write it from the repository's root, like src/api.";
-  if (path.startsWith("-"))
-    return "a folder name can't start with a dash. Pick a folder that does not, or the one above it.";
+  if (path.startsWith("-")) return "it starts with a dash. Rename the folder or pick the one above it.";
   const parts = path.split("/");
   if (parts.includes("..")) return "it points outside the repository. Write it from the repository's root, without ..";
   if (parts.some((part) => part === "")) return "it has a double slash. Use one / between folders.";

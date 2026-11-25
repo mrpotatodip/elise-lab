@@ -31,7 +31,7 @@ describe("checkScopePaths", () => {
     ["a backslash", ["one\\two"], "backslash"],
     ["a .. part", ["one/../two"], "outside the repository"],
     ["a leading ..", ["../one"], "outside the repository"],
-    ["a leading dash", ["-rf"], "start with a dash"],
+    ["a leading dash", ["-rf"], "it starts with a dash. Rename the folder"],
     ["a glob", ["one/*"], "without spaces or special characters"],
     ["a space", ["one two"], "without spaces or special characters"],
     ["a line break", ["one\ntwo"], "without spaces or special characters"],
@@ -62,6 +62,13 @@ describe("checkScopePaths", () => {
     [["a", "a"], `"a" can't be used: it is in the list twice. Remove one of them.`],
   ])("says %j in one line, entry first, then the fix", (given, message) => {
     expect(checkScopePaths(given)).toEqual({ ok: false, message });
+  });
+
+  it("never cuts an emoji in half when it shortens an entry", () => {
+    const checked = checkScopePaths([`${"a".repeat(39)}😀${"b".repeat(5)}`]);
+
+    expect(checked.ok).toBe(false);
+    expect(checked.ok ? "" : checked.message).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/);
   });
 
   it("shortens a very long entry in its message", () => {

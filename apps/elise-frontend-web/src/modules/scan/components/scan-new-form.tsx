@@ -503,7 +503,8 @@ export function ScanNewForm({
                       className="text-sm leading-relaxed"
                     />
                     <p id="spend-limit-help" className={HELP_CLASS}>
-                      The audit stops at this much of your Claude, from $1 to ${RUNNER_SPEND_LIMIT_MAX_USD}.
+                      The audit stops at this much of your Claude. It starts at the cap of the Coverage, from $1 to $
+                      {RUNNER_SPEND_LIMIT_MAX_USD}.
                     </p>
                   </div>
                   <div className="grid gap-1.5 sm:col-span-2">
@@ -527,7 +528,8 @@ export function ScanNewForm({
                       className="text-sm leading-relaxed"
                     />
                     <p id="scope-paths-help" className={HELP_CLASS}>
-                      One folder per line, from the root, up to {SCAN_SCOPE_PATHS_LIMIT}. Folders make a partial Scan.
+                      One folder per line, from the root, up to {SCAN_SCOPE_PATHS_LIMIT}. Empty scans everything;
+                      folders make a partial Scan.
                     </p>
                   </div>
                 </div>
