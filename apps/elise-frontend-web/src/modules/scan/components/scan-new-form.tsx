@@ -545,9 +545,10 @@ export function ScanNewForm({
             </Collapsible>
           </div>
         )}
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{RUNNER_GIT_LOGIN_HINT}</p>
       </DialogBody>
 
-      <DialogFooter className="grid gap-3">
+      <DialogFooter className="grid justify-stretch gap-3">
         <p className="sr-only" aria-live="polite">
           {summary ?? (selected === null ? "Choose a repository and we'll summarise what is about to run." : "")}
         </p>
@@ -556,7 +557,6 @@ export function ScanNewForm({
             ? `This audit runs on ${runner.name}'s own Claude, so the Elise Runner must be running there with Claude Code signed in. Elise charges nothing per audit.${scopeSentence === null ? "" : ` ${scopeSentence}`}`
             : "Connect a Runner to start an audit."}
         </p>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{RUNNER_GIT_LOGIN_HINT}</p>
         <div className="flex items-center justify-end gap-3">
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
           <Button
