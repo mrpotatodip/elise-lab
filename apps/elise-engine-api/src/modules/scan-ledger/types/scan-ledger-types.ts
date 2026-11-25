@@ -44,6 +44,24 @@ export type ScanRepo = {
 };
 
 // -----
+// What a resume reads of the Scan it resumes. job is null for a
+// Scan that ran in our cloud; archive is null unless an upload
+// Scan read a zip (its archiveId is null once the zip is removed).
+// -----
+export type ResumeSource = {
+  id: string;
+  status: ScanState;
+  error: string | null;
+  ref: string | null;
+  maxBudgetUsd: number;
+  repoUrl: string;
+  provider: SourceProviderId;
+  job: { runnerId: string; optionsJson: string } | null;
+  resumedByScanId: string | null;
+  archive: { archiveId: string | null } | null;
+};
+
+// -----
 // The reads a route makes as one Account, inside withTenant.
 // -----
 export type ScanReads = Pick<ScanRepo, "list" | "get" | "file">;

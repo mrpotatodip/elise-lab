@@ -44,8 +44,11 @@ export const scanRowToStatus = (
   runner: ScanRunner | null = null,
   archive: ScanArchiveRef | null = null,
   optionsJson?: string,
+  resumedByScanId: string | null = null,
 ): ScanStatus =>
   ScanStatusSchema.parse({
+    resumesScanId: row.resumesScanId,
+    resumedByScanId,
     scanId: row.id,
     accountId: row.tenantId,
     repo: row.repo,

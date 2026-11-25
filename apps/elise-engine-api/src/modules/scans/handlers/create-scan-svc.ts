@@ -43,6 +43,7 @@ export const queueScanSvc = (
   hold?: HoldCredit,
   runnerSources?: RunnerSources,
   linkArchive?: LinkArchive,
+  resumesScanId?: string,
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
     const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
@@ -208,6 +209,7 @@ export const queueScanSvc = (
       options,
       keySource: usesOwnKey ? "account" : "platform",
       runnerId,
+      resumesScanId,
       createdAt: new Date().toISOString(),
     };
     yield* repo.create(params, record.id, Date.now());
