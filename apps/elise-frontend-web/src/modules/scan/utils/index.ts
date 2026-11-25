@@ -6,6 +6,7 @@ export * from "./scan-finding-prompt";
 export * from "./scan-plan-summary";
 export * from "./scan-profile-note";
 export * from "./scan-repo-name";
+export * from "./scan-resume";
 export * from "./scan-repo-picks";
 export * from "./scan-scope-paths";
 export * from "./scan-sidebar";

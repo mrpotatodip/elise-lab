@@ -61,6 +61,12 @@ export const stopScan = createServerFn({ method: "POST" })
     engineJson(ScanStatusSchema, `/scans/${data.scanId}/stop`, { method: "POST" }, await engineAuth()),
   );
 
+export const resumeScan = createServerFn({ method: "POST" })
+  .validator(ScanIdInputSchema)
+  .handler(async ({ data }) =>
+    engineJson(ScanQueuedSchema, `/scans/${data.scanId}/resume`, { method: "POST" }, await engineAuth()),
+  );
+
 export const fetchScanFile = createServerFn({ method: "GET" })
   .validator(ScanFileInputSchema)
   .handler(async ({ data }) => {

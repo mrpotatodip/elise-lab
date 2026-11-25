@@ -20,6 +20,7 @@ import { ScanFindingsTable } from "./scan-findings-table";
 import { ScanHeaderMeta } from "./scan-header-meta";
 import { ScanMarkdown } from "./scan-markdown";
 import { ScanNewDialog } from "./scan-new-dialog";
+import { ScanResumeButton } from "./scan-resume-button";
 import { ScanRunDetails } from "./scan-run-details";
 import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanSummary } from "./scan-summary";
@@ -176,6 +177,7 @@ export function ScanDetail({ scanId }: { scanId: string }) {
         badges={<GithubPrivateBadge isPrivate={scan.isPrivate} />}
         below={<ScanHeaderMeta scan={scan} />}
       >
+        <ScanResumeButton scan={scan} />
         {canStopScan(scan) && <ScanStopButton scanId={scan.scanId} onRunner={Boolean(scan.runner)} size="default" />}
         {scan.archive ? (
           <ScanNewDialog

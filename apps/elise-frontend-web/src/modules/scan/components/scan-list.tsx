@@ -23,6 +23,7 @@ import { ScanProfileBadge } from "./scan-profile-badge";
 import { ScanRepoLink } from "./scan-repo-link";
 import { ScanSeverityDots } from "./scan-severity-dots";
 import { ScanStatusBadge } from "./scan-status-badge";
+import { ScanChain } from "./scan-chain";
 import { canStopScan, ScanStopButton } from "./scan-stop-button";
 import { ScanTime } from "./scan-time";
 
@@ -83,6 +84,7 @@ const columns = column.columns([
           stretch
         />
         <ScanOrigin scan={row.original} />
+        <ScanChain scan={row.original} className="mt-0.5 text-xs" />
       </>
     ),
   }),
