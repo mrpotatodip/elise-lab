@@ -2,7 +2,7 @@ import { z } from "zod";
 import { FINDING_TRIAGE_STATUS_VALUES, REPO_BRANCH_LIMIT, REPO_FINDING_STATE_VALUES, FINDING_SEVERITY_VALUES } from "@repo/contracts/elise";
 import { DEFAULT_SOURCE_PROVIDER_ENTRY } from "#/providers/registry";
 
-export { REPO_BRANCH_LIMIT, REPO_LIMIT_PER_TENANT, RepoDetailSchema, RepoFindingListSchema, RepoListSchema, RepoParamSchema } from "@repo/contracts/elise";
+export { REPO_BRANCH_LIMIT, REPO_LIMIT_PER_TENANT, RepoDetailSchema, RepoFindingListSchema, RepoListSchema, RepoParamSchema, UploadArchiveRemovedSchema } from "@repo/contracts/elise";
 export type { Repo, RepoBranch, RepoFinding } from "@repo/contracts/elise";
 
 const { address } = DEFAULT_SOURCE_PROVIDER_ENTRY;

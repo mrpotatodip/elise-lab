@@ -16,6 +16,7 @@ import type { Repo } from "../schemas";
 import { repoAttention, repoName } from "../utils";
 import { RepoAddDialog } from "./repo-add-dialog";
 import { RepoOpenFindings } from "./repo-open-findings";
+import { RepoRemovedSection } from "./repo-removed-section";
 import { RepoSummary } from "./repo-summary";
 
 const SEARCH_FROM = 6;
@@ -93,6 +94,7 @@ export function RepoList() {
 
   if (data.repos.length === 0) {
     return (
+      <>
       <Card>
         <CardHeader>
           <CardTitle>Repositories</CardTitle>
@@ -114,6 +116,8 @@ export function RepoList() {
           </Empty>
         </CardContent>
       </Card>
+      <RepoRemovedSection />
+      </>
     );
   }
 
@@ -154,6 +158,7 @@ export function RepoList() {
           )}
         </CardContent>
       </Card>
+      <RepoRemovedSection />
     </>
   );
 }

@@ -6,5 +6,7 @@ export * from "./repo-open-findings";
 export * from "./repo-summary";
 export * from "./repo-summary-strip";
 export * from "./repo-add-dialog";
+export * from "./repo-remove-button";
+export * from "./repo-removed-section";
 export * from "./repo-branch-switch";
 export * from "./repo-overview-brief";
