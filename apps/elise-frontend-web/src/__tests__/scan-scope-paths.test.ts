@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { scanCreateBodyOf } from "#/modules/scan/utils/scan-create-body";
-import { scanScopeNote, scanScopePathsOf } from "#/modules/scan/utils/scan-scope-paths";
+import { scanPlanSummary } from "#/modules/scan/utils/scan-plan-summary";
+import {
+  scanCustomizeProblems,
+  scanScopeNote,
+  scanScopePathsOf,
+  scanScopeSentence,
+} from "#/modules/scan/utils/scan-scope-paths";
 
 describe("scanScopePathsOf", () => {
   it.each([
@@ -15,15 +21,56 @@ describe("scanScopePathsOf", () => {
 
   it.each([
     ["../outside", "outside"],
-    ["/etc", "absolute"],
+    ["/etc", "computer's root"],
     ["one\none", "twice"],
-    ["src/*", "globs"],
+    ["src/*", "special characters"],
     ["one\\two", "backslash"],
   ])("refuses %j and says why", (text, reason) => {
     const read = scanScopePathsOf(text);
 
     expect(read.paths).toBeUndefined();
     expect(read.problem).toContain(reason);
+  });
+});
+
+describe("scanScopeSentence", () => {
+  it.each([
+    [undefined, null],
+    [[], null],
+    [["src"], "It reads only src, so it is a partial Scan."],
+    [["a", "b", "c"], "It reads only a, b and c, so it is a partial Scan."],
+    [["a", "b", "c", "d"], "It reads only 4 folders, so it is a partial Scan."],
+  ])("says for %j: %j", (paths, sentence) => {
+    expect(scanScopeSentence(paths)).toBe(sentence);
+  });
+
+  it("is part of the plan summary only when folders are set", () => {
+    const base = {
+      repo: "https://github.com/honojs/hono",
+      model: "claude-sonnet-5-5",
+      effort: "high",
+      profile: "standard",
+    } as const;
+
+    expect(scanPlanSummary({ ...base, scopePaths: ["src", "lib"] })).toContain(
+      "with Claude Sonnet 5.5. It reads only src and lib, so it is a partial Scan. You'll land",
+    );
+    expect(scanPlanSummary(base)).toBe(
+      "You're about to run a balanced audit of honojs/hono with Claude Sonnet 5.5. You'll land on the report page, where progress updates on its own.",
+    );
+  });
+});
+
+describe("scanCustomizeProblems", () => {
+  it("lists the reason of every invalid field Customize holds", () => {
+    expect(scanCustomizeProblems({ problem: "Enter a dollar amount" }, { problem: "bad folder" })).toEqual([
+      "Spend limit: Enter a dollar amount",
+      "Folders: bad folder",
+    ]);
+  });
+
+  it("is empty when both fields are fine", () => {
+    expect(scanCustomizeProblems({ problem: null }, { problem: null })).toEqual([]);
   });
 });
 

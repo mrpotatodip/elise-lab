@@ -15,7 +15,6 @@ import { Segmented } from "#/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
 import { fieldAria, fieldMessage, fieldMessageAria } from "#/lib/form-field";
-import { cn } from "#/lib/utils";
 import { RUNNER_SPEND_LIMIT_MAX_USD } from "@repo/contracts/elise";
 import { creditQuery } from "#/modules/credit";
 import { RUNNER_GIT_LOGIN_HINT, runnersQuery } from "#/modules/runner";
@@ -39,6 +38,7 @@ import {
 import { CreateScanInputSchema, type CreateScanInput, type SourceProviderValue } from "../schemas";
 import {
   scanArchivePick,
+  scanCustomizeProblems,
   scanKnownRepos,
   scanPlanSummary,
   scanRepoChoices,
@@ -47,6 +47,7 @@ import {
   scanRepoPicks,
   SCAN_SCOPE_PATHS_LIMIT,
   scanScopePathsOf,
+  scanScopeSentence,
   scanSpendLimitOf,
   scanSpendLimitTextAfterProfileChange,
   scanStartProblem,
@@ -69,9 +70,12 @@ type OptionSelectProps<T extends string> = {
   options: readonly ScanOption<T>[];
   value: T;
   onPick: (value: T) => void;
+  help?: string;
 };
 
-function OptionSelect<T extends string>({ id, label, options, value, onPick }: OptionSelectProps<T>) {
+const HELP_CLASS = "max-w-copy text-sm leading-relaxed text-muted-foreground";
+
+function OptionSelect<T extends string>({ id, label, options, value, onPick, help }: OptionSelectProps<T>) {
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={id} className="text-xs text-muted-foreground">
@@ -85,7 +89,7 @@ function OptionSelect<T extends string>({ id, label, options, value, onPick }: O
           if (picked) onPick(picked.value);
         }}
       >
-        <SelectTrigger id={id} className="h-9">
+        <SelectTrigger id={id} className="h-9" aria-describedby={help ? `${id}-help` : undefined}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -99,6 +103,11 @@ function OptionSelect<T extends string>({ id, label, options, value, onPick }: O
           ))}
         </SelectContent>
       </Select>
+      {help && (
+        <p id={`${id}-help`} className={HELP_CLASS}>
+          {help}
+        </p>
+      )}
     </div>
   );
 }
@@ -221,6 +230,8 @@ export function ScanNewForm({
   const limitShown = limitText ?? (profileCapUsd === undefined ? "" : String(profileCapUsd));
   const [scopeText, setScopeText] = useState("");
   const scope = scanScopePathsOf(scopeText);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const customizeProblems = scanCustomizeProblems(spendLimit, scope);
   const plan: CreateScanInput = {
     ...values,
     maxBudgetUsd: spendLimit.usd,
@@ -264,6 +275,7 @@ export function ScanNewForm({
     },
   });
 
+  const scopeSentence = scanScopeSentence(scope.paths);
   const summary = scanPlanSummary(plan, runner?.name, selected?.archive?.label);
   const chips = [
     runner?.name ?? "No Runner connected",
@@ -404,13 +416,13 @@ export function ScanNewForm({
                   className="w-full sm:w-72"
                 />
               </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className={HELP_CLASS}>
                 {SCAN_PROFILE_OPTIONS.find((option) => option.value === values.profile)?.description}
               </p>
             </div>
 
-            <Collapsible>
-              <CollapsibleTrigger className="group flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 rounded-md text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Collapsible open={customizeOpen} onOpenChange={setCustomizeOpen}>
+              <CollapsibleTrigger className="group flex min-h-6 w-full flex-wrap items-center gap-x-2 gap-y-1.5 rounded-md text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 {chips.map((chip) => (
                   <span
                     key={chip}
@@ -425,7 +437,7 @@ export function ScanNewForm({
                 </span>
               </CollapsibleTrigger>
               <CollapsiblePanel>
-                <div className={cn("grid items-start gap-3 pt-3", showRunner ? "sm:grid-cols-2" : "sm:grid-cols-3")}>
+                <div className="grid items-start gap-x-3 gap-y-6 pt-3 sm:grid-cols-2">
                   {showRunner && (
                     <div className="grid gap-1.5">
                       <Label htmlFor="run-where" className="text-xs text-muted-foreground">
@@ -469,6 +481,7 @@ export function ScanNewForm({
                     options={SCAN_EFFORT_OPTIONS}
                     value={values.effort}
                     onPick={(v) => form.setFieldValue("effort", v)}
+                    help="More effort can find more issues, but takes longer."
                   />
                   <div className="grid gap-1.5">
                     <Label htmlFor="spend-limit" className="text-xs text-muted-foreground">
@@ -484,39 +497,49 @@ export function ScanNewForm({
                       onChange={(event) => setLimitText(event.target.value)}
                       {...fieldMessageAria(spendLimit.problem ?? undefined, "spend-limit", "spend-limit-help")}
                     />
-                    <FieldError id="spend-limit" message={spendLimit.problem ?? undefined} />
+                    <FieldError
+                      id="spend-limit"
+                      message={spendLimit.problem ?? undefined}
+                      className="text-sm leading-relaxed"
+                    />
+                    <p id="spend-limit-help" className={HELP_CLASS}>
+                      The audit stops at this much of your Claude, from $1 to ${RUNNER_SPEND_LIMIT_MAX_USD}.
+                    </p>
+                  </div>
+                  <div className="grid gap-1.5 sm:col-span-2">
+                    <Label htmlFor="scope-paths" className="text-xs text-muted-foreground">
+                      Which folders should we audit? <span className="font-normal">(optional)</span>
+                    </Label>
+                    <Textarea
+                      id="scope-paths"
+                      rows={2}
+                      className="min-h-14"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={scopeText}
+                      placeholder={"One folder for each line, like\napps/api\npackages/db"}
+                      onChange={(event) => setScopeText(event.target.value)}
+                      {...fieldMessageAria(scope.problem ?? undefined, "scope-paths", "scope-paths-help")}
+                    />
+                    <FieldError
+                      id="scope-paths"
+                      message={scope.problem ?? undefined}
+                      className="text-sm leading-relaxed"
+                    />
+                    <p id="scope-paths-help" className={HELP_CLASS}>
+                      One folder per line, from the root, up to {SCAN_SCOPE_PATHS_LIMIT}. Folders make a partial Scan.
+                    </p>
                   </div>
                 </div>
-                <p id="spend-limit-help" className="pt-3 text-sm leading-relaxed text-muted-foreground">
-                  The audit stops when it has spent this much of your Claude. It starts at the cap of the Coverage you
-                  picked, and you can set any amount from $1 up to ${RUNNER_SPEND_LIMIT_MAX_USD}.
-                </p>
-                <div className="grid gap-1.5 pt-3">
-                  <Label htmlFor="scope-paths" className="text-xs text-muted-foreground">
-                    Folders to scan (optional)
-                  </Label>
-                  <Textarea
-                    id="scope-paths"
-                    rows={3}
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={scopeText}
-                    placeholder={"One folder for each line, like\napps/api\npackages/db"}
-                    onChange={(event) => setScopeText(event.target.value)}
-                    {...fieldMessageAria(scope.problem ?? undefined, "scope-paths", "scope-paths-help")}
-                  />
-                  <FieldError id="scope-paths" message={scope.problem ?? undefined} />
-                </div>
-                <p id="scope-paths-help" className="pt-3 text-sm leading-relaxed text-muted-foreground">
-                  Leave it empty to scan the whole repository. With folders, the audit reads only those, up to{" "}
-                  {SCAN_SCOPE_PATHS_LIMIT}, written from the repository's root with no wildcards. It is faster, but it
-                  is a partial Scan: the report names the folders, and the Verdict never counts it as a full pass.
-                </p>
-                <p className="pt-3 text-sm leading-relaxed text-muted-foreground">
-                  More effort can find more issues, but takes longer. The Elise Runner must be running on that computer,
-                  with Claude Code signed in.
-                </p>
               </CollapsiblePanel>
+              {!customizeOpen && customizeProblems.length > 0 && (
+                <div role="alert" className="max-w-copy pt-3 text-sm leading-relaxed text-status-danger">
+                  {customizeProblems.map((problem) => (
+                    <p key={problem}>{problem}</p>
+                  ))}
+                  <p>Open Customize to fix it.</p>
+                </div>
+              )}
             </Collapsible>
           </div>
         )}
@@ -526,13 +549,13 @@ export function ScanNewForm({
         <p className="sr-only" aria-live="polite">
           {summary ?? (selected === null ? "Choose a repository and we'll summarise what is about to run." : "")}
         </p>
-        <p className="text-xs text-muted-foreground">{RUNNER_GIT_LOGIN_HINT}</p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          {runner !== undefined
+            ? `This audit runs on ${runner.name}'s own Claude, so the Elise Runner must be running there with Claude Code signed in. Elise charges nothing per audit.${scopeSentence === null ? "" : ` ${scopeSentence}`}`
+            : "Connect a Runner to start an audit."}
+        </p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{RUNNER_GIT_LOGIN_HINT}</p>
         <div className="flex items-center justify-end gap-3">
-          <p className="mr-auto text-sm leading-relaxed text-muted-foreground">
-            {runner !== undefined
-              ? `This audit runs on ${runner.name}'s own Claude. Elise charges nothing per audit. It stops when it reaches its spend limit.`
-              : "Connect a Runner to start an audit."}
-          </p>
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
           <Button
             type="submit"

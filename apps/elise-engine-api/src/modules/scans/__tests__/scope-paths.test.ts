@@ -22,28 +22,55 @@ describe("checkScopePaths", () => {
   it.each([
     ["an empty entry", [""], "empty"],
     ["only blanks", ["   "], "empty"],
-    ["the root", ["."], "root"],
-    ["the root with a slash", ["./"], "root"],
-    ["the root written twice", ["././"], "root"],
-    ["a lone slash", ["/"], "absolute"],
-    ["an absolute path", ["/etc"], "absolute"],
-    ["a drive letter", ["C:/one"], "absolute"],
+    ["the root", ["."], "whole repository"],
+    ["the root with a slash", ["./"], "whole repository"],
+    ["the root written twice", ["././"], "whole repository"],
+    ["a lone slash", ["/"], "computer's root"],
+    ["an absolute path", ["/etc"], "computer's root"],
+    ["a drive letter", ["C:/one"], "computer's root"],
     ["a backslash", ["one\\two"], "backslash"],
-    ["a .. part", ["one/../two"], ".."],
-    ["a leading ..", ["../one"], ".."],
-    ["a leading dash", ["-rf"], "starts with -"],
-    ["a glob", ["one/*"], "globs"],
-    ["a space", ["one two"], "spaces"],
-    ["a line break", ["one\ntwo"], "globs"],
-    ["a double slash", ["one//two"], "empty part"],
-    ["a . part", ["one/./two"], ". part"],
+    ["a .. part", ["one/../two"], "outside the repository"],
+    ["a leading ..", ["../one"], "outside the repository"],
+    ["a leading dash", ["-rf"], "start with a dash"],
+    ["a glob", ["one/*"], "without spaces or special characters"],
+    ["a space", ["one two"], "without spaces or special characters"],
+    ["a line break", ["one\ntwo"], "without spaces or special characters"],
+    ["a double slash", ["one//two"], "double slash"],
+    ["a . part", ["one/./two"], "lone ."],
     ["a repeat after cleaning", ["one", "./one/"], "twice"],
-    ["a path that is too long", ["a".repeat(201)], "too long"],
+    ["a path that is too long", ["a".repeat(201)], "longer than 200"],
     ["too many folders", Array.from({ length: SCAN_SCOPE_PATHS_MAX + 1 }, (_, index) => `dir${index}`), "at most"],
   ])("refuses %s", (_name, given, reason) => {
     const checked = checkScopePaths(given);
 
     expect(checked).toMatchObject({ ok: false, message: expect.stringContaining(reason) });
+  });
+
+  it.each([
+    [
+      ["one two"],
+      `"one two" can't be used: it has a character that is not allowed. Use folder names without spaces or special characters, written from the repository's root.`,
+    ],
+    [
+      ["../secrets"],
+      `"../secrets" can't be used: it points outside the repository. Write it from the repository's root, without ..`,
+    ],
+    [
+      ["one\ntwo"],
+      `"one two" can't be used: it has a character that is not allowed. Use folder names without spaces or special characters, written from the repository's root.`,
+    ],
+    [["a", "a"], `"a" can't be used: it is in the list twice. Remove one of them.`],
+  ])("says %j in one line, entry first, then the fix", (given, message) => {
+    expect(checkScopePaths(given)).toEqual({ ok: false, message });
+  });
+
+  it("shortens a very long entry in its message", () => {
+    const checked = checkScopePaths(["a".repeat(201)]);
+
+    expect(checked).toEqual({
+      ok: false,
+      message: `"${"a".repeat(40)}…" can't be used: it is longer than 200 characters. Use a shorter path.`,
+    });
   });
 });
 
