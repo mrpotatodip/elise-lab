@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canRemoveRepos, repoRemoveCopy } from "#/modules/repo/utils/repo-remove-copy";
 
-const GIT_TEXT = "It leaves your list and your overview counts. Its Scans stay and adding it again brings them back.";
+const GIT_TEXT = "It leaves your list, the overview's Repo count and open findings. Its Scans stay and adding it again brings them back.";
 
 describe("repoRemoveCopy", () => {
   it("asks about a git repo without mentioning zips", () => {

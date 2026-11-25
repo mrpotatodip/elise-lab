@@ -5,6 +5,7 @@ import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCredit
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
+import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
@@ -211,8 +212,9 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   // -----
   // Insert or find the repo's record. The unique index
   // on (account, provider, host, canonical) settles a
-  // race between two first scans of the same repo. A
-  // removed repo that is scanned again is listed again.
+  // race between two first scans of the same repo. The row
+  // is locked until the transaction ends, so a remove of the
+  // repo waits for the scan being made.
   // -----
   ensureRepo: (accountId, url, provider) =>
     Effect.tryPromise({
@@ -223,11 +225,23 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
           .values({ tenantId: accountId, ...identity, url: displayRepoUrlOf(url, provider) })
           .onConflictDoNothing();
         const [row] = await db
-          .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url, removedAt: scanRepos.removedAt })
+          .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url })
           .from(scanRepos)
-          .where(sameRepoIdentity(accountId, identity));
-        if (row.removedAt && !(await restoreRemovedRepo(db, accountId, eq(scanRepos.id, row.id)))) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
-        return { id: row.id, canonical: row.canonical, url: row.url };
+          .where(sameRepoIdentity(accountId, identity))
+          .for("update");
+        return row;
+      },
+      catch: toDbError,
+    }),
+
+  restoreRepo: (accountId, repoId, userId) =>
+    Effect.tryPromise({
+      try: async () => {
+        const [row] = await db.select({ removedAt: scanRepos.removedAt }).from(scanRepos).where(and(eq(scanRepos.tenantId, accountId), eq(scanRepos.id, repoId)));
+        if (!row?.removedAt) return;
+        if (!(await restoreRemovedRepo(db, accountId, eq(scanRepos.id, repoId)))) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
+        if (userId === undefined) return;
+        await insertAuditEntry(db, { actorPartyId: await actorPartyOf(db, userId), action: "repo.restored", subjectId: repoId, tenantId: accountId });
       },
       catch: (cause) => (cause instanceof Conflict ? cause : toDbError(cause)),
     }),

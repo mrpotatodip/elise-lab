@@ -14,7 +14,7 @@ export const reposQuery = () => queryOptions({ queryKey: repoKeys.list(), queryF
 
 export const removedReposQuery = () => queryOptions({ queryKey: repoKeys.removed(), queryFn: () => fetchRemovedRepos() });
 
-export const repoQuery =(repoId: string) =>
+export const repoQuery = (repoId: string) =>
   queryOptions({
     queryKey: repoKeys.detail(repoId),
     queryFn: () => fetchRepo({ data: { repoId } }),

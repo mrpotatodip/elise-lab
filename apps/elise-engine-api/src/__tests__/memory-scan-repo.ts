@@ -44,6 +44,7 @@ export function memoryScanRepo() {
         repos.set(key, found);
         return found;
       }),
+    restoreRepo: () => Effect.void,
     create: (params, repoId, nowMs) =>
       Effect.suspend(() => {
         const live = [...rows.values()].find((row) => row.repoId === repoId && isLive(row, nowMs));
@@ -138,6 +139,7 @@ export function memoryScanRepo() {
 // -----
 export const brokenScanRepo: ScanRepo = {
   ensureRepo: () => Effect.fail(new DbError({ cause: new Error("db down") })),
+  restoreRepo: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   create: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   mark: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   addFiles: () => Effect.fail(new DbError({ cause: new Error("db down") })),

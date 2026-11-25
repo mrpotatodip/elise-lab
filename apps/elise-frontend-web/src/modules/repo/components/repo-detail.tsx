@@ -670,7 +670,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         </CardContent>
       </Card>
 
-      <RepoRemoveButton repoId={repoId} name={repoName(repo.url)} isArchive={isApp} />
+      <RepoRemoveButton repoId={repoId} name={repoName(repo.url)} isArchive={isApp} removedAt={repo.removedAt} />
     </>
   );
 }

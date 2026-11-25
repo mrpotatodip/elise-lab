@@ -374,7 +374,7 @@ export const RepoSchema = z.object({
 
 export const RepoListSchema = z.object({ repos: z.array(RepoSchema) });
 
-export const RepoListQuerySchema = z.object({ removed: z.enum(["true"]).optional() });
+export const RepoListQuerySchema = z.object({ removed: z.enum(["true", "false"]).optional() });
 
 // -----
 // A branch with its own history. latestCommit is the commit of

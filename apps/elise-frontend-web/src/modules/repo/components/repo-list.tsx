@@ -95,28 +95,28 @@ export function RepoList() {
   if (data.repos.length === 0) {
     return (
       <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Repositories</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Every repository you scan, with what is still open in it.</p>
-        </CardHeader>
-        <CardContent className="overflow-hidden p-0">
-          <Empty className="py-14">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <FolderGit2 />
-              </EmptyMedia>
-              <EmptyTitle>No repositories yet</EmptyTitle>
-              <EmptyDescription>A repository appears here after its first scan, with every finding it has had and what happened to each.</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <RepoAddDialog label="Add a repository" size="default" variant="default" />
-              <ScanNewDialog label="Start your first audit" size="default" variant="outline" />
-            </EmptyContent>
-          </Empty>
-        </CardContent>
-      </Card>
-      <RepoRemovedSection />
+        <Card>
+          <CardHeader>
+            <CardTitle>Repositories</CardTitle>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Every repository you scan, with what is still open in it.</p>
+          </CardHeader>
+          <CardContent className="overflow-hidden p-0">
+            <Empty className="py-14">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FolderGit2 />
+                </EmptyMedia>
+                <EmptyTitle>No repositories yet</EmptyTitle>
+                <EmptyDescription>A repository appears here after its first scan, with every finding it has had and what happened to each.</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <RepoAddDialog label="Add a repository" size="default" variant="default" />
+                <ScanNewDialog label="Start your first audit" size="default" variant="outline" />
+              </EmptyContent>
+            </Empty>
+          </CardContent>
+        </Card>
+        <RepoRemovedSection />
       </>
     );
   }

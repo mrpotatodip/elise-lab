@@ -290,7 +290,7 @@ export const restoreRepoEffect = (db: AppDbType, tenantId: string, repoId: strin
     yield* Effect.tryPromise({
       try: async () => {
         const actorPartyId = await actorPartyOf(db, userId);
-        await insertAuditEntry(db,{ actorPartyId, action: "repo.restored", subjectId: repoId, tenantId });
+        await insertAuditEntry(db, {actorPartyId, action: "repo.restored", subjectId: repoId, tenantId });
       },
       catch: toDbError,
     });

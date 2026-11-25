@@ -117,7 +117,7 @@ One source of code an Account scans, kept once per Account (`scan_repos`) howeve
 _Avoid_: Project, target
 
 **Removed Repo**:
-A Repo a person took off the list. Its History stays, but it counts nowhere (not in the findings across Repos, the overview, the Verdict or the Signals) and does not take one of the 200 places. Only an admin removes one, and not while a Scan of it is queued or running. Adding it again, or a Scan of it, brings it back with its History, if the Account has a free place.
+A Repo a person took off the list. Its History stays, but it is not in the Repo list, the findings across Repos, the overview's Repo count and findings tiles, the Verdict or the Signals, and it does not take one of the 200 places. Its Scans still show on the Scans page and in the overview's Scan counts. Only an admin removes one, and not while a Scan of it is queued or running. Adding it again, or a Scan of it, brings it back with its History, if the Account has a free place.
 _Avoid_: Deleted Repo, soft delete, archived Repo
 
 **Provider**:

@@ -1,26 +1,16 @@
 import { useState } from "react";
 import { useRouteContext } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { Card } from "#/components/ui/card";
 import { ScanTime } from "#/modules/scan";
-import { restoreRepo } from "../api";
-import { removedReposQuery, repoKeys } from "../hooks";
+import { removedReposQuery, useRestoreRepo } from "../hooks";
 import type { Repo } from "../schemas";
 import { canRemoveRepos, repoName } from "../utils";
 
 function RemovedRow({ repo }: { repo: Repo }) {
-  const queryClient = useQueryClient();
-  const restore = useMutation({
-    mutationFn: () => restoreRepo({ data: { repoId: repo.id } }),
-    onSuccess: async () => {
-      toast.success(`${repoName(repo.url)} is back in your list.`);
-      await queryClient.invalidateQueries({ queryKey: repoKeys.all });
-    },
-    onError: (error) => toast.error(error.message),
-  });
+  const restore = useRestoreRepo(repo.id, repoName(repo.url));
 
   return (
     <li className="flex items-center justify-between gap-3 px-6 py-3">

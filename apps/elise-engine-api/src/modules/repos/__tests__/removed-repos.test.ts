@@ -14,6 +14,7 @@ const REMOVER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:repos:d
 const RUNNER = "5b3f0d7e-61a4-4c2f-9d58-2f7a1c9e4b10";
 const app = tenantRouteApp(() => test, {
   sessionUserId: async () => "ada",
+  userHasAccount: async () => true,
   userHasPower: async (_c, _userId, _accountId, power) => held.has(power),
 });
 const accountOf = new Map<string, string>();
@@ -260,6 +261,53 @@ describe("when the Account already has the most Repos", () => {
     const res = await call("full-free", `/repos/${gone}/restore`, { method: "POST" });
 
     expect({ status: res.status, removed: (await restoredAtOf(gone)) !== null }).toEqual({ status: 200, removed: false });
+  });
+});
+
+const seedActive = async (account: string, repoId: string, scanId: string, updatedAt: string) => {
+  await test.raw.insert(scans).values(scanValues(accountOf.get(account) ?? "", repoId, scanId, updatedAt, { repo: addressOf(scanId), status: "running", skill: "full", updatedAt: new Date(updatedAt) }));
+};
+
+describe("DELETE /repos/:repoId with a Scan of the Repo", () => {
+  it("answers 409 while a Scan is live, and leaves the Repo listed", async () => {
+    const repoId = await newRepo("acme", "remove-live");
+    await seedActive("acme", repoId, "remove-live", new Date().toISOString());
+
+    const res = await call("acme", `/repos/${repoId}`, { method: "DELETE" });
+
+    expect({ status: res.status, listed: (await listedIds("acme")).includes(repoId) }).toEqual({ status: 409, listed: true });
+  });
+
+  it("is not blocked by a stalled Scan", async () => {
+    const repoId = await newRepo("acme", "remove-stalled");
+    await seedActive("acme", repoId, "remove-stalled", "2026-11-01T00:00:00Z");
+
+    const res = await call("acme", `/repos/${repoId}`, { method: "DELETE" });
+
+    expect({ status: res.status, listed: (await listedIds("acme")).includes(repoId) }).toEqual({ status: 200, listed: false });
+  });
+
+  it("answers 404 for a Repo that is already removed", async () => {
+    const gone = await removedRepo("acme", "remove-twice", false);
+
+    const res = await call("acme", `/repos/${gone}`, { method: "DELETE" });
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("a Scan of a Removed Repo started by a login", () => {
+  it("writes repo.restored to the Audit trail with that login", async () => {
+    const gone = await removedRepo("acme", "scan-audit", false);
+    held = new Set<AccessPower>(["company:dashboard:read"]);
+    const { env } = fakeBindings();
+    const headers = { "x-account-id": accountOf.get("acme") ?? "", "content-type": "application/json" };
+    const body = JSON.stringify({ repo: addressOf("scan-audit"), runner_id: RUNNER });
+
+    const res = await app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body }), env, testExecutionContext);
+    const rows = await test.raw.select().from(accessAuditLog).where(and(eq(accessAuditLog.subjectId, gone), eq(accessAuditLog.action, "repo.restored")));
+
+    expect({ status: res.status, actors: rows.map((row) => row.actorPartyId) }).toEqual({ status: 201, actors: [partyOf.get("acme")] });
   });
 });
 

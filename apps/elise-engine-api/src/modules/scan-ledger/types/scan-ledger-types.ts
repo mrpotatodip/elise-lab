@@ -33,7 +33,8 @@ export type ScanPage ={ scans: ScanStatus[]; nextCursor: string | null };
 // bytes of each file, and scan_files says where.
 // -----
 export type ScanRepo = {
-  ensureRepo: (accountId: string, url: string, provider?: SourceProviderId) => Effect.Effect<RepoRecord, Conflict | DbError>;
+  ensureRepo: (accountId: string, url: string, provider?: SourceProviderId) => Effect.Effect<RepoRecord, DbError>;
+  restoreRepo: (accountId: string, repoId: string, userId?: string) => Effect.Effect<void, Conflict | DbError>;
   create: (params: ScanParams, repoId: string, nowMs: number) => Effect.Effect<void, DbError | Conflict>;
   mark: (accountId: string, scanId: string, patch: ScanPatch) => Effect.Effect<void, DbError>;
   addFiles: (accountId: string, scanId: string, files: NewScanFile[]) => Effect.Effect<void, DbError>;

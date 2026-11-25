@@ -15,7 +15,7 @@ export const restoreRepo = createServerFn({ method: "POST" })
   .validator(RepoParamSchema)
   .handler(async ({ data }) => engineJson(RepoDetailSchema, `/repos/${data.repoId}/restore`, { method: "POST" }, await engineAuth()));
 
-export const fetchRepo =createServerFn({ method: "GET" })
+export const fetchRepo = createServerFn({ method: "GET" })
   .validator(RepoParamSchema)
   .handler(async ({ data }) => engineJson(RepoDetailSchema, `/repos/${data.repoId}`, {}, await engineAuth()));
 

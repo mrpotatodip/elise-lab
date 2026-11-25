@@ -25,13 +25,14 @@ export const ARCHIVE_NOT_LINKED = "archive_id: this Scan cannot read a zip";
 // -----
 export const queueScanSvc = (
   env: CreateScanEnv,
-  repo: Pick<ScanRepo, "ensureRepo" | "create" | "mark" | "activeSince">,
+  repo: Pick<ScanRepo, "ensureRepo" | "restoreRepo" | "create" | "mark" | "activeSince">,
   accountId: string,
   input: CreateScanBody,
   spend: MonthSpend,
   hold?: HoldCredit,
   runnerSources?: RunnerSources,
   linkArchive?: LinkArchive,
+  actorUserId?: string,
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
     const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
@@ -190,6 +191,7 @@ export const queueScanSvc = (
       if (!linkArchive || fixedBranch === null || input.archive_id === undefined) return yield* new Invalid({ message: ARCHIVE_NOT_LINKED });
       yield* linkArchive({ scanId: params.scanId, repoId: record.id, archiveId: input.archive_id, branch: fixedBranch });
     }
+    yield* repo.restoreRepo(accountId, record.id, actorUserId);
     // -----
     // The check above read the balance; this takes it, under a lock.
     // A scan that lost the race to another is failed, not started.
@@ -262,6 +264,7 @@ export const submitScanSvc = (
   deps: SubmitScanDeps,
   accountId: string,
   input: CreateScanBody,
+  actorUserId?: string,
 ): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   tenant((db) =>
     deps.monthSpend(db, accountId).pipe(
@@ -275,6 +278,7 @@ export const submitScanSvc = (
           (scanId, holdUsd) => deps.holdCredit(db, accountId, scanId, holdUsd),
           (runnerId) => deps.connectedRunnerSources(db, accountId, runnerId),
           (link) => deps.linkArchive(db, accountId, link),
+          actorUserId,
         ),
       ),
     ),
