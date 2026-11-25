@@ -141,6 +141,8 @@ pub struct Job {
     resume: bool,
     #[serde(default)]
     resumes_scan_id: Option<String>,
+    #[serde(default)]
+    earlier_scan_ids: Vec<String>,
     priors_json: String,
 }
 
@@ -359,6 +361,7 @@ async fn run_traced_job(token: &str, job: Job, tools: FindTools<'_>, settings: &
     on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
 
     let work = std::env::temp_dir().join(format!("eliselab-runner-{}", job.scan_id));
+    let _lock = FolderLock::hold(&work);
     let (job_stopper, job_stop) = Stopper::new();
     let unwanted = std::sync::Mutex::new(None);
     let ended = {
@@ -529,16 +532,27 @@ fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
 // validators and the files to send. The work folder holds `repo`, `out` and what the clone left.
 // -----
 async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
-    let resume = if job.resume { Some(resume_plan(job, work)?) } else { None };
+    prepare(tools, job, work)?;
+    audit_prepared(tools, job, work, None, minute, on_event, stop).await
+}
+
+fn prepare(tools: &Tools, job: &Job, work: &Path) -> Result<(), String> {
     strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
     check_scope(&work.join("repo"), &job.scope_paths)?;
     install_skill(tools, skill_dir_of(job)?, work)?;
-    write_agent_settings(work)?;
+    write_agent_settings(work)
+}
 
+async fn audit_prepared(
+    tools: &Tools,
+    job: &Job,
+    work: &Path,
+    resume: Option<Resume>,
+    minute: Duration,
+    on_event: OnEvent<'_>,
+    stop: &Stop,
+) -> Result<Report, String> {
     let phased = job.skill == "full" && !job.phase_prompts.is_empty();
-    if resume.is_some() && !phased {
-        return Err(refused("the job carries no Phase prompts to continue with."));
-    }
     if phased {
         return run_phases(tools, job, work, resume.as_ref(), minute, on_event, stop).await;
     }
@@ -606,13 +620,6 @@ async fn run_phases(
     match resume {
         Some(resume) => {
             spent.before = resume.before_usd;
-            set_earlier_logs_aside(work, job.resumes_scan_id.as_deref().unwrap_or_default())?;
-            if let Some(mut checkpoint) = read_checkpoint(work) {
-                checkpoint.scan_id = job.scan_id.clone();
-                if let Ok(text) = serde_json::to_string(&checkpoint) {
-                    let _ = fs::write(work.join(CHECKPOINT_FILE), text);
-                }
-            }
         }
         None => write_checkpoint(work, job, &[], 0.0),
     }
@@ -708,6 +715,7 @@ struct Checkpoint {
 }
 
 struct Resume {
+    earlier: String,
     done: Vec<String>,
     before_usd: f64,
 }
@@ -727,7 +735,7 @@ fn git_text(repo: &Path, args: &[&str]) -> Option<String> {
 }
 
 fn repo_status(work: &Path) -> Option<String> {
-    git_text(&work.join("repo"), &["status", "--porcelain", "--untracked-files=all"])
+    git_text(&work.join("repo"), &["status", "--porcelain", "--untracked-files=no"])
 }
 
 fn write_checkpoint(work: &Path, job: &Job, done: &[String], spent_usd: f64) {
@@ -761,15 +769,23 @@ fn safe_id(id: &str) -> bool {
     !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-fn resume_plan(job: &Job, work: &Path) -> Result<Resume, String> {
-    let earlier = job.resumes_scan_id.as_deref().filter(|id| safe_id(id));
-    let Some(earlier) = earlier else {
+fn resume_plan(job: &Job, work: &Path) -> Result<(Resume, PathBuf), String> {
+    let Some(first) = job.resumes_scan_id.as_deref().filter(|id| safe_id(id)) else {
         return Err(refused("the job does not name the earlier Scan."));
     };
     if job.source != Source::Git {
         return Err(refused("only a Scan of a git repository can be resumed."));
     }
-    check_folder(earlier, work)
+    if job.skill != "full" || job.phase_prompts.is_empty() {
+        return Err(refused("the job carries no Phase prompts to continue with."));
+    }
+    let chain = std::iter::once(first).chain(job.earlier_scan_ids.iter().map(String::as_str)).filter(|id| safe_id(id));
+    let folders = chain.map(|id| (id, work.with_file_name(format!("eliselab-runner-{id}"))));
+    let (earlier, kept) = folders
+        .into_iter()
+        .find(|(_, folder)| folder.is_dir())
+        .unwrap_or_else(|| (first, work.with_file_name(format!("eliselab-runner-{first}"))));
+    check_folder(earlier, &kept).map(|resume| (resume, kept))
 }
 
 pub fn check_kept(scan_id: &str) -> Result<Vec<String>, String> {
@@ -777,6 +793,38 @@ pub fn check_kept(scan_id: &str) -> Result<Vec<String>, String> {
         return Err(refused("that is not a Scan id."));
     }
     check_folder(scan_id, &std::env::temp_dir().join(format!("eliselab-runner-{scan_id}"))).map(|resume| resume.done)
+}
+
+fn lock_path(work: &Path) -> PathBuf {
+    let name = work.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default();
+    work.with_file_name(format!("{name}.lock"))
+}
+
+struct FolderLock {
+    _file: fs::File,
+    path: PathBuf,
+}
+
+impl FolderLock {
+    fn hold(work: &Path) -> Option<FolderLock> {
+        let path = lock_path(work);
+        let file = fs::OpenOptions::new().create(true).truncate(false).write(true).open(&path).ok()?;
+        file.try_lock().ok()?;
+        Some(FolderLock { _file: file, path })
+    }
+}
+
+impl Drop for FolderLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+fn in_use(work: &Path) -> bool {
+    let Ok(file) = fs::OpenOptions::new().write(true).open(lock_path(work)) else {
+        return false;
+    };
+    matches!(file.try_lock(), Err(fs::TryLockError::WouldBlock))
 }
 
 pub struct KeptFolder {
@@ -795,7 +843,7 @@ pub fn kept_folders() -> Vec<KeptFolder> {
             let name = entry.file_name().to_string_lossy().to_string();
             let scan_id = name.strip_prefix("eliselab-runner-").filter(|id| safe_id(id))?.to_string();
             let path = entry.path();
-            path.is_dir().then(|| KeptFolder { done: check_kept(&scan_id).ok(), scan_id, path })
+            (path.is_dir() && !in_use(&path)).then(|| KeptFolder { done: check_kept(&scan_id).ok(), scan_id, path })
         })
         .collect();
     folders.sort_by(|a, b| a.scan_id.cmp(&b.scan_id));
@@ -825,7 +873,7 @@ fn check_folder(earlier: &str, work: &Path) -> Result<Resume, String> {
         return Err(refused("the repository in the work folder has been edited since the earlier Scan's last Phase."));
     }
     let done = checkpoint.phases_done.into_iter().filter(|phase| phase != "report").collect();
-    Ok(Resume { done, before_usd: logged_spend(work) })
+    Ok(Resume { earlier: earlier.to_string(), done, before_usd: logged_spend(work) })
 }
 
 fn logged_spend(work: &Path) -> f64 {
@@ -858,13 +906,29 @@ fn set_earlier_logs_aside(work: &Path, earlier: &str) -> Result<(), String> {
 }
 
 async fn execute_resume(tools: &Tools, job: &Job, work: &Path, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
-    let earlier =
-        job.resumes_scan_id.as_deref().filter(|id| safe_id(id)).ok_or_else(|| refused("the job does not name the earlier Scan."))?;
-    let kept = work.with_file_name(format!("eliselab-runner-{earlier}"));
-    resume_plan(job, &kept)?;
+    let (resume, kept) = resume_plan(job, work)?;
+    prepare(tools, job, &kept)?;
+    take_over(job, &kept, work, &resume.earlier)?;
+    audit_prepared(tools, job, work, Some(resume), MINUTE, on_event, stop).await
+}
+
+fn take_over(job: &Job, kept: &Path, work: &Path, earlier: &str) -> Result<(), String> {
     let _ = fs::remove_dir_all(work);
-    fs::rename(&kept, work).map_err(|e| format!("Could not take over the earlier Scan's work folder: {e}"))?;
-    audit(tools, job, work, MINUTE, on_event, stop).await
+    fs::rename(kept, work).map_err(|e| format!("Could not take over the earlier Scan's work folder: {e}"))?;
+    let taken = rename_checkpoint(work, &job.scan_id).and_then(|()| set_earlier_logs_aside(work, earlier));
+    if let Err(error) = taken {
+        let _ = rename_checkpoint(work, earlier);
+        let _ = fs::rename(work, kept);
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn rename_checkpoint(work: &Path, scan_id: &str) -> Result<(), String> {
+    let mut checkpoint = read_checkpoint(work).ok_or_else(|| "Could not read the folder's checkpoint.".to_string())?;
+    checkpoint.scan_id = scan_id.to_string();
+    let text = serde_json::to_string(&checkpoint).map_err(|e| format!("Could not write the folder's checkpoint: {e}"))?;
+    fs::write(work.join(CHECKPOINT_FILE), text).map_err(|e| format!("Could not write the folder's checkpoint: {e}"))
 }
 
 const RESUME_NOTE: &str = "This run carries on from an earlier attempt at this audit that ended before it finished, and its files are in ./out. Keep every unit of ./out/coverage-ledger.json whose status is final exactly as it is. Put each unit whose status is in_progress back to planned. Work only the units that are not final, and continue at the wave the ledger and run-metadata.json record. Do not redo finished work.";
@@ -1979,6 +2043,7 @@ mod tests {
             phase_prompts: Vec::new(),
             resume: false,
             resumes_scan_id: None,
+            earlier_scan_ids: Vec::new(),
             priors_json: String::new(),
         }
     }
@@ -2278,7 +2343,18 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     #[cfg(unix)]
     fn scan_told(stage: &Stage, job: &Job, minute: Duration, on_event: OnEvent<'_>) -> Report {
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        match runtime.block_on(audit(&stage.tools, job, &stage.work, minute, on_event, &Stop::never())) {
+        if let (true, Some(earlier)) = (job.resume, job.resumes_scan_id.as_deref()) {
+            let kept = stage.root.join(format!("eliselab-runner-{earlier}"));
+            if stage.work.is_dir() && !kept.exists() {
+                fs::rename(&stage.work, &kept).unwrap();
+            }
+        }
+        let ran = if job.resume {
+            runtime.block_on(execute_resume(&stage.tools, job, &stage.work, on_event, &Stop::never()))
+        } else {
+            runtime.block_on(audit(&stage.tools, job, &stage.work, minute, on_event, &Stop::never()))
+        };
+        match ran {
             Ok(report) => report,
             Err(error) => failed_report(&stage.work, error),
         }
@@ -3300,6 +3376,38 @@ esac
             assert_eq!(calls_of(&stage), "", "{name}: no agent starts");
             let _ = fs::remove_dir_all(&stage.root);
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_resume_the_runner_refused_leaves_the_folder_so_the_next_resume_finds_it_through_the_chain() {
+        let stage = kept("resume-after-refusal", FAILS_IN_HUNT);
+        let repo_file = stage.work.join("repo/main.rs");
+        fs::write(&repo_file, "fn evil() {}\n").unwrap();
+        let refused = scan(&stage, &resuming(THEN_RUNS, "s1"));
+        assert_eq!(refused.state, "failed");
+        assert!(stage.root.join("eliselab-runner-s1").is_dir(), "a refusal leaves the folder under its own name");
+        fs::write(stage.root.join("eliselab-runner-s1/repo/main.rs"), "fn main() {}\n").unwrap();
+        let again = Job { scan_id: "s3".into(), earlier_scan_ids: vec!["s1".into()], ..resuming(THEN_RUNS, "s2") };
+
+        let report = scan(&stage, &again);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert!(calls_of(&stage).starts_with("9|phase=hunt cost=2"), "{}", calls_of(&stage));
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn untracked_output_the_agent_left_in_the_repository_does_not_refuse_a_resume() {
+        let stage = kept("resume-untracked", FAILS_IN_HUNT);
+        fs::create_dir_all(stage.work.join("repo/build")).unwrap();
+        fs::write(stage.work.join("repo/build/out.bin"), "agent output").unwrap();
+
+        let report = scan(&stage, &resuming(THEN_RUNS, "s1"));
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let _ = fs::remove_dir_all(&stage.root);
     }
 
     #[cfg(unix)]

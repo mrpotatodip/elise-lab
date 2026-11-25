@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   RESUME_ALREADY_RESUMED_REASON,
+  RESUME_ARCHIVE_REASON,
   RESUME_POOL_SPENT_REASON,
-  RESUME_ZIP_REMOVED_REASON,
-  scanResumeState,
-} from "#/modules/scan/utils/scan-resume";
+} from "#/modules/scan/constants";
+import { scanResumeState } from "#/modules/scan/utils/scan-resume";
 
 const runner = { id: "6f1c1c3e-0000-4000-8000-000000000000", name: "laptop" };
 
@@ -35,11 +35,11 @@ describe("scanResumeState", () => {
     });
   });
 
-  it("disables it when the zip was removed", () => {
-    const archive = { id: null, label: "app.zip", contentSha256: "a".repeat(64) };
+  it.each([null, "6f1c1c3e-0000-4000-8000-000000000001"])("disables it for a zip Scan (zip id %s)", (id) => {
+    const archive = { id, label: "app.zip", contentSha256: "a".repeat(64) };
     expect(scanResumeState({ status: "failed", runner, archive })).toEqual({
       kind: "disabled",
-      reason: RESUME_ZIP_REMOVED_REASON,
+      reason: RESUME_ARCHIVE_REASON,
     });
   });
 });

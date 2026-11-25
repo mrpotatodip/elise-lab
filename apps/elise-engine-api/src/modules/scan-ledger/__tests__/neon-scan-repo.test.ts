@@ -5,6 +5,7 @@ import { scanFindings, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners 
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanParams } from "#/schemas";
 import { neonScanRepo } from "#/modules/scan-ledger";
+import { RESUME_ALREADY_RESUMED_MESSAGE } from "#/modules/scans/constants";
 
 let test: TestDb;
 let acme: string;
@@ -255,6 +256,23 @@ describe("neonScanRepo", () => {
     await Effect.runPromise(repo.mark(acme, "dup-1", { status: "succeeded", error: null }));
     await Effect.runPromise(repo.create(paramsFor(acme, "dup-3"), record.id, Date.now()));
     expect(await Effect.runPromise(repo.get(acme, "dup-3"))).toMatchObject({ status: "queued", repoId: record.id });
+  });
+
+  it("answers 'already resumed' when a Scan is resumed twice, and lets it be resumed again once the first Resumed Scan gave its link back", async () => {
+    const repo = neonScanRepo(test.http);
+    const url = "https://github.com/octocat/twice";
+    const record = await queue(repo, { ...paramsFor(acme, "twice-a"), repo: url });
+    await Effect.runPromise(repo.mark(acme, "twice-a", { status: "failed", error: "crashed" }));
+    const resumed = (scanId: string) => ({ ...paramsFor(acme, scanId), repo: url, resumesScanId: "twice-a" });
+    await Effect.runPromise(repo.create(resumed("twice-b"), record.id, Date.now()));
+    await Effect.runPromise(repo.mark(acme, "twice-b", { status: "failed", error: "refused" }));
+
+    const refused = await Effect.runPromise(Effect.flip(repo.create(resumed("twice-c"), record.id, Date.now())));
+    expect(refused).toMatchObject({ _tag: "Conflict", message: RESUME_ALREADY_RESUMED_MESSAGE });
+
+    await Effect.runPromise(repo.mark(acme, "twice-b", { status: "failed", error: "refused", resumesScanId: null }));
+    await Effect.runPromise(repo.create(resumed("twice-d"), record.id, Date.now()));
+    expect(await Effect.runPromise(repo.get(acme, "twice-d"))).toMatchObject({ resumesScanId: "twice-a" });
   });
 
   it("closes a scan that stalled so the repo is not blocked for ever", async () => {

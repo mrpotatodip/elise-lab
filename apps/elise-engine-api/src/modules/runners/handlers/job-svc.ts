@@ -21,6 +21,7 @@ import {
 } from "#/modules/runners/constants";
 import {
   claimRunnerJobEffect,
+  earlierScanIdsEffect,
   readRunnerJobEffect,
   recordRunnerSourcesEffect,
   reportRunnerJobEffect,
@@ -117,6 +118,7 @@ const claimNextJob = (
     if (row.resumesScanId !== null) {
       job.resume = true;
       job.resumesScanId = row.resumesScanId;
+      job.earlierScanIds = yield* earlierScanIdsEffect(db, row.tenantId, row.resumesScanId);
     }
     return job;
   });

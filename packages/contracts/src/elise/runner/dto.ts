@@ -143,6 +143,14 @@ export const RunnerJobSchema = z.object({
   // -----
   resume: z.boolean().optional(),
   resumesScanId: z.string().optional(),
+  // -----
+  // The Scans in the chain, nearest first, starting with
+  // resumesScanId. The kept folder is named for the last attempt
+  // that took it over, so the Runner uses the first one it finds.
+  // Absent from an older engine: the Runner then tries only
+  // resumesScanId.
+  // -----
+  earlierScanIds: z.array(z.string()).optional(),
 });
 
 // -----

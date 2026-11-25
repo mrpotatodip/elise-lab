@@ -15,6 +15,7 @@ export type ScanPatch = {
   usage?: ScanUsage | null;
   commitSha?: string | null;
   branch?: string | null;
+  resumesScanId?: null;
 };
 
 export type RepoRecord = { id: string; canonical: string; url: string };

@@ -13,7 +13,8 @@ import {
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
-import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
+import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
+import { RESUME_ALREADY_RESUMED_MESSAGE } from "#/modules/scans/constants";
 import type { ScanParams, ScanStatus } from "#/schemas";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
 import {
@@ -281,23 +282,36 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
   ] as const;
 };
 
-const createErrorOf = (cause: unknown): DbError | Conflict =>
-  pgErrorCode(cause) === PG_UNIQUE_VIOLATION ? new Conflict({ message: ACTIVE_SCAN_CONFLICT }) : toDbError(cause);
+const RESUMES_UNIQUE_CONSTRAINT = "uq_scans_resumes_scan_id";
 
-const activeConflictOf = (db: AppDbType, repoId: string) => (): Effect.Effect<never, DbError | Conflict> =>
-  Effect.tryPromise({
-    try: () =>
-      db
-        .select({ id: scans.id })
-        .from(scans)
-        .where(and(eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"])))
-        .limit(1),
-    catch: toDbError,
-  }).pipe(
-    Effect.flatMap(([active]) =>
-      Effect.fail(new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT })),
-    ),
-  );
+const createErrorOf = (cause: unknown): DbError | Conflict => {
+  if (pgErrorCode(cause) !== PG_UNIQUE_VIOLATION) return toDbError(cause);
+  return new Conflict({
+    message:
+      pgErrorConstraint(cause) === RESUMES_UNIQUE_CONSTRAINT ? RESUME_ALREADY_RESUMED_MESSAGE : ACTIVE_SCAN_CONFLICT,
+  });
+};
+
+const activeConflictOf =
+  (db: AppDbType, repoId: string) =>
+  (error: Conflict): Effect.Effect<never, DbError | Conflict> =>
+    error.message === RESUME_ALREADY_RESUMED_MESSAGE
+      ? Effect.fail(error)
+      : Effect.tryPromise({
+          try: () =>
+            db
+              .select({ id: scans.id })
+              .from(scans)
+              .where(and(eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"])))
+              .limit(1),
+          catch: toDbError,
+        }).pipe(
+          Effect.flatMap(([active]) =>
+            Effect.fail(
+              new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT }),
+            ),
+          ),
+        );
 
 const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   ...scanReads(db),
@@ -336,6 +350,7 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
             ...(patch.error !== undefined && { error: patch.error }),
             ...(patch.commitSha !== undefined && { commitSha: patch.commitSha }),
             ...(patch.branch !== undefined && { branch: patch.branch }),
+            ...(patch.resumesScanId === null && { resumesScanId: null }),
             ...(ended && { finishedAt: new Date(), step: null }),
             ...(patch.usage && {
               inputTokens: patch.usage.inputTokens,

@@ -261,7 +261,13 @@ export const abandonScanSvc = (
 ): Effect.Effect<void> =>
   Effect.all(
     [
-      repo.mark(queued.params.accountId, queued.params.scanId, { status: "failed", error }).pipe(Effect.ignore),
+      repo
+        .mark(queued.params.accountId, queued.params.scanId, {
+          status: "failed",
+          error,
+          ...(queued.params.resumesScanId !== undefined && { resumesScanId: null }),
+        })
+        .pipe(Effect.ignore),
       queued.holdUsd > 0 && release ? release(queued.params.scanId).pipe(Effect.ignore) : Effect.void,
     ],
     { discard: true },

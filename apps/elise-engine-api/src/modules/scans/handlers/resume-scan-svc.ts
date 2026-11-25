@@ -3,14 +3,12 @@ import { Conflict, Invalid, NotFound, type DbError, type ExternalError, type Rat
 import type { TenantEffect } from "#/lib/tenant-effect";
 import { ScanOptionsSchema } from "#/schemas";
 import { resumeSourceEffect } from "#/modules/scan-ledger";
-import { RESUME_RUNNER_GONE_MESSAGE } from "#/modules/scans/constants";
+import { JOB_OPTIONS_UNREADABLE, RESUME_RUNNER_GONE_MESSAGE } from "#/modules/scans/constants";
 import { abandonScanSvc, queueScanSvc, startScanSvc } from "./create-scan-svc";
 import type { ScanQueued } from "#/modules/scans/schemas";
 import type { SubmitScanDeps } from "#/modules/scans/types";
 import { resumeRefusalOf } from "#/modules/scans/utils";
 import type { Bindings } from "#/types/variables";
-
-const JOB_OPTIONS_UNREADABLE = "This Scan's job options cannot be read, so it cannot be resumed. Start a new Scan.";
 
 export const submitResumeSvc = (
   env: Bindings,
@@ -48,12 +46,11 @@ export const submitResumeSvc = (
           runner_id: runnerId,
           ref: source.ref ?? undefined,
           scope_paths: options.scopePaths,
-          archive_id: source.archive?.archiveId ?? undefined,
         },
         spend,
         (newScanId, holdUsd) => deps.holdCredit(db, accountId, newScanId, holdUsd),
         (id) => deps.connectedRunnerSources(db, accountId, id),
-        (link) => deps.linkArchive(db, accountId, link),
+        undefined,
         scanId,
       );
     }),

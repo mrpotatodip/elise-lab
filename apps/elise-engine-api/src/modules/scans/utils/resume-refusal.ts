@@ -5,7 +5,7 @@ import {
   RESUME_CLOUD_MESSAGE,
   RESUME_POOL_SPENT_MESSAGE,
   RESUME_SUCCEEDED_MESSAGE,
-  RESUME_ZIP_REMOVED_MESSAGE,
+  RESUME_ARCHIVE_MESSAGE,
 } from "#/modules/scans/constants";
 
 export type ResumeRefusal = { kind: "conflict" | "invalid"; message: string };
@@ -19,7 +19,6 @@ export const resumeRefusalOf = (source: ResumeSource): ResumeRefusal | null => {
     return { kind: "conflict", message: RESUME_POOL_SPENT_MESSAGE };
   if (source.resumedByScanId !== null)
     return { kind: "conflict", message: `${RESUME_ALREADY_RESUMED_MESSAGE}: ${source.resumedByScanId}` };
-  if (source.archive !== null && source.archive.archiveId === null)
-    return { kind: "invalid", message: RESUME_ZIP_REMOVED_MESSAGE };
+  if (source.archive !== null) return { kind: "invalid", message: RESUME_ARCHIVE_MESSAGE };
   return null;
 };
