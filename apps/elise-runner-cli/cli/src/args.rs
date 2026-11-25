@@ -6,6 +6,7 @@ pub enum Command {
     Doctor { hosts: Vec<String> },
     Unpair,
     Run { once: bool, parallel: usize },
+    Resume { scan_id: String },
 }
 
 #[derive(Debug, PartialEq)]
@@ -25,6 +26,7 @@ Usage:
   elise-runner status
   elise-runner doctor [host...]
   elise-runner run [--once] [--parallel N]
+  elise-runner resume <scan-id>
   elise-runner unpair
   elise-runner --help | --version
 
@@ -50,6 +52,11 @@ Commands:
     --parallel N  Run up to N Scans at once, from 1 to 3 (default 1). Elise allows 3 live Runner
                   Scans for an Account, shared by all its Runners, so a Scan that would be the
                   fourth is refused.
+  resume <scan-id>
+                  Say whether the work folder a failed or stopped Scan kept on this computer can be
+                  resumed, and which Phases it holds. A resume itself starts in Elise (the Resume
+                  button on that Scan); `run` then claims it, and only this computer can, because
+                  the folder is here. `status` lists the kept folders.
   unpair          Tell Elise to drop this Runner's token, then forget it.
 
 Where the token is kept, in order:
@@ -120,6 +127,7 @@ pub fn parse(args: &[String]) -> Parsed {
         "pair" => &["--yes", "-y", "--print-token"],
         "login" => &["--no-browser"],
         "run" => &["--once"],
+        "resume" => &[],
         "status" | "unpair" | "doctor" => &[],
         "help" => return Parsed::Help,
         other => return Parsed::Usage(format!("unknown command `{other}`")),
@@ -138,6 +146,8 @@ pub fn parse(args: &[String]) -> Parsed {
         ("doctor", hosts) => Parsed::Command(Command::Doctor { hosts: hosts.iter().map(|host| host.to_ascii_lowercase()).collect() }),
         ("unpair", []) => Parsed::Command(Command::Unpair),
         ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel }),
+        ("resume", [scan_id]) => Parsed::Command(Command::Resume { scan_id: scan_id.to_string() }),
+        ("resume", []) => Parsed::Usage("`resume` needs the Scan id of a kept work folder (`status` lists them)".to_string()),
         _ => Parsed::Usage(format!("too many arguments for `{command}`")),
     }
 }
