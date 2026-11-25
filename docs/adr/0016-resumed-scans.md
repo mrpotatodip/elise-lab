@@ -21,3 +21,4 @@ How a Runner Scan that failed or was stopped carries on without paying for its f
 - A resume cannot move to another computer, and cannot start if the Runner was removed.
 - The kept folder stays until the resumed Scan succeeds, then goes with it. There is no timer.
 - A prompt cannot force the agent to skip finished units. The profile check stays the proof.
+- The cap is not a hard limit over many attempts. The Pool a resume starts with is the cap less the cost the earlier logs show. A Phase that is killed or crashes before it prints its result shows no cost, so it adds $0 to that total, even though the agent spent real money before it died. Repeated crash-and-resume cycles can therefore spend more than the cap across all the attempts. Counting the agent's streamed partial costs, which arrive before the final result, would close this gap. That is a possible later ticket, and nothing in the code changes for it now.

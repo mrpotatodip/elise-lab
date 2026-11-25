@@ -92,6 +92,7 @@ export function memoryScanRepo() {
           ...(patch.error !== undefined && { error: patch.error }),
           ...(patch.commitSha !== undefined && { commitSha: patch.commitSha }),
           ...(patch.branch !== undefined && { branch: patch.branch }),
+          ...(patch.resumesScanId === null && { resumesScanId: null }),
           ...(patch.usage && { usage: patch.usage }),
           ...(ended && { finishedAt: now, step: null }),
           updatedAt: now,

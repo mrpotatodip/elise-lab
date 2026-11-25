@@ -25,6 +25,30 @@ export const insertRunnerJobEffect = (db: DbConnectType, job: NewRunnerJob): Eff
     catch: toDbError,
   }).pipe(Effect.asVoid);
 
+const EARLIER_SCANS_MAX = 50;
+
+export const earlierScanIdsEffect = (
+  db: DbConnectType,
+  tenantId: string,
+  resumesScanId: string,
+): Effect.Effect<string[], DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const found: string[] = [];
+      let next: string | null = resumesScanId;
+      while (next !== null && !found.includes(next) && found.length < EARLIER_SCANS_MAX) {
+        found.push(next);
+        const [row] = await db
+          .select({ resumes: scans.resumesScanId })
+          .from(scans)
+          .where(and(eq(scans.tenantId, tenantId), eq(scans.id, next)));
+        next = row?.resumes ?? null;
+      }
+      return found;
+    },
+    catch: toDbError,
+  });
+
 export const scanStoppedEffect = (db: DbConnectType, scanId: string): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () => db.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)),

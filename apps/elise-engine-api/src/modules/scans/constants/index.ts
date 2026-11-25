@@ -32,14 +32,17 @@ export const SCANS_SCAN_ID_PATTERN = /^[\w-]{1,100}$/;
 // Why a Scan cannot be resumed (ADR 0016). The dashboard shows
 // these words as they are.
 // -----
-export const RESUME_CLOUD_MESSAGE = "Only a Scan that ran on a Runner can be resumed. Start a new Scan.";
+export const RESUME_CLOUD_MESSAGE =
+  "Only a Scan that ran on a Runner can be resumed, and this Scan has no Runner job (it ran in the cloud, or it ended before a Runner took it). Start a new Scan.";
+export const JOB_OPTIONS_UNREADABLE =
+  "This Scan's job options cannot be read, so it cannot be resumed. Start a new Scan.";
 export const RESUME_ACTIVE_MESSAGE = "This Scan is still active. Stop it or wait for it to end before resuming it.";
 export const RESUME_SUCCEEDED_MESSAGE = "This Scan succeeded, so there is nothing to resume.";
 export const RESUME_POOL_SPENT_MESSAGE =
   "This Scan spent its whole Budget cap, so there is no money left to resume with. Start a new Scan with a bigger profile.";
 export const RESUME_ALREADY_RESUMED_MESSAGE = "This Scan was already resumed as another Scan";
-export const RESUME_ZIP_REMOVED_MESSAGE =
-  "The zip this Scan read was removed, so it cannot be resumed. Upload it again.";
+export const RESUME_ARCHIVE_MESSAGE =
+  "A Scan of an uploaded zip cannot be resumed, because the Runner resumes only a Scan of a git repository. Upload the zip again as a new Scan.";
 export const RESUME_RUNNER_GONE_MESSAGE =
   "A Scan can only resume on the Runner that ran it, and that Runner was removed. Start a new Scan.";
 

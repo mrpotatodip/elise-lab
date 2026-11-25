@@ -15,6 +15,12 @@ import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { realAppDeps } from "#/lib/app-deps";
 import type { ScanOptions } from "#/schemas";
+import {
+  RESUME_ACTIVE_MESSAGE,
+  RESUME_CLOUD_MESSAGE,
+  RESUME_POOL_SPENT_MESSAGE,
+  RESUME_SUCCEEDED_MESSAGE,
+} from "#/modules/scans/constants";
 import { claimJobSvc } from "#/modules/runners/handlers";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { claimPairingEffect, createRunnerEffect } from "#/modules/runners/queries";
@@ -213,17 +219,28 @@ describe("resuming a Scan", () => {
   });
 
   it.each([
-    { name: "a succeeded Scan", seed: { status: "succeeded" as const }, code: 409 },
-    { name: "a Scan that is still running", seed: { status: "running" as const, error: null }, code: 409 },
-    { name: "a Scan whose Pool was spent", seed: { error: "the scan's budget is spent" }, code: 409 },
-    { name: "a cloud Scan", seed: { withJob: false }, code: 400 },
-  ])("refuses $name and creates no Scan", async ({ seed, code }) => {
+    { name: "a succeeded Scan", seed: { status: "succeeded" as const }, code: 409, message: RESUME_SUCCEEDED_MESSAGE },
+    {
+      name: "a Scan that is still running",
+      seed: { status: "running" as const, error: null },
+      code: 409,
+      message: RESUME_ACTIVE_MESSAGE,
+    },
+    {
+      name: "a Scan whose Pool was spent",
+      seed: { error: "the scan's budget is spent" },
+      code: 409,
+      message: RESUME_POOL_SPENT_MESSAGE,
+    },
+    { name: "a cloud Scan", seed: { withJob: false }, code: 400, message: RESUME_CLOUD_MESSAGE },
+  ])("refuses $name and creates no Scan", async ({ seed, code, message }) => {
     const old = await seedScan(seed);
     const before = await test.raw.select({ id: scans.id }).from(scans).where(eq(scans.tenantId, tenantId));
     const response = await resume(old).res;
 
     expect(response.status).toBe(code);
-    expect(QueuedBodySchema.parse(await response.json()).error?.message).toBeTruthy();
+    const said = QueuedBodySchema.parse(await response.json()).error?.message;
+    expect(said).toBe(message);
     expect(await test.raw.select({ id: scans.id }).from(scans).where(eq(scans.tenantId, tenantId))).toHaveLength(
       before.length,
     );
