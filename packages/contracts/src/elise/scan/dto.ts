@@ -369,9 +369,12 @@ export const RepoSchema = z.object({
   lastScanStatus: ScanStateSchema.nullable(),
   lastScanAt: z.string().nullable(),
   open: RepoOpenSchema,
+  removedAt: z.string().nullable().optional(),
 });
 
 export const RepoListSchema = z.object({ repos: z.array(RepoSchema) });
+
+export const RepoListQuerySchema = z.object({ removed: z.enum(["true"]).optional() });
 
 // -----
 // A branch with its own history. latestCommit is the commit of
@@ -460,6 +463,7 @@ export type ScanListQuery = z.infer<typeof ScanListQuerySchema>;
 export type RepoOpen = z.infer<typeof RepoOpenSchema>;
 export type Repo = z.infer<typeof RepoSchema>;
 export type RepoList = z.infer<typeof RepoListSchema>;
+export type RepoListQuery = z.infer<typeof RepoListQuerySchema>;
 export type RepoBranch = z.infer<typeof RepoBranchSchema>;
 export type RepoBranchList = z.infer<typeof RepoBranchListSchema>;
 export type RepoDetail = z.infer<typeof RepoDetailSchema>;

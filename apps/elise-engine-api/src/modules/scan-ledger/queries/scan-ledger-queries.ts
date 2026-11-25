@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, ne, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { ScanUsage } from "@repo/contracts/elise";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
@@ -8,7 +8,7 @@ import { scanArchivesEffect } from "#/modules/archives/queries";
 import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
 import type { ScanParams, ScanStatus } from "#/schemas";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
-import { displayRepoUrlOf, liveScansSql, repoIdentityOf, sameRepoIdentity, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
+import { displayRepoUrlOf, liveScansSql, REPO_LIMIT_MESSAGE, repoIdentityOf, restoreRemovedRepo, sameRepoIdentity, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
 
@@ -222,14 +222,14 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
           .insert(scanRepos)
           .values({ tenantId: accountId, ...identity, url: displayRepoUrlOf(url, provider) })
           .onConflictDoNothing();
-        await db.update(scanRepos).set({ removedAt: null }).where(and(sameRepoIdentity(accountId, identity), isNotNull(scanRepos.removedAt)));
         const [row] = await db
-          .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url })
+          .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url, removedAt: scanRepos.removedAt })
           .from(scanRepos)
           .where(sameRepoIdentity(accountId, identity));
-        return row;
+        if (row.removedAt && !(await restoreRemovedRepo(db, accountId, eq(scanRepos.id, row.id)))) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
+        return { id: row.id, canonical: row.canonical, url: row.url };
       },
-      catch: toDbError,
+      catch: (cause) => (cause instanceof Conflict ? cause : toDbError(cause)),
     }),
 
   mark: (accountId, scanId, patch) => {

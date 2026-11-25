@@ -5,13 +5,16 @@ import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
 import { scanReads } from "#/modules/scan-ledger";
 import { REPOS_HISTORY_LIMIT } from "#/modules/repos/constants";
 import { addBranchesEffect, isCommitId, listBranchesEffect, normalizeBranchName } from "#/modules/branches";
-import { addRepoEffect, getRepoEffect, listRepoBranchesEffect, listReposEffect, repoFindingsEffect, scanDiffEffect } from "#/modules/repos/queries";
+import { addRepoEffect, getRepoEffect, listRepoBranchesEffect, listReposEffect, repoFindingsEffect, restoreRepoEffect, scanDiffEffect } from "#/modules/repos/queries";
 import type { AddBranchBody, AddRepoBody } from "#/modules/repos/schemas";
 import { severityRank } from "#/modules/repos/utils";
 import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
 
-export const listReposSvc = (db: AppDbType, accountId: string): Effect.Effect<RepoList, DbError> =>
-  listReposEffect(db, accountId).pipe(Effect.map((repos) => ({ repos })));
+export const listReposSvc = (db: AppDbType, accountId: string, removedOnly = false): Effect.Effect<RepoList, DbError> =>
+  listReposEffect(db, accountId, undefined, removedOnly).pipe(Effect.map((repos) => ({ repos })));
+
+export const restoreRepoSvc = (db: AppDbType, accountId: string, repoId: string, userId: string): Effect.Effect<RepoDetail, NotFound | Conflict | DbError> =>
+  restoreRepoEffect(db, accountId, repoId, userId).pipe(Effect.flatMap(() => getRepoSvc(db, accountId, repoId)));
 
 // -----
 // The repo with its branches and its newest scans, each with

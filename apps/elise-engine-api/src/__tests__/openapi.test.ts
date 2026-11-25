@@ -77,6 +77,7 @@ describe("GET /openapi.json", () => {
       "POST /repos",
       "POST /repos/{repoId}/archives",
       "POST /repos/{repoId}/branches",
+      "POST /repos/{repoId}/restore",
       "POST /runners",
       "POST /runners/claim",
       "POST /runners/enroll",

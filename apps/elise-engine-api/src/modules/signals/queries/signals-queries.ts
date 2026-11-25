@@ -40,7 +40,7 @@ export const listSignalsEffect = (db: AppDbType, tenantId: string, repo: string)
     try: async () => {
       const [account] = await db.select({ enabled: tenants.signalsEnabled }).from(tenants).where(eq(tenants.id, tenantId));
       if (account?.enabled === false) return [];
-      const repoIds = db.select({ id: scanRepos.id }).from(scanRepos).where(sameRepoIdentity(tenantId, repoIdentityOf(repo)));
+      const repoIds = db.select({ id: scanRepos.id }).from(scanRepos).where(and(sameRepoIdentity(tenantId, repoIdentityOf(repo)), isNull(scanRepos.removedAt)));
       const rows = await db
         .select()
         .from(scanSignals)
@@ -74,7 +74,7 @@ export const findReasonCheckInputEffect = (db: AppDbType, tenantId: string, body
         .from(scanFindings)
         .innerJoin(scans, eq(scans.id, scanFindings.scanId))
         .innerJoin(scanRepos, eq(scanRepos.id, scans.repoId))
-        .where(and(eq(scanFindings.tenantId, tenantId), sameRepoIdentity(tenantId, repoIdentityOf(body.repo)), eq(scanFindings.fingerprint, body.fingerprint)))
+        .where(and(eq(scanFindings.tenantId, tenantId), sameRepoIdentity(tenantId, repoIdentityOf(body.repo)), isNull(scanRepos.removedAt), eq(scanFindings.fingerprint, body.fingerprint)))
         .orderBy(desc(scanFindings.createdAt))
         .limit(1);
       return { enabled: true, finding: row ?? null };

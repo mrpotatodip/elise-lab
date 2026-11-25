@@ -121,6 +121,7 @@ export const CROSS_ACCOUNT_CASES = {
   "GET /repos/:repoId/archives": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives`, expect: "not-found" },
   "POST /repos/:repoId/archives": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives?label=app.zip`, method: "POST", body: {}, expect: "not-found" },
   "DELETE /repos/:repoId/archives/:archiveId": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives/${OTHER_REPO_ID}`, method: "DELETE", expect: "not-found" },
+  "POST /repos/:repoId/restore": { kind: "run", path: `/repos/${OTHER_REPO_ID}/restore`, method: "POST", expect: "not-found" },
   "DELETE /repos/:repoId": { kind: "run", path: `/repos/${OTHER_REPO_ID}`, method: "DELETE", expect: "not-found" },
   "GET /scans": { kind: "run", path: "/scans", expect: "empty" },
   "GET /scans/:scanId": { kind: "run", path: "/scans/theirs", expect: "not-found" },

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { Verdict } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
-import type { DbError, NotFound } from "#/lib/effect-query";
+import { NotFound, type DbError } from "#/lib/effect-query";
 import { getRepoEffect } from "#/modules/repos/queries";
 import { commitEvidenceEffect } from "#/modules/verdict/queries";
 import { judgeCommit } from "#/modules/verdict/utils";
@@ -14,7 +14,8 @@ import { judgeCommit } from "#/modules/verdict/utils";
 // -----
 export const verdictSvc = (db: AppDbType, accountId: string, repoId: string, commit: string, now: Date): Effect.Effect<Verdict, NotFound | DbError> =>
   Effect.gen(function* () {
-    yield* getRepoEffect(db, accountId, repoId);
+    const repo = yield* getRepoEffect(db, accountId, repoId);
+    if (repo.removedAt) return yield* new NotFound({ message: "Repo not found" });
     const evidence = yield* commitEvidenceEffect(db, accountId, repoId, commit);
     return judgeCommit({ commit, ...evidence, now });
   });

@@ -18,10 +18,10 @@ const severityRank = sql`case ${scanFindings.severity}
 // -----
 // Without a scanId, a repo's findings are those of
 // its newest successful scan of the default branch, so an old scan's
-// findings never mix with a newer one's.
+// findings never mix with a newer one's. A Removed Repo has none.
 // -----
 const latestScanIds = (tenantId: string) =>
-  sql`(select distinct on (repo_id) id from scans where tenant_id = ${tenantId} and status = 'succeeded' and ref is null order by repo_id, created_at desc)`;
+  sql`(select distinct on (repo_id) id from scans where tenant_id = ${tenantId} and status = 'succeeded' and ref is null and repo_id in (select id from scan_repos where tenant_id = ${tenantId} and removed_at is null) order by repo_id, created_at desc)`;
 
 export type DecidedBy = { firstName: string; lastName: string } | null;
 

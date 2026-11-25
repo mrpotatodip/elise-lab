@@ -19,6 +19,7 @@ export type AuditAction =
   | "finding.risk.accepted"
   | "finding.comment.deleted"
   | "repo.removed"
+  | "repo.restored"
   | "usage.budget.updated"
   | "anthropic.key.set"
   | "anthropic.key.removed"
