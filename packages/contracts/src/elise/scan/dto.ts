@@ -122,6 +122,9 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   branch: z.string().nullish(),
   branchId: z.uuid().nullish(),
   untrackedReason: z.string().nullish(),
+  // The chain of attempts (ADR 0016): the Scan this one resumes, and the Scan that resumed it.
+  resumesScanId: z.string().nullish(),
+  resumedByScanId: z.string().nullish(),
   profileMet: z.enum(PROFILE_MET_VALUES).nullish(),
   signalPairsSkipped: z.number().int().min(0).nullish(),
   status: ScanStateSchema,

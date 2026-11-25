@@ -188,6 +188,7 @@ export const CROSS_ACCOUNT_CASES = {
     expect: "created",
   },
   "POST /scans/:scanId/stop": { kind: "run", path: "/scans/theirs/stop", method: "POST", expect: "not-found" },
+  "POST /scans/:scanId/resume": { kind: "run", path: "/scans/theirs/resume", method: "POST", expect: "not-found" },
   "GET /files": { kind: "run", path: "/files", listedIn: "files", expect: "empty" },
   "GET /repos/:repoId/verdict": {
     kind: "run",

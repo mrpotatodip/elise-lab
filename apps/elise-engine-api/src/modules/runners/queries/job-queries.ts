@@ -16,8 +16,8 @@ export const insertRunnerJobEffect = (db: DbConnectType, job: NewRunnerJob): Eff
   Effect.tryPromise({
     try: () =>
       db.execute(sql`
-        insert into scan_runner_jobs (scan_id, tenant_id, runner_id, repo_url, ref, prompt, options_json, priors_json)
-        select ${job.scanId}, ${job.tenantId}::uuid, ${job.runnerId}::uuid, ${job.repoUrl}, ${job.ref}, ${job.prompt}, ${job.optionsJson}, ${job.priorsJson}
+        insert into scan_runner_jobs (scan_id, tenant_id, runner_id, repo_url, ref, prompt, options_json, priors_json, resumes_scan_id)
+        select ${job.scanId}, ${job.tenantId}::uuid, ${job.runnerId}::uuid, ${job.repoUrl}, ${job.ref}, ${job.prompt}, ${job.optionsJson}, ${job.priorsJson}, ${job.resumesScanId}
         from scans
         where id = ${job.scanId} and status <> 'stopped'
         on conflict do nothing

@@ -144,6 +144,8 @@ export const scans = pgTable(
     traceCandidateFindings: integer("trace_candidate_findings"),
     // How many candidate pairs the possible-duplicate Signal step left unasked because of its per-Scan cap. Null: the step did not run for this Scan.
     signalPairsSkipped: integer("signal_pairs_skipped"),
+    // The Scan this one resumes (ADR 0016). Set once, at creation; the earlier Scan's own row never changes. At most one Scan resumes a given Scan.
+    resumesScanId: text("resumes_scan_id"),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),
@@ -184,6 +186,15 @@ export const scans = pgTable(
       columns: [t.branchId, t.tenantId],
       foreignColumns: [scanRepoBranches.id, scanRepoBranches.tenantId],
     }).onDelete("set null"),
+    fkResumesTenant: foreignKey({
+      name: "scans_resumes_tenant_fk",
+      columns: [t.resumesScanId, t.tenantId],
+      foreignColumns: [t.id, t.tenantId],
+    }),
+    // A Scan is resumed at most once, so a chain of attempts is a line.
+    uqResumesScan: uniqueIndex("uq_scans_resumes_scan_id")
+      .on(t.resumesScanId)
+      .where(sql`${t.resumesScanId} is not null`),
     // One active scan per repo. A scan that stalls is expired before a new one is queued.
     uqActivePerRepo: uniqueIndex("uq_scans_active_per_repo")
       .on(t.repoId)

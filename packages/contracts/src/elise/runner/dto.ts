@@ -134,6 +134,15 @@ export const RunnerJobSchema = z.object({
   prompt: z.string(),
   phasePrompts: z.array(RunnerPhasePromptSchema).optional(),
   priorsJson: z.string(),
+  // -----
+  // Set only on a Resumed Scan (ADR 0016): resume is true and
+  // resumesScanId is the earlier Scan's ID. The Runner reuses the
+  // work folder of that Scan. An older Runner ignores both and
+  // sees a normal job, and only the Runner that ran the earlier
+  // Scan is ever handed one.
+  // -----
+  resume: z.boolean().optional(),
+  resumesScanId: z.string().optional(),
 });
 
 // -----

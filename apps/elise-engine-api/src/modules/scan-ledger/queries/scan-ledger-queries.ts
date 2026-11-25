@@ -132,6 +132,14 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
         });
         const runners = yield* runnersOf(db, ids);
         const archives = yield* scanArchivesEffect(db, ids);
+        const resumers = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select({ id: scans.id, resumes: scans.resumesScanId })
+              .from(scans)
+              .where(inArray(scans.resumesScanId, ids)),
+          catch: toDbError,
+        });
         return rows.map((row) => {
           const job = runners.find((runner) => runner.scanId === row.id);
           return scanRowToStatus(
@@ -146,6 +154,7 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
             runnerOfJob(job),
             archives.get(row.id) ?? null,
             job?.optionsJson,
+            resumers.find((resumer) => resumer.resumes === row.id)?.id ?? null,
           );
         });
       });
@@ -259,6 +268,7 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
       repo: params.repo,
       repoId,
       ref: params.ref ?? null,
+      resumesScanId: params.resumesScanId ?? null,
       status: "queued",
       skill: params.options.skill,
       model: params.options.model,

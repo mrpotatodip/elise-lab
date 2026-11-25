@@ -61,6 +61,7 @@ export function memoryScanRepo() {
           repo: params.repo,
           repoId,
           ref: params.ref ?? null,
+          resumesScanId: params.resumesScanId ?? null,
           branch: null,
           branchId: null,
           untrackedReason: null,
