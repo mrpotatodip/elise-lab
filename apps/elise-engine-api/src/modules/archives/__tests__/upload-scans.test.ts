@@ -172,12 +172,4 @@ describe("DELETE /repos/:repoId for an upload app", () => {
 
     expect({ same: again === appId, listed: listed.includes(appId), archives }).toEqual({ same: true, listed: true, archives: [] });
   });
-
-  it("removes no git Repo", async () => {
-    const repoId = IdSchema.parse(await dataOf(await send("acme", "/repos", { method: "POST", json: { repo: "https://github.com/octocat/Spoon-Knife" } }))).id;
-
-    const res = await send("acme", `/repos/${repoId}`, { method: "DELETE" });
-
-    expect(res.status).toBe(404);
-  });
 });

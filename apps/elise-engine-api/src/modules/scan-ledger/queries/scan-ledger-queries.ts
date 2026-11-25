@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { ScanUsage } from "@repo/contracts/elise";
 import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
@@ -211,7 +211,8 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   // -----
   // Insert or find the repo's record. The unique index
   // on (account, provider, host, canonical) settles a
-  // race between two first scans of the same repo.
+  // race between two first scans of the same repo. A
+  // removed repo that is scanned again is listed again.
   // -----
   ensureRepo: (accountId, url, provider) =>
     Effect.tryPromise({
@@ -221,6 +222,7 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
           .insert(scanRepos)
           .values({ tenantId: accountId, ...identity, url: displayRepoUrlOf(url, provider) })
           .onConflictDoNothing();
+        await db.update(scanRepos).set({ removedAt: null }).where(and(sameRepoIdentity(accountId, identity), isNotNull(scanRepos.removedAt)));
         const [row] = await db
           .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url })
           .from(scanRepos)

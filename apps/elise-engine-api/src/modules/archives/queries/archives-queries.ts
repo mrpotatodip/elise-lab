@@ -6,6 +6,7 @@ import type { AppDbType } from "#/lib/db-connection";
 import { Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 
 export const UPLOAD_APP_NOT_FOUND = "Upload app not found";
+export const REPO_NOT_FOUND = "Repo not found";
 export const UPLOAD_ARCHIVE_NOT_FOUND = "Upload not found";
 
 export const archiveViewOf = (row: TScanUploadArchive): UploadArchive => ({
@@ -31,15 +32,26 @@ export const findUploadAppEffect = (db: AppDbType, tenantId: string, repoId: str
     catch: toDbError,
   }).pipe(Effect.flatMap(([row]) => (row ? Effect.succeed(row) : Effect.fail(new NotFound({ message: UPLOAD_APP_NOT_FOUND })))));
 
+export const findLiveRepoEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<{ id: string }, NotFound | DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select({ id: scanRepos.id })
+        .from(scanRepos)
+        .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId), isNull(scanRepos.removedAt))),
+    catch: toDbError,
+  }).pipe(Effect.flatMap(([row]) => (row ? Effect.succeed(row) : Effect.fail(new NotFound({ message: REPO_NOT_FOUND })))));
+
 // -----
-// Removes an upload app: deletes its zips' rows, marks the app
-// removed and gives back where the zips' bytes are. The Repo row
-// stays, so its Scans and findings keep their History; the
+// Soft-deletes a repo of any provider: marks it removed, and
+// deletes the rows of its zips (an upload app has them, a git
+// Repo has none) and gives back where their bytes are. The Repo
+// row stays, so its Scans and findings keep their History; the
 // links of those Scans keep each zip's label and hash.
 // -----
 export const removeUploadAppEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<string[], NotFound | DbError> =>
   Effect.gen(function* () {
-    yield* findUploadAppEffect(db, tenantId, repoId);
+    yield* findLiveRepoEffect(db, tenantId, repoId);
     return yield* Effect.tryPromise({
       try: async () => {
         const deleted = await db

@@ -152,3 +152,25 @@ describe("the zips of an upload app", () => {
     });
   });
 });
+
+describe("removing a git repo", () => {
+  it("takes it off the list, keeps the row, refuses a second removal and lists it again when it is added again", async () => {
+    const repo = "https://github.com/octocat/soft-delete";
+    const repoId = z.uuid().parse(DataSchema.parse(await (await call("acme", "/repos", { method: "POST", json: { repo } })).json()).data.id);
+    const rowOf = async () => (await test.raw.select({ removedAt: scanRepos.removedAt }).from(scanRepos).where(eq(scanRepos.id, repoId)))[0];
+    const listedIds = async () => z.object({ data: z.object({ repos: z.array(z.object({ id: z.string() })) }) }).parse(await (await call("acme", "/repos")).json()).data.repos.map((r) => r.id);
+
+    const removed = await call("acme", `/repos/${repoId}`, { method: "DELETE" });
+    const afterRemove = { listed: (await listedIds()).includes(repoId), removedAt: (await rowOf())?.removedAt !== null };
+    const second = await call("acme", `/repos/${repoId}`, { method: "DELETE" });
+    await call("acme", "/repos", { method: "POST", json: { repo } });
+
+    expect({ removed: removed.status, afterRemove, second: second.status, listedAgain: (await listedIds()).includes(repoId), removedAtCleared: (await rowOf())?.removedAt }).toEqual({
+      removed: 200,
+      afterRemove: { listed: false, removedAt: true },
+      second: 404,
+      listedAgain: true,
+      removedAtCleared: null,
+    });
+  });
+});
