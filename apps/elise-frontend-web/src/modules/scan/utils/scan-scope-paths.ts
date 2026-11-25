@@ -13,6 +13,26 @@ export function scanScopePathsOf(text: string) {
 
 export const SCAN_SCOPE_PATHS_LIMIT = SCAN_SCOPE_PATHS_MAX;
 
+const SCOPE_NAMED_MAX = 3;
+
+export function scanScopeSentence(paths: readonly string[] | undefined) {
+  if (paths === undefined || paths.length === 0) return null;
+  const named =
+    paths.length > SCOPE_NAMED_MAX
+      ? `${paths.length} folders`
+      : paths.length === 1
+        ? paths.join("")
+        : `${paths.slice(0, -1).join(", ")} and ${paths[paths.length - 1]}`;
+  return `It reads only ${named}, so it is a partial Scan.`;
+}
+
+export function scanCustomizeProblems(spendLimit: { problem: string | null }, scope: { problem: string | null }) {
+  return [
+    ...(spendLimit.problem === null ? [] : [`Spend limit: ${spendLimit.problem}`]),
+    ...(scope.problem === null ? [] : [`Folders: ${scope.problem}`]),
+  ];
+}
+
 export function scanScopeNote(scan: Pick<ScanStatus, "scopePaths" | "status">) {
   const paths = scan.scopePaths ?? [];
   if (scan.status !== "succeeded" || paths.length === 0) return null;
