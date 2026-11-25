@@ -178,6 +178,40 @@ fn confirm(question: &str) -> bool {
 }
 
 pub async fn status(store: &Store) -> Exit {
+    let exit = connection_status(store).await;
+    let kept = scan::kept_folders();
+    if !kept.is_empty() {
+        println!("Kept work folders (a failed or stopped Scan leaves one; delete a folder you no longer need):");
+        for folder in kept {
+            let state = match folder.done {
+                Some(done) if done.is_empty() => "can be resumed from the start".to_string(),
+                Some(done) => format!("can be resumed after {}", done.join(", ")),
+                None => "cannot be resumed (`elise-runner resume` says why)".to_string(),
+            };
+            println!("  Scan {}: {state}\n    {}", folder.scan_id, folder.path.display());
+        }
+    }
+    exit
+}
+
+pub fn resume(scan_id: &str) -> Exit {
+    match scan::check_kept(scan_id) {
+        Ok(done) => {
+            let held =
+                if done.is_empty() { "no finished Phase yet".to_string() } else { format!("the finished Phases {}", done.join(", ")) };
+            println!(
+                "Scan {scan_id}'s work folder holds {held} and can be resumed. Press Resume on that Scan in Elise; `elise-runner run` on this computer then claims it."
+            );
+            Exit::Ok
+        }
+        Err(why) => {
+            eprintln!("{why}");
+            Exit::Error
+        }
+    }
+}
+
+async fn connection_status(store: &Store) -> Exit {
     let place = store.describe();
     match pairing::status(store.tokens()).await {
         RunnerStatus::Connected { name, account_name } => {
