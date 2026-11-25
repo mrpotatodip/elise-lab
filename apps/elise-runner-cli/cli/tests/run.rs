@@ -743,3 +743,70 @@ fn an_engine_that_answers_conflict_ends_the_push_and_fails_nothing() {
     assert_eq!(fingerprints(&engine.finding_batches()), ["fp-1", "fp-2"]);
     assert_eq!(engine.results()[0].1["state"], "succeeded");
 }
+
+fn resuming(scan_id: &str, earlier: &str, phase_prompts: [&str; 4]) -> String {
+    let mut job: serde_json::Value = serde_json::from_str(&job(scan_id, phase_prompts)).unwrap();
+    job["resume"] = true.into();
+    job["resumesScanId"] = earlier.into();
+    job.to_string()
+}
+
+#[test]
+fn a_resumed_scan_carries_on_from_the_kept_folder_and_status_and_resume_tell_what_is_kept() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(job("scan_30", ["phase=recon cost=1.5", "phase=hunt stop=crash", "phase=check", "phase=report"]));
+    let first = runner.run(&["run", "--once"], "");
+    assert_eq!(first.code, 1, "{}{}", first.stdout, first.stderr);
+    let kept = stubs.work_folder("scan_30");
+
+    let status = runner.run(&["status"], "");
+    let asked = runner.run(&["resume", "scan_30"], "");
+    let unknown = runner.run(&["resume", "scan_99"], "");
+
+    assert!(status.stdout.contains(&format!("Scan scan_30: can be resumed after recon\n    {}", kept.display())), "{}", status.stdout);
+    assert_eq!(asked.code, 0, "{}{}", asked.stdout, asked.stderr);
+    assert!(asked.stdout.contains("finished Phases recon") && asked.stdout.contains("Resume"), "{}", asked.stdout);
+    assert_eq!(unknown.code, 1);
+    assert!(unknown.stderr.contains("Start a new Scan instead."), "{}", unknown.stderr);
+
+    engine.queue_job(resuming("scan_31", "scan_30", PLAIN));
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    let log: Vec<&str> = output.stdout.lines().collect();
+    assert_eq!(
+        log,
+        [
+            "[acme/widgets scan_31] Scan claimed",
+            "[acme/widgets scan_31] the hunt phase started",
+            "[acme/widgets scan_31] the hunt phase ended: spent $4.00, $6.50 left of the Pool",
+            "[acme/widgets scan_31] the check phase started",
+            "[acme/widgets scan_31] the check phase ended: spent $2.50, $4.00 left of the Pool",
+            "[acme/widgets scan_31] the report phase started",
+            "[acme/widgets scan_31] the report phase ended: spent $1.00, $3.00 left of the Pool",
+            "[acme/widgets scan_31] result sent to Elise",
+            "[acme/widgets scan_31] Scan succeeded.",
+        ]
+    );
+    assert_eq!(engine.results()[1].1["state"], "succeeded");
+    assert!(!kept.exists() && !stubs.work_folder("scan_31").exists(), "the kept folder goes with the Scan that succeeded");
+}
+
+#[test]
+fn a_resume_of_a_folder_that_is_not_there_fails_the_scan_with_a_sentence_and_starts_no_agent() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    let stubs = runner.stub_tools(&["claude", "node"]);
+    engine.queue_job(resuming("scan_32", "scan_nowhere", PLAIN));
+
+    let output = runner.run(&["run", "--once"], "");
+
+    assert_eq!(output.code, 1, "{}{}", output.stdout, output.stderr);
+    let (_, result) = &engine.results()[0];
+    assert_eq!(result["state"], "failed");
+    assert!(result["error"].as_str().unwrap().ends_with("Start a new Scan instead."), "{result}");
+    assert!(!stubs.record.join("git.txt").exists(), "nothing is fetched");
+    assert!(!output.stdout.contains("phase started"), "{}", output.stdout);
+}

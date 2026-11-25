@@ -16,14 +16,38 @@ export const insertRunnerJobEffect = (db: DbConnectType, job: NewRunnerJob): Eff
   Effect.tryPromise({
     try: () =>
       db.execute(sql`
-        insert into scan_runner_jobs (scan_id, tenant_id, runner_id, repo_url, ref, prompt, options_json, priors_json)
-        select ${job.scanId}, ${job.tenantId}::uuid, ${job.runnerId}::uuid, ${job.repoUrl}, ${job.ref}, ${job.prompt}, ${job.optionsJson}, ${job.priorsJson}
+        insert into scan_runner_jobs (scan_id, tenant_id, runner_id, repo_url, ref, prompt, options_json, priors_json, resumes_scan_id)
+        select ${job.scanId}, ${job.tenantId}::uuid, ${job.runnerId}::uuid, ${job.repoUrl}, ${job.ref}, ${job.prompt}, ${job.optionsJson}, ${job.priorsJson}, ${job.resumesScanId}
         from scans
         where id = ${job.scanId} and status <> 'stopped'
         on conflict do nothing
       `),
     catch: toDbError,
   }).pipe(Effect.asVoid);
+
+const EARLIER_SCANS_MAX = 50;
+
+export const earlierScanIdsEffect = (
+  db: DbConnectType,
+  tenantId: string,
+  resumesScanId: string,
+): Effect.Effect<string[], DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const found: string[] = [];
+      let next: string | null = resumesScanId;
+      while (next !== null && !found.includes(next) && found.length < EARLIER_SCANS_MAX) {
+        found.push(next);
+        const [row] = await db
+          .select({ resumes: scans.resumesScanId })
+          .from(scans)
+          .where(and(eq(scans.tenantId, tenantId), eq(scans.id, next)));
+        next = row?.resumes ?? null;
+      }
+      return found;
+    },
+    catch: toDbError,
+  });
 
 export const scanStoppedEffect = (db: DbConnectType, scanId: string): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({

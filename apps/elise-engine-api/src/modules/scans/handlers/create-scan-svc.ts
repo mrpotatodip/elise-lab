@@ -43,6 +43,7 @@ export const queueScanSvc = (
   hold?: HoldCredit,
   runnerSources?: RunnerSources,
   linkArchive?: LinkArchive,
+  resumesScanId?: string,
 ): Effect.Effect<QueuedScan, Invalid | RateLimited | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
     const provider = sourceProviderOf(input.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
@@ -208,6 +209,7 @@ export const queueScanSvc = (
       options,
       keySource: usesOwnKey ? "account" : "platform",
       runnerId,
+      resumesScanId,
       createdAt: new Date().toISOString(),
     };
     yield* repo.create(params, record.id, Date.now());
@@ -259,7 +261,13 @@ export const abandonScanSvc = (
 ): Effect.Effect<void> =>
   Effect.all(
     [
-      repo.mark(queued.params.accountId, queued.params.scanId, { status: "failed", error }).pipe(Effect.ignore),
+      repo
+        .mark(queued.params.accountId, queued.params.scanId, {
+          status: "failed",
+          error,
+          ...(queued.params.resumesScanId !== undefined && { resumesScanId: null }),
+        })
+        .pipe(Effect.ignore),
       queued.holdUsd > 0 && release ? release(queued.params.scanId).pipe(Effect.ignore) : Effect.void,
     ],
     { discard: true },

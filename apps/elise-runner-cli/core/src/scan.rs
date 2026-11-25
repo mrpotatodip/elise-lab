@@ -137,6 +137,12 @@ pub struct Job {
     // the Scan is one run on `prompt`.
     #[serde(default)]
     phase_prompts: Vec<PhasePrompt>,
+    #[serde(default)]
+    resume: bool,
+    #[serde(default)]
+    resumes_scan_id: Option<String>,
+    #[serde(default)]
+    earlier_scan_ids: Vec<String>,
     priors_json: String,
 }
 
@@ -355,6 +361,7 @@ async fn run_traced_job(token: &str, job: Job, tools: FindTools<'_>, settings: &
     on_event(Event::Claimed { scan_id: job.scan_id.clone(), repo: label.clone() });
 
     let work = std::env::temp_dir().join(format!("eliselab-runner-{}", job.scan_id));
+    let _lock = FolderLock::hold(&work);
     let (job_stopper, job_stop) = Stopper::new();
     let unwanted = std::sync::Mutex::new(None);
     let ended = {
@@ -474,6 +481,10 @@ async fn execute(
     if !job.scan_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
         return Err("The scan id is not one this runner will use.".into());
     }
+    if job.resume {
+        skill_dir_of(job)?;
+        return execute_resume(tools, job, work, on_event, stop).await;
+    }
     let clone = match job.source {
         Source::Git => {
             let address = clone_address(&job.repo, settings)?;
@@ -521,13 +532,29 @@ fn skill_dir_of(job: &Job) -> Result<&'static str, String> {
 // validators and the files to send. The work folder holds `repo`, `out` and what the clone left.
 // -----
 async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
+    prepare(tools, job, work)?;
+    audit_prepared(tools, job, work, None, minute, on_event, stop).await
+}
+
+fn prepare(tools: &Tools, job: &Job, work: &Path) -> Result<(), String> {
     strip_untrusted(&work.join("repo")).map_err(|e| format!("Could not clean the cloned repository: {e}"))?;
     check_scope(&work.join("repo"), &job.scope_paths)?;
     install_skill(tools, skill_dir_of(job)?, work)?;
-    write_agent_settings(work)?;
+    write_agent_settings(work)
+}
 
-    if job.skill == "full" && !job.phase_prompts.is_empty() {
-        return run_phases(tools, job, work, minute, on_event, stop).await;
+async fn audit_prepared(
+    tools: &Tools,
+    job: &Job,
+    work: &Path,
+    resume: Option<Resume>,
+    minute: Duration,
+    on_event: OnEvent<'_>,
+    stop: &Stop,
+) -> Result<Report, String> {
+    let phased = job.skill == "full" && !job.phase_prompts.is_empty();
+    if phased {
+        return run_phases(tools, job, work, resume.as_ref(), minute, on_event, stop).await;
     }
 
     let end = run_agent(tools, work, job, &job.prompt, budget_for(job), None, AGENT_TIMEOUT, stop).await?.end?;
@@ -573,7 +600,15 @@ async fn audit(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event
 // agent gets one repair run (`repair`); a failure of the environment ends the Scan without one.
 // The files of the Phases that ended stay in the work folder when a later one fails.
 // -----
-async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
+async fn run_phases(
+    tools: &Tools,
+    job: &Job,
+    work: &Path,
+    resume: Option<&Resume>,
+    minute: Duration,
+    on_event: OnEvent<'_>,
+    stop: &Stop,
+) -> Result<Report, String> {
     let names: Vec<&str> = job.phase_prompts.iter().map(|p| p.phase.as_str()).collect();
     if names != PHASES.map(|(phase, _)| phase) {
         return Err(format!(
@@ -582,7 +617,13 @@ async fn run_phases(tools: &Tools, job: &Job, work: &Path, minute: Duration, on_
         ));
     }
     let mut spent = Spent::default();
-    let ran = run_each_phase(tools, job, work, &mut spent, minute, on_event, stop).await;
+    match resume {
+        Some(resume) => {
+            spent.before = resume.before_usd;
+        }
+        None => write_checkpoint(work, job, &[], 0.0),
+    }
+    let ran = run_each_phase(tools, job, work, resume, &mut spent, minute, on_event, stop).await;
     // The engine reads the last JSON object of the log as the Scan's usage: the sum, a failed Scan's too.
     if let Some(sum) = spent.sum_line() {
         append_to_log(work, &format!("{sum}\n"));
@@ -619,31 +660,318 @@ impl Halt {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_each_phase(
     tools: &Tools,
     job: &Job,
     work: &Path,
+    resume: Option<&Resume>,
     spent: &mut Spent,
     minute: Duration,
     on_event: OnEvent<'_>,
     stop: &Stop,
 ) -> Result<(), Halt> {
     let cap = budget_for(job);
+    let mut done: Vec<String> = resume.map(|resume| resume.done.clone()).unwrap_or_default();
+    let mut restarting = resume.is_some();
     for (prompt, (phase, minutes)) in job.phase_prompts.iter().zip(PHASES) {
-        let left = money(cap - spent.cost);
+        if done.iter().any(|finished| finished == phase) {
+            continue;
+        }
+        let left = money(cap - spent.used());
         if left <= 0.0 {
             return Err(Halt::Limit { limit: Limit::Budget { cap }, phase: phase.to_string(), message: phase_cap_message(phase, cap) });
         }
+        let mut prompt = prompt.prompt.clone();
+        if std::mem::take(&mut restarting) {
+            prompt = restart_prompt(tools, work, phase, prompt, stop).await?;
+        }
         on_event(Event::PhaseStarted { phase: phase.to_string() });
-        let run = run_agent(tools, work, job, &prompt.prompt, left, Some(phase), minute * (minutes as u32), stop).await?;
+        let run = run_agent(tools, work, job, &prompt, left, Some(phase), minute * (minutes as u32), stop).await?;
         settle_told(run, spent, phase, cap, on_event)?;
         match check_after(tools, job, work, phase, stop, false).await {
             Ok(()) => {}
             Err(CheckFailure::Content(error)) => repair(tools, job, work, spent, minute, phase, &error, on_event, stop).await?,
             Err(CheckFailure::Environment(error)) => return Err(error.into()),
         }
+        done.push(phase.to_string());
+        write_checkpoint(work, job, &done, spent.used());
     }
     Ok(())
+}
+
+const CHECKPOINT_FILE: &str = "checkpoint.json";
+const CHECKPOINT_OUT: &str = "checkpoint-out";
+const EARLIER: &str = "earlier-";
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Checkpoint {
+    scan_id: String,
+    phases_done: Vec<String>,
+    spent_usd: f64,
+    commit: String,
+    repo_status: String,
+}
+
+struct Resume {
+    earlier: String,
+    done: Vec<String>,
+    before_usd: f64,
+}
+
+pub fn refused(why: &str) -> String {
+    format!("This Scan cannot resume the earlier one: {why} Start a new Scan instead.")
+}
+
+fn git_text(repo: &Path, args: &[&str]) -> Option<String> {
+    let mut command = std::process::Command::new("git");
+    command.arg("-C").arg(repo).args(args).env("GIT_OPTIONAL_LOCKS", "0");
+    for outer in ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"] {
+        command.env_remove(outer);
+    }
+    let output = command.output().ok()?;
+    output.status.success().then(|| String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn repo_status(work: &Path) -> Option<String> {
+    git_text(&work.join("repo"), &["status", "--porcelain", "--untracked-files=no"])
+}
+
+fn write_checkpoint(work: &Path, job: &Job, done: &[String], spent_usd: f64) {
+    let Some(commit) = read_trimmed(work.join("repo.sha")) else {
+        return;
+    };
+    let Some(repo_status) = repo_status(work) else {
+        return;
+    };
+    let copy = work.join(CHECKPOINT_OUT);
+    let _ = fs::remove_dir_all(&copy);
+    if copy_dir(&work.join("out"), &copy).is_err() {
+        return;
+    }
+    let checkpoint =
+        Checkpoint { scan_id: job.scan_id.clone(), phases_done: done.to_vec(), spent_usd: money(spent_usd), commit, repo_status };
+    let Ok(text) = serde_json::to_string(&checkpoint) else {
+        return;
+    };
+    let partial = work.join(format!("{CHECKPOINT_FILE}.tmp"));
+    if fs::write(&partial, text).is_ok() {
+        let _ = fs::rename(partial, work.join(CHECKPOINT_FILE));
+    }
+}
+
+fn read_checkpoint(work: &Path) -> Option<Checkpoint> {
+    serde_json::from_str(&fs::read_to_string(work.join(CHECKPOINT_FILE)).ok()?).ok()
+}
+
+fn safe_id(id: &str) -> bool {
+    !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn resume_plan(job: &Job, work: &Path) -> Result<(Resume, PathBuf), String> {
+    let Some(first) = job.resumes_scan_id.as_deref().filter(|id| safe_id(id)) else {
+        return Err(refused("the job does not name the earlier Scan."));
+    };
+    if job.source != Source::Git {
+        return Err(refused("only a Scan of a git repository can be resumed."));
+    }
+    if job.skill != "full" || job.phase_prompts.is_empty() {
+        return Err(refused("the job carries no Phase prompts to continue with."));
+    }
+    let chain = std::iter::once(first).chain(job.earlier_scan_ids.iter().map(String::as_str)).filter(|id| safe_id(id));
+    let folders = chain.map(|id| (id, work.with_file_name(format!("eliselab-runner-{id}"))));
+    let (earlier, kept) = folders
+        .into_iter()
+        .find(|(_, folder)| folder.is_dir())
+        .unwrap_or_else(|| (first, work.with_file_name(format!("eliselab-runner-{first}"))));
+    check_folder(earlier, &kept).map(|resume| (resume, kept))
+}
+
+pub fn check_kept(scan_id: &str) -> Result<Vec<String>, String> {
+    if !safe_id(scan_id) {
+        return Err(refused("that is not a Scan id."));
+    }
+    check_folder(scan_id, &std::env::temp_dir().join(format!("eliselab-runner-{scan_id}"))).map(|resume| resume.done)
+}
+
+fn lock_path(work: &Path) -> PathBuf {
+    let name = work.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default();
+    work.with_file_name(format!("{name}.lock"))
+}
+
+struct FolderLock {
+    _file: fs::File,
+    path: PathBuf,
+}
+
+impl FolderLock {
+    fn hold(work: &Path) -> Option<FolderLock> {
+        let path = lock_path(work);
+        let file = fs::OpenOptions::new().create(true).truncate(false).write(true).open(&path).ok()?;
+        file.try_lock().ok()?;
+        Some(FolderLock { _file: file, path })
+    }
+}
+
+impl Drop for FolderLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+fn in_use(work: &Path) -> bool {
+    let Ok(file) = fs::OpenOptions::new().write(true).open(lock_path(work)) else {
+        return false;
+    };
+    matches!(file.try_lock(), Err(fs::TryLockError::WouldBlock))
+}
+
+pub struct KeptFolder {
+    pub scan_id: String,
+    pub path: PathBuf,
+    pub done: Option<Vec<String>>,
+}
+
+pub fn kept_folders() -> Vec<KeptFolder> {
+    let Ok(entries) = fs::read_dir(std::env::temp_dir()) else {
+        return Vec::new();
+    };
+    let mut folders: Vec<KeptFolder> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let scan_id = name.strip_prefix("eliselab-runner-").filter(|id| safe_id(id))?.to_string();
+            let path = entry.path();
+            (path.is_dir() && !in_use(&path)).then(|| KeptFolder { done: check_kept(&scan_id).ok(), scan_id, path })
+        })
+        .collect();
+    folders.sort_by(|a, b| a.scan_id.cmp(&b.scan_id));
+    folders
+}
+
+fn check_folder(earlier: &str, work: &Path) -> Result<Resume, String> {
+    let Some(checkpoint) = read_checkpoint(work) else {
+        return Err(refused(
+            "the work folder has no checkpoint this Runner can read (it was removed, or the Scan ended before its first one).",
+        ));
+    };
+    if checkpoint.scan_id != earlier {
+        return Err(refused(&format!("the work folder's checkpoint belongs to Scan {}, not Scan {earlier}.", checkpoint.scan_id)));
+    }
+    let in_order =
+        checkpoint.phases_done.len() <= PHASES.len() && checkpoint.phases_done.iter().zip(PHASES).all(|(done, (phase, _))| done == phase);
+    if !in_order {
+        return Err(refused("the work folder's checkpoint lists Phases this Runner does not know."));
+    }
+    let recorded = read_trimmed(work.join("repo.sha"));
+    let head = git_text(&work.join("repo"), &["rev-parse", "HEAD"]).map(|text| text.trim().to_string());
+    if recorded.as_deref() != Some(checkpoint.commit.as_str()) || head.as_deref() != Some(checkpoint.commit.as_str()) {
+        return Err(refused("the repository in the work folder is not at the commit the earlier Scan used."));
+    }
+    if repo_status(work).as_deref() != Some(checkpoint.repo_status.as_str()) {
+        return Err(refused("the repository in the work folder has been edited since the earlier Scan's last Phase."));
+    }
+    let done = checkpoint.phases_done.into_iter().filter(|phase| phase != "report").collect();
+    Ok(Resume { earlier: earlier.to_string(), done, before_usd: logged_spend(work) })
+}
+
+fn logged_spend(work: &Path) -> f64 {
+    let Ok(entries) = fs::read_dir(work) else {
+        return 0.0;
+    };
+    let cost: f64 = entries
+        .flatten()
+        .filter(|entry| {
+            let name = entry.file_name().to_string_lossy().to_string();
+            name.ends_with(".log") && name.contains("agent-")
+        })
+        .filter_map(|entry| last_result(&fs::read_to_string(entry.path()).ok()?))
+        .filter_map(|result| cost_of(&result))
+        .sum();
+    money(cost)
+}
+
+fn set_earlier_logs_aside(work: &Path, earlier: &str) -> Result<(), String> {
+    let entries = fs::read_dir(work).map_err(|e| format!("Could not read the work folder: {e}"))?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let is_log = name.starts_with("agent") && (name.ends_with(".log") || name.ends_with(".err"));
+        if is_log {
+            fs::rename(entry.path(), work.join(format!("{EARLIER}{earlier}-{name}")))
+                .map_err(|e| format!("Could not set the earlier Scan's log {name} aside: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+async fn execute_resume(tools: &Tools, job: &Job, work: &Path, on_event: OnEvent<'_>, stop: &Stop) -> Result<Report, String> {
+    let (resume, kept) = resume_plan(job, work)?;
+    prepare(tools, job, &kept)?;
+    take_over(job, &kept, work, &resume.earlier)?;
+    audit_prepared(tools, job, work, Some(resume), MINUTE, on_event, stop).await
+}
+
+fn take_over(job: &Job, kept: &Path, work: &Path, earlier: &str) -> Result<(), String> {
+    let _ = fs::remove_dir_all(work);
+    fs::rename(kept, work).map_err(|e| format!("Could not take over the earlier Scan's work folder: {e}"))?;
+    let taken = rename_checkpoint(work, &job.scan_id).and_then(|()| set_earlier_logs_aside(work, earlier));
+    if let Err(error) = taken {
+        let _ = rename_checkpoint(work, earlier);
+        let _ = fs::rename(work, kept);
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn rename_checkpoint(work: &Path, scan_id: &str) -> Result<(), String> {
+    let mut checkpoint = read_checkpoint(work).ok_or_else(|| "Could not read the folder's checkpoint.".to_string())?;
+    checkpoint.scan_id = scan_id.to_string();
+    let text = serde_json::to_string(&checkpoint).map_err(|e| format!("Could not write the folder's checkpoint: {e}"))?;
+    fs::write(work.join(CHECKPOINT_FILE), text).map_err(|e| format!("Could not write the folder's checkpoint: {e}"))
+}
+
+const RESUME_NOTE: &str = "This run carries on from an earlier attempt at this audit that ended before it finished, and its files are in ./out. Keep every unit of ./out/coverage-ledger.json whose status is final exactly as it is. Put each unit whose status is in_progress back to planned. Work only the units that are not final, and continue at the wave the ledger and run-metadata.json record. Do not redo finished work.";
+
+async fn restart_prompt(tools: &Tools, work: &Path, phase: &str, prompt: String, stop: &Stop) -> Result<String, Halt> {
+    if phase == "hunt" || phase == VALIDATED_AFTER {
+        let ledger = work.join("out").join("coverage-ledger.json");
+        let valid = ledger.is_file()
+            && match run_skill_script(tools, work, stop, "validate-coverage-ledger.cjs", &[ledger], "coverage-ledger.json", "").await {
+                Ok(()) => true,
+                Err(CheckFailure::Content(_)) => false,
+                Err(CheckFailure::Environment(error)) => return Err(error.into()),
+            };
+        if valid {
+            let said = if phase == VALIDATED_AFTER {
+                match validate_full(tools, work, stop).await {
+                    Err(CheckFailure::Content(words)) => Some(words),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            return Ok(match said {
+                Some(words) => format!(
+                    "{prompt}\n\n{RESUME_NOTE} The check of the files said: {}",
+                    words.split_whitespace().collect::<Vec<_>>().join(" ")
+                ),
+                None => format!("{prompt}\n\n{RESUME_NOTE}"),
+            });
+        }
+    }
+    let out = work.join("out");
+    let _ = fs::remove_dir_all(&out);
+    let copy = work.join(CHECKPOINT_OUT);
+    if copy.is_dir() {
+        copy_dir(&copy, &out).map_err(|e| format!("Could not put the files of the last checkpoint back: {e}"))?;
+    } else {
+        fs::create_dir_all(&out).map_err(|e| format!("Could not clear the Phase's files: {e}"))?;
+    }
+    if phase == "report" {
+        let _ = fs::remove_file(out.join("REPORT.md"));
+    }
+    Ok(prompt)
 }
 
 async fn check_after(tools: &Tools, job: &Job, work: &Path, phase: &str, stop: &Stop, after_repair: bool) -> Result<(), CheckFailure> {
@@ -752,7 +1080,7 @@ fn timed_out_message(who: &str, minutes: u64) -> String {
 fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event: OnEvent<'_>) -> Result<(), Halt> {
     let cost_usd = run.result.as_ref().and_then(cost_of);
     let settled = settle(run, spent, phase, cap);
-    on_event(Event::PhaseEnded { phase: phase.to_string(), cost_usd, pool_left_usd: money(cap - spent.cost) });
+    on_event(Event::PhaseEnded { phase: phase.to_string(), cost_usd, pool_left_usd: money(cap - spent.used()) });
     settled
 }
 
@@ -781,7 +1109,7 @@ async fn repair(
         return Err(format!("{failed} The Scan's one repair run was already used."));
     }
     let cap = budget_for(job);
-    let left = money(cap - spent.cost);
+    let left = money(cap - spent.used());
     if left <= 0.0 {
         return Err(phase_cap_message(REPAIR, cap));
     }
@@ -844,9 +1172,14 @@ struct Spent {
     cache_write: u64,
     last: Option<serde_json::Value>,
     repaired: bool,
+    before: f64,
 }
 
 impl Spent {
+    fn used(&self) -> f64 {
+        self.before + self.cost
+    }
+
     fn add(&mut self, result: &serde_json::Value) {
         let count = |value: &serde_json::Value| value.as_u64().unwrap_or(0);
         self.cost += cost_of(result).unwrap_or(0.0);
@@ -1708,6 +2041,9 @@ mod tests {
             scope_paths: Vec::new(),
             prompt: "Use the security-audit-lite skill".into(),
             phase_prompts: Vec::new(),
+            resume: false,
+            resumes_scan_id: None,
+            earlier_scan_ids: Vec::new(),
             priors_json: String::new(),
         }
     }
@@ -2007,7 +2343,18 @@ if grep -q INVALID "$2" 2>/dev/null; then echo "the file is not valid" >&2; exit
     #[cfg(unix)]
     fn scan_told(stage: &Stage, job: &Job, minute: Duration, on_event: OnEvent<'_>) -> Report {
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        match runtime.block_on(audit(&stage.tools, job, &stage.work, minute, on_event, &Stop::never())) {
+        if let (true, Some(earlier)) = (job.resume, job.resumes_scan_id.as_deref()) {
+            let kept = stage.root.join(format!("eliselab-runner-{earlier}"));
+            if stage.work.is_dir() && !kept.exists() {
+                fs::rename(&stage.work, &kept).unwrap();
+            }
+        }
+        let ran = if job.resume {
+            runtime.block_on(execute_resume(&stage.tools, job, &stage.work, on_event, &Stop::never()))
+        } else {
+            runtime.block_on(audit(&stage.tools, job, &stage.work, minute, on_event, &Stop::never()))
+        };
+        match ran {
             Ok(report) => report,
             Err(error) => failed_report(&stage.work, error),
         }
@@ -2849,6 +3196,263 @@ esac
 
         assert!(old.scope_paths.is_empty());
         assert_eq!(new.scope_paths, ["alpha", "beta/c"]);
+    }
+
+    #[cfg(unix)]
+    fn git_in(repo: &Path, args: &[&str]) -> String {
+        let output = std::process::Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-C"])
+            .arg(repo)
+            .args(args)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    #[cfg(unix)]
+    fn git_stage(name: &str) -> Stage {
+        let stage = stage(name);
+        let repo = stage.work.join("repo");
+        git_in(&repo, &["init", "-q"]);
+        fs::write(repo.join("main.rs"), "fn main() {}\n").unwrap();
+        git_in(&repo, &["add", "."]);
+        git_in(&repo, &["commit", "-q", "-m", "first"]);
+        fs::write(stage.work.join("repo.sha"), git_in(&repo, &["rev-parse", "HEAD"])).unwrap();
+        stage
+    }
+
+    fn resuming(prompts: [&str; 4], earlier: &str) -> Job {
+        Job { scan_id: "s2".into(), resume: true, resumes_scan_id: Some(earlier.into()), ..phased_job(prompts) }
+    }
+
+    #[cfg(unix)]
+    fn kept(name: &str, prompts: [&str; 4]) -> Stage {
+        let stage = git_stage(name);
+        let first = scan(&stage, &phased_job(prompts));
+        assert_eq!(first.state, "failed", "{:?}", first.error);
+        fs::remove_file(stage.work.join("calls.txt")).ok();
+        stage
+    }
+
+    #[cfg(unix)]
+    fn calls_of(stage: &Stage) -> String {
+        fs::read_to_string(stage.work.join("calls.txt")).unwrap_or_default()
+    }
+
+    const FAILS_IN_HUNT: [&str; 4] = ["phase=recon cost=3 ledger=1", "phase=hunt stop=crash", "phase=check", "phase=report"];
+    const THEN_RUNS: [&str; 4] = ["phase=recon cost=1", "phase=hunt cost=2", "phase=check cost=1", "phase=report cost=1"];
+
+    #[cfg(unix)]
+    #[test]
+    fn a_resume_after_recon_starts_the_agent_at_hunt_with_the_pool_less_what_the_log_shows_was_spent() {
+        let stage = kept("resume-pool", FAILS_IN_HUNT);
+
+        let report = scan(&stage, &resuming(THEN_RUNS, "s1"));
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let calls = calls_of(&stage);
+        assert!(calls.starts_with("9|phase=hunt cost=2"), "recon is not run again, and the pool is 12 less the 3 it spent: {calls}");
+        assert!(!calls.contains("phase=recon"), "{calls}");
+        assert!(calls.ends_with("\n7|phase=check cost=1\n6|phase=report cost=1\n"), "{calls}");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_engine_reads_only_the_resumed_scans_own_usage_from_the_log() {
+        let stage = kept("resume-usage", FAILS_IN_HUNT);
+
+        let report = scan(&stage, &resuming(THEN_RUNS, "s1"));
+
+        let sum = last_json(report.agent_log.as_deref().unwrap());
+        assert_eq!(sum["total_cost_usd"], 4.0);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_valid_kept_ledger_adds_the_resume_paragraph_to_the_hunt_prompt_and_the_ledger_is_kept() {
+        let stage = kept("resume-valid", FAILS_IN_HUNT);
+
+        scan(&stage, &resuming(THEN_RUNS, "s1"));
+
+        let calls = calls_of(&stage);
+        assert!(calls.contains("phase=hunt cost=2\n\nThis run carries on from an earlier attempt"), "{calls}");
+        assert!(calls.contains("Put each unit whose status is in_progress back to planned"), "{calls}");
+        assert!(!calls.contains("phase=check cost=1\n\nThis run"), "{calls}");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_kept_ledger_that_fails_or_is_missing_clears_the_phases_files_and_runs_the_phase_whole() {
+        for damage in ["invalid", "missing"] {
+            let stage = kept(&format!("resume-damaged-{damage}"), FAILS_IN_HUNT);
+            let ledger = stage.work.join("out/coverage-ledger.json");
+            if damage == "invalid" {
+                fs::write(&ledger, "INVALID").unwrap();
+            } else {
+                fs::remove_file(&ledger).unwrap();
+            }
+            fs::write(stage.work.join("out/half-written.json"), "{").unwrap();
+
+            let report = scan(&stage, &resuming(THEN_RUNS, "s1"));
+
+            assert_eq!(report.state, "succeeded", "{damage}: {:?}", report.error);
+            let calls = calls_of(&stage);
+            assert!(calls.starts_with("9|phase=hunt cost=2\n7|"), "{damage}: {calls}");
+            assert!(!calls.contains("This run carries on"), "{damage}: {calls}");
+            assert!(!report.files.contains_key("half-written.json"), "{damage}");
+            let _ = fs::remove_dir_all(&stage.root);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_check_that_failed_its_validators_resumes_with_the_validators_words_in_the_paragraph() {
+        let stage = git_stage("resume-check");
+        fs::write(stage.work.join("repair.txt"), "nofix=1").unwrap();
+        let first = scan(&stage, &phased_job(["phase=recon ledger=1", "phase=hunt", "phase=check invalid=1", "phase=report"]));
+        assert_eq!(first.state, "failed");
+        fs::remove_file(stage.work.join("calls.txt")).unwrap();
+        fs::remove_file(stage.work.join("repair.txt")).unwrap();
+
+        let report = scan(&stage, &resuming(THEN_RUNS, "s1"));
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let calls = calls_of(&stage);
+        assert!(calls.starts_with("12|phase=check cost=1\n\nThis run carries on"), "{calls}");
+        assert!(calls.contains("The check of the files said:") && calls.contains("the file is not valid"), "{calls}");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recon_and_report_restart_from_the_top_with_their_files_cleared() {
+        let in_recon = kept("resume-recon", ["phase=recon stop=crash", "phase=hunt", "phase=check", "phase=report"]);
+        fs::write(in_recon.work.join("out/half-written.md"), "half").unwrap();
+        let in_report = kept("resume-report", ["phase=recon", "phase=hunt", "phase=check", "phase=report stop=crash"]);
+        fs::write(in_report.work.join("out/REPORT.md"), "half").unwrap();
+
+        let from_recon = scan(&in_recon, &resuming(THEN_RUNS, "s1"));
+        let from_report = scan(&in_report, &resuming(THEN_RUNS, "s1"));
+
+        assert_eq!(from_recon.state, "succeeded", "{:?}", from_recon.error);
+        assert!(calls_of(&in_recon).starts_with("12|phase=recon cost=1\n"), "{}", calls_of(&in_recon));
+        assert!(!from_recon.files.contains_key("half-written.md"));
+        assert_eq!(from_report.state, "succeeded", "{:?}", from_report.error);
+        assert_eq!(calls_of(&in_report), "12|phase=report cost=1\n");
+        assert_eq!(from_report.files["REPORT.md"], "# Report\n");
+        let _ = fs::remove_dir_all(&in_recon.root);
+        let _ = fs::remove_dir_all(&in_report.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_resume_whose_checkpoint_commit_scan_or_repository_does_not_match_is_refused_and_starts_no_agent() {
+        type Damage = fn(&Stage);
+        let cases: [(&str, &str, Damage); 5] = [
+            ("another scan", "s9", |_| {}),
+            ("a moved commit", "s1", |stage| {
+                git_in(&stage.work.join("repo"), &["commit", "-q", "--allow-empty", "-m", "moved on"]);
+            }),
+            ("an edited repo", "s1", |stage| fs::write(stage.work.join("repo/main.rs"), "fn evil() {}\n").unwrap()),
+            ("no checkpoint", "s1", |stage| fs::remove_file(stage.work.join("checkpoint.json")).unwrap()),
+            ("an unreadable checkpoint", "s1", |stage| fs::write(stage.work.join("checkpoint.json"), "{not json").unwrap()),
+        ];
+        for (name, earlier, damage) in cases {
+            let stage = kept(&format!("resume-refused-{}", name.replace(' ', "-")), FAILS_IN_HUNT);
+            damage(&stage);
+
+            let report = scan(&stage, &resuming(THEN_RUNS, earlier));
+
+            assert_eq!(report.state, "failed", "{name}");
+            let said = report.error.unwrap();
+            assert!(said.contains("cannot resume the earlier one") && said.ends_with("Start a new Scan instead."), "{name}: {said}");
+            assert_eq!(calls_of(&stage), "", "{name}: no agent starts");
+            let _ = fs::remove_dir_all(&stage.root);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_resume_the_runner_refused_leaves_the_folder_so_the_next_resume_finds_it_through_the_chain() {
+        let stage = kept("resume-after-refusal", FAILS_IN_HUNT);
+        let repo_file = stage.work.join("repo/main.rs");
+        fs::write(&repo_file, "fn evil() {}\n").unwrap();
+        let refused = scan(&stage, &resuming(THEN_RUNS, "s1"));
+        assert_eq!(refused.state, "failed");
+        assert!(stage.root.join("eliselab-runner-s1").is_dir(), "a refusal leaves the folder under its own name");
+        fs::write(stage.root.join("eliselab-runner-s1/repo/main.rs"), "fn main() {}\n").unwrap();
+        let again = Job { scan_id: "s3".into(), earlier_scan_ids: vec!["s1".into()], ..resuming(THEN_RUNS, "s2") };
+
+        let report = scan(&stage, &again);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert!(calls_of(&stage).starts_with("9|phase=hunt cost=2"), "{}", calls_of(&stage));
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn untracked_output_the_agent_left_in_the_repository_does_not_refuse_a_resume() {
+        let stage = kept("resume-untracked", FAILS_IN_HUNT);
+        fs::create_dir_all(stage.work.join("repo/build")).unwrap();
+        fs::write(stage.work.join("repo/build/out.bin"), "agent output").unwrap();
+
+        let report = scan(&stage, &resuming(THEN_RUNS, "s1"));
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_resume_with_no_money_left_in_the_pool_starts_no_phase_and_ends_with_the_cap_error() {
+        let stage = git_stage("resume-spent");
+        let capped = |job: Job| Job { profile_cap_usd: Some(5.0), ..job };
+        let first = scan(&stage, &capped(phased_job(["phase=recon cost=5", "phase=hunt", "phase=check", "phase=report"])));
+        assert_eq!(first.state, "failed");
+        fs::remove_file(stage.work.join("calls.txt")).unwrap();
+
+        let report = scan(&stage, &capped(resuming(THEN_RUNS, "s1")));
+
+        assert_eq!(report.state, "failed");
+        let said = report.error.unwrap();
+        assert!(said.contains("cap was reached") && said.contains("$5") && said.contains("hunt phase"), "{said}");
+        assert_eq!(calls_of(&stage), "");
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_money_of_every_earlier_attempt_in_a_chain_leaves_the_pool() {
+        let stage = kept("resume-chain", FAILS_IN_HUNT);
+        let second = scan(&stage, &resuming(["phase=recon", "phase=hunt cost=2", "phase=check stop=crash", "phase=report"], "s1"));
+        assert_eq!(second.state, "failed");
+        fs::remove_file(stage.work.join("calls.txt")).unwrap();
+        let third = Job { scan_id: "s3".into(), resumes_scan_id: Some("s2".into()), ..resuming(THEN_RUNS, "s2") };
+
+        let report = scan(&stage, &third);
+
+        assert_eq!(report.state, "succeeded", "{:?}", report.error);
+        assert!(calls_of(&stage).starts_with("7|phase=check cost=1"), "{}", calls_of(&stage));
+        let _ = fs::remove_dir_all(&stage.root);
+    }
+
+    #[test]
+    fn a_job_reads_with_or_without_the_resume_fields() {
+        let base = r#""scanId":"s2","repo":"https://github.com/o/n","ref":null,"skill":"full","model":"m","effort":"high","maxBudgetUsd":50,"prompt":"p","priorsJson":"""#;
+        let old: Job = serde_json::from_str(&format!("{{{base}}}")).unwrap();
+        let new: Job = serde_json::from_str(&format!("{{{base},\"resume\":true,\"resumesScanId\":\"s1\"}}")).unwrap();
+
+        assert!(!old.resume && old.resumes_scan_id.is_none());
+        assert!(new.resume);
+        assert_eq!(new.resumes_scan_id.as_deref(), Some("s1"));
     }
 
     #[cfg(unix)]

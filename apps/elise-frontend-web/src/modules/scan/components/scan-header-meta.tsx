@@ -7,6 +7,7 @@ import { useNow } from "#/lib/use-now";
 import { SCAN_PROFILE_OPTIONS } from "../constants";
 import type { ScanStatus } from "../schemas";
 import { scanArchiveNote, scanDuration } from "../utils";
+import { ScanChain } from "./scan-chain";
 import { ScanStatusBadge } from "./scan-status-badge";
 import { ScanTime } from "./scan-time";
 
@@ -200,6 +201,7 @@ export function ScanHeaderMeta({ scan }: { scan: ScanStatus }) {
     <div className="grid gap-3">
       <ScanBranchRow scan={scan} />
       <ScanStatusLine scan={scan} />
+      <ScanChain scan={scan} />
     </div>
   );
 }

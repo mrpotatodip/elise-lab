@@ -21,6 +21,7 @@ import {
 } from "#/modules/runners/constants";
 import {
   claimRunnerJobEffect,
+  earlierScanIdsEffect,
   readRunnerJobEffect,
   recordRunnerSourcesEffect,
   reportRunnerJobEffect,
@@ -95,7 +96,7 @@ const claimNextJob = (
       yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_ARCHIVE_REMOVED, now);
       return yield* claimNextJob(db, runnerId, readsArchive);
     }
-    return {
+    const job: RunnerJob = {
       scanId: row.scanId,
       repo: row.repoUrl,
       source: archive?.id ? { kind: "archive" as const, archiveId: archive.id } : { kind: "git" as const },
@@ -114,6 +115,12 @@ const claimNextJob = (
       })),
       priorsJson: row.priorsJson,
     };
+    if (row.resumesScanId !== null) {
+      job.resume = true;
+      job.resumesScanId = row.resumesScanId;
+      job.earlierScanIds = yield* earlierScanIdsEffect(db, row.tenantId, row.resumesScanId);
+    }
+    return job;
   });
 
 // -----

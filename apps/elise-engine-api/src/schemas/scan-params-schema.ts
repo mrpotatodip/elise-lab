@@ -15,6 +15,7 @@ export const ScanParamsSchema = z.object({
   // keySource is "account".
   // -----
   runnerId: z.uuid().optional(),
+  resumesScanId: z.string().optional(),
   createdAt: z.string(),
 });
 

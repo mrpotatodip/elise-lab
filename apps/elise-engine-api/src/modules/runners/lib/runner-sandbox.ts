@@ -40,6 +40,7 @@ export const runnerSandbox = (
           prompt: buildAgentPrompt(options, RUNNER_PROMPT_PLACE),
           optionsJson: JSON.stringify(options),
           priorsJson: "",
+          resumesScanId: params.resumesScanId ?? null,
         }),
       );
     },

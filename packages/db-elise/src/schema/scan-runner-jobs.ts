@@ -35,6 +35,8 @@ export const scanRunnerJobs = pgTable(
     prompt: text("prompt").notNull(),
     optionsJson: text("options_json").notNull(),
     priorsJson: text("priors_json").notNull(),
+    // Set when the job resumes an earlier Scan (ADR 0016): that Scan's ID. The job's runner_id is the Runner that ran it, and only that Runner claims the job.
+    resumesScanId: text("resumes_scan_id"),
     commitSha: text("commit_sha"),
     branch: text("branch"),
     error: text("error"),
