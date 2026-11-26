@@ -155,32 +155,46 @@ export const RUNNER = {
   needs: "The computer also needs your own AI tool installed and signed in, because the scan runs on that login.",
 } as const;
 
-// The two plans the live plans table offers (Starter, $15 a month, 2 members; Runner, $35 a month,
-// 5 members). Older plans stay in the table but are not offered, so they are not printed. Both rows are
-// enabled with Stripe prices (checked against the live table 2026-11-22). Update this when the plans table changes.
+// The three plans the live plans table offers (Solo, $6 a month, 1 member; Starter, $15 a month, 2 members;
+// Runner, $35 a month, 5 members). Older plans stay in the table but are not offered, so they are not printed.
+// Starter and Runner were checked against the live table 2026-11-22; Solo is printed ahead of its row being
+// enabled (spec #453), so do not deploy this until the row is. Update this when the plans table changes.
 // -----
 // The yearly prices below must match the engine's plan rows (platform_master_plans: monthly and
 // yearly price). The per-month figures and the "months free" badge are worked out from them.
 // -----
-const PLAN_USD = { starter: { month: 15, year: 150 }, runner: { month: 35, year: 350 } } as const;
+const PLAN_USD = { solo: { month: 6, year: 60 }, starter: { month: 15, year: 150 }, runner: { month: 35, year: 350 } } as const;
 
 const usd = (amount: number) => `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
 const perMonth = (yearly: number) => usd(Math.round((yearly / 12) * 100) / 100);
 const MONTHS_FREE = Math.floor(Math.min(...Object.values(PLAN_USD).map((plan) => 12 - plan.year / plan.month)));
 
 export const PRICING = {
-  note: "Two plans, one flat price each, billed monthly or yearly by card through Stripe. There is no free trial.",
+  note: "Three plans, one flat price each, billed monthly or yearly by card through Stripe. There is no free trial.",
   intervals: { month: "Monthly", year: "Yearly" },
   yearlyBadge: `${MONTHS_FREE} months free`,
   action: "Create an account",
   actionHint: "Create an account opens the sign-up page in Elise.",
   plans: [
     {
+      name: "Solo",
+      price: usd(PLAN_USD.solo.month),
+      yearlyPrice: usd(PLAN_USD.solo.year),
+      yearlyPerMonth: perMonth(PLAN_USD.solo.year),
+      summary: "Every scan runs on your own AI subscription. For one person.",
+      points: [
+        "Flat price. We add no charge per scan.",
+        "Install a Runner on your computer or a server and pair it to your account. Scans run there, on your own AI subscription, which you pay for directly.",
+        "See Runners, scans, reports and findings for every repository and branch in one dashboard.",
+        "1 member per account.",
+      ],
+    },
+    {
       name: "Starter",
       price: usd(PLAN_USD.starter.month),
       yearlyPrice: usd(PLAN_USD.starter.year),
       yearlyPerMonth: perMonth(PLAN_USD.starter.year),
-      summary: "Every scan runs on your own AI subscription. For one or two people.",
+      summary: "Every scan runs on your own AI subscription. For two people.",
       points: [
         "Flat price. We add no charge per scan.",
         "Install a Runner on your computer or a server and pair it to your account. Scans run there, on your own AI subscription, which you pay for directly.",
@@ -193,7 +207,7 @@ export const PRICING = {
       price: usd(PLAN_USD.runner.month),
       yearlyPrice: usd(PLAN_USD.runner.year),
       yearlyPerMonth: perMonth(PLAN_USD.runner.year),
-      summary: "Every scan runs on your own AI subscription. For up to five people.",
+      summary: "Every scan runs on your own AI subscription. For a team of up to 5.",
       points: [
         "Flat price. We add no charge per scan.",
         "Install a Runner on your computer or a server and pair it to your account. Scans run there, on your own AI subscription, which you pay for directly.",
@@ -226,7 +240,7 @@ export const FACTS = [
   },
   {
     title: "What it costs",
-    text: "Starter is $15 a month for up to 2 members and Runner is $35 a month for up to 5. Both have the same features, and yearly billing is available. Scans run on your own AI subscription through a Runner, so you pay that provider directly. We add no per-scan charge. Coverage sets how deep a scan goes: Focused is one bounded pass, Balanced suits most repositories and Exhaustive covers the most and takes longest.",
+    text: "Solo is $6 a month for 1 member, Starter is $15 a month for up to 2 and Runner is $35 a month for up to 5. All three have the same features, and yearly billing is available. Scans run on your own AI subscription through a Runner, so you pay that provider directly. We add no per-scan charge. Coverage sets how deep a scan goes: Focused is one bounded pass, Balanced suits most repositories and Exhaustive covers the most and takes longest.",
     more: { href: "#pricing", label: "See the plans under Pricing." },
   },
 ] as const;
