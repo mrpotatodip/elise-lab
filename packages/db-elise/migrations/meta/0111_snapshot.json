@@ -1,6 +1,6 @@
 {
-  "id": "252b92a4-2e44-43a0-adc5-0c5afc174a21",
-  "prevId": "fe25db27-9b35-44fc-aeb7-5200c68eedd4",
+  "id": "6fd93527-3fbc-44d5-8258-d7b8f040e2d6",
+  "prevId": "3263e8cc-9fe6-40a2-bb52-b684e28150f0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5031,6 +5031,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -5054,6 +5060,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_scan_repos_project": {
+          "name": "idx_scan_repos_project",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -5068,6 +5095,21 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "scan_repos_project_tenant_fk": {
+          "name": "scan_repos_project_tenant_fk",
+          "tableFrom": "scan_repos",
+          "tableTo": "tenant_projects",
+          "columnsFrom": [
+            "project_id",
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id",
+            "tenant_id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -5303,18 +5345,6 @@
         "cost_usd": {
           "name": "cost_usd",
           "type": "numeric(10, 4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "phase_usage": {
-          "name": "phase_usage",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "open_problem_checks": {
-          "name": "open_problem_checks",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -6230,6 +6260,109 @@
           "value": "\"scan_upload_archives\".\"content_sha256\" ~ '^[0-9a-f]{64}$'"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.tenant_projects": {
+      "name": "tenant_projects",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_tenant_projects_tenant_name": {
+          "name": "uq_tenant_projects_tenant_name",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "uq_tenant_projects_id_tenant": {
+          "name": "uq_tenant_projects_id_tenant",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tenant_projects_tenant_id_tenants_id_fk": {
+          "name": "tenant_projects_tenant_id_tenants_id_fk",
+          "tableFrom": "tenant_projects",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },

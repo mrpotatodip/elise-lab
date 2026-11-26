@@ -20,6 +20,10 @@ export type AuditAction =
   | "group.deleted"
   | "group.member.added"
   | "group.member.removed"
+  | "project.created"
+  | "project.renamed"
+  | "project.deleted"
+  | "repo.project.moved"
   | "finding.triage.set"
   | "finding.risk.accepted"
   | "finding.comment.deleted"
@@ -42,6 +46,7 @@ export type AuditDetails = {
   role?: string;
   partyId?: string;
   groupIds?: string[];
+  projectId?: string | null;
   reason?: "replaced" | "revoked";
   fingerprint?: string;
   status?: string;

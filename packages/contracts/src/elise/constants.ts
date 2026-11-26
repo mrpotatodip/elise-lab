@@ -97,6 +97,12 @@ export const TEAM_PENDING_INVITE_LIMIT = 200;
 export const TEAM_INVITE_GROUP_LIMIT = 20;
 
 // -----
+// Projects: named sets of Repos in one Account
+// -----
+export const PROJECT_NAME_MAX = 60;
+export const PROJECT_LIMIT_PER_TENANT = 50;
+
+// -----
 // Verdict: an accepted risk lasts at most this many days;
 // a pass needs succeeded scans of the commit whose weights
 // add up to VERDICT_MIN_SCANS. A scan weighs what its Skill

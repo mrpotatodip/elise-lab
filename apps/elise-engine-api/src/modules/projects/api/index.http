@@ -1,0 +1,44 @@
+@baseUrl = http://localhost:8787
+@account = 0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4
+
+# The Projects of the account, by name. A login needs the Dashboard Power; the service token can read.
+GET {{baseUrl}}/projects
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+
+###
+
+# Make a Project (name unique ignoring case, 60 characters at most, 50 per account). This needs the session of a login whose Role holds company:repos:delete; the service token is refused.
+POST {{baseUrl}}/projects
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "name": "Storefront" }
+
+###
+
+# Rename a Project. Same Power; 404 for a Project of another account, 409 for a taken name.
+PATCH {{baseUrl}}/projects/<project id>
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "name": "Shop" }
+
+###
+
+# Delete a Project. Its Repos stay and go back to no Project.
+DELETE {{baseUrl}}/projects/<project id>
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+
+###
+
+# Move a Repo into a Project, or out of every Project with null. Same Power.
+PUT {{baseUrl}}/repos/<repo id>/project
+Authorization: Bearer <session-token>
+x-account-id: {{account}}
+Content-Type: application/json
+
+{ "projectId": "<project id>" }

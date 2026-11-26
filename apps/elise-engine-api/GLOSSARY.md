@@ -117,8 +117,12 @@ The `REPORT.md` file the agent writes for people to read.
 _Avoid_: Output, result
 
 **Repo**:
-One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included.
-_Avoid_: Project, target
+One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included. A Repo belongs to at most one Project.
+_Avoid_: target
+
+**Project**:
+A named set of Repos in one Account, kept together so they can be reviewed together. A Repo is in at most one Project, or in none. A Project grants nothing and scans nothing: Powers still come from a Role, and a Scan is still started per Repo. It shows the sum of its Repos' open findings, per severity, and the latest Scan. Names are unique per Account, ignoring case. Deleting a Project leaves its Repos ungrouped and deletes none of them. Not a Group, which is a set of people.
+_Avoid_: Group (people only), folder, workspace
 
 **Removed Repo**:
 A Repo a person took off the list. Its History stays, but it is not in the Repo list, the findings across Repos, the overview's Repo count and findings tiles, the Verdict or the Signals, and it does not take one of the 200 places. Its Scans still show on the Scans page and in the overview's Scan counts. Only an admin removes one, and not while a Scan of it is queued or running. Adding it again, or a Scan of it, brings it back with its History, if the Account has a free place.
@@ -134,7 +138,7 @@ _Avoid_: Connection, token (that is the Runner token)
 
 **Upload app**:
 A named app whose code comes from zips the user uploaded, not from a git host: a Repo with Provider `upload`, the name as its path, no host and one hidden Branch named `upload`. The name is unique inside an Account. All its zips are versions of the same code and share one History, with the Archive's content hash standing in for the commit.
-_Avoid_: Project, upload (as a noun for the zip: that is an Archive)
+_Avoid_: upload (as a noun for the zip: that is an Archive)
 
 **Archive**:
 One stored zip of an Upload app: an ID, a label, its R2 key under the Account, size, content hash and upload time. A Scan of an Upload app reads one Archive, chosen by ID, and a link row records which. An Archive can be scanned many times or never. Limits: 50 MB zipped, 250 MB unpacked, 20,000 files, 20 path levels, 20 per app and 500 MB per Account. One no Scan has read is deleted 30 days after upload. Removing an Archive or an app deletes its files and rows, and past Scans stay in the History with a note that the file is gone. The server serves the zip only to the Runner that claimed that job.
@@ -231,7 +235,7 @@ The most an admin may set as the Monthly budget: `tenants.monthly_scan_budget_al
 _Avoid_: Ceiling (the ceiling of a Budget cap is in its own entry), limit
 
 **Plan**:
-What an Account pays for. Two Plans are offered, both paid through Stripe: Starter (`starter`, $15 a month or $150 a year, 2 members) and Runner (`runner`, $35 a month or $350 a year, 5 members); the yearly price needs its Stripe yearly price ID on the row before it is offered. Older rows stay because subscriptions still point to them: Pro (`pro`, $49 a month, $49 of Included credit) and Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month). A Plan is a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap. The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
+What an Account pays for. Three Plans are offered, all paid through Stripe and all on the Account's own key: Solo (`solo`, $6 a month or $60 a year, 1 member), Starter (`starter`, $15 a month or $150 a year, 2 members) and Runner (`runner`, $35 a month or $350 a year, 5 members); the yearly price needs its Stripe yearly price ID on the row before it is offered. Older rows stay because subscriptions still point to them: Pro (`pro`, $49 a month, $49 of Included credit) and Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month). A Plan is a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap. The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Team is a disabled row kept because subscriptions still point to it. Solo stays disabled until its Stripe price IDs are on the row. This is the subscription, not the Instance type.
 _Avoid_: Tier, subscription (for the Plan itself)
 
 **Subscription**:

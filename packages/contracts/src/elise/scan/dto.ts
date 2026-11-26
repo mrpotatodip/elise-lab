@@ -412,6 +412,7 @@ export const RepoSchema = z.object({
   url: z.string(),
   canonical: z.string(),
   isPrivate: z.boolean().nullable().optional(),
+  projectId: z.uuid().nullable().optional(),
   defaultBranch: z.string().nullable(),
   branchNames: z.array(z.string()),
   scans: z.number().int().min(0),
