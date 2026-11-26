@@ -355,6 +355,10 @@ _Avoid_: enforce MFA, mandatory 2FA
 An admin clearing another member's Two-factor because the Login lost both its Authenticator and its Backup codes. A `tenant_admin` can reset any other member, a `workspace_admin` only a non-admin, and nobody their own. It writes an Audit trail entry, sends a Security notice and signs the Login out everywhere.
 _Avoid_: unlock, disable (for an admin's action)
 
+**Checked, not found**:
+What the Branch shows for an open problem the latest full Scan did not see, when that Scan's check Phase looked at it again and answered `gone`. Without that answer the problem shows as not re-checked. It changes no state and no Verdict.
+_Avoid_: closed, fixed, resolved
+
 **Service token**:
 The secret `SCAN_API_TOKEN`. Only a server holds it, and every `/scans` route needs it as a bearer token.
 _Avoid_: API key, password

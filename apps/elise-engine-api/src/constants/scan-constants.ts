@@ -30,11 +30,14 @@ export const SCAN_REPORT_FILES = [
   "run-metadata.json",
 ] as const;
 // -----
-// What a succeeded Scan keeps: the report files and the architecture
-// map the next Scan of the Branch starts from. The map is never
-// served (SCAN_SERVABLE_FILES leaves it out).
+// What a succeeded Scan keeps: the report files, the architecture map
+// the next Scan of the Branch starts from, and the check Phase's answer
+// for each open problem it was handed (spec #464). The last two are
+// never served (SCAN_SERVABLE_FILES leaves them out), and the prompts
+// that ask for the report files do not name them.
 // -----
-export const SCAN_KEPT_FILES = [...SCAN_REPORT_FILES, "architecture.md"] as const;
+export const OPEN_PROBLEM_CHECKS_FILE = "open-problem-checks.json";
+export const SCAN_KEPT_FILES = [...SCAN_REPORT_FILES, "architecture.md", OPEN_PROBLEM_CHECKS_FILE] as const;
 
 // -----
 // What an older Scan saved besides these: its answer to the Prior

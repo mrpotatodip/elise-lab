@@ -1,6 +1,6 @@
 import { SCAN_REPORT_FILES } from "#/constants";
 import type { ScanOptions } from "#/schemas";
-import { askOfHandover } from "#/modules/decided-problems/utils";
+import { askOfHandover, checkAskOfHandover } from "#/modules/decided-problems/utils";
 import { askOfPreviousMap } from "#/modules/previous-map/utils";
 import {
   SCAN_SANDBOX_OUT_DIR,
@@ -150,6 +150,7 @@ const handoffOf = (
     (place.validatedBy === "runner" && phase !== "report" ? RUNNER_HANDOFF[phase] : undefined) ?? PHASE_HANDOFF[phase],
     phase === "hunt" ? askOfHandover(handover) : "",
     phase === "recon" ? askOfPreviousMap(handover) : "",
+    phase === "check" ? checkAskOfHandover(handover) : "",
     SUBAGENT_ASK[profile][phase],
     agentsAtOnceAsk(phase, place.agentsAtOnce),
     phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : "",

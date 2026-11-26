@@ -11,3 +11,15 @@ export type DecidedProblem = {
   file: string | null;
   status: (typeof DECIDED_PROBLEMS_STATUSES)[number];
 };
+
+// -----
+// One open problem handed to the check: what it needs to find
+// the problem again.
+// -----
+export type OpenProblem = {
+  fingerprint: string;
+  title: string;
+  class: string;
+  file: string | null;
+  severity: "critical" | "high" | "medium" | "low" | "informational" | null;
+};

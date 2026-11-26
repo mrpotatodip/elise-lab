@@ -55,6 +55,7 @@ type Saved = {
   status?: "succeeded" | "failed";
   report?: string;
   commit?: string;
+  checks?: string;
 };
 
 // -----
@@ -91,6 +92,8 @@ const recordScan = async (name: string, saved: Saved = {}) => {
   const bindings = fakeBindings();
   bindings.store.set(`accounts/${tenantId}/scans/${scanId}/findings.json`, JSON.stringify(saved.findings ?? []));
   if (saved.report) bindings.store.set(`accounts/${tenantId}/scans/${scanId}/REPORT.md`, saved.report);
+  if (saved.checks !== undefined)
+    bindings.store.set(`accounts/${tenantId}/scans/${scanId}/open-problem-checks.json`, saved.checks);
   const record = await run(
     buildScanRecordSvc(
       bindings.env.REPORTS,
@@ -367,5 +370,89 @@ describe("a Branch's findings are the merge of its Scans", () => {
     expect(repo.open).toEqual(branch?.open);
     expect(repo.open).toMatchObject({ total: 3, unchecked: 1, needsValidation: 1 });
     expect(unresolved).toHaveLength(repo.open.total);
+  });
+});
+
+describe("what the check's answers show on the Branch", () => {
+  const answers = async (...pairs: [string, string][]) => {
+    const known = await listed();
+    const checks = pairs.map(([title, answer]) => ({
+      fingerprint: known.find((finding) => finding.title === title)?.fingerprint ?? title,
+      answer,
+    }));
+    return JSON.stringify({ checks });
+  };
+  const checkedOf = async () =>
+    Object.fromEntries((await listed()).map((finding) => [finding.title, finding.checkedNotFound]));
+
+  it("is checked, not found only for a problem the latest Scan did not see and the check says is gone", async () => {
+    await recordScan("s1", {
+      findings: [
+        confirmed("a", "problem a"),
+        confirmed("b", "problem b"),
+        confirmed("c", "problem c"),
+        confirmed("d", "problem d"),
+      ],
+    });
+    await recordScan("s2", {
+      findings: [confirmed("d", "problem d")],
+      checks: await answers(
+        ["problem a", "gone"],
+        ["problem b", "still_there"],
+        ["problem c", "not_reached"],
+        ["problem d", "gone"],
+      ),
+    });
+
+    expect(await checkedOf()).toEqual({
+      "problem a": true,
+      "problem b": false,
+      "problem c": false,
+      "problem d": false,
+    });
+  });
+
+  it("changes no state, no decision and no open count", async () => {
+    await recordScan("s1", { findings: [confirmed("a", "problem a"), confirmed("b", "problem b")] });
+    await recordScan("s2", {
+      findings: [confirmed("b", "problem b")],
+      checks: await answers(["problem a", "gone"]),
+    });
+
+    expect(await seen()).toEqual([
+      { title: "problem a", state: "open", unchecked: true, first: "s1", last: "s1" },
+      { title: "problem b", state: "open", unchecked: false, first: "s1", last: "s2" },
+    ]);
+    expect((await listed()).every((finding) => finding.triage === null)).toBe(true);
+    expect((await mainBranch())?.open).toMatchObject({ total: 2, unchecked: 1 });
+  });
+
+  it.each([
+    ["no file", () => Promise.resolve(undefined)],
+    ["a file that does not parse", () => Promise.resolve("{ not json")],
+    ["an answer the check does not know", () => answers(["problem a", "vanished"])],
+  ])("is false when the latest Scan wrote %s", async (_name, checksOf) => {
+    await recordScan("s1", { findings: [confirmed("a", "problem a")] });
+    await recordScan("s2", { findings: [], checks: await checksOf() });
+
+    expect(await checkedOf()).toEqual({ "problem a": false });
+  });
+
+  it("is false when only an older Scan answered gone", async () => {
+    await recordScan("s1", { findings: [confirmed("a", "problem a")] });
+    await recordScan("s2", { findings: [], checks: await answers(["problem a", "gone"]) });
+    await recordScan("s3", { findings: [] });
+
+    expect(await checkedOf()).toEqual({ "problem a": false });
+  });
+
+  it("keeps the first answer when the check wrote a fingerprint twice", async () => {
+    await recordScan("s1", { findings: [confirmed("a", "problem a")] });
+    await recordScan("s2", {
+      findings: [],
+      checks: await answers(["problem a", "still_there"], ["problem a", "gone"]),
+    });
+
+    expect(await checkedOf()).toEqual({ "problem a": false });
   });
 });
