@@ -74,9 +74,7 @@ const readProfileScan = (
     const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE);
     const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE);
     const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE);
-    const openProblemChecks = yield* openProblemChecksOf(
-      yield* readText(reports, params, OPEN_PROBLEM_CHECKS_FILE),
-    );
+    const openProblemChecks = yield* openProblemChecksOf(yield* readText(reports, params, OPEN_PROBLEM_CHECKS_FILE));
     const scoped = (params.options.scopePaths?.length ?? 0) > 0;
     const check =
       params.runnerId && !scoped

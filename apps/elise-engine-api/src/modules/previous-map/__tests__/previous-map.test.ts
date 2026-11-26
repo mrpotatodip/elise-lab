@@ -83,7 +83,6 @@ describe("the architecture map of the last Scan on a Branch", () => {
       buildPhasePrompt(OPTIONS, "hunt"),
     );
   });
-
 });
 
 describe("the hand-over built from a map", () => {

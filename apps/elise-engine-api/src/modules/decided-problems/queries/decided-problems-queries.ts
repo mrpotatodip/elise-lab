@@ -27,15 +27,13 @@ export const openProblemsEffect = (
         .filter(isUnresolved)
         .toSorted((a, b) => severityRank(a.severity) - severityRank(b.severity))
         .slice(0, limit)
-        .map(
-          (finding): OpenProblem => ({
-            fingerprint: finding.fingerprint,
-            title: finding.title,
-            class: finding.class,
-            file: finding.file,
-            severity: finding.severity,
-          }),
-        ),
+        .map((finding): OpenProblem => ({
+          fingerprint: finding.fingerprint,
+          title: finding.title,
+          class: finding.class,
+          file: finding.file,
+          severity: finding.severity,
+        })),
     ),
   );
 
