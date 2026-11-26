@@ -89,6 +89,11 @@ export const SCAN_SANDBOX_DEFAULT_PRICE = { input: 10, output: 50, cacheRead: 0.
 // -----
 export const SCAN_SANDBOX_FULL_PHASES = ["recon", "hunt", "check", "report"] as const;
 export const SCAN_SANDBOX_PHASES_KEY = "phases";
+// -----
+// The key that holds the meter's reading at the start of each Phase, so a
+// Phase's spend is the next reading minus its own.
+// -----
+export const SCAN_SANDBOX_PHASE_STARTS_KEY = "phase-starts";
 
 // -----
 // The key that holds the running Phase's Trace: how far its log was

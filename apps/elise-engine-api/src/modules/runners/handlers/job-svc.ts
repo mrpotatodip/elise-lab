@@ -11,7 +11,7 @@ import { NotFound, toExternalError, type DbError, type ExternalError } from "#/l
 import type { ScanFiles } from "#/lib/scan-file-types";
 import { ScanOptionsSchema } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
-import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox";
+import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentPhases, parseAgentUsage } from "#/modules/scan-sandbox";
 import {
   RUNNER_JOB_ARCHIVE_REMOVED,
   RUNNER_JOB_BAD_OPTIONS,
@@ -204,7 +204,8 @@ export const reportJobSvc = (
 
     const files = keptFiles(body.files);
     const succeeded = body.state === "succeeded" && files["REPORT.md"] !== undefined;
-    const usage = body.agentLog ? parseAgentUsage(body.agentLog) : null;
+    const total = body.agentLog ? parseAgentUsage(body.agentLog) : null;
+    const usage = total === null || !body.agentLog ? total : { ...total, phases: parseAgentPhases(body.agentLog) };
     // -----
     // An upload Scan read the zip the server linked it to: its
     // hash is the commit and the app's hidden Branch its Branch,

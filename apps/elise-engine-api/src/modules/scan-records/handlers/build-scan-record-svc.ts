@@ -108,6 +108,7 @@ export const buildScanRecordSvc = (
         cacheReadTokens: usage?.cacheReadTokens ?? null,
         cacheWriteTokens: usage?.cacheWriteTokens ?? null,
         costUsd: usage ? usage.costUsd.toFixed(4) : null,
+        phaseUsage: usage?.phases ?? null,
         turns: usage?.turns ?? null,
         durationMs: usage?.durationMs ?? null,
         createdAt: new Date(params.createdAt),

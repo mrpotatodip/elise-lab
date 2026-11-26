@@ -21,6 +21,7 @@ import {
   SCAN_SANDBOX_METER_KEY,
   SCAN_SANDBOX_OUT_DIR,
   SCAN_SANDBOX_PHASES_KEY,
+  SCAN_SANDBOX_PHASE_STARTS_KEY,
   SCAN_SANDBOX_PROMPT_PATH,
   SCAN_SANDBOX_REPO_DIR,
   SCAN_SANDBOX_TRACE_KEY,
@@ -47,13 +48,17 @@ import {
   freshMeter,
   parseAgentUsage,
   phaseAgentFiles,
+  phaseSpends,
   remainingUsd,
   sumOrNull,
   withReserve,
   withSpend,
   withoutReserve,
   type AgentFiles,
+  type PhaseStart,
 } from "#/modules/scan-sandbox/utils";
+
+const parseLog = (log: string | null | undefined) => (log == null ? null : parseAgentUsage(log));
 
 type SandboxContext = DurableObjectState & { exports: { Outbound: OutboundExport } };
 
@@ -167,7 +172,12 @@ export class FullScanSandbox extends DurableObject<Bindings> {
         pending: [phaseMarker("phase_started", phase, new Date())],
         ended: false,
       };
-      await this.ctx.storage.put({ [SCAN_SANDBOX_PHASES_KEY]: [...started, phase], [SCAN_SANDBOX_TRACE_KEY]: trace });
+      const starts = (await this.ctx.storage.get<PhaseStart[]>(SCAN_SANDBOX_PHASE_STARTS_KEY)) ?? [];
+      await this.ctx.storage.put({
+        [SCAN_SANDBOX_PHASES_KEY]: [...started, phase],
+        [SCAN_SANDBOX_PHASE_STARTS_KEY]: [...starts, { phase, meter }],
+        [SCAN_SANDBOX_TRACE_KEY]: trace,
+      });
     }
     const remaining = remainingUsd(meter);
     console.log(`scan: phase ${phase} starts, $${remaining.toFixed(4)} of the $${options.maxBudgetUsd} cap left`);
@@ -243,9 +253,7 @@ export class FullScanSandbox extends DurableObject<Bindings> {
         this.#logEnd(files.log),
       ),
     );
-    const reports = logs
-      .flatMap((log) => (log === null ? [] : [parseAgentUsage(log)]))
-      .filter((report) => report !== null);
+    const reports = logs.map(parseLog).filter((report) => report !== null);
     const reported =
       reports.length === 0
         ? null
@@ -255,7 +263,13 @@ export class FullScanSandbox extends DurableObject<Bindings> {
             durationMs: sumOrNull(reports.map((report) => report.durationMs)),
           };
     if (meter === undefined) return reported;
+    const starts = (await this.ctx.storage.get<PhaseStart[]>(SCAN_SANDBOX_PHASE_STARTS_KEY)) ?? [];
+    const phases = phaseSpends(starts, meter).map((spend) => {
+      const report = parseLog(logs[started.indexOf(spend.phase)]);
+      return { ...spend, turns: report?.turns ?? null, durationMs: report?.durationMs ?? null };
+    });
     return {
+      phases: phases.length > 0 ? phases : null,
       inputTokens: meter.inputTokens,
       outputTokens: meter.outputTokens,
       cacheReadTokens: meter.cacheReadTokens,

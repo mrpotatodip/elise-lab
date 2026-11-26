@@ -6,6 +6,7 @@ import {
   FINDING_STATUS_VALUES,
   FINDING_TRIAGE_STATUS_VALUES,
   REPO_FINDING_STATE_VALUES,
+  RUNNER_JOB_PHASE_VALUES,
   SCAN_FAILURE_CODE_VALUES,
   SCAN_STATE_VALUES,
   SCAN_STEP_VALUES,
@@ -45,7 +46,7 @@ export const ScanOptionsSchema = z.object({
 // What a scan spent. Tokens come from the agent's own
 // report; costUsd is its estimate at the model's list price.
 // -----
-export const ScanUsageSchema = z.object({
+const ScanSpendSchema = z.object({
   inputTokens: z.number().int().min(0),
   outputTokens: z.number().int().min(0),
   cacheReadTokens: z.number().int().min(0),
@@ -53,6 +54,23 @@ export const ScanUsageSchema = z.object({
   costUsd: z.number().min(0),
   turns: z.number().int().min(0).nullable(),
   durationMs: z.number().int().min(0).nullable(),
+});
+
+// -----
+// What one Phase of a Scan spent. The Phases a Scan ran add up to
+// its total, within rounding.
+// -----
+export const ScanPhaseUsageSchema = ScanSpendSchema.extend({
+  phase: z.enum(RUNNER_JOB_PHASE_VALUES),
+});
+
+// -----
+// phases is the split of the total by Phase, in the order they ran.
+// Absent for a Scan from before the split was recorded, and for a
+// Scan that has not read its usage.
+// -----
+export const ScanUsageSchema = ScanSpendSchema.extend({
+  phases: z.array(ScanPhaseUsageSchema).nullish(),
 });
 
 // -----
@@ -157,6 +175,7 @@ export type RecheckTally = z.infer<typeof RecheckTallySchema>;
 export type ScanSummary = z.infer<typeof ScanSummarySchema>;
 export type ScanArtifact = z.infer<typeof ScanArtifactSchema>;
 export type ScanUsage = z.infer<typeof ScanUsageSchema>;
+export type ScanPhaseUsage = z.infer<typeof ScanPhaseUsageSchema>;
 export type ScanState = z.infer<typeof ScanStateSchema>;
 export type ScanRunner = z.infer<typeof ScanRunnerSchema>;
 export type ScanStatus = z.infer<typeof ScanStatusSchema>;
