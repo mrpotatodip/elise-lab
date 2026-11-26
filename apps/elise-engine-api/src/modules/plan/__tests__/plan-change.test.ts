@@ -93,6 +93,10 @@ beforeAll(async () => {
     .update(platformMasterPlans)
     .set({ stripePriceId: STARTER_PRICE, stripeYearlyPriceId: STARTER_YEARLY, enabled: true })
     .where(eq(platformMasterPlans.key, "starter"));
+  await test.raw
+    .update(platformMasterPlans)
+    .set({ stripePriceId: "price_solo_test", stripeYearlyPriceId: "price_solo_year_test", enabled: true })
+    .where(eq(platformMasterPlans.key, "solo"));
   [{ id: runnerPlanId }] = await test.raw
     .select({ id: platformMasterPlans.id })
     .from(platformMasterPlans)
@@ -177,6 +181,20 @@ describe("POST /usage/plan/change", () => {
       ]);
     },
   );
+
+  it.each([
+    { members: 2, status: 409, counts: "2 people and 0 pending invites, and Solo holds 1" },
+    { members: 1, status: 200, counts: "" },
+  ])("from Starter to Solo with $members people answers $status", async ({ members, status, counts }) => {
+    await subscribe(starterPlanId);
+    await setPeople(members);
+    const answer = await planChange("solo");
+    expect([answer.status, answer.text.includes(counts), stripe.changes.length]).toEqual([
+      status,
+      true,
+      status === 200 ? 1 : 0,
+    ]);
+  });
 
   it("switches the same plan from monthly to yearly", async () => {
     await subscribe(runnerPlanId);
