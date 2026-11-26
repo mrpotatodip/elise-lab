@@ -10,6 +10,7 @@ import {
   tenantCreditLedger,
   tenantRunners,
 } from "@repo/db-elise/schema";
+import { SCAN_SERVABLE_FILES } from "#/constants";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
@@ -115,7 +116,7 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
                 contentType: scanFiles.contentType,
               })
               .from(scanFiles)
-              .where(inArray(scanFiles.scanId, ids))
+              .where(and(inArray(scanFiles.scanId, ids), inArray(scanFiles.name, [...SCAN_SERVABLE_FILES])))
               .orderBy(asc(scanFiles.name)),
           catch: toDbError,
         });

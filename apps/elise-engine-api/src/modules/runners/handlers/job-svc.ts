@@ -5,13 +5,14 @@ import {
   type RunnerJobResultBody,
   type RunnerJobState,
 } from "@repo/contracts/elise";
-import { SCAN_REPORT_FILES } from "#/constants";
+import { SCAN_KEPT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
 import { NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import { ScanOptionsSchema } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
 import { handoverFilesSvc } from "#/modules/decided-problems";
+import { previousMapFilesSvc, type PreviousMapStore } from "#/modules/previous-map";
 import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentPhases, parseAgentUsage } from "#/modules/scan-sandbox";
 import {
   RUNNER_JOB_ARCHIVE_REMOVED,
@@ -52,11 +53,12 @@ export const claimJobSvc = (
   db: DbConnectType,
   runnerId: string,
   reported?: readonly string[],
+  previousMaps?: PreviousMapStore,
 ): Effect.Effect<RunnerJob | null, DbError> =>
   Effect.gen(function* () {
     const sources = RUNNER_JOB_SOURCE_VALUES.filter((source) => source === "git" || reported?.includes(source));
     yield* recordRunnerSourcesEffect(db, runnerId, sources);
-    return yield* claimNextJob(db, runnerId, sources.includes("archive"));
+    return yield* claimNextJob(db, runnerId, sources.includes("archive"), previousMaps);
   });
 
 const failClaimed = (
@@ -82,6 +84,7 @@ const claimNextJob = (
   db: DbConnectType,
   runnerId: string,
   readsArchive: boolean,
+  previousMaps?: PreviousMapStore,
 ): Effect.Effect<RunnerJob | null, DbError> =>
   Effect.gen(function* () {
     const now = new Date();
@@ -90,14 +93,19 @@ const claimNextJob = (
     const options = yield* Effect.try(() => ScanOptionsSchema.parse(JSON.parse(row.optionsJson))).pipe(Effect.option);
     if (options._tag === "None") {
       yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_BAD_OPTIONS, now);
-      return yield* claimNextJob(db, runnerId, readsArchive);
+      return yield* claimNextJob(db, runnerId, readsArchive, previousMaps);
     }
     const archive = yield* scanArchiveOfEffect(db, row.scanId);
     if (archive !== null && archive.id === null) {
       yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_ARCHIVE_REMOVED, now);
-      return yield* claimNextJob(db, runnerId, readsArchive);
+      return yield* claimNextJob(db, runnerId, readsArchive, previousMaps);
     }
-    const handoverFiles = yield* handoverFilesSvc(db, row.tenantId, row.repoUrl, row.ref ?? undefined);
+    const handoverFiles = [
+      ...(yield* handoverFilesSvc(db, row.tenantId, row.repoUrl, row.ref ?? undefined)),
+      ...(previousMaps === undefined
+        ? []
+        : yield* previousMapFilesSvc(db, previousMaps, row.tenantId, row.repoUrl, row.ref ?? undefined)),
+    ];
     const handoverNames = handoverFiles.map((file) => file.name);
     const job: RunnerJob = {
       scanId: row.scanId,
@@ -170,7 +178,7 @@ export const jobStateSvc = (
 // -----
 const keptFiles = (sent: RunnerJobResultBody["files"]): ScanFiles => {
   const kept: ScanFiles = {};
-  for (const name of SCAN_REPORT_FILES) {
+  for (const name of SCAN_KEPT_FILES) {
     const text = sent?.[name];
     if (text !== undefined) kept[name] = text;
   }

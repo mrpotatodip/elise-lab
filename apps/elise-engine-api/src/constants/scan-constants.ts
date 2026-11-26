@@ -30,6 +30,13 @@ export const SCAN_REPORT_FILES = [
   "run-metadata.json",
 ] as const;
 // -----
+// What a succeeded Scan keeps: the report files and the architecture
+// map the next Scan of the Branch starts from. The map is never
+// served (SCAN_SERVABLE_FILES leaves it out).
+// -----
+export const SCAN_KEPT_FILES = [...SCAN_REPORT_FILES, "architecture.md"] as const;
+
+// -----
 // What an older Scan saved besides these: its answer to the Prior
 // findings and the list it was given. No new Scan writes them, but
 // an old Scan's page still serves them.
