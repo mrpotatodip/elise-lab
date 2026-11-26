@@ -785,6 +785,20 @@
       "when": 1795652637524,
       "tag": "0111_tenant_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1795662000000,
+      "tag": "0112_scan_phase_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1795662608819,
+      "tag": "0113_scan_open_problem_checks",
+      "breakpoints": true
     }
   ]
 }

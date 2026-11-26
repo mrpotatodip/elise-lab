@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  HANDOVER_FILE_MAX,
+  HANDOVER_FILE_NAME_PATTERN,
+  HANDOVER_FILES_MAX,
   RUNNER_JOB_ERROR_MAX,
   RUNNER_JOB_FILE_MAX,
   RUNNER_JOB_LOG_MAX,
@@ -119,6 +122,27 @@ export const RunnerClaimBodySchema = z.object({
   sources: z.array(z.string().max(RUNNER_JOB_SOURCE_NAME_MAX)).max(RUNNER_JOB_SOURCES_MAX).optional(),
 });
 
+// -----
+// A hand-over file: a JSON file the engine puts in the agent's output
+// directory before the Scan starts (the cloud container and a Runner
+// alike). name is a plain file name, content its text. The format is
+// generic on purpose: the decided problems of a Branch are one such
+// file, and any later hand-over is another entry. A Runner writes each
+// entry to out/<name>; an older app ignores the field and the agent
+// finds no file, which every prompt that mentions one allows for. In
+// the cloud container the engine writes the same entries to the output
+// directory before the first Phase. No entry means nothing to hand
+// over and an unchanged prompt.
+// decided-problems.json is { problems: [{ fingerprint, title, class,
+// file, status }] }: the Branch's false positives, accepted risks and
+// duplicates, worst first, capped at DECIDED_PROBLEMS_LIMIT, with no
+// decision note.
+// -----
+export const HandoverFileSchema = z.object({
+  name: z.string().regex(HANDOVER_FILE_NAME_PATTERN),
+  content: z.string().max(HANDOVER_FILE_MAX),
+});
+
 export const RunnerJobSchema = z.object({
   scanId: z.string(),
   repo: z.string(),
@@ -133,6 +157,7 @@ export const RunnerJobSchema = z.object({
   scopePaths: z.array(z.string()).max(SCAN_SCOPE_PATHS_MAX).optional(),
   prompt: z.string(),
   phasePrompts: z.array(RunnerPhasePromptSchema).optional(),
+  handoverFiles: z.array(HandoverFileSchema).max(HANDOVER_FILES_MAX).optional(),
   priorsJson: z.string(),
   // -----
   // Set only on a Resumed Scan (ADR 0016): resume is true and
@@ -255,6 +280,7 @@ export type Runners = z.infer<typeof RunnersSchema>;
 export type RunnerPhasePrompt = z.infer<typeof RunnerPhasePromptSchema>;
 export type RunnerJobSource = z.infer<typeof RunnerJobSourceSchema>;
 export type RunnerJob = z.infer<typeof RunnerJobSchema>;
+export type HandoverFile = z.infer<typeof HandoverFileSchema>;
 export type RunnerClaimBody = z.infer<typeof RunnerClaimBodySchema>;
 export type RunnerJobState = z.infer<typeof RunnerJobStateSchema>;
 export type RunnerJobResultBody = z.infer<typeof RunnerJobResultBodySchema>;

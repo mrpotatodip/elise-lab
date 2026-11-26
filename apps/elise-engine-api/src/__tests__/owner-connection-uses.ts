@@ -90,9 +90,9 @@ export const OWNER_CONNECTION_USES = {
     reason: "The env type of record-scan, which the Workflow passes",
   },
   "modules/scan-workflow/lib/full-scan-workflow.ts": {
-    uses: 10,
+    uses: 12,
     reason:
-      "Workflow steps with no request: mark the Scan, read the priors and the sealed key, drive a Runner job, write its Trace entries, store the possible-duplicate Signals, each filtered by the Scan's Account",
+      "Workflow steps with no request: mark the Scan, read the priors and the sealed key, read the Branch's decided problems, drive a Runner job, write its Trace entries, store the possible-duplicate Signals, each filtered by the Scan's Account",
   },
   "modules/scan-workflow/lib/settle-scan-credit.ts": {
     uses: 4,

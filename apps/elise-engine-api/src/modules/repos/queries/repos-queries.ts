@@ -65,6 +65,7 @@ const branchTips = (db: AppDbType, tenantId: string, scope: BranchScope) =>
     .selectDistinctOn([scans.branchId], {
       branchId: sql<string>`${scans.branchId}`.as("tip_branch_id"),
       scanId: sql<string>`${scans.id}`.as("tip_scan_id"),
+      checks: sql`${scans.openProblemChecks}`.as("tip_checks"),
     })
     .from(scans)
     .where(and(branchScansWhere(tenantId, scope), weighedScanWhere))
@@ -83,6 +84,7 @@ const branchTips = (db: AppDbType, tenantId: string, scope: BranchScope) =>
 const latestPerProblem = (db: AppDbType, tenantId: string, scope: BranchScope) => {
   const tips = branchTips(db, tenantId, scope);
   const problem = sql`partition by ${scans.branchId}, ${scanFindings.fingerprint}`;
+  const notSeenByTip = sql`(${tips.scanId} is not null and not coalesce(bool_or(${scans.id} = ${tips.scanId}) over (${problem}), false))`;
   return db
     .selectDistinctOn([scans.branchId, scanFindings.fingerprint], {
       rowId: sql<string>`${scanFindings.id}`.as("latest_row_id"),
@@ -95,9 +97,10 @@ const latestPerProblem = (db: AppDbType, tenantId: string, scope: BranchScope) =
         sql<string>`first_value(${scans.id}) over (${problem} order by ${scans.createdAt} asc, ${scans.id} asc)`.as(
           "latest_first_seen_scan_id",
         ),
-      unchecked:
-        sql<boolean>`(${tips.scanId} is not null and not coalesce(bool_or(${scans.id} = ${tips.scanId}) over (${problem}), false))`.as(
-          "latest_unchecked",
+      unchecked: sql<boolean>`${notSeenByTip}`.as("latest_unchecked"),
+      checkedNotFound:
+        sql<boolean>`(${notSeenByTip} and coalesce(${tips.checks} @> jsonb_build_array(jsonb_build_object('fingerprint', ${scanFindings.fingerprint}, 'answer', 'gone')), false))`.as(
+          "latest_checked_not_found",
         ),
     })
     .from(scanFindings)
@@ -160,6 +163,7 @@ export const repoFindingsEffect = (
           branchId: latest.branchId,
           firstSeenScanId: latest.firstSeenScanId,
           unchecked: latest.unchecked,
+          checkedNotFound: latest.checkedNotFound,
           history: scanRepoFindings,
           triage: scanFindingTriage,
           person: partyPersons,
@@ -177,7 +181,7 @@ export const repoFindingsEffect = (
   }).pipe(
     Effect.map((rows) =>
       byBranchOf(rows, (row): RepoFinding => {
-        const { finding, firstSeenScanId, unchecked, history, triage, person, url } = row;
+        const { finding, firstSeenScanId, unchecked, checkedNotFound, history, triage, person, url } = row;
         return {
           id: finding.id,
           scanId: finding.scanId,
@@ -199,6 +203,7 @@ export const repoFindingsEffect = (
           triage: triage ? triageView(triage, person) : null,
           state: branchStateOf(row),
           unchecked,
+          checkedNotFound,
           firstSeenScanId,
           fixedInScanId: history?.fixedInScanId ?? null,
           possibleDuplicateOf: history?.possibleDuplicateOf ?? null,

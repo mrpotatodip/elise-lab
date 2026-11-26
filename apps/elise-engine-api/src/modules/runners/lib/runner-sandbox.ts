@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { RUNNER_JOB_QUEUE_TIMEOUT_MS, ScanUsageSchema } from "@repo/contracts/elise";
-import { SCAN_REPORT_FILES } from "#/constants";
+import { SCAN_KEPT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
@@ -28,6 +28,8 @@ export const runnerSandbox = (
   const read = () => runEffect(readRunnerJobEffect(db, params.scanId));
   return {
     prepare: async () => ({ commitSha: null, branch: null }),
+
+    putHandoverFiles: async () => undefined,
 
     launchAgent: async (options) => {
       await runEffect(
@@ -80,7 +82,7 @@ export const runnerSandbox = (
       const job = await read();
       const sent = job?.filesJson ? FilesSchema.parse(JSON.parse(job.filesJson)) : {};
       const files: ScanFiles = {};
-      for (const name of SCAN_REPORT_FILES) {
+      for (const name of SCAN_KEPT_FILES) {
         const text = sent[name];
         if (text !== undefined) files[name] = text;
       }

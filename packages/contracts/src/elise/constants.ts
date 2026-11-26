@@ -62,6 +62,15 @@ export const RUNNER_JOB_SOURCES_MAX = 10;
 export const RUNNER_JOB_SOURCE_NAME_MAX = 40;
 
 // -----
+// Hand-over files: what the engine gives the agent before a Scan
+// starts, as files in its output directory. At most this many, each
+// with a plain file name and a text no longer than the byte limit.
+// -----
+export const HANDOVER_FILES_MAX = 4;
+export const HANDOVER_FILE_NAME_PATTERN = /^[a-z][a-z0-9-]{0,60}\.json$/;
+export const HANDOVER_FILE_MAX = 100_000;
+
+// -----
 // A Scan's Trace: the most entries one Scan keeps (a sanity cap, so a
 // runaway producer cannot fill the table) and the most one batch may
 // carry. A producer sends a batch every few seconds, far below both.

@@ -200,6 +200,19 @@ export const runScan = async (deps: ScanRunDeps, params: ScanParams, step: Workf
       }
       if (outcome.state === "failed") throw new Error(outcome.error ?? "the agent failed");
     } else {
+      try {
+        await step.do(
+          "handover",
+          { retries: SCAN_WORKFLOW_RETRY_ONCE, timeout: SCAN_WORKFLOW_RECORD_TIMEOUT },
+          async () => {
+            const files = await deps.handoverFiles(params);
+            if (files.length > 0) await sandbox.putHandoverFiles(files);
+            return files.length;
+          },
+        );
+      } catch (cause) {
+        console.error("scan: could not hand over the decided problems", cause instanceof Error ? cause.message : cause);
+      }
       for (const phase of deps.phases) await runPhase(phase);
       await readUsage();
     }

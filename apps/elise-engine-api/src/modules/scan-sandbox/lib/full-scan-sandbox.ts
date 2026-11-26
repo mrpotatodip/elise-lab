@@ -1,7 +1,7 @@
 import { Files } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
-import type { ScanUsage, TraceEntry } from "@repo/contracts/elise";
-import { SCAN_REPORT_FILES } from "#/constants";
+import type { HandoverFile, ScanUsage, TraceEntry } from "@repo/contracts/elise";
+import { SCAN_KEPT_FILES } from "#/constants";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions } from "#/schemas";
 import type { Bindings } from "#/types/variables";
@@ -13,6 +13,7 @@ import {
   SCAN_SANDBOX_CLONE_GUARD_MS,
   SCAN_SANDBOX_CLONED_MARKER,
   SCAN_SANDBOX_COMMIT_FILE,
+  SCAN_SANDBOX_HANDOVER_KEY,
   SCAN_SANDBOX_INACTIVITY_MS,
   SCAN_SANDBOX_INSTANCE_TYPE,
   SCAN_SANDBOX_KIND_FILE,
@@ -21,6 +22,7 @@ import {
   SCAN_SANDBOX_METER_KEY,
   SCAN_SANDBOX_OUT_DIR,
   SCAN_SANDBOX_PHASES_KEY,
+  SCAN_SANDBOX_PHASE_STARTS_KEY,
   SCAN_SANDBOX_PROMPT_PATH,
   SCAN_SANDBOX_REPO_DIR,
   SCAN_SANDBOX_TRACE_KEY,
@@ -43,17 +45,22 @@ import {
   buildAgentScript,
   buildCloneScript,
   buildPhasePrompt,
+  CONTAINER_PLACE,
   DEFAULT_AGENT_FILES,
   freshMeter,
   parseAgentUsage,
   phaseAgentFiles,
+  phaseSpends,
   remainingUsd,
   sumOrNull,
   withReserve,
   withSpend,
   withoutReserve,
   type AgentFiles,
+  type PhaseStart,
 } from "#/modules/scan-sandbox/utils";
+
+const parseLog = (log: string | null | undefined) => (log == null ? null : parseAgentUsage(log));
 
 type SandboxContext = DurableObjectState & { exports: { Outbound: OutboundExport } };
 
@@ -131,6 +138,15 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     return { commitSha, branch: normalizeBranchName((await this.#readText(SCAN_SANDBOX_BRANCH_FILE)) ?? "") };
   }
 
+  async putHandoverFiles(files: HandoverFile[]): Promise<void> {
+    await this.#files.mkdir(SCAN_SANDBOX_OUT_DIR, { recursive: true });
+    for (const file of files) await this.#files.writeFile(`${SCAN_SANDBOX_OUT_DIR}/${file.name}`, file.content);
+    await this.ctx.storage.put(
+      SCAN_SANDBOX_HANDOVER_KEY,
+      files.map((file) => file.name),
+    );
+  }
+
   // -----
   // One run of the agent for the whole Scan, with the whole Budget cap.
   // A Scan in our cloud runs in Phases (launchPhase). The one-run branch
@@ -167,7 +183,12 @@ export class FullScanSandbox extends DurableObject<Bindings> {
         pending: [phaseMarker("phase_started", phase, new Date())],
         ended: false,
       };
-      await this.ctx.storage.put({ [SCAN_SANDBOX_PHASES_KEY]: [...started, phase], [SCAN_SANDBOX_TRACE_KEY]: trace });
+      const starts = (await this.ctx.storage.get<PhaseStart[]>(SCAN_SANDBOX_PHASE_STARTS_KEY)) ?? [];
+      await this.ctx.storage.put({
+        [SCAN_SANDBOX_PHASES_KEY]: [...started, phase],
+        [SCAN_SANDBOX_PHASE_STARTS_KEY]: [...starts, { phase, meter }],
+        [SCAN_SANDBOX_TRACE_KEY]: trace,
+      });
     }
     const remaining = remainingUsd(meter);
     console.log(`scan: phase ${phase} starts, $${remaining.toFixed(4)} of the $${options.maxBudgetUsd} cap left`);
@@ -179,7 +200,8 @@ export class FullScanSandbox extends DurableObject<Bindings> {
       throw new Error(`the budget cap of $${options.maxBudgetUsd} was reached before the ${phase} phase could start`);
     }
     const files = phaseAgentFiles(phase);
-    await this.#files.writeFile(files.prompt, buildPhasePrompt(options, phase));
+    const handover = (await this.ctx.storage.get<string[]>(SCAN_SANDBOX_HANDOVER_KEY)) ?? [];
+    await this.#files.writeFile(files.prompt, buildPhasePrompt(options, phase, CONTAINER_PLACE, handover));
     await this.#container.exec(["/bin/sh", "-c", buildAgentScript(options, files, Number(remaining.toFixed(6)))], {
       cwd: SCAN_SANDBOX_REPO_DIR,
       env: SCAN_SANDBOX_AGENT_ENV,
@@ -243,9 +265,7 @@ export class FullScanSandbox extends DurableObject<Bindings> {
         this.#logEnd(files.log),
       ),
     );
-    const reports = logs
-      .flatMap((log) => (log === null ? [] : [parseAgentUsage(log)]))
-      .filter((report) => report !== null);
+    const reports = logs.map(parseLog).filter((report) => report !== null);
     const reported =
       reports.length === 0
         ? null
@@ -255,7 +275,13 @@ export class FullScanSandbox extends DurableObject<Bindings> {
             durationMs: sumOrNull(reports.map((report) => report.durationMs)),
           };
     if (meter === undefined) return reported;
+    const starts = (await this.ctx.storage.get<PhaseStart[]>(SCAN_SANDBOX_PHASE_STARTS_KEY)) ?? [];
+    const phases = phaseSpends(starts, meter).map((spend) => {
+      const report = parseLog(logs[started.indexOf(spend.phase)]);
+      return { ...spend, turns: report?.turns ?? null, durationMs: report?.durationMs ?? null };
+    });
     return {
+      phases: phases.length > 0 ? phases : null,
       inputTokens: meter.inputTokens,
       outputTokens: meter.outputTokens,
       cacheReadTokens: meter.cacheReadTokens,
@@ -273,7 +299,7 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async readFiles(): Promise<ScanFiles> {
     console.log("scan: reading deliverables");
     const files: ScanFiles = {};
-    for (const name of SCAN_REPORT_FILES) {
+    for (const name of SCAN_KEPT_FILES) {
       const text = await this.#readText(`${SCAN_SANDBOX_OUT_DIR}/${name}`);
       if (text !== null) files[name] = text;
     }

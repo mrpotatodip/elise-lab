@@ -73,6 +73,7 @@ const setup = (options: SetupOptions = {}) => {
       return { commitSha: "abc123", branch: ref && /^v\d/.test(ref) ? null : (ref ?? "main") };
     },
     launchAgent: async () => undefined,
+    putHandoverFiles: async () => undefined,
     launchPhase: async (_options, phase) => {
       currentPhase = phase;
       capReached = capReached || options.capReachedInPhase === phase;
@@ -99,6 +100,7 @@ const setup = (options: SetupOptions = {}) => {
     ledger: ledger.repo,
     reports: bindings.env.REPORTS,
     sealedKeyFor: async () => options.sealedKey ?? null,
+    handoverFiles: async () => [],
     recordScan: async (_params: ScanParams, status: ScanState) => {
       calls.push(`record:${status}:${ledger.rows.get("scan-1")?.status}`);
       if (options.recordFails === status) throw new Error("database down");

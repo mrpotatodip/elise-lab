@@ -143,7 +143,23 @@ pub struct Job {
     resumes_scan_id: Option<String>,
     #[serde(default)]
     earlier_scan_ids: Vec<String>,
+    #[serde(default)]
+    handover_files: Vec<HandoverFile>,
     priors_json: String,
+}
+
+#[derive(Deserialize)]
+struct HandoverFile {
+    name: String,
+    content: String,
+}
+
+fn safe_handover_name(name: &str) -> bool {
+    name.ends_with(".json")
+        && name.len() <= 66
+        && name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.')
+        && name.matches('.').count() == 1
 }
 
 // git: clone `repo`. archive: download the zip of an upload Scan from Elise, which serves it only to
@@ -507,6 +523,9 @@ async fn execute(
     fs::create_dir_all(work.join("out")).map_err(|e| format!("Could not make a work folder: {e}"))?;
     if !job.priors_json.is_empty() {
         fs::write(work.join("prior-findings.json"), &job.priors_json).map_err(|e| format!("Could not save the earlier findings: {e}"))?;
+    }
+    for file in job.handover_files.iter().filter(|file| safe_handover_name(&file.name)) {
+        fs::write(work.join("out").join(&file.name), &file.content).map_err(|e| format!("Could not save {}: {e}", file.name))?;
     }
 
     match clone {
@@ -2044,6 +2063,7 @@ mod tests {
             resume: false,
             resumes_scan_id: None,
             earlier_scan_ids: Vec::new(),
+            handover_files: Vec::new(),
             priors_json: String::new(),
         }
     }
