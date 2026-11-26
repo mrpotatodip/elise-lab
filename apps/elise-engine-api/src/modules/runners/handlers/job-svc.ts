@@ -11,6 +11,7 @@ import { NotFound, toExternalError, type DbError, type ExternalError } from "#/l
 import type { ScanFiles } from "#/lib/scan-file-types";
 import { ScanOptionsSchema } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
+import { handoverFilesSvc } from "#/modules/decided-problems";
 import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox";
 import {
   RUNNER_JOB_ARCHIVE_REMOVED,
@@ -96,6 +97,8 @@ const claimNextJob = (
       yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_ARCHIVE_REMOVED, now);
       return yield* claimNextJob(db, runnerId, readsArchive);
     }
+    const handoverFiles = yield* handoverFilesSvc(db, row.tenantId, row.repoUrl, row.ref ?? undefined);
+    const handoverNames = handoverFiles.map((file) => file.name);
     const job: RunnerJob = {
       scanId: row.scanId,
       repo: row.repoUrl,
@@ -111,10 +114,11 @@ const claimNextJob = (
       prompt: row.prompt,
       phasePrompts: SCAN_SANDBOX_FULL_PHASES.map((phase) => ({
         phase,
-        prompt: buildPhasePrompt(options.value, phase, RUNNER_PROMPT_PLACE),
+        prompt: buildPhasePrompt(options.value, phase, RUNNER_PROMPT_PLACE, handoverNames),
       })),
       priorsJson: row.priorsJson,
     };
+    if (handoverFiles.length > 0) job.handoverFiles = handoverFiles;
     if (row.resumesScanId !== null) {
       job.resume = true;
       job.resumesScanId = row.resumesScanId;

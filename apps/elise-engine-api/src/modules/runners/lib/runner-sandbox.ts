@@ -29,6 +29,8 @@ export const runnerSandbox = (
   return {
     prepare: async () => ({ commitSha: null, branch: null }),
 
+    putHandoverFiles: async () => undefined,
+
     launchAgent: async (options) => {
       await runEffect(
         insertRunnerJobEffect(db, {

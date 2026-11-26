@@ -1,6 +1,6 @@
 import { Files } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
-import type { ScanUsage, TraceEntry } from "@repo/contracts/elise";
+import type { HandoverFile, ScanUsage, TraceEntry } from "@repo/contracts/elise";
 import { SCAN_REPORT_FILES } from "#/constants";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions } from "#/schemas";
@@ -13,6 +13,7 @@ import {
   SCAN_SANDBOX_CLONE_GUARD_MS,
   SCAN_SANDBOX_CLONED_MARKER,
   SCAN_SANDBOX_COMMIT_FILE,
+  SCAN_SANDBOX_HANDOVER_KEY,
   SCAN_SANDBOX_INACTIVITY_MS,
   SCAN_SANDBOX_INSTANCE_TYPE,
   SCAN_SANDBOX_KIND_FILE,
@@ -43,6 +44,7 @@ import {
   buildAgentScript,
   buildCloneScript,
   buildPhasePrompt,
+  CONTAINER_PLACE,
   DEFAULT_AGENT_FILES,
   freshMeter,
   parseAgentUsage,
@@ -131,6 +133,15 @@ export class FullScanSandbox extends DurableObject<Bindings> {
     return { commitSha, branch: normalizeBranchName((await this.#readText(SCAN_SANDBOX_BRANCH_FILE)) ?? "") };
   }
 
+  async putHandoverFiles(files: HandoverFile[]): Promise<void> {
+    await this.#files.mkdir(SCAN_SANDBOX_OUT_DIR, { recursive: true });
+    for (const file of files) await this.#files.writeFile(`${SCAN_SANDBOX_OUT_DIR}/${file.name}`, file.content);
+    await this.ctx.storage.put(
+      SCAN_SANDBOX_HANDOVER_KEY,
+      files.map((file) => file.name),
+    );
+  }
+
   // -----
   // One run of the agent for the whole Scan, with the whole Budget cap.
   // A Scan in our cloud runs in Phases (launchPhase). The one-run branch
@@ -179,7 +190,8 @@ export class FullScanSandbox extends DurableObject<Bindings> {
       throw new Error(`the budget cap of $${options.maxBudgetUsd} was reached before the ${phase} phase could start`);
     }
     const files = phaseAgentFiles(phase);
-    await this.#files.writeFile(files.prompt, buildPhasePrompt(options, phase));
+    const handover = (await this.ctx.storage.get<string[]>(SCAN_SANDBOX_HANDOVER_KEY)) ?? [];
+    await this.#files.writeFile(files.prompt, buildPhasePrompt(options, phase, CONTAINER_PLACE, handover));
     await this.#container.exec(["/bin/sh", "-c", buildAgentScript(options, files, Number(remaining.toFixed(6)))], {
       cwd: SCAN_SANDBOX_REPO_DIR,
       env: SCAN_SANDBOX_AGENT_ENV,

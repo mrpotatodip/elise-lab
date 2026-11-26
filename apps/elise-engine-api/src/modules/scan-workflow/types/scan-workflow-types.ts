@@ -1,4 +1,4 @@
-import type { SaveTraceBody, ScanUsage, TraceEntry, TraceSaved } from "@repo/contracts/elise";
+import type { HandoverFile, SaveTraceBody, ScanUsage, TraceEntry, TraceSaved } from "@repo/contracts/elise";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions, ScanParams, ScanState } from "#/schemas";
 import type { ScanRepo } from "#/modules/scan-ledger";
@@ -11,6 +11,14 @@ import type { AgentState, FullPhase, OutboundAnthropicKey, ScanCheckout } from "
 export type SandboxPort = {
   prepare: (repoUrl: string, ref?: string, anthropicKey?: OutboundAnthropicKey) => Promise<ScanCheckout>;
   launchAgent: (options: ScanOptions) => Promise<void>;
+  // -----
+  // Writes the hand-over files (HandoverFile) into the output
+  // directory, before the first Phase, and notes their names so the
+  // Phase prompts can mention them. Cloud only: a Runner's job
+  // carries the files itself. Not optional, for the reason given at
+  // readCheckout.
+  // -----
+  putHandoverFiles: (files: HandoverFile[]) => Promise<void>;
   // -----
   // The two calls of a full Scan's Phases. A Phase is one run of the agent;
   // the Phases share the Scan's one Budget cap. pollAgent answers for the
@@ -53,6 +61,7 @@ export type ScanRunDeps = {
   ledger: ScanRepo;
   reports: R2Bucket;
   sealedKeyFor: (accountId: string) => Promise<string | null>;
+  handoverFiles: (params: ScanParams) => Promise<HandoverFile[]>;
   recordScan: (params: ScanParams, status: ScanState, error: string | null, usage: ScanUsage | null) => Promise<void>;
   saveTrace: (params: ScanParams, body: SaveTraceBody) => Promise<TraceSaved>;
   detectSignals: (params: ScanParams) => Promise<void>;

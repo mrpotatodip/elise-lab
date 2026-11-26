@@ -3,6 +3,7 @@ import { runEffect } from "#/lib/effect-query";
 import { dbConnect } from "#/lib/db-connection";
 import type { ScanParams } from "#/schemas";
 import { realAppDeps } from "#/lib/app-deps";
+import { handoverFilesSvc } from "#/modules/decided-problems";
 import { detectDuplicateSignalsSvc } from "#/modules/signals";
 import { findSealedKeyEffect } from "#/modules/anthropic-key";
 import { runnerSandbox } from "#/modules/runners/lib";
@@ -35,6 +36,8 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
         ledger: neonScanRepo(dbConnect(this.env.DATABASE_URL)),
         reports: this.env.REPORTS,
         sealedKeyFor: (accountId) => runEffect(findSealedKeyEffect(dbConnect(this.env.DATABASE_URL), accountId)),
+        handoverFiles: (params) =>
+          runEffect(handoverFilesSvc(dbConnect(this.env.DATABASE_URL), params.accountId, params.repo, params.ref)),
         recordScan: (params, status, error, usage) => runEffect(recordScanSvc(this.env, params, status, error, usage)),
         saveTrace: (params, body) =>
           runEffect(keepTraceBatchSvc(dbConnect(this.env.DATABASE_URL), params.accountId, params.scanId, body)),

@@ -91,6 +91,12 @@ export const SCAN_SANDBOX_FULL_PHASES = ["recon", "hunt", "check", "report"] as 
 export const SCAN_SANDBOX_PHASES_KEY = "phases";
 
 // -----
+// The key that holds the names of the hand-over files written to the
+// output directory before the first Phase.
+// -----
+export const SCAN_SANDBOX_HANDOVER_KEY = "handover";
+
+// -----
 // The key that holds the running Phase's Trace: how far its log was
 // read, the entry that can still grow, and the markers not yet sent.
 // -----

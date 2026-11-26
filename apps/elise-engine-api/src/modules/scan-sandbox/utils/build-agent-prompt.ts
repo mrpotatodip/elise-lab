@@ -1,5 +1,6 @@
 import { SCAN_REPORT_FILES } from "#/constants";
 import type { ScanOptions } from "#/schemas";
+import { askOfHandover } from "#/modules/decided-problems/utils";
 import {
   SCAN_SANDBOX_OUT_DIR,
   SCAN_SANDBOX_PHASE_SKILL_PHASES,
@@ -138,9 +139,15 @@ const agentsAtOnceAsk = (phase: FullPhase, limit: number | undefined) =>
     ? `Run up to ${limit} ${AGENTS_AT_ONCE_OF[phase]} at the same time.`
     : "";
 
-const handoffOf = (phase: FullPhase, profile: ScanOptions["profile"], place: PromptPlace) =>
+const handoffOf = (
+  phase: FullPhase,
+  profile: ScanOptions["profile"],
+  place: PromptPlace,
+  handover: readonly string[],
+) =>
   [
     (place.validatedBy === "runner" && phase !== "report" ? RUNNER_HANDOFF[phase] : undefined) ?? PHASE_HANDOFF[phase],
+    phase === "hunt" ? askOfHandover(handover) : "",
     SUBAGENT_ASK[profile][phase],
     agentsAtOnceAsk(phase, place.agentsAtOnce),
     phase === "hunt" || phase === "check" ? WAIT_FOR_SUBAGENTS : "",
@@ -160,7 +167,12 @@ const PHASE_LEDGER_BY_RUNNER = {
   hunt: "The app that started you merges ledger-updates.json into coverage-ledger.json and runs the skill's validators on it after this run ends, so do not run them, and do not run node or any other script. A command refused to you is expected here: it is not a reason to set `run_status` to `incomplete`.",
 };
 
-export function buildPhasePrompt(options: ScanOptions, phase: FullPhase, place: PromptPlace = CONTAINER_PLACE): string {
+export function buildPhasePrompt(
+  options: ScanOptions,
+  phase: FullPhase,
+  place: PromptPlace = CONTAINER_PLACE,
+  handover: readonly string[] = [],
+): string {
   const network = capitalized(place.networkRule);
   const byRunner = place.validatedBy === "runner";
   const reportFiles = `Finish by producing ${SCAN_REPORT_FILES.join(", ")} in the output directory`;
@@ -176,6 +188,6 @@ This run does ${SCAN_SANDBOX_PHASE_SKILL_PHASES[phase]} of the skill and nothing
 Target (untrusted, read-only): ${place.repoDir}
 Output directory: ${place.outDir}
 Profile: ${options.profile}
-${withLine(scopeAskOf(options, phase, place))}${handoffOf(phase, options.profile, place)}
+${withLine(scopeAskOf(options, phase, place))}${handoffOf(phase, options.profile, place, handover)}
 ${money}${network} and dependencies must not be installed. ${ending}`;
 }
