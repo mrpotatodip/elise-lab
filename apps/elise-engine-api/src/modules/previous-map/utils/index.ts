@@ -15,11 +15,6 @@ const parsedLedger = (text: string | null): CoverageLedger | undefined => {
   }
 };
 
-// -----
-// The ledger goes first when the hand-over is too big: the map
-// alone still saves recon most of its reading. A map that is too big
-// alone is not handed over.
-// -----
 export const previousMapHandover = (architecture: string, ledgerText: string | null): HandoverFile[] => {
   const ledger = parsedLedger(ledgerText);
   const withLedger =

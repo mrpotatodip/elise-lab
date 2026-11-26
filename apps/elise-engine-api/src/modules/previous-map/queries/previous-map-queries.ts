@@ -8,10 +8,6 @@ import { PREVIOUS_MAP_ARCHITECTURE_FILE, PREVIOUS_MAP_LEDGER_FILE } from "#/modu
 
 export type PreviousMapKeys = { architectureKey: string; ledgerKey: string | null };
 
-// -----
-// The newest succeeded full Scan of the Branch that saved a map, and
-// the R2 keys of its map and its ledger.
-// -----
 export const previousMapKeysEffect = (
   db: AppDbType,
   tenantId: string,
@@ -36,6 +32,7 @@ export const previousMapKeysEffect = (
             eq(scans.branchId, branchId),
             eq(scans.status, "succeeded"),
             eq(scans.skill, SCAN_RECORDS_PROFILE_SKILL),
+            eq(scans.partial, false),
           ),
         )
         .orderBy(desc(scans.createdAt), desc(scans.id))

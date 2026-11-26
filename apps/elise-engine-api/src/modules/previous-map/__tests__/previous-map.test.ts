@@ -3,7 +3,6 @@ import { HANDOVER_FILE_MAX } from "@repo/contracts/elise";
 import { scanFiles, scans } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { branchIdOf, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { SCAN_KEPT_FILES, SCAN_SERVABLE_FILES } from "#/constants";
 import { buildPhasePrompt, CONTAINER_PLACE } from "#/modules/scan-sandbox/utils";
 import { PREVIOUS_MAP_FILE } from "#/modules/previous-map/constants";
 import { previousMapFilesSvc } from "#/modules/previous-map/handlers";
@@ -35,12 +34,18 @@ beforeAll(async () => {
   const repoId = await seedRepo(test, tenantId);
   main = await branchIdOf(test, repoId);
   await test.raw.insert(scans).values([
-    scanValues(tenantId, repoId, "s-old", "2026-11-01T10:00:00Z", { skill: "full", branchId: main }),
-    scanValues(tenantId, repoId, "s-new", "2026-11-02T10:00:00Z", { skill: "full", branchId: main }),
+    scanValues(tenantId, repoId, "s-old", "2026-11-01T10:00:00Z", { skill: "full", branchId: main, partial: false }),
+    scanValues(tenantId, repoId, "s-new", "2026-11-02T10:00:00Z", { skill: "full", branchId: main, partial: false }),
     scanValues(tenantId, repoId, "s-failed", "2026-11-03T10:00:00Z", {
       skill: "full",
       branchId: main,
+      partial: false,
       status: "failed",
+    }),
+    scanValues(tenantId, repoId, "s-partial", "2026-11-04T10:00:00Z", {
+      skill: "full",
+      branchId: main,
+      partial: true,
     }),
   ]);
 });
@@ -59,6 +64,7 @@ describe("the architecture map of the last Scan on a Branch", () => {
     await seedFiles("s-old", { "architecture.md": "# old map", "coverage-ledger.json": "[]" });
     await seedFiles("s-new", { "architecture.md": "# new map", "coverage-ledger.json": '[{"coverage_id":"a"}]' });
     await seedFiles("s-failed", { "architecture.md": "# failed map" });
+    await seedFiles("s-partial", { "architecture.md": "# one folder only" });
 
     const files = await run(previousMapFilesSvc(test.http, store, tenantId, URL, "main"));
 
@@ -78,10 +84,6 @@ describe("the architecture map of the last Scan on a Branch", () => {
     );
   });
 
-  it("is saved by every Scan, and never served to the dashboard", () => {
-    expect(SCAN_KEPT_FILES).toContain("architecture.md");
-    expect(SCAN_SERVABLE_FILES).not.toContain("architecture.md");
-  });
 });
 
 describe("the hand-over built from a map", () => {

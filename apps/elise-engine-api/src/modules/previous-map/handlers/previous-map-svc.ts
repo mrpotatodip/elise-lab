@@ -12,11 +12,6 @@ export const r2TextStore = (reports: R2Bucket): PreviousMapStore => ({
   read: (key) => reports.get(key).then((object) => (object === null ? null : object.text())),
 });
 
-// -----
-// The hand-over of the last map of the Branch the Scan is on: no
-// entry for a Branch with none, and a map that R2 no longer holds
-// is no map.
-// -----
 export const previousMapFilesSvc = (
   db: AppDbType,
   store: PreviousMapStore,
