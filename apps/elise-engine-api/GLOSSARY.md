@@ -113,8 +113,12 @@ The `REPORT.md` file the agent writes for people to read.
 _Avoid_: Output, result
 
 **Repo**:
-One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included.
-_Avoid_: Project, target
+One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included. A Repo belongs to at most one Project.
+_Avoid_: target
+
+**Project**:
+A named set of Repos in one Account, kept together so they can be reviewed together. A Repo is in at most one Project, or in none. A Project grants nothing and scans nothing: Powers still come from a Role, and a Scan is still started per Repo. It shows the sum of its Repos' open findings, the worst severity among them and the latest Scan. Names are unique per Account, ignoring case. Deleting a Project leaves its Repos ungrouped and deletes none of them. Not a Group, which is a set of people.
+_Avoid_: Group (people only), folder, workspace
 
 **Provider**:
 Where the code of a Scan comes from: `github`, `gitlab`, `gitlab-sh` or `upload`. The user picks it first, and each Provider is its own flow with its own address or file rules, contract schemas and dashboard screens. Core knows only the `SourceProvider` port and one registry, and lint fails when core reads a Provider's folder or one Provider reads another. A request with no `provider` means `github`. On a Runner the clone happens on the user's computer with their own git login, so EliseLAB stores no token for any Provider. `gitlab-sh` takes only hosts the user listed in their own Runner settings: a host that only the job names is refused. ADR 0008 (git providers) holds the rules.
@@ -126,7 +130,7 @@ _Avoid_: Connection, token (that is the Runner token)
 
 **Upload app**:
 A named app whose code comes from zips the user uploaded, not from a git host: a Repo with Provider `upload`, the name as its path, no host and one hidden Branch named `upload`. The name is unique inside an Account. All its zips are versions of the same code and share one History, with the Archive's content hash standing in for the commit.
-_Avoid_: Project, upload (as a noun for the zip: that is an Archive)
+_Avoid_: upload (as a noun for the zip: that is an Archive)
 
 **Archive**:
 One stored zip of an Upload app: an ID, a label, its R2 key under the Account, size, content hash and upload time. A Scan of an Upload app reads one Archive, chosen by ID, and a link row records which. An Archive can be scanned many times or never. Limits: 50 MB zipped, 250 MB unpacked, 20,000 files, 20 path levels, 20 per app and 500 MB per Account. One no Scan has read is deleted 30 days after upload. Removing an Archive or an app deletes its files and rows, and past Scans stay in the History with a note that the file is gone. The server serves the zip only to the Runner that claimed that job.
@@ -311,6 +315,34 @@ A Party of the type `organization`. It has one name (`party_organizations`).
 
 **Login**:
 A way to sign in (`auth_user`). It belongs to one Party. Its `name` column always has a value; first and last name exist only for a Person.
+
+**Verified Login**:
+A Login whose email has been confirmed. Only a Verified Login can sign in. A person confirms by opening the link in a Verification email, by accepting a Team invite sent to that address, or by completing a password reset. A new sign-up for an email held by an unverified Login replaces that Login.
+_Avoid_: confirmed email, activated user
+
+**Verification email**:
+The email that holds the one-time link that makes a Login a Verified Login. The link lasts 24 hours and works once. It is always sent, has no unsubscribe link, and is neither a Security notice nor an Activity email.
+_Avoid_: confirmation email, welcome email
+
+**Two-factor**:
+A second step at sign-in: after the password, a Login types a code from its Authenticator, or a Backup code. A Login has Two-factor only once it has typed one valid code at enrolment; an abandoned setup leaves it off. A Login with `tenant_admin` or `workspace_admin` in any Account must have it and is sent to set it up at its next sign-in, with no skip. Every other Login chooses, unless its Account has a Two-factor requirement. A Runner token never passes through it.
+_Avoid_: MFA, 2FA (in text people read), device login
+
+**Authenticator**:
+The app on a person's phone or computer (a TOTP app) that holds a Login's Two-factor secret and shows the six-digit code. Emailed codes are not a second factor here.
+_Avoid_: token, OTP app
+
+**Backup code**:
+One of ten single-use codes shown once when a Login enrols in Two-factor, each good in place of an Authenticator code. A Login can regenerate them with its password, which voids the old ten.
+_Avoid_: recovery code, reset code
+
+**Two-factor requirement**:
+An Account setting a `tenant_admin` turns on so that every Login in the Account must have Two-factor. A member without it is sent to set it up at the next sign-in.
+_Avoid_: enforce MFA, mandatory 2FA
+
+**2FA reset**:
+An admin clearing another member's Two-factor because the Login lost both its Authenticator and its Backup codes. A `tenant_admin` can reset any other member, a `workspace_admin` only a non-admin, and nobody their own. It writes an Audit trail entry, sends a Security notice and signs the Login out everywhere.
+_Avoid_: unlock, disable (for an admin's action)
 
 **Service token**:
 The secret `SCAN_API_TOKEN`. Only a server holds it, and every `/scans` route needs it as a bearer token.
