@@ -142,7 +142,10 @@ describe("planPriceView", () => {
 
   it("reads Solo as $6.00 a month and $5.00 per month when billed yearly", () => {
     const solo = { monthlyPriceUsd: 6, yearlyPriceUsd: 60 };
-    expect([planPriceView(solo, "month")?.amount, planPriceView(solo, "year")?.perMonth]).toEqual(["$6.00", "$5.00 per month"]);
+    expect([planPriceView(solo, "month")?.amount, planPriceView(solo, "year")?.perMonth]).toEqual([
+      "$6.00",
+      "$5.00 per month",
+    ]);
   });
 });
 

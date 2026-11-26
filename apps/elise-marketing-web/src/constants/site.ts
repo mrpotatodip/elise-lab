@@ -163,7 +163,11 @@ export const RUNNER = {
 // The yearly prices below must match the engine's plan rows (platform_master_plans: monthly and
 // yearly price). The per-month figures and the "months free" badge are worked out from them.
 // -----
-const PLAN_USD = { solo: { month: 6, year: 60 }, starter: { month: 15, year: 150 }, runner: { month: 35, year: 350 } } as const;
+const PLAN_USD = {
+  solo: { month: 6, year: 60 },
+  starter: { month: 15, year: 150 },
+  runner: { month: 35, year: 350 },
+} as const;
 
 const usd = (amount: number) => `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
 const perMonth = (yearly: number) => usd(Math.round((yearly / 12) * 100) / 100);
