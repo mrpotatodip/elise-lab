@@ -367,18 +367,18 @@ h2 {
   display: none;
 }
 
-/* Pricing: two cards in the dashboard's card style (token surface, hairline, card shadow). */
+/* Pricing: three cards in the dashboard's card style (token surface, hairline, card shadow). */
 .plans {
   display: grid;
-  /* Cards in a row stretch to the tallest one, so both boxes are the same size. */
+  /* Cards in a row stretch to the tallest one, so all boxes are the same size. */
   align-items: stretch;
   gap: 2rem;
   grid-template-columns: minmax(0, 1fr);
 }
 
-@media (min-width: 48rem) {
+@media (min-width: 64rem) {
   .plans {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
