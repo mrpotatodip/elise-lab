@@ -30,6 +30,15 @@ export const SCAN_REPORT_FILES = [
   "run-metadata.json",
 ] as const;
 // -----
+// The check Phase's answer for each open problem it was handed
+// (spec #464). Kept with a Scan, but not a deliverable: the
+// prompts that ask for the report files do not name it, and it is
+// not served.
+// -----
+export const OPEN_PROBLEM_CHECKS_FILE = "open-problem-checks.json";
+export const SCAN_KEPT_FILES = [...SCAN_REPORT_FILES, OPEN_PROBLEM_CHECKS_FILE] as const;
+
+// -----
 // What an older Scan saved besides these: its answer to the Prior
 // findings and the list it was given. No new Scan writes them, but
 // an old Scan's page still serves them.

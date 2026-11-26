@@ -137,11 +137,17 @@ function RepoFindingFacts({
         <SheetFact label="Latest full scan">
           {fullScanId ? (
             <>
-              Not in the latest full scan, <ScanLink scanId={fullScanId} starts={starts} />. It stays open until a
-              person decides it.
+              {finding.checkedNotFound
+                ? "Checked, not found in the latest full scan, "
+                : "Not in the latest full scan, not re-checked, "}
+              <ScanLink scanId={fullScanId} starts={starts} />. It stays open until a person decides it.
             </>
           ) : (
-            "This problem is not in the latest full scan. It stays open until a person decides it."
+            `${
+              finding.checkedNotFound
+                ? "Checked, not found in the latest full scan."
+                : "Not in the latest full scan, not re-checked."
+            } It stays open until a person decides it.`
           )}
         </SheetFact>
       )}

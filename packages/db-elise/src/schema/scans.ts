@@ -166,6 +166,8 @@ export const scans = pgTable(
     costUsd: numeric("cost_usd", { precision: 10, scale: 4 }),
     // What each Phase of the Scan spent, in the order they ran; they add up to the columns above. Null: no split (a row from before this column, a Scan whose agent log held none, or a Scan that has not read its usage).
     phaseUsage: jsonb("phase_usage").$type<ScanPhaseUsage[]>(),
+    // What the check Phase said of each open problem it was handed (spec #464): {fingerprint, answer} with answer still_there, gone or not_reached. Null: nothing was handed over or the check wrote no file. Read for display only; it never changes a problem's state.
+    openProblemChecks: jsonb("open_problem_checks").$type<{ fingerprint: string; answer: "still_there" | "gone" | "not_reached" }[]>(),
     turns: integer("turns"),
     durationMs: integer("duration_ms"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),

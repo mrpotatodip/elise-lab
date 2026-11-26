@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import type { ProfileMetValue, ScanUsage } from "@repo/contracts/elise";
+import { OPEN_PROBLEM_CHECKS_FILE } from "#/constants";
 import { toExternalError, toParseError, type ExternalError, type ParseError } from "#/lib/effect-query";
 import type { ScanParams, ScanState } from "#/schemas";
 import { readScanFileEffect, scanKey } from "#/modules/scan-store";
@@ -10,7 +11,12 @@ import {
   SCAN_RECORDS_PROFILE_SKILL,
   SCAN_RECORDS_REPORT_FILE,
 } from "#/modules/scan-records/constants";
-import { FullFindingsSchema, type FullFinding } from "#/modules/scan-records/schemas";
+import {
+  FullFindingsSchema,
+  OpenProblemChecksSchema,
+  type FullFinding,
+  type OpenProblemCheck,
+} from "#/modules/scan-records/schemas";
 import type { NewFindingRow, ScanBranch, ScanRecord } from "#/modules/scan-records/types";
 import { checkRunnerProfile, fullFindingRowOf, isPartialScan, profileMetOf } from "#/modules/scan-records/utils";
 
@@ -19,6 +25,18 @@ const readText = (reports: R2Bucket, params: ScanParams, file: string): Effect.E
     const object = yield* readScanFileEffect(reports, scanKey(params.accountId, params.scanId, file));
     return object ? yield* Effect.tryPromise({ try: () => object.text(), catch: toExternalError }) : null;
   });
+
+export const openProblemChecksOf = (text: string | null): Effect.Effect<OpenProblemCheck[] | null> =>
+  text === null
+    ? Effect.succeed(null)
+    : Effect.try({ try: () => OpenProblemChecksSchema.parse(JSON.parse(text)), catch: toParseError }).pipe(
+        Effect.map(({ checks }) => {
+          const kept = new Map<string, OpenProblemCheck>();
+          for (const check of checks) if (!kept.has(check.fingerprint)) kept.set(check.fingerprint, check);
+          return [...kept.values()];
+        }),
+        Effect.orElseSucceed(() => null),
+      );
 
 // -----
 // A succeeded full Scan: the nested records, one row for each
@@ -32,7 +50,12 @@ const readProfileScan = (
   reports: R2Bucket,
   params: ScanParams,
 ): Effect.Effect<
-  { findings: NewFindingRow[]; partial: boolean; profileMet: ProfileMetValue | null },
+  {
+    findings: NewFindingRow[];
+    partial: boolean;
+    profileMet: ProfileMetValue | null;
+    openProblemChecks: OpenProblemCheck[] | null;
+  },
   ExternalError | ParseError
 > =>
   Effect.gen(function* () {
@@ -51,6 +74,9 @@ const readProfileScan = (
     const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE);
     const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE);
     const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE);
+    const openProblemChecks = yield* openProblemChecksOf(
+      yield* readText(reports, params, OPEN_PROBLEM_CHECKS_FILE),
+    );
     const scoped = (params.options.scopePaths?.length ?? 0) > 0;
     const check =
       params.runnerId && !scoped
@@ -60,6 +86,7 @@ const readProfileScan = (
       findings,
       partial: scoped || isPartialScan(report, ledger, metadata),
       profileMet: profileMetOf(params.options.profile, check),
+      openProblemChecks,
     };
   });
 
@@ -109,6 +136,7 @@ export const buildScanRecordSvc = (
         cacheWriteTokens: usage?.cacheWriteTokens ?? null,
         costUsd: usage ? usage.costUsd.toFixed(4) : null,
         phaseUsage: usage?.phases ?? null,
+        openProblemChecks: profile?.openProblemChecks ?? null,
         turns: usage?.turns ?? null,
         durationMs: usage?.durationMs ?? null,
         createdAt: new Date(params.createdAt),

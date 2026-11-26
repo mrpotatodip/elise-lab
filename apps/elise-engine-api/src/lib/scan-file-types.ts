@@ -1,3 +1,3 @@
-import type { SCAN_REPORT_FILES } from "#/constants";
+import type { SCAN_KEPT_FILES } from "#/constants";
 
-export type ScanFiles = Partial<Record<(typeof SCAN_REPORT_FILES)[number], string>>;
+export type ScanFiles = Partial<Record<(typeof SCAN_KEPT_FILES)[number], string>>;

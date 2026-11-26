@@ -6,8 +6,34 @@ import { toDbError, type DbError } from "#/lib/effect-query";
 import { isCommitId, normalizeBranchName } from "#/modules/branches/utils";
 import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
-import { DECIDED_PROBLEMS_LIMIT, DECIDED_PROBLEMS_STATUSES } from "#/modules/decided-problems/constants";
-import type { DecidedProblem } from "#/modules/decided-problems/types";
+import { DECIDED_PROBLEMS_LIMIT, DECIDED_PROBLEMS_STATUSES, OPEN_PROBLEMS_LIMIT } from "#/modules/decided-problems/constants";
+import type { DecidedProblem, OpenProblem } from "#/modules/decided-problems/types";
+import { repoFindingsEffect } from "#/modules/repos/queries";
+import { isUnresolved, severityRank } from "#/modules/repos/utils";
+
+export const openProblemsEffect = (
+  db: AppDbType,
+  tenantId: string,
+  branchId: string,
+  limit: number = OPEN_PROBLEMS_LIMIT,
+): Effect.Effect<OpenProblem[], DbError> =>
+  repoFindingsEffect(db, tenantId, branchId).pipe(
+    Effect.map((byBranch) =>
+      (byBranch.get(branchId) ?? [])
+        .filter(isUnresolved)
+        .toSorted((a, b) => severityRank(a.severity) - severityRank(b.severity))
+        .slice(0, limit)
+        .map(
+          (finding): OpenProblem => ({
+            fingerprint: finding.fingerprint,
+            title: finding.title,
+            class: finding.class,
+            file: finding.file,
+            severity: finding.severity,
+          }),
+        ),
+    ),
+  );
 
 export const decidedBranchIdEffect = (
   db: AppDbType,

@@ -1,7 +1,7 @@
 import { Files } from "@cloudflare/sandbox";
 import { DurableObject } from "cloudflare:workers";
 import type { HandoverFile, ScanUsage, TraceEntry } from "@repo/contracts/elise";
-import { SCAN_REPORT_FILES } from "#/constants";
+import { SCAN_KEPT_FILES } from "#/constants";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions } from "#/schemas";
 import type { Bindings } from "#/types/variables";
@@ -299,7 +299,7 @@ export class FullScanSandbox extends DurableObject<Bindings> {
   async readFiles(): Promise<ScanFiles> {
     console.log("scan: reading deliverables");
     const files: ScanFiles = {};
-    for (const name of SCAN_REPORT_FILES) {
+    for (const name of SCAN_KEPT_FILES) {
       const text = await this.#readText(`${SCAN_SANDBOX_OUT_DIR}/${name}`);
       if (text !== null) files[name] = text;
     }

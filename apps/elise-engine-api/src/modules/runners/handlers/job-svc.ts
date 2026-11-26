@@ -5,7 +5,7 @@ import {
   type RunnerJobResultBody,
   type RunnerJobState,
 } from "@repo/contracts/elise";
-import { SCAN_REPORT_FILES } from "#/constants";
+import { SCAN_KEPT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
 import { NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
@@ -170,7 +170,7 @@ export const jobStateSvc = (
 // -----
 const keptFiles = (sent: RunnerJobResultBody["files"]): ScanFiles => {
   const kept: ScanFiles = {};
-  for (const name of SCAN_REPORT_FILES) {
+  for (const name of SCAN_KEPT_FILES) {
     const text = sent?.[name];
     if (text !== undefined) kept[name] = text;
   }
