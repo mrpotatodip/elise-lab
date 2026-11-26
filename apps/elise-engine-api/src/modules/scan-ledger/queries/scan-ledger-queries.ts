@@ -385,6 +385,7 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
               cacheReadTokens: patch.usage.cacheReadTokens,
               cacheWriteTokens: patch.usage.cacheWriteTokens,
               costUsd: patch.usage.costUsd.toFixed(4),
+              phaseUsage: patch.usage.phases ?? null,
               turns: patch.usage.turns,
               durationMs: patch.usage.durationMs,
             }),
@@ -509,6 +510,7 @@ export const stoppedUsageEffect = (
           cacheReadTokens: usage.cacheReadTokens,
           cacheWriteTokens: usage.cacheWriteTokens,
           costUsd: usage.costUsd.toFixed(4),
+          phaseUsage: usage.phases ?? null,
           turns: usage.turns,
           durationMs: usage.durationMs,
         })

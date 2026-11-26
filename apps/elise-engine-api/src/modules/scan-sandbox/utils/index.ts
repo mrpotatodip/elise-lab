@@ -6,6 +6,7 @@ export * from "./build-clone-script";
 export * from "./is-allowed-outbound";
 export * from "./parse-agent-usage";
 export * from "./meter";
+export * from "./phase-spend";
 export * from "./create-usage-scanner";
 export * from "./git-auth";
 export * from "./guard-messages";

@@ -52,6 +52,7 @@ export const writeScanRecordEffect = (db: DbConnectType, record: ScanRecord): Ef
             cacheReadTokens: scan.cacheReadTokens,
             cacheWriteTokens: scan.cacheWriteTokens,
             costUsd: scan.costUsd,
+            phaseUsage: scan.phaseUsage,
             turns: scan.turns,
             durationMs: scan.durationMs,
             recordedAt: new Date(),

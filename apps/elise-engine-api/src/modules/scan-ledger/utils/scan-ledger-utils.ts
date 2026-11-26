@@ -1,18 +1,24 @@
 import { z } from "zod";
 import type { scans } from "@repo/db-elise/schema";
-import type {
-  FindingOriginValue,
-  FindingSeverityValue,
-  FindingStatusValue,
-  ScanArchiveRef,
-  ScanArtifact,
-  ScanRunner,
-  ScanSummary,
+import {
+  ScanPhaseUsageSchema,
+  type FindingOriginValue,
+  type FindingSeverityValue,
+  type FindingStatusValue,
+  type ScanArchiveRef,
+  type ScanArtifact,
+  type ScanRunner,
+  type ScanSummary,
 } from "@repo/contracts/elise";
 import { ScanStatusSchema, type ScanStatus } from "#/schemas";
 import { failureCodeOf } from "./failure-code";
 
 type ScanRow = typeof scans.$inferSelect;
+
+const phasesOf = (stored: ScanRow["phaseUsage"]) => {
+  const parsed = z.array(ScanPhaseUsageSchema).safeParse(stored);
+  return parsed.success ? parsed.data : null;
+};
 
 const JobOptionsTextSchema = z
   .string()
@@ -88,6 +94,7 @@ export const scanRowToStatus = (
             cacheReadTokens: row.cacheReadTokens ?? 0,
             cacheWriteTokens: row.cacheWriteTokens ?? 0,
             costUsd: Number(row.costUsd),
+            phases: phasesOf(row.phaseUsage),
             turns: row.turns,
             durationMs: row.durationMs,
           },
