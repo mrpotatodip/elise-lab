@@ -8,13 +8,7 @@
 // "slide-up": new text comes in from below and moves up.
 // "slide-down" / "slide-left" / "slide-right": same idea,
 // moving down, left or right.
-export type AGUILoadingTextAnimation =
-  | "slide-up"
-  | "slide-down"
-  | "slide-left"
-  | "slide-right"
-  | "typing"
-  | "shuffle";
+export type AGUILoadingTextAnimation = "slide-up" | "slide-down" | "slide-left" | "slide-right" | "typing" | "shuffle";
 
 export const AGUI_LOADING_TEXT_ANIMATIONS = [
   "slide-up",

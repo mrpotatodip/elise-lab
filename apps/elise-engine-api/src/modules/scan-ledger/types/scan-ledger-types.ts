@@ -15,6 +15,7 @@ export type ScanPatch = {
   usage?: ScanUsage | null;
   commitSha?: string | null;
   branch?: string | null;
+  resumesScanId?: null;
 };
 
 export type RepoRecord = { id: string; canonical: string; url: string };
@@ -25,7 +26,7 @@ export type NewScanFile = ScanArtifact & { r2Key: string };
 
 export type ScanFileRef = { r2Key: string; contentType: string };
 
-export type ScanPage ={ scans: ScanStatus[]; nextCursor: string | null };
+export type ScanPage = { scans: ScanStatus[]; nextCursor: string | null };
 
 // -----
 // Neon is the record of every scan. The workflow
@@ -34,6 +35,7 @@ export type ScanPage ={ scans: ScanStatus[]; nextCursor: string | null };
 // -----
 export type ScanRepo = {
   ensureRepo: (accountId: string, url: string, provider?: SourceProviderId) => Effect.Effect<RepoRecord, DbError>;
+  restoreRepo: (accountId: string, repoId: string, userId?: string) => Effect.Effect<void, Conflict | DbError>;
   create: (params: ScanParams, repoId: string, nowMs: number) => Effect.Effect<void, DbError | Conflict>;
   mark: (accountId: string, scanId: string, patch: ScanPatch) => Effect.Effect<void, DbError>;
   addFiles: (accountId: string, scanId: string, files: NewScanFile[]) => Effect.Effect<void, DbError>;
@@ -41,6 +43,24 @@ export type ScanRepo = {
   get: (accountId: string, scanId: string) => Effect.Effect<ScanStatus | null, DbError>;
   activeSince: (accountId: string, nowMs: number) => Effect.Effect<ScanStatus[], DbError>;
   file: (accountId: string, scanId: string, name: string) => Effect.Effect<ScanFileRef | null, DbError>;
+};
+
+// -----
+// What a resume reads of the Scan it resumes. job is null for a
+// Scan that ran in our cloud; archive is null unless an upload
+// Scan read a zip (its archiveId is null once the zip is removed).
+// -----
+export type ResumeSource = {
+  id: string;
+  status: ScanState;
+  error: string | null;
+  ref: string | null;
+  maxBudgetUsd: number;
+  repoUrl: string;
+  provider: SourceProviderId;
+  job: { runnerId: string; optionsJson: string } | null;
+  resumedByScanId: string | null;
+  archive: { archiveId: string | null } | null;
 };
 
 // -----

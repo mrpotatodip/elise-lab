@@ -7,7 +7,12 @@ import { cn } from "#/lib/utils";
 import { RUNNER_LOGIN_COMMAND } from "#/modules/runner";
 import { ScanNewDialog } from "#/modules/scan";
 import { CopyCommand, INLINE_LINK_CLASS } from "#/modules/shared";
-import { GETTING_STARTED_RELEASES_URL,GETTING_STARTED_DOCTOR_COMMAND, GETTING_STARTED_INSTALL_COMMAND } from "../constants";
+import {
+  GETTING_STARTED_RELEASES_URL,
+  GETTING_STARTED_DOCTOR_COMMAND,
+  GETTING_STARTED_INSTALL_COMMAND,
+  GETTING_STARTED_WINDOWS_INSTALL_COMMAND,
+} from "../constants";
 import { useGettingStarted, useGettingStartedFlag } from "../hooks";
 import type { GettingStartedTaskKey } from "../utils";
 
@@ -21,7 +26,13 @@ function Task({ done, title, children }: TaskProps) {
   const Icon = done ? Check : Circle;
   return (
     <li className="flex gap-3 py-4 first:pt-0 last:pb-0">
-      <span aria-hidden="true" className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full", done ? "bg-status-success-soft text-status-success" : "text-muted-foreground")}>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full",
+          done ? "bg-status-success-soft text-status-success" : "text-muted-foreground",
+        )}
+      >
         <Icon className="size-3.5" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -51,10 +62,17 @@ export function GettingStartedCard() {
       <CardHeader className="flex-row items-start justify-between gap-3">
         <div className="grid gap-1.5">
           <CardTitle>Getting started</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Five setup tasks take you to your first Report. They tick themselves as Elise sees your Runner and Scans.</p>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+            Five setup tasks take you to your first Report. They tick themselves as Elise sees your Runner and Scans.
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <a href={GETTING_STARTED_RELEASES_URL} target="_blank" rel="noreferrer" className={cn(INLINE_LINK_CLASS, "min-h-6")}>
+          <a
+            href={GETTING_STARTED_RELEASES_URL}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(INLINE_LINK_CLASS, "min-h-6")}
+          >
             All downloads
           </a>
           <Button type="button" size="sm" variant="ghost" onClick={() => setDismissed(true)}>
@@ -65,12 +83,22 @@ export function GettingStartedCard() {
       <CardContent>
         <ol className="flex flex-col divide-y">
           <Task done={done("install")} title="Install the Runner">
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">On macOS or Linux:</p>
             <CopyCommand command={GETTING_STARTED_INSTALL_COMMAND} />
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Claude Code must be installed and signed in on that computer.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              On Windows, in PowerShell (new: it needs Git for Windows, and Windows may show a SmartScreen warning
+              because the file is not signed yet):
+            </p>
+            <CopyCommand command={GETTING_STARTED_WINDOWS_INSTALL_COMMAND} />
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Claude Code must be installed and signed in on that computer.
+            </p>
           </Task>
           <Task done={done("login")} title="Log the Runner in">
             <CopyCommand command={RUNNER_LOGIN_COMMAND} />
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">It opens this site so you can approve the computer on the device page.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              It opens this site so you can approve the computer on the device page.
+            </p>
           </Task>
           <Task done={done("git-access")} title="Check git access (private repositories only)">
             <CopyCommand command={GETTING_STARTED_DOCTOR_COMMAND} />

@@ -23,11 +23,20 @@ export function RepoSummaryStrip(props: RepoSummaryStripProps) {
   const verdict = "branch" in props ? props.verdict : undefined;
   const short = Boolean(verdict);
   const notRated = totals.total - Object.values(totals.severity).reduce((sum, count) => sum + count, 0);
-  const where = "repos" in props ? `Across ${scanPlural(props.repos.length, "repository", "repositories")}.` : "On this branch.";
+  const where =
+    "repos" in props ? `Across ${scanPlural(props.repos.length, "repository", "repositories")}.` : "On this branch.";
 
   return (
-    <section aria-label={"repos" in props ? "Summary across repositories" : "Summary of this branch"} className="grid gap-6">
-      <Card className={cn("grid divide-y overflow-hidden lg:divide-x lg:divide-y-0", short ? "lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]" : "lg:grid-cols-4")}>
+    <section
+      aria-label={"repos" in props ? "Summary across repositories" : "Summary of this branch"}
+      className="grid gap-6"
+    >
+      <Card
+        className={cn(
+          "grid divide-y overflow-hidden lg:divide-x lg:divide-y-0",
+          short ? "lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]" : "lg:grid-cols-4",
+        )}
+      >
         {verdict}
         <Cell
           lead={!short}
@@ -52,12 +61,28 @@ export function RepoSummaryStrip(props: RepoSummaryStripProps) {
         <Cell
           label="Came back"
           value={totals.regressed}
-          note={totals.regressed > 0 ? (short ? "Fixed before, reported again." : "Fixed before, reported again. Look at these first.") : short ? "Nothing fixed has returned." : "Nothing that was fixed has returned."}
+          note={
+            totals.regressed > 0
+              ? short
+                ? "Fixed before, reported again."
+                : "Fixed before, reported again. Look at these first."
+              : short
+                ? "Nothing fixed has returned."
+                : "Nothing that was fixed has returned."
+          }
         />
         <Cell
           label="Needs a person"
           value={totals.needsValidation}
-          note={totals.needsValidation > 0 ? (short ? "Unverified. Check by hand." : "Likely but unverified. Check by hand before acting.") : short ? "All verified." : "Every open finding was verified."}
+          note={
+            totals.needsValidation > 0
+              ? short
+                ? "Unverified. Check by hand."
+                : "Likely but unverified. Check by hand before acting."
+              : short
+                ? "All verified."
+                : "Every open finding was verified."
+          }
         />
         <Cell
           label={short ? "Not in full scan" : "Not in the latest full scan"}

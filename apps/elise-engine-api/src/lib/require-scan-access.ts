@@ -14,7 +14,9 @@ import type { AppEnv } from "#/types/variables";
 const SUMMARY_READS = [/^\/repos\/?$/, /^\/repos\/[^/]+\/findings\/?$/] as const;
 
 const powerFor = (method: string, path: string): AccessPower =>
-  method === "GET" && SUMMARY_READS.some((pattern) => pattern.test(path)) ? "company:summary:read" : "company:dashboard:read";
+  method === "GET" && SUMMARY_READS.some((pattern) => pattern.test(path))
+    ? "company:summary:read"
+    : "company:dashboard:read";
 
 // -----
 // Two ways in, one rule: x-account-id names the

@@ -18,7 +18,7 @@ const read = () => {
   }
 };
 
-export function useCollapsedSections() {
+export function useRepoCollapsedSections() {
   const raw = useSyncExternalStore(subscribe, read, () => "[]");
   const collapsed = useMemo(() => {
     try {

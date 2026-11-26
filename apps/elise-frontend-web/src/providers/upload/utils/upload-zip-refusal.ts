@@ -78,7 +78,11 @@ function zipContentsOf(bytes: Uint8Array): ZipContents | null {
     const name = decoder.decode(bytes.subarray(at + CENTRAL_SIZE, at + CENTRAL_SIZE + nameLength));
     let unpacked = u32(at + 24);
     if (unpacked === U32_MAX) {
-      for (let field = at + CENTRAL_SIZE + nameLength; field + 4 <= at + CENTRAL_SIZE + nameLength + extraLength; field += 4 + u16(field + 2)) {
+      for (
+        let field = at + CENTRAL_SIZE + nameLength;
+        field + 4 <= at + CENTRAL_SIZE + nameLength + extraLength;
+        field += 4 + u16(field + 2)
+      ) {
         if (u16(field) === ZIP64_EXTRA && fits(field + 4, 8)) unpacked = u64(field + 4);
       }
     }

@@ -10,10 +10,16 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/", listGroupsDoc, requirePower("company:team:groups:read"), zValidator("header", AccountHeaderSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listGroupsSvc(db, accountId)));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/",
+  listGroupsDoc,
+  requirePower("company:team:groups:read"),
+  zValidator("header", AccountHeaderSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listGroupsSvc(db, accountId)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

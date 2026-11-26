@@ -24,7 +24,8 @@ const SPEND: MonthSpend = {
 
 const update = (requestedUsd: number | null, spend: MonthSpend = SPEND) =>
   setUsageBudgetSvc(ENV, test.pool, tenantId, "admin-user", requestedUsd, spend, 0, new Date());
-const budgetOf = async () => (await test.raw.select().from(tenants).where(eq(tenants.id, tenantId)))[0].monthlyScanBudgetUsd;
+const budgetOf = async () =>
+  (await test.raw.select().from(tenants).where(eq(tenants.id, tenantId)))[0].monthlyScanBudgetUsd;
 
 beforeAll(async () => {
   test = await openTestDb();
@@ -42,7 +43,11 @@ describe("setUsageBudgetSvc", () => {
     expect(usage).toMatchObject({ budgetUsd: 40, allowanceUsd: 100, spentUsd: 5, remainingUsd: 35 });
     expect(await budgetOf()).toBe("40.00");
     const [entry] = await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, tenantId));
-    expect(entry).toMatchObject({ action: "usage.budget.updated", before: { monthlyBudgetUsd: null }, after: { tenantId, monthlyBudgetUsd: 40 } });
+    expect(entry).toMatchObject({
+      action: "usage.budget.updated",
+      before: { monthlyBudgetUsd: null },
+      after: { tenantId, monthlyBudgetUsd: 40 },
+    });
   });
 
   it.each([

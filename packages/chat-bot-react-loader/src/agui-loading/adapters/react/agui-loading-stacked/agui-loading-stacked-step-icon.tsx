@@ -11,9 +11,7 @@ import { useAGUILoadingStackedStep } from "./agui-loading-stacked-steps";
 // color them from the row, e.g.
 // data-[status=done]:text-emerald-500.
 // -----
-const BUSY_ICON = (
-  <span className="cbl-spinner" />
-);
+const BUSY_ICON = <span className="cbl-spinner" />;
 
 const DONE_ICON = (
   <svg viewBox="0 0 16 16" className="cbl-icon">

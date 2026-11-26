@@ -53,9 +53,7 @@ export function AGUILoadingStackedStepText({
   const step = useAGUILoadingStackedStep("AGUILoadingStackedStepText");
   const openingEvent = STACKED_STEP_START_EVENT[step.kind];
   const waiting = step.status === "waiting";
-  const busyTexts = waiting
-    ? stackedStepWaitingTexts(step, waitingByEvent)
-    : stackedStepBusyTexts(step, busyByEvent);
+  const busyTexts = waiting ? stackedStepWaitingTexts(step, waitingByEvent) : stackedStepBusyTexts(step, busyByEvent);
   // A new key starts a new deck when the row starts or stops waiting.
   const captionKey = waiting ? "waiting" : openingEvent;
 

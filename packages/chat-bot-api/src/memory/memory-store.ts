@@ -6,19 +6,10 @@ import {
   type ChatBotStructure,
   type ChatBotTurn,
 } from "../contracts";
-import {
-  CHAT_BOT_RUN_EXISTS,
-  CHAT_BOT_THREAD_NOT_FOUND,
-} from "../constants";
+import { CHAT_BOT_RUN_EXISTS, CHAT_BOT_THREAD_NOT_FOUND } from "../constants";
 import { ChatBotConflict, ChatBotInvalid, ChatBotNotFound } from "../errors";
 import type { ChatBotRunCloseStatus } from "../schemas";
-import type {
-  ChatBotNewThread,
-  ChatBotOwner,
-  ChatBotStore,
-  ChatBotThreadAttrs,
-  ChatBotTurnUsage,
-} from "../types";
+import type { ChatBotNewThread, ChatBotOwner, ChatBotStore, ChatBotThreadAttrs, ChatBotTurnUsage } from "../types";
 
 type MemoryThread = {
   id: string;
@@ -126,9 +117,7 @@ export function createMemoryChatBotStore(
     return session && thread && holds(session, owner) ? thread : null;
   };
 
-  const addMessage = (
-    message: Omit<MemoryMessage, "id" | "createdAt"> & { createdAt?: Date },
-  ): void => {
+  const addMessage = (message: Omit<MemoryMessage, "id" | "createdAt"> & { createdAt?: Date }): void => {
     state.messages.push({
       ...message,
       id: crypto.randomUUID(),
@@ -212,9 +201,7 @@ export function createMemoryChatBotStore(
       }),
 
     insertUserMessage: ({ threadId, content }) =>
-      Effect.sync(() =>
-        addMessage({ threadId, role: "user", content, toolsUsed: [], structure: null }),
-      ),
+      Effect.sync(() => addMessage({ threadId, role: "user", content, toolsUsed: [], structure: null })),
 
     insertAssistantMessage: ({ threadId, content, toolsUsed, structure }) =>
       Effect.sync(() => {

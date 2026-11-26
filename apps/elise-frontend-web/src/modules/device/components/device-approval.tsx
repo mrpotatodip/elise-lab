@@ -88,7 +88,15 @@ function DeviceDetails({ login, differs }: { login: PendingRunnerLogin; differs:
   );
 }
 
-function DeviceAccountField({ accounts, value, onChange }: { accounts: DeviceAccount[]; value: string; onChange: (next: string) => void }) {
+function DeviceAccountField({
+  accounts,
+  value,
+  onChange,
+}: {
+  accounts: DeviceAccount[];
+  value: string;
+  onChange: (next: string) => void;
+}) {
   const [only] = accounts;
   if (accounts.length === 1 && only) {
     return (
@@ -101,7 +109,11 @@ function DeviceAccountField({ accounts, value, onChange }: { accounts: DeviceAcc
   return (
     <div className="grid gap-2">
       <Label htmlFor={ACCOUNT_ID}>Which account is this Runner for?</Label>
-      <Select value={value} items={accounts.map((account) => ({ value: account.id, label: account.name }))} onValueChange={(next) => onChange(next ?? "")}>
+      <Select
+        value={value}
+        items={accounts.map((account) => ({ value: account.id, label: account.name }))}
+        onValueChange={(next) => onChange(next ?? "")}
+      >
         <SelectTrigger id={ACCOUNT_ID} className="w-full">
           <SelectValue placeholder="Choose an account" />
         </SelectTrigger>
@@ -124,8 +136,13 @@ export function DeviceApproval({ code }: { code: string }) {
   const [denied, setDenied] = useState(false);
 
   const approve = useMutation({
-    mutationFn: (input: { accountId: string; name: string }) => approveDeviceLogin({ data: { userCode: code, ...input } }),
-    onSuccess: (_result, input) => setApproved({ name: input.name, accountName: data.accounts.find((account) => account.id === input.accountId)?.name ?? "" }),
+    mutationFn: (input: { accountId: string; name: string }) =>
+      approveDeviceLogin({ data: { userCode: code, ...input } }),
+    onSuccess: (_result, input) =>
+      setApproved({
+        name: input.name,
+        accountName: data.accounts.find((account) => account.id === input.accountId)?.name ?? "",
+      }),
     onError: async (error) => {
       toast.error(`We couldn't approve this login. ${error.message}`);
       await queryClient.invalidateQueries({ queryKey: deviceKeys.login(code) });
@@ -163,7 +180,9 @@ export function DeviceApproval({ code }: { code: string }) {
         <CardContent className="grid gap-6 px-8 pb-8">
           <div className="grid gap-1.5 text-center">
             <span className="text-xs text-muted-foreground">{DEVICE_COPY.codeLabel}</span>
-            <span className="rounded-lg border bg-muted/40 py-3 font-mono text-2xl tracking-widest">{displayCode(code)}</span>
+            <span className="rounded-lg border bg-muted/40 py-3 font-mono text-2xl tracking-widest">
+              {displayCode(code)}
+            </span>
           </div>
           <Alert variant="warning">
             <TriangleAlert />
@@ -191,7 +210,11 @@ export function DeviceApproval({ code }: { code: string }) {
               <form.Field name="accountId">
                 {(field) => (
                   <div className="grid gap-2">
-                    <DeviceAccountField accounts={data.accounts} value={field.state.value} onChange={field.handleChange} />
+                    <DeviceAccountField
+                      accounts={data.accounts}
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                    />
                     <FieldError id={ACCOUNT_ID} message={fieldMessage(field)} />
                   </div>
                 )}
@@ -218,7 +241,15 @@ export function DeviceApproval({ code }: { code: string }) {
                 <Button type="submit" size="lg" disabled={busy}>
                   {approve.isPending ? DEVICE_COPY.approving : DEVICE_COPY.approve}
                 </Button>
-                <Button type="button" size="lg" variant="outline" disabled={busy} onClick={() => deny.mutate({ accountId: denyAccountId(data.accounts, form.getFieldValue("accountId")) })}>
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    deny.mutate({ accountId: denyAccountId(data.accounts, form.getFieldValue("accountId")) })
+                  }
+                >
                   {deny.isPending ? DEVICE_COPY.denying : DEVICE_COPY.deny}
                 </Button>
               </div>

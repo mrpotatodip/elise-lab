@@ -18,7 +18,11 @@ const repository = column.display({
     return (
       <span className="grid gap-0.5">
         <span className="flex items-center gap-2">
-          <Link to="/repos/$repoId" params={{ repoId: repo.id }} className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link
+            to="/repos/$repoId"
+            params={{ repoId: repo.id }}
+            className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             {repoName(repo.url)}
           </Link>
           <GithubPrivateBadge isPrivate={repo.isPrivate} />
@@ -57,7 +61,11 @@ const branches = column.display({
   },
 });
 
-const open = column.display({ id: "open", header: "Open findings", cell: ({ row }) => <RepoOpenFindings open={row.original.open} /> });
+const open = column.display({
+  id: "open",
+  header: "Open findings",
+  cell: ({ row }) => <RepoOpenFindings open={row.original.open} />,
+});
 
 const last = column.display({
   id: "last",
@@ -84,6 +92,13 @@ export const writeColumns = (projects: readonly Project[]) =>
       id: "actions",
       header: () => <span className="sr-only">Actions</span>,
       meta: { cell: "text-right" },
-      cell: ({ row }) => <MoveRepoDialog repoId={row.original.id} repoLabel={repoName(row.original.url)} current={row.original.projectId ?? null} projects={projects} />,
+      cell: ({ row }) => (
+        <MoveRepoDialog
+          repoId={row.original.id}
+          repoLabel={repoName(row.original.url)}
+          current={row.original.projectId ?? null}
+          projects={projects}
+        />
+      ),
     }),
   ]);

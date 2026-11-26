@@ -25,7 +25,8 @@ export const openApiDocument: OpenApiOptions["documentation"] = {
       bearerAuth: {
         type: "http",
         scheme: "bearer",
-        description: "The service token. Send it as `Authorization: Bearer <SCAN_API_TOKEN>`. Only a server may hold it.",
+        description:
+          "The service token. Send it as `Authorization: Bearer <SCAN_API_TOKEN>`. Only a server may hold it.",
       },
     },
   },

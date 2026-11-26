@@ -1,5 +1,13 @@
 import { authUser } from "@repo/db-elise";
-import { accessAuditLog, parties, partyMasterTypes, partyPersons, scanFindingComments, scanFindings, scans } from "@repo/db-elise/schema";
+import {
+  accessAuditLog,
+  parties,
+  partyMasterTypes,
+  partyPersons,
+  scanFindingComments,
+  scanFindings,
+  scans,
+} from "@repo/db-elise/schema";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -19,7 +27,11 @@ let held: ReadonlySet<AccessPower>;
 const FINGERPRINT = "a".repeat(64);
 const REPO = "https://github.com/octocat/Hello-World";
 const THREAD_URL = `/findings/comments?repo=${REPO}&fingerprint=${FINGERPRINT}`;
-const MEMBER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:dashboard:read", "company:summary:read", "company:findings:comments:create"]);
+const MEMBER: ReadonlySet<AccessPower> = new Set<AccessPower>([
+  "company:dashboard:read",
+  "company:summary:read",
+  "company:findings:comments:create",
+]);
 const ADMIN: ReadonlySet<AccessPower> = new Set<AccessPower>([...MEMBER, "company:findings:comments:delete"]);
 const READER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:dashboard:read", "company:summary:read"]);
 const WATCHER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:summary:read"]);
@@ -31,16 +43,23 @@ const app = tenantRouteApp(() => test, {
 
 const call = (path: string, init: { method?: string; token?: boolean } = {}) => {
   const { env } = fakeBindings();
-  const headers = new Headers({ authorization: `Bearer ${init.token ? TEST_TOKEN : "session-token"}`, "x-account-id": tenantId });
+  const headers = new Headers({
+    authorization: `Bearer ${init.token ? TEST_TOKEN : "session-token"}`,
+    "x-account-id": tenantId,
+  });
   return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers }), env, testExecutionContext);
 };
 
 const seedComment = async (authorPartyId: string | null, body = "a comment") => {
-  const [row] = await test.raw.insert(scanFindingComments).values({ tenantId, repoId, fingerprint: FINGERPRINT, authorPartyId, body }).returning();
+  const [row] = await test.raw
+    .insert(scanFindingComments)
+    .values({ tenantId, repoId, fingerprint: FINGERPRINT, authorPartyId, body })
+    .returning();
   return row.id;
 };
 
-const remove = (commentId: string, token = false) => call(`/findings/comments/${commentId}`, { method: "DELETE", token });
+const remove = (commentId: string, token = false) =>
+  call(`/findings/comments/${commentId}`, { method: "DELETE", token });
 
 const thread = async () =>
   z
@@ -55,8 +74,19 @@ beforeAll(async () => {
   adaPartyId = seeded.partyId;
   repoId = await seedRepo(test, tenantId);
   await test.raw.insert(scans).values(scanValues(tenantId, repoId, "scan-1", "2026-11-01T00:00:00Z"));
-  await test.raw.insert(scanFindings).values({ tenantId, scanId: "scan-1", findingId: "F-1", fingerprint: FINGERPRINT, status: "confirmed", severity: "high", title: "a problem", class: "authz" });
-  await test.raw.insert(authUser).values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: adaPartyId });
+  await test.raw.insert(scanFindings).values({
+    tenantId,
+    scanId: "scan-1",
+    findingId: "F-1",
+    fingerprint: FINGERPRINT,
+    status: "confirmed",
+    severity: "high",
+    title: "a problem",
+    class: "authz",
+  });
+  await test.raw
+    .insert(authUser)
+    .values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: adaPartyId });
   const [type] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
   const [bo] = await test.raw.insert(parties).values({ masterTypeId: type.id }).returning();
   boPartyId = bo.id;
@@ -80,7 +110,14 @@ describe("who may delete a comment", () => {
     const [event] = await thread();
     const [stored] = await test.raw.select().from(scanFindingComments);
 
-    expect([res.status, event.id, event.body, event.deletedAt === null, stored.body, stored.deletedByPartyId]).toEqual([200, id, null, false, "", adaPartyId]);
+    expect([res.status, event.id, event.body, event.deletedAt === null, stored.body, stored.deletedByPartyId]).toEqual([
+      200,
+      id,
+      null,
+      false,
+      "",
+      adaPartyId,
+    ]);
   });
 
   it("lets a holder of the delete Power delete another member's comment", async () => {
@@ -140,7 +177,9 @@ describe("what a delete leaves", () => {
     await remove(id);
     const rows = await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, id));
 
-    expect(rows.map((row) => [row.action, row.actorPartyId, row.subjectId, row.after])).toEqual([["finding.comment.deleted", adaPartyId, id, { tenantId }]]);
+    expect(rows.map((row) => [row.action, row.actorPartyId, row.subjectId, row.after])).toEqual([
+      ["finding.comment.deleted", adaPartyId, id, { tenantId }],
+    ]);
   });
 
   it("writes no Audit trail row when the delete is refused", async () => {

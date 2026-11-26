@@ -31,18 +31,36 @@ const readText = (reports: R2Bucket, params: ScanParams, file: string): Effect.E
 const readProfileScan = (
   reports: R2Bucket,
   params: ScanParams,
-): Effect.Effect<{ findings: NewFindingRow[]; partial: boolean; profileMet: ProfileMetValue | null }, ExternalError | ParseError> =>
+): Effect.Effect<
+  { findings: NewFindingRow[]; partial: boolean; profileMet: ProfileMetValue | null },
+  ExternalError | ParseError
+> =>
   Effect.gen(function* () {
     const findingsText = yield* readText(reports, params, SCAN_RECORDS_FINDINGS_FILE);
-    const records = findingsText === null ? [] : yield* Effect.try({ try: () => FullFindingsSchema.parse(JSON.parse(findingsText)), catch: toParseError });
+    const records =
+      findingsText === null
+        ? []
+        : yield* Effect.try({ try: () => FullFindingsSchema.parse(JSON.parse(findingsText)), catch: toParseError });
     const kept = new Map<string, FullFinding>();
-    for (const record of records) if (record.verdict !== "rejected" && !kept.has(record.fingerprint)) kept.set(record.fingerprint, record);
-    const findings = yield* Effect.tryPromise({ try: () => Promise.all([...kept.values()].map((record) => fullFindingRowOf(record, params))), catch: toExternalError });
+    for (const record of records)
+      if (record.verdict !== "rejected" && !kept.has(record.fingerprint)) kept.set(record.fingerprint, record);
+    const findings = yield* Effect.tryPromise({
+      try: () => Promise.all([...kept.values()].map((record) => fullFindingRowOf(record, params))),
+      catch: toExternalError,
+    });
     const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE);
     const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE);
     const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE);
-    const check = params.runnerId ? checkRunnerProfile(params.options.profile, { report, ledger, metadata, findings: findingsText }) : null;
-    return { findings, partial: isPartialScan(report, ledger, metadata), profileMet: profileMetOf(params.options.profile, check) };
+    const scoped = (params.options.scopePaths?.length ?? 0) > 0;
+    const check =
+      params.runnerId && !scoped
+        ? checkRunnerProfile(params.options.profile, { report, ledger, metadata, findings: findingsText })
+        : null;
+    return {
+      findings,
+      partial: scoped || isPartialScan(report, ledger, metadata),
+      profileMet: profileMetOf(params.options.profile, check),
+    };
   });
 
 export const buildScanRecordSvc = (
@@ -62,7 +80,10 @@ export const buildScanRecordSvc = (
     // are frozen. A Scan of the older Skill is no longer started,
     // so its findings are not read here.
     // -----
-    const profile = status === "succeeded" && params.options.skill === SCAN_RECORDS_PROFILE_SKILL ? yield* readProfileScan(reports, params) : null;
+    const profile =
+      status === "succeeded" && params.options.skill === SCAN_RECORDS_PROFILE_SKILL
+        ? yield* readProfileScan(reports, params)
+        : null;
     return {
       scan: {
         id: params.scanId,

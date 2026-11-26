@@ -4,7 +4,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Copy, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
@@ -62,18 +71,31 @@ export function RunnerAddDialog() {
           <div className="grid gap-2 px-6 pb-2">
             <p className="text-sm font-medium leading-none">On the computer, run this in a terminal</p>
             <CopyCommand command={RUNNER_LOGIN_COMMAND} />
-            <p className="text-xs text-muted-foreground">It opens this site so you can approve the computer. For CI and containers with no browser, make a pairing code below.</p>
+            <p className="text-xs text-muted-foreground">
+              It opens this site so you can approve the computer. For CI and containers with no browser, make a pairing
+              code below.
+            </p>
           </div>
         )}
         {created ? (
           <>
             <DialogBody className="grid gap-3">
               <p className="text-sm">
-                On <span className="font-medium">{created.name}</span>, run <span className="font-mono">elise-runner pair</span> followed by this code. It works once and expires at {runnerWhen(created.expiresAt)}.
+                On <span className="font-medium">{created.name}</span>, run{" "}
+                <span className="font-mono">elise-runner pair</span> followed by this code. It works once and expires at{" "}
+                {runnerWhen(created.expiresAt)}.
               </p>
               <Label htmlFor="runner-code">Pairing code</Label>
-              <Input id="runner-code" readOnly value={created.pairingCode} onFocus={(event) => event.target.select()} className="h-12 text-center font-mono text-2xl tracking-widest" />
-              <p className="text-sm text-muted-foreground">We show it only once. If you lose it, remove this runner and add it again.</p>
+              <Input
+                id="runner-code"
+                readOnly
+                value={created.pairingCode}
+                onFocus={(event) => event.target.select()}
+                className="h-12 text-center font-mono text-2xl tracking-widest"
+              />
+              <p className="text-sm text-muted-foreground">
+                We show it only once. If you lose it, remove this runner and add it again.
+              </p>
             </DialogBody>
             <DialogFooter>
               <Button
@@ -129,7 +151,9 @@ export function RunnerAddDialog() {
               <form.Subscribe selector={(state) => state.values.name}>
                 {(name) => (
                   <p className="mr-auto text-xs text-muted-foreground">
-                    {name.trim() === "" ? "We make a one-time code, good for 10 minutes." : `You're about to add ${name.trim()}. We make a one-time code, good for 10 minutes.`}
+                    {name.trim() === ""
+                      ? "We make a one-time code, good for 10 minutes."
+                      : `You're about to add ${name.trim()}. We make a one-time code, good for 10 minutes.`}
                   </p>
                 )}
               </form.Subscribe>

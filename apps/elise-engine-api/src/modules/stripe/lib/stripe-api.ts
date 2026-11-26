@@ -8,7 +8,6 @@ import {
 } from "#/modules/stripe/schemas";
 import type { StripeGateway } from "#/modules/stripe/types";
 
-
 const parse = async <S extends z.ZodType>(response: Response, schema: S, what: string): Promise<z.infer<S>> => {
   if (!response.ok) throw new Error(`Stripe ${what} answered ${response.status}`);
   return schema.parse(await response.json());
@@ -18,7 +17,10 @@ export type StripeBrandingFiles = { iconFileId?: string; logoFileId?: string };
 
 const brandingFields = ({ iconFileId, logoFileId }: StripeBrandingFiles) => {
   const fields = [["branding_settings[display_name]", "EliseLAB"]];
-  for (const [key, fileId] of [["icon", iconFileId], ["logo", logoFileId]] as const) {
+  for (const [key, fileId] of [
+    ["icon", iconFileId],
+    ["logo", logoFileId],
+  ] as const) {
     if (fileId) fields.push([`branding_settings[${key}][type]`, "file"], [`branding_settings[${key}][file]`, fileId]);
   }
   return fields;
@@ -26,19 +28,33 @@ const brandingFields = ({ iconFileId, logoFileId }: StripeBrandingFiles) => {
 
 export const stripeGateway = (secretKey: string, brandingFiles: StripeBrandingFiles = {}): StripeGateway => {
   const headers = { authorization: `Bearer ${secretKey}`, "stripe-version": STRIPE_API_VERSION };
-  const get = async <S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> => parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { headers }), schema, `GET ${path}`);
-  const post = async <S extends z.ZodType>(path: string, schema: S, form: URLSearchParams, idempotencyKey?: string): Promise<z.infer<S>> => {
+  const get = async <S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> =>
+    parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { headers }), schema, `GET ${path}`);
+  const post = async <S extends z.ZodType>(
+    path: string,
+    schema: S,
+    form: URLSearchParams,
+    idempotencyKey?: string,
+  ): Promise<z.infer<S>> => {
     const postHeaders = new Headers(headers);
     postHeaders.set("content-type", "application/x-www-form-urlencoded");
     if (idempotencyKey) postHeaders.set("idempotency-key", idempotencyKey);
-    return parse(await fetch(`${STRIPE_API_BASE_URL}${path}`, { method: "POST", headers: postHeaders, body: form.toString() }), schema, `POST ${path}`);
+    return parse(
+      await fetch(`${STRIPE_API_BASE_URL}${path}`, { method: "POST", headers: postHeaders, body: form.toString() }),
+      schema,
+      `POST ${path}`,
+    );
   };
 
-  const lookup = (subscriptionId: string) => get(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeSubscriptionResponseSchema);
+  const lookup = (subscriptionId: string) =>
+    get(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeSubscriptionResponseSchema);
 
   return {
     findCustomer: async ({ accountId }) => {
-      const found = await get(`/customers/search?query=${encodeURIComponent(`metadata['accountId']:'${accountId}'`)}&limit=1`, StripeCustomerSearchResponseSchema);
+      const found = await get(
+        `/customers/search?query=${encodeURIComponent(`metadata['accountId']:'${accountId}'`)}&limit=1`,
+        StripeCustomerSearchResponseSchema,
+      );
       return found.data[0] ?? null;
     },
     createCustomer: ({ name, email, accountId }) => {
@@ -53,28 +69,37 @@ export const stripeGateway = (secretKey: string, brandingFiles: StripeBrandingFi
         new URLSearchParams([
           ...brandingFields(brandingFiles),
           ...Object.entries({
-        mode: "subscription",
-        customer: customerId,
-        client_reference_id: accountId,
-        "line_items[0][price]": priceId,
-        "line_items[0][quantity]": "1",
-        "payment_method_types[0]": "card",
-        allow_promotion_codes: "false",
-        "tax_id_collection[enabled]": "true",
-        "customer_update[name]": "auto",
-        "customer_update[address]": "auto",
-        "subscription_data[metadata][accountId]": accountId,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
+            mode: "subscription",
+            customer: customerId,
+            client_reference_id: accountId,
+            "line_items[0][price]": priceId,
+            "line_items[0][quantity]": "1",
+            "payment_method_types[0]": "card",
+            allow_promotion_codes: "false",
+            "tax_id_collection[enabled]": "true",
+            "customer_update[name]": "auto",
+            "customer_update[address]": "auto",
+            "subscription_data[metadata][accountId]": accountId,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
           }),
         ]),
       ),
-    createPortalSession: ({ customerId, returnUrl }) => post("/billing_portal/sessions", StripeUrlResponseSchema, new URLSearchParams({ customer: customerId, return_url: returnUrl })),
+    createPortalSession: ({ customerId, returnUrl }) =>
+      post(
+        "/billing_portal/sessions",
+        StripeUrlResponseSchema,
+        new URLSearchParams({ customer: customerId, return_url: returnUrl }),
+      ),
     changeSubscriptionPrice: async ({ subscriptionId, priceId }) => {
       const found = await lookup(subscriptionId);
       const item = found.items.data[0];
       if (!item) throw new Error(`Stripe subscription ${subscriptionId} has no item`);
-      await post(`/subscriptions/${encodeURIComponent(subscriptionId)}`, StripeIdResponseSchema, new URLSearchParams({ "items[0][id]": item.id, "items[0][price]": priceId }));
+      await post(
+        `/subscriptions/${encodeURIComponent(subscriptionId)}`,
+        StripeIdResponseSchema,
+        new URLSearchParams({ "items[0][id]": item.id, "items[0][price]": priceId }),
+      );
     },
     retrieveSubscription: async (subscriptionId) => {
       const found = await lookup(subscriptionId);

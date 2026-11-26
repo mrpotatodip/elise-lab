@@ -11,7 +11,9 @@ let tenantId: string;
 const app = tenantRouteApp(() => test);
 
 const ListBodySchema = z.object({ data: z.object({ scans: z.array(z.object({ scanId: z.string() })) }) });
-const DetailBodySchema = z.object({ data: z.object({ scanId: z.string(), skill: z.string(), files: z.array(z.string()) }) });
+const DetailBodySchema = z.object({
+  data: z.object({ scanId: z.string(), skill: z.string(), files: z.array(z.string()) }),
+});
 const DiffBodySchema = z.object({ data: z.object({ scanId: z.string(), previousScanId: z.string().nullable() }) });
 
 beforeAll(async () => {
@@ -19,11 +21,20 @@ beforeAll(async () => {
   tenantId = (await seedTenant(test, "acme")).tenantId;
   const repoId = await seedRepo(test, tenantId);
   const branchId = await branchIdOf(test, repoId);
-  await test.raw.insert(scans).values([
-    scanValues(tenantId, repoId, "older", "2026-11-01T00:00:00Z", { branchId }),
-    scanValues(tenantId, repoId, "newer", "2026-11-02T00:00:00Z", { branchId }),
-  ]);
-  await test.raw.insert(scanFiles).values({ tenantId, scanId: "newer", name: "REPORT.md", r2Key: `accounts/${tenantId}/scans/newer/REPORT.md`, sizeBytes: 8, contentType: "text/markdown; charset=utf-8" });
+  await test.raw
+    .insert(scans)
+    .values([
+      scanValues(tenantId, repoId, "older", "2026-11-01T00:00:00Z", { branchId }),
+      scanValues(tenantId, repoId, "newer", "2026-11-02T00:00:00Z", { branchId }),
+    ]);
+  await test.raw.insert(scanFiles).values({
+    tenantId,
+    scanId: "newer",
+    name: "REPORT.md",
+    r2Key: `accounts/${tenantId}/scans/newer/REPORT.md`,
+    sizeBytes: 8,
+    contentType: "text/markdown; charset=utf-8",
+  });
 });
 
 afterAll(async () => {
@@ -49,7 +60,11 @@ describe("the Scan read routes as one account", () => {
     const { env, store } = fakeBindings();
     store.set(`accounts/${tenantId}/scans/newer/REPORT.md`, "# report");
     const headers = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": tenantId };
-    const res = await app.fetch(new Request("http://localhost/scans/newer/files/REPORT.md", { headers }), env, testExecutionContext);
+    const res = await app.fetch(
+      new Request("http://localhost/scans/newer/files/REPORT.md", { headers }),
+      env,
+      testExecutionContext,
+    );
 
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("# report");

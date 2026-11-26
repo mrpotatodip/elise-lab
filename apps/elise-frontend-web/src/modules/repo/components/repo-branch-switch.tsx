@@ -13,9 +13,17 @@ type RepoBranchSwitchProps = {
 // The default branch first, then the most recently scanned, then the
 // ones never scanned.
 // -----
-const byRecent = (a: RepoBranch, b: RepoBranch) => Number(b.isDefault) - Number(a.isDefault) || (b.latestScanAt ?? "").localeCompare(a.latestScanAt ?? "") || a.name.localeCompare(b.name);
+const byRecent = (a: RepoBranch, b: RepoBranch) =>
+  Number(b.isDefault) - Number(a.isDefault) ||
+  (b.latestScanAt ?? "").localeCompare(a.latestScanAt ?? "") ||
+  a.name.localeCompare(b.name);
 
-const openNote = (branch: RepoBranch) => (branch.latestScanAt === null ? "Never scanned" : branch.open.total === 0 ? "Nothing open" : `${branch.open.total} open`);
+const openNote = (branch: RepoBranch) =>
+  branch.latestScanAt === null
+    ? "Never scanned"
+    : branch.open.total === 0
+      ? "Nothing open"
+      : `${branch.open.total} open`;
 
 export function RepoBranchSwitch({ repoId, branches, current }: RepoBranchSwitchProps) {
   const navigate = useNavigate();
@@ -36,7 +44,8 @@ export function RepoBranchSwitch({ repoId, branches, current }: RepoBranchSwitch
       value={current.id}
       items={sorted.map((branch) => ({ value: branch.id, label: branch.name }))}
       onValueChange={(next) => {
-        if (next && next !== current.id) void navigate({ to: "/repos/$repoId/branches/$branchId", params: { repoId, branchId: next } });
+        if (next && next !== current.id)
+          void navigate({ to: "/repos/$repoId/branches/$branchId", params: { repoId, branchId: next } });
       }}
     >
       <SelectTrigger aria-label="Switch branch" className="h-9 w-fit max-w-full gap-2 font-mono text-sm">

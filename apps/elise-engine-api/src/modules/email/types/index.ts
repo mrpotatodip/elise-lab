@@ -96,11 +96,58 @@ export type RunnerNoticeEmail = {
 export type RunnerNames = { runnerName: string; actorName: string; accountName: string };
 
 // -----
+// Security notices about a Login's own Two-factor. They go
+// only to that Login and name no one.
+// -----
+export type TwoFactorNoticeEmail = {
+  kind: "two-factor-enabled" | "two-factor-disabled" | "backup-codes-regenerated" | "backup-code-used";
+  to: string;
+  at: string;
+  link: string;
+};
+
+// -----
+// Security notice: an admin cleared the Login's Two-factor.
+// -----
+export type TwoFactorResetEmail = {
+  kind: "two-factor-reset";
+  to: string;
+  accountName: string;
+  actorName: string;
+  at: string;
+  link: string;
+};
+
+// -----
+// Security notice to every admin: the Account's Two-factor
+// requirement was turned on or off.
+// -----
+export type TwoFactorRequirementEmail = {
+  kind: "two-factor-requirement-changed";
+  to: string;
+  accountName: string;
+  actorName: string;
+  required: boolean;
+  at: string;
+  link: string;
+};
+
+// -----
 // What the email queue carries: one member for each
 // email, told apart by `kind`. A kind with no
 // template does not compile (render-email.ts).
 // -----
-export type QueuedEmail = TeamInviteEmail | VerifyEmail | PasswordResetEmail | PasswordResetDoneEmail | AnthropicKeyChangedEmail | BudgetChangedEmail | RunnerNoticeEmail;
+export type QueuedEmail =
+  | TeamInviteEmail
+  | VerifyEmail
+  | PasswordResetEmail
+  | PasswordResetDoneEmail
+  | AnthropicKeyChangedEmail
+  | BudgetChangedEmail
+  | RunnerNoticeEmail
+  | TwoFactorNoticeEmail
+  | TwoFactorResetEmail
+  | TwoFactorRequirementEmail;
 
 // -----
 // The shape queued before `kind` existed: always a

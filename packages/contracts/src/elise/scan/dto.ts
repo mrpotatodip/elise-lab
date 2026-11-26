@@ -1,14 +1,25 @@
 import { z } from "zod";
 import { ACCEPTED_RISK_MAX_DAYS } from "../constants";
 import { ScanArchiveRefSchema } from "../upload/dto";
-import { FINDING_SEVERITY_VALUES, FINDING_STATUS_VALUES, FINDING_TRIAGE_STATUS_VALUES, REPO_FINDING_STATE_VALUES, SCAN_STATE_VALUES, SCAN_STEP_VALUES, SOURCE_PROVIDER_VALUES } from "../enums";
+import {
+  FINDING_SEVERITY_VALUES,
+  FINDING_STATUS_VALUES,
+  FINDING_TRIAGE_STATUS_VALUES,
+  REPO_FINDING_STATE_VALUES,
+  SCAN_FAILURE_CODE_VALUES,
+  SCAN_STATE_VALUES,
+  SCAN_STEP_VALUES,
+  SOURCE_PROVIDER_VALUES,
+} from "../enums";
+import { SCAN_SCOPE_PATHS_MAX } from "./scope-paths";
 
 export const SCAN_MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5"] as const;
 // Opus is not offered for new scans, but a stored scan may still carry it.
-export const SCAN_RECORDED_MODELS =[...SCAN_MODELS, "claude-opus-5-5"] as const;
+export const SCAN_RECORDED_MODELS = [...SCAN_MODELS, "claude-opus-5-5"] as const;
 export const SCAN_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export const SCAN_SKILLS = ["lite", "full"] as const;
 export const SCAN_PROFILES = ["quick", "standard", "deep"] as const;
+export const RUNNER_SPEND_LIMIT_MAX_USD = 50;
 // -----
 // What a Profile check says a Runner Scan met: a profile, or none
 // of them. Stored as text, so it is not a database enum.
@@ -27,6 +38,7 @@ export const ScanOptionsSchema = z.object({
   effort: z.enum(SCAN_EFFORTS),
   profile: z.enum(SCAN_PROFILES),
   maxBudgetUsd: z.number().positive(),
+  scopePaths: z.array(z.string()).max(SCAN_SCOPE_PATHS_MAX).optional(),
 });
 
 // -----
@@ -110,6 +122,9 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   branch: z.string().nullish(),
   branchId: z.uuid().nullish(),
   untrackedReason: z.string().nullish(),
+  // The chain of attempts (ADR 0016): the Scan this one resumes, and the Scan that resumed it.
+  resumesScanId: z.string().nullish(),
+  resumedByScanId: z.string().nullish(),
   profileMet: z.enum(PROFILE_MET_VALUES).nullish(),
   signalPairsSkipped: z.number().int().min(0).nullish(),
   status: ScanStateSchema,
@@ -117,6 +132,7 @@ export const ScanStatusSchema = ScanOptionsSchema.extend({
   updatedAt: z.string(),
   finishedAt: z.string().nullable(),
   error: z.string().nullable(),
+  failureCode: z.enum(SCAN_FAILURE_CODE_VALUES).nullish(),
   files: z.array(z.string()).nullable(),
   artifacts: z.array(ScanArtifactSchema).nullish(),
   step: z.enum(SCAN_STEP_VALUES).nullish(),
@@ -204,7 +220,12 @@ export const UsageBudgetChangesSchema = z.array(UsageBudgetChangeSchema);
 const SettingsChangeBase = { at: z.string(), by: z.string().nullable() };
 
 export const SettingsChangeSchema = z.discriminatedUnion("kind", [
-  z.object({ ...SettingsChangeBase, kind: z.literal("budget"), fromUsd: z.number().min(0).nullable(), toUsd: z.number().min(0).nullable() }),
+  z.object({
+    ...SettingsChangeBase,
+    kind: z.literal("budget"),
+    fromUsd: z.number().min(0).nullable(),
+    toUsd: z.number().min(0).nullable(),
+  }),
   z.object({ ...SettingsChangeBase, kind: z.literal("anthropic_key_set"), lastFour: z.string().nullable() }),
   z.object({ ...SettingsChangeBase, kind: z.literal("anthropic_key_removed"), lastFour: z.string().nullable() }),
 ]);
@@ -295,16 +316,26 @@ export const FindingTriageBodySchema = z
   })
   .superRefine((body, ctx) => {
     if (body.signalId !== undefined && body.status !== "accepted_risk") {
-      ctx.addIssue({ code: "custom", path: ["signalId"], message: "Only an accepted risk takes the Signal it was saved over" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["signalId"],
+        message: "Only an accepted risk takes the Signal it was saved over",
+      });
     }
     if (body.status === "duplicate" && body.duplicateOf === undefined) {
       ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "A duplicate needs the Finding it duplicates" });
     } else if (body.status !== "duplicate" && body.duplicateOf !== undefined) {
-      ctx.addIssue({ code: "custom", path: ["duplicateOf"], message: "Only a duplicate takes a Finding it duplicates" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["duplicateOf"],
+        message: "Only a duplicate takes a Finding it duplicates",
+      });
     }
     if (body.status === "accepted_risk") {
-      if (!body.note?.trim()) ctx.addIssue({ code: "custom", path: ["note"], message: "An accepted risk needs a reason" });
-      if (body.acceptDays === undefined) ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "An accepted risk needs a number of days" });
+      if (!body.note?.trim())
+        ctx.addIssue({ code: "custom", path: ["note"], message: "An accepted risk needs a reason" });
+      if (body.acceptDays === undefined)
+        ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "An accepted risk needs a number of days" });
     } else if (body.acceptDays !== undefined) {
       ctx.addIssue({ code: "custom", path: ["acceptDays"], message: "Only an accepted risk takes days" });
     }
@@ -352,8 +383,6 @@ export const RepoOpenSchema = z.object({
 // provider and host, with canonical as the path, are the Repo's
 // identity; host is null for an upload app. Optional so an older
 // engine still parses: a Repo without them is github on github.com.
-// projectId is the Project the Repo is grouped under, null for
-// none; an engine that does not send it means none.
 // -----
 export const SourceProviderSchema = z.enum(SOURCE_PROVIDER_VALUES);
 
@@ -372,9 +401,12 @@ export const RepoSchema = z.object({
   lastScanStatus: ScanStateSchema.nullable(),
   lastScanAt: z.string().nullable(),
   open: RepoOpenSchema,
+  removedAt: z.string().nullable().optional(),
 });
 
 export const RepoListSchema = z.object({ repos: z.array(RepoSchema) });
+
+export const RepoListQuerySchema = z.object({ removed: z.enum(["true", "false"]).optional() });
 
 // -----
 // A branch with its own history. latestCommit is the commit of
@@ -397,7 +429,10 @@ export const RepoBranchSchema = z.object({
 
 export const RepoBranchListSchema = z.object({ branches: z.array(RepoBranchSchema) });
 
-export const RepoDetailSchema = RepoSchema.extend({ history: z.array(ScanStatusSchema), branches: z.array(RepoBranchSchema) });
+export const RepoDetailSchema = RepoSchema.extend({
+  history: z.array(ScanStatusSchema),
+  branches: z.array(RepoBranchSchema),
+});
 
 export const RepoParamSchema = z.object({ repoId: z.uuid() });
 
@@ -424,7 +459,10 @@ export const RepoFindingsQuerySchema = z.object({
   cursor: z.string().regex(/^\d+$/).optional(),
 });
 
-export const RepoFindingListSchema = z.object({ findings: z.array(RepoFindingSchema), nextCursor: z.string().nullable() });
+export const RepoFindingListSchema = z.object({
+  findings: z.array(RepoFindingSchema),
+  nextCursor: z.string().nullable(),
+});
 
 // -----
 // GET /scans/:scanId/diff. Compared with the previous succeeded
@@ -463,6 +501,7 @@ export type ScanListQuery = z.infer<typeof ScanListQuerySchema>;
 export type RepoOpen = z.infer<typeof RepoOpenSchema>;
 export type Repo = z.infer<typeof RepoSchema>;
 export type RepoList = z.infer<typeof RepoListSchema>;
+export type RepoListQuery = z.infer<typeof RepoListQuerySchema>;
 export type RepoBranch = z.infer<typeof RepoBranchSchema>;
 export type RepoBranchList = z.infer<typeof RepoBranchListSchema>;
 export type RepoDetail = z.infer<typeof RepoDetailSchema>;

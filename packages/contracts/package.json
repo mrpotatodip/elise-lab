@@ -1,20 +1,20 @@
 {
   "name": "@repo/contracts",
   "version": "1.0.0",
+  "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./response": "./src/response.ts",
     "./chat-bots": "./src/chat-bots/index.ts",
     "./elise": "./src/elise/index.ts"
   },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
   "dependencies": {
     "@repo/chat-bot-api": "workspace:*",
     "zod": "^4.4.3"
-  },
-  "scripts": {
-    "check": "tsc --noEmit"
   }
 }

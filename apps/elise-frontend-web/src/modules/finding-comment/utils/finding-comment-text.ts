@@ -57,7 +57,8 @@ const NUMBER = new Intl.NumberFormat("en");
 // -----
 // The live count under a box: "0 of 4,000 characters".
 // -----
-export const commentCountText = (length: number, max: number): string => `${NUMBER.format(length)} of ${NUMBER.format(max)} characters`;
+export const commentCountText = (length: number, max: number): string =>
+  `${NUMBER.format(length)} of ${NUMBER.format(max)} characters`;
 
 // -----
 // A time in full for a tooltip: date, year, time and zone.

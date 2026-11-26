@@ -47,7 +47,8 @@ const unpinnedSrLabels = (source: string) =>
         .some((breakpoint) => !tokens.includes(`${breakpoint}:whitespace-nowrap`));
     });
 
-const INK_FILL =/\b(?:bg|stroke|fill)-(?:status-(?:success|danger|warning|info|neutral)|severity-(?:critical|high|medium|low|informational))(?:\/(\d+))?(?![\w-])/g;
+const INK_FILL =
+  /\b(?:bg|stroke|fill)-(?:status-(?:success|danger|warning|info|neutral)|severity-(?:critical|high|medium|low|informational))(?:\/(\d+))?(?![\w-])/g;
 const TINT_ALPHA = 30;
 
 // -----
@@ -96,6 +97,8 @@ describe("class names", () => {
     const source = ["// the `collapsed` list", `const a = "x";`, "const b = `y ${z} line-clamp-2 block`;"].join("\n");
 
     expect(clampedAndDisplayed(source)).toHaveLength(1);
-    expect(clampedAndDisplayed(["// a `note`", `<span className="line-clamp-2 text-sm" />`, "const c = `ok`;"].join("\n"))).toHaveLength(0);
+    expect(
+      clampedAndDisplayed(["// a `note`", `<span className="line-clamp-2 text-sm" />`, "const c = `ok`;"].join("\n")),
+    ).toHaveLength(0);
   });
 });

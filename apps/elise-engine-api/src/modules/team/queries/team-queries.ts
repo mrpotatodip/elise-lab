@@ -4,6 +4,7 @@ import {
   accessMasterRoles,
   authAccount,
   authSession,
+  authTwoFactor,
   authUser,
   findTenantRole,
   partyMasterRoles,
@@ -25,6 +26,7 @@ import {
   type TeamInvitePreview,
   type TeamList,
   type TeamRoles,
+  type TeamTwoFactorRequirement,
 } from "@repo/contracts/elise";
 import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { Conflict, DbError, Forbidden, Invalid, NotFound, toDbError } from "#/lib/effect-query";
@@ -40,6 +42,10 @@ import {
   TEAM_INVITE_NOT_FOUND,
   TEAM_INVITE_RACE,
   TEAM_INVITE_SIGN_IN_REQUIRED,
+  TEAM_MEMBER_NOT_FOUND,
+  TEAM_RESET_ADMIN_FORBIDDEN,
+  TEAM_RESET_SELF,
+  TEAM_WORKSPACE_ADMIN_ROLE_KEY,
   TEAM_PENDING_EMAIL_CONSTRAINT,
   TEAM_ROLE_UNKNOWN,
   TEAM_TOO_MANY_INVITES,
@@ -68,7 +74,11 @@ export const listAssignableRolesEffect = (db: AppDbType, tenantId: string): Effe
   Effect.tryPromise({
     try: () =>
       db
-        .select({ key: accessMasterRoles.key, label: accessMasterRoles.label, description: accessMasterRoles.description })
+        .select({
+          key: accessMasterRoles.key,
+          label: accessMasterRoles.label,
+          description: accessMasterRoles.description,
+        })
         .from(partyMasterRoles)
         .innerJoin(accessMasterRoles, eq(accessMasterRoles.id, partyMasterRoles.masterRoleId))
         .where(
@@ -98,6 +108,7 @@ export const listTeamEffect = (db: AppDbType, tenantId: string, now: Date): Effe
             email: authUser.email,
             role: accessMasterRoles.key,
             roleLabel: accessMasterRoles.label,
+            twoFactorEnabled: authUser.twoFactorEnabled,
           })
           .from(partyRoles)
           .innerJoin(authUser, eq(authUser.partyId, partyRoles.partyId))
@@ -158,6 +169,55 @@ export const listTeamEffect = (db: AppDbType, tenantId: string, now: Date): Effe
     };
   });
 
+export const findTwoFactorRequirementEffect = (
+  db: AppDbType,
+  tenantId: string,
+): Effect.Effect<TeamTwoFactorRequirement, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [row] = await db
+        .select({ required: tenants.twoFactorRequired })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId));
+      return { required: row?.required ?? false };
+    },
+    catch: toDbError,
+  });
+
+export const setTwoFactorRequirementEffect = (
+  db: AppTxDbType,
+  tenantId: string,
+  actorUserId: string,
+  required: boolean,
+): Effect.Effect<TeamTwoFactorRequirement & { changed: boolean }, DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db.transaction(async (tx) => {
+        const actorPartyId = await actorPartyOf(tx, actorUserId);
+        const [before] = await tx
+          .select({ required: tenants.twoFactorRequired })
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .for("update");
+        if (!before) return { required: false, changed: false };
+        const [saved] = await tx
+          .update(tenants)
+          .set({ twoFactorRequired: required })
+          .where(eq(tenants.id, tenantId))
+          .returning({ required: tenants.twoFactorRequired });
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "team.two_factor_requirement.set",
+          subjectId: tenantId,
+          tenantId,
+          before: { required: before.required },
+          after: { required: saved?.required ?? required },
+        });
+        return { required: saved?.required ?? required, changed: before.required !== (saved?.required ?? required) };
+      }),
+    catch: toDbError,
+  });
+
 // -----
 // Thrown inside a transaction to roll it back;
 // each maps to one domain failure.
@@ -184,7 +244,10 @@ const refuse = (failure: Conflict | Forbidden | Invalid | NotFound): never => {
 // email (so only the newest link works), save the
 // invite and its Groups, and write the audit row.
 // -----
-export const createInviteEffect = (db: AppTxDbType, invite: NewInvite): Effect.Effect<TeamInvite, Conflict | Invalid | DbError | Forbidden | NotFound> =>
+export const createInviteEffect = (
+  db: AppTxDbType,
+  invite: NewInvite,
+): Effect.Effect<TeamInvite, Conflict | Invalid | DbError | Forbidden | NotFound> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -201,7 +264,8 @@ export const createInviteEffect = (db: AppTxDbType, invite: NewInvite): Effect.E
         }
 
         const role = await findTenantRole(tx, invite.tenantId, invite.roleKey);
-        if (!role?.enabled || role.key === TENANT_ADMIN_ROLE_KEY) return refuse(new Invalid({ message: TEAM_ROLE_UNKNOWN }));
+        if (!role?.enabled || role.key === TENANT_ADMIN_ROLE_KEY)
+          return refuse(new Invalid({ message: TEAM_ROLE_UNKNOWN }));
 
         const [member] = await tx
           .select({ id: partyRoles.id })
@@ -214,11 +278,23 @@ export const createInviteEffect = (db: AppTxDbType, invite: NewInvite): Effect.E
         const replaced = await tx
           .update(tenantTeamInvites)
           .set({ revokedAt: invite.now })
-          .where(and(eq(tenantTeamInvites.tenantId, invite.tenantId), eq(tenantTeamInvites.email, invite.email), pendingAt(invite.now)))
+          .where(
+            and(
+              eq(tenantTeamInvites.tenantId, invite.tenantId),
+              eq(tenantTeamInvites.email, invite.email),
+              pendingAt(invite.now),
+            ),
+          )
           .returning({ id: tenantTeamInvites.id });
         await Promise.all(
           replaced.map((old) =>
-            insertAuditEntry(tx, { actorPartyId, action: "team.invite.revoked", subjectId: old.id, tenantId: invite.tenantId, after: { reason: "replaced" } }),
+            insertAuditEntry(tx, {
+              actorPartyId,
+              action: "team.invite.revoked",
+              subjectId: old.id,
+              tenantId: invite.tenantId,
+              after: { reason: "replaced" },
+            }),
           ),
         );
 
@@ -265,7 +341,9 @@ export const createInviteEffect = (db: AppTxDbType, invite: NewInvite): Effect.E
           })
           .returning();
         if (groupIds.length > 0) {
-          await tx.insert(tenantTeamInviteGroups).values(groupIds.map((groupId) => ({ inviteId: row.id, groupId, tenantId: invite.tenantId })));
+          await tx
+            .insert(tenantTeamInviteGroups)
+            .values(groupIds.map((groupId) => ({ inviteId: row.id, groupId, tenantId: invite.tenantId })));
         }
         await insertAuditEntry(tx, {
           actorPartyId,
@@ -311,13 +389,24 @@ export const inviteEmailContextEffect = (
     return { accountName: tenant?.name ?? "your team", inviterName: actor?.name ?? "A teammate" };
   });
 
-export const markInviteEmailStatusEffect = (db: AppDbType, inviteId: string, status: Exclude<InviteEmailStatusValue, "not_sent">, now: Date): Effect.Effect<void, DbError> =>
+export const markInviteEmailStatusEffect = (
+  db: AppDbType,
+  inviteId: string,
+  status: Exclude<InviteEmailStatusValue, "not_sent">,
+  now: Date,
+): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
         .update(tenantTeamInvites)
         .set({ emailStatus: status, emailStatusAt: now })
-        .where(and(eq(tenantTeamInvites.id, inviteId), isNull(tenantTeamInvites.revokedAt), isNull(tenantTeamInvites.acceptedAt)))
+        .where(
+          and(
+            eq(tenantTeamInvites.id, inviteId),
+            isNull(tenantTeamInvites.revokedAt),
+            isNull(tenantTeamInvites.acceptedAt),
+          ),
+        )
         .then(() => undefined),
     catch: toDbError,
   });
@@ -344,7 +433,13 @@ export const revokeInviteEffect = (
           .where(and(eq(tenantTeamInvites.id, inviteId), eq(tenantTeamInvites.tenantId, tenantId), pendingAt(now)))
           .returning({ id: tenantTeamInvites.id });
         if (!row) return refuse(new NotFound({ message: TEAM_INVITE_NOT_FOUND }));
-        await insertAuditEntry(tx, { actorPartyId, action: "team.invite.revoked", subjectId: row.id, tenantId, after: { reason: "revoked" } });
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "team.invite.revoked",
+          subjectId: row.id,
+          tenantId,
+          after: { reason: "revoked" },
+        });
         return row;
       }),
     catch: (cause) => {
@@ -359,7 +454,11 @@ export const revokeInviteEffect = (
 // the invited address already has a login. Never
 // the address itself.
 // -----
-export const previewInviteEffect = (db: DbConnectType, tokenHash: string, now: Date): Effect.Effect<TeamInvitePreview, Forbidden | DbError> =>
+export const previewInviteEffect = (
+  db: DbConnectType,
+  tokenHash: string,
+  now: Date,
+): Effect.Effect<TeamInvitePreview, Forbidden | DbError> =>
   Effect.gen(function* () {
     const [invite] = yield* Effect.tryPromise({
       try: () =>
@@ -380,7 +479,12 @@ export const previewInviteEffect = (db: DbConnectType, tokenHash: string, now: D
     });
     if (!invite) return yield* new Forbidden({ message: TEAM_INVITE_INVALID });
     const login = yield* Effect.tryPromise({
-      try: () => db.select({ id: authUser.id, emailVerified: authUser.emailVerified }).from(authUser).where(eq(sql`lower(${authUser.email})`, invite.email)).limit(1),
+      try: () =>
+        db
+          .select({ id: authUser.id, emailVerified: authUser.emailVerified })
+          .from(authUser)
+          .where(eq(sql`lower(${authUser.email})`, invite.email))
+          .limit(1),
       catch: toDbError,
     });
     return {
@@ -454,13 +558,19 @@ export const acceptInviteEffect = (
             .where(and(eq(authAccount.userId, existing.id), eq(authAccount.providerId, "credential")));
           await tx.delete(authSession).where(eq(authSession.userId, existing.id));
         } else if (existing) {
-          if (accept.signedInUserId !== existing.id) return refuse(new Forbidden({ message: TEAM_INVITE_SIGN_IN_REQUIRED }));
+          if (accept.signedInUserId !== existing.id)
+            return refuse(new Forbidden({ message: TEAM_INVITE_SIGN_IN_REQUIRED }));
           partyId = existing.partyId;
           loginId = existing.id;
         } else {
           if (!accept.newLogin) return refuse(new Invalid({ message: TEAM_INVITE_DETAILS_REQUIRED }));
           const { firstName, lastName, passwordHash } = accept.newLogin;
-          ({ partyId, userId: loginId } = await createPersonLogin(tx, { firstName, lastName, email: invite.email, passwordHash }));
+          ({ partyId, userId: loginId } = await createPersonLogin(tx, {
+            firstName,
+            lastName,
+            email: invite.email,
+            passwordHash,
+          }));
         }
         await tx.update(authUser).set({ emailVerified: true }).where(eq(authUser.id, loginId));
 
@@ -469,14 +579,18 @@ export const acceptInviteEffect = (
           .from(partyRoles)
           .where(and(eq(partyRoles.tenantId, invite.tenantId), eq(partyRoles.partyId, partyId)));
         if (held) return refuse(new Conflict({ message: TEAM_ALREADY_MEMBER }));
-        await tx.insert(partyRoles).values({ partyId, tenantId: invite.tenantId, roleId: invite.roleId, roleScope: "tenant" });
+        await tx
+          .insert(partyRoles)
+          .values({ partyId, tenantId: invite.tenantId, roleId: invite.roleId, roleScope: "tenant" });
 
         const groups = await tx
           .select({ groupId: tenantTeamInviteGroups.groupId })
           .from(tenantTeamInviteGroups)
           .where(eq(tenantTeamInviteGroups.inviteId, invite.id));
         if (groups.length > 0) {
-          await tx.insert(tenantGroupMembers).values(groups.map(({ groupId }) => ({ groupId, tenantId: invite.tenantId, partyId })));
+          await tx
+            .insert(tenantGroupMembers)
+            .values(groups.map(({ groupId }) => ({ groupId, tenantId: invite.tenantId, partyId })));
         }
         await insertAuditEntry(tx, {
           actorPartyId: partyId,
@@ -488,4 +602,53 @@ export const acceptInviteEffect = (
         return { tenantId: invite.tenantId };
       }),
     catch: classify,
+  });
+
+const roleKeyOf = (tx: Pick<AppDbType, "select">, tenantId: string, partyId: string) =>
+  tx
+    .select({ role: accessMasterRoles.key })
+    .from(partyRoles)
+    .innerJoin(partyMasterRoles, eq(partyMasterRoles.id, partyRoles.roleId))
+    .innerJoin(accessMasterRoles, eq(accessMasterRoles.id, partyMasterRoles.masterRoleId))
+    .where(and(eq(partyRoles.tenantId, tenantId), eq(partyRoles.partyId, partyId)))
+    .then(([row]) => row?.role ?? null);
+
+export const resetTwoFactorEffect = (
+  db: PoolDbType,
+  tenantId: string,
+  actorUserId: string,
+  memberPartyId: string,
+): Effect.Effect<{ partyId: string; userId: string; email: string; name: string }, NotFound | Forbidden | DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db.transaction(async (tx) => {
+        const actorPartyId = await actorPartyOf(tx, actorUserId);
+        if (!actorPartyId) return refuse(new Forbidden({ message: "Forbidden" }));
+        const memberRole = await roleKeyOf(tx, tenantId, memberPartyId);
+        const [login] = await tx
+          .select({ id: authUser.id, email: authUser.email, name: authUser.name })
+          .from(authUser)
+          .where(eq(authUser.partyId, memberPartyId));
+        if (!memberRole || !login) return refuse(new NotFound({ message: TEAM_MEMBER_NOT_FOUND }));
+        if (memberPartyId === actorPartyId) return refuse(new Forbidden({ message: TEAM_RESET_SELF }));
+        const actorRole = await roleKeyOf(tx, tenantId, actorPartyId);
+        const memberIsAdmin = memberRole === TENANT_ADMIN_ROLE_KEY || memberRole === TEAM_WORKSPACE_ADMIN_ROLE_KEY;
+        if (actorRole !== TENANT_ADMIN_ROLE_KEY && memberIsAdmin)
+          return refuse(new Forbidden({ message: TEAM_RESET_ADMIN_FORBIDDEN }));
+        await tx.delete(authTwoFactor).where(eq(authTwoFactor.userId, login.id));
+        await tx.update(authUser).set({ twoFactorEnabled: false }).where(eq(authUser.id, login.id));
+        await tx.delete(authSession).where(eq(authSession.userId, login.id));
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "team.two_factor.reset",
+          subjectId: memberPartyId,
+          tenantId,
+          after: { role: memberRole },
+        });
+        return { partyId: memberPartyId, userId: login.id, email: login.email, name: login.name };
+      }),
+    catch: (cause) => {
+      const failure = classify(cause);
+      return failure._tag === "Conflict" || failure._tag === "Invalid" ? toDbError(cause) : failure;
+    },
   });

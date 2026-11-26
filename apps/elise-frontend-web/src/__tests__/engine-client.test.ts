@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScanListSchema } from "@repo/contracts/elise";
 import { EngineError, engineFetch, engineJson } from "#/lib/engine-client";
 
-const answer = (body: string, status = 200) => vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status })));
+const answer = (body: string, status = 200) =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(body, { status })),
+  );
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -23,8 +27,15 @@ describe("engineFetch", () => {
   });
 
   it("replaces the engine's generic text on an outside-service failure", async () => {
-    answer(JSON.stringify({ data: null, error: { code: "EXTERNAL_SERVICE_ERROR", message: "Internal server error" } }), 502);
-    await expect(engineFetch("/usage/plan/checkout")).rejects.toMatchObject({ status: 502, code: "EXTERNAL_SERVICE_ERROR", message: expect.stringContaining("outside service") });
+    answer(
+      JSON.stringify({ data: null, error: { code: "EXTERNAL_SERVICE_ERROR", message: "Internal server error" } }),
+      502,
+    );
+    await expect(engineFetch("/usage/plan/checkout")).rejects.toMatchObject({
+      status: 502,
+      code: "EXTERNAL_SERVICE_ERROR",
+      message: expect.stringContaining("outside service"),
+    });
   });
 
   it("reads a Better Auth error body", async () => {

@@ -10,7 +10,12 @@ const encoder = new TextEncoder();
 
 export type TraceDrain = { state: TraceState; entries: TraceEntry[] };
 
-export const drainTrace = (state: TraceState, text: string, phase: RunnerJobPhaseValue | null, at: Date): TraceDrain => {
+export const drainTrace = (
+  state: TraceState,
+  text: string,
+  phase: RunnerJobPhaseValue | null,
+  at: Date,
+): TraceDrain => {
   const end = text.lastIndexOf("\n");
   if (end < 0) return { state, entries: [] };
   const whole = text.slice(0, end + 1);
@@ -30,7 +35,18 @@ export const drainTrace = (state: TraceState, text: string, phase: RunnerJobPhas
   return { state: { offset: state.offset + encoder.encode(whole).length, open }, entries: [...changed.values()] };
 };
 
-export const phaseMarker = (label: "phase_started" | "phase_ended", phase: RunnerJobPhaseValue, at: Date): TraceEntry => {
+export const phaseMarker = (
+  label: "phase_started" | "phase_ended",
+  phase: RunnerJobPhaseValue,
+  at: Date,
+): TraceEntry => {
   const time = new Date(at.getTime() + (label === "phase_ended" ? 1 : 0));
-  return { id: uuidV7(time.getTime(), 0), label, phase, startedAt: time.toISOString(), endedAt: time.toISOString(), count: 1 };
+  return {
+    id: uuidV7(time.getTime(), 0),
+    label,
+    phase,
+    startedAt: time.toISOString(),
+    endedAt: time.toISOString(),
+    count: 1,
+  };
 };

@@ -25,7 +25,12 @@ const column = dataTableColumns<BranchScanRow>();
 // -----
 const versionColumn = (zip: boolean) =>
   zip
-    ? column.display({ id: "commit", header: "Zip", meta: { cell: "text-xs text-muted-foreground" }, cell: ({ row }) => scanArchiveNote(row.original.archive) ?? "-" })
+    ? column.display({
+        id: "commit",
+        header: "Zip",
+        meta: { cell: "text-xs text-muted-foreground" },
+        cell: ({ row }) => scanArchiveNote(row.original.archive) ?? "-",
+      })
     : column.display({
         id: "commit",
         header: "Commit",
@@ -33,57 +38,78 @@ const versionColumn = (zip: boolean) =>
         cell: ({ row }) => (row.original.commitSha ? row.original.commitSha.slice(0, 7) : "-"),
       });
 
-const columnsOf = (zip: boolean) => column.columns([
-  column.display({
-    id: "started",
-    header: "Started",
-    cell: ({ row }) =>
-      row.original.current ? (
-        <span className="flex items-center gap-2">
-          <ScanTime value={row.original.createdAt} />
-          <Badge variant="secondary">This scan</Badge>
-        </span>
-      ) : (
-        <Link to="/scans/$scanId" params={{ scanId: row.original.scanId }} className="after:absolute after:inset-0 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <ScanTime value={row.original.createdAt} />
-        </Link>
-      ),
-  }),
-  column.display({ id: "status", header: "Status", cell: ({ row }) => <ScanStatusBadge status={row.original.status} /> }),
-  versionColumn(zip),
-  column.display({
-    id: "findings",
-    header: "Findings",
-    cell: ({ row }) => {
-      const item = row.original;
-      if (item.summary) {
-        return (
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-medium tabular-nums">{scanPlural(item.summary.total, "finding", "findings")}</span>
-            <ScanSeverityDots counts={item.summary.severity} />
-            {item.summary.new > 0 && <span className="text-xs text-muted-foreground">{item.summary.new} new</span>}
+const columnsOf = (zip: boolean) =>
+  column.columns([
+    column.display({
+      id: "started",
+      header: "Started",
+      cell: ({ row }) =>
+        row.original.current ? (
+          <span className="flex items-center gap-2">
+            <ScanTime value={row.original.createdAt} />
+            <Badge variant="secondary">This scan</Badge>
           </span>
-        );
-      }
-      if (item.status === "failed") return <span className="text-sm text-status-danger">{scanFailure(item.error).title}</span>;
-      return <span className="text-muted-foreground">{scanNoSummaryText(item.status)}</span>;
-    },
-  }),
-  column.display({
-    id: "open",
-    header: () => <span className="sr-only">Open</span>,
-    meta: { head: "w-10" },
-    cell: ({ row }) => (row.original.current ? null : <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />),
-  }),
-]);
+        ) : (
+          <Link
+            to="/scans/$scanId"
+            params={{ scanId: row.original.scanId }}
+            className="after:absolute after:inset-0 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ScanTime value={row.original.createdAt} />
+          </Link>
+        ),
+    }),
+    column.display({
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => <ScanStatusBadge status={row.original.status} />,
+    }),
+    versionColumn(zip),
+    column.display({
+      id: "findings",
+      header: "Findings",
+      cell: ({ row }) => {
+        const item = row.original;
+        if (item.summary) {
+          return (
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-medium tabular-nums">{scanPlural(item.summary.total, "finding", "findings")}</span>
+              <ScanSeverityDots counts={item.summary.severity} />
+              {item.summary.new > 0 && <span className="text-xs text-muted-foreground">{item.summary.new} new</span>}
+            </span>
+          );
+        }
+        if (item.status === "failed")
+          return <span className="text-sm text-status-danger">{scanFailure(item.error, item.failureCode).title}</span>;
+        return <span className="text-muted-foreground">{scanNoSummaryText(item.status)}</span>;
+      },
+    }),
+    column.display({
+      id: "open",
+      header: () => <span className="sr-only">Open</span>,
+      meta: { head: "w-10" },
+      cell: ({ row }) =>
+        row.original.current ? null : <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />,
+    }),
+  ]);
 
 const COLUMNS = columnsOf(false);
 const ZIP_COLUMNS = columnsOf(true);
 
 function BranchScansTable({ rows, zip }: { rows: BranchScanRow[]; zip: boolean }) {
-  const table = useTable({ features: dataTableFeatures, columns: zip ? ZIP_COLUMNS : COLUMNS, data: rows, getRowId: (item) => item.scanId });
+  const table = useTable({
+    features: dataTableFeatures,
+    columns: zip ? ZIP_COLUMNS : COLUMNS,
+    data: rows,
+    getRowId: (item) => item.scanId,
+  });
 
-  return <DataTable table={table} rowProps={(row) => ({ className: "relative", "aria-current": row.original.current ? "page" : undefined })} />;
+  return (
+    <DataTable
+      table={table}
+      rowProps={(row) => ({ className: "relative", "aria-current": row.original.current ? "page" : undefined })}
+    />
+  );
 }
 
 // -----
@@ -112,7 +138,8 @@ export function ScanBranchScans({ scan }: { scan: ScanStatus }) {
       <CardHeader className="gap-1.5 pb-7">
         <CardTitle>Scans of this {where}</CardTitle>
         <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-          The latest scans of {zip ? "this app, across its zips" : (scan.branch ?? "this branch")}. Open one to read its report.
+          The latest scans of {zip ? "this app, across its zips" : (scan.branch ?? "this branch")}. Open one to read its
+          report.
         </p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
@@ -120,7 +147,11 @@ export function ScanBranchScans({ scan }: { scan: ScanStatus }) {
         {more > 0 && (
           <p className="border-t px-6 py-3 text-sm leading-relaxed text-muted-foreground">
             {scanPlural(more, "older scan", "older scans")} of this {where}.{" "}
-            <Link to="/repos/$repoId/branches/$branchId" params={{ repoId: scan.repoId, branchId }} className="rounded-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Link
+              to="/repos/$repoId/branches/$branchId"
+              params={{ repoId: scan.repoId, branchId }}
+              className="rounded-sm underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               See the {where} history
             </Link>
           </p>

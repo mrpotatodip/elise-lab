@@ -13,6 +13,7 @@ import {
 } from "../constants";
 import { RUNNER_JOB_PHASE_VALUES, RUNNER_JOB_STATE_VALUES, type RunnerJobSourceValue } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
+import { SCAN_SCOPE_PATHS_MAX } from "../scan/scope-paths";
 
 export const RunnerIdSchema = z.uuid();
 
@@ -81,11 +82,10 @@ export const RunnerRemovedSchema = z.object({
 // when it is not empty (the Worker now always sends ""), and gives
 // the agent the prompt. The Worker
 // builds the prompt, so the audit's words stay in one place.
-// profile and profileCapUsd are the Scan's profile and the cap the
-// profile has in the Worker's table, for a Runner app that runs the
-// full Skill. Both are optional: an old Worker sends neither, and an
-// old app ignores them. maxBudgetUsd stays the Runner's own ceiling,
-// and the Runner takes no credit.
+// profile and profileCapUsd are the Scan's profile and the Scan's
+// spend limit, for a Runner app that runs the full Skill. Both are
+// optional: an old Worker sends neither, and an old app ignores them.
+// maxBudgetUsd carries the same limit, and the Runner takes no credit.
 // phasePrompts are the four Phase prompts in order, each with its Phase
 // name, built for a Runner's place when the job is claimed. An app that
 // knows Phases runs them one after the other; an older app ignores the
@@ -130,9 +130,27 @@ export const RunnerJobSchema = z.object({
   profile: z.enum(SCAN_PROFILES).optional(),
   profileCapUsd: z.number().positive().optional(),
   maxBudgetUsd: z.number().positive(),
+  scopePaths: z.array(z.string()).max(SCAN_SCOPE_PATHS_MAX).optional(),
   prompt: z.string(),
   phasePrompts: z.array(RunnerPhasePromptSchema).optional(),
   priorsJson: z.string(),
+  // -----
+  // Set only on a Resumed Scan (ADR 0016): resume is true and
+  // resumesScanId is the earlier Scan's ID. The Runner reuses the
+  // work folder of that Scan. An older Runner ignores both and
+  // sees a normal job, and only the Runner that ran the earlier
+  // Scan is ever handed one.
+  // -----
+  resume: z.boolean().optional(),
+  resumesScanId: z.string().optional(),
+  // -----
+  // The Scans in the chain, nearest first, starting with
+  // resumesScanId. The kept folder is named for the last attempt
+  // that took it over, so the Runner uses the first one it finds.
+  // Absent from an older engine: the Runner then tries only
+  // resumesScanId.
+  // -----
+  earlierScanIds: z.array(z.string()).optional(),
 });
 
 // -----

@@ -10,11 +10,20 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/", createProjectDoc, requirePower("company:dashboard:read"), zValidator("header", AccountHeaderSchema), zValidator("json", CreateProjectBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { name } = c.req.valid("json");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(createProjectSvc(db, accountId, userIdOf(c), name)));
-  return c.json({ data, error: null }, 201);
-});
+app.post(
+  "/",
+  createProjectDoc,
+  requirePower("company:repos:delete"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", CreateProjectBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { name } = c.req.valid("json");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(createProjectSvc(db, accountId, userIdOf(c), name)));
+    return c.json({ data, error: null }, 201);
+  },
+);
 
 export default app;

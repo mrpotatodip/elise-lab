@@ -56,9 +56,7 @@ export const chatBotThreads = pgTable("chat_bot_threads", {
     .notNull()
     .default("chat")
     .references(() => chatBotModules.id, { onDelete: "restrict" }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
@@ -81,9 +79,7 @@ export const chatBotThreadSessions = pgTable(
     userId: text("user_id").references(() => authUser.id, { onDelete: "cascade" }),
     anonymousId: text("anonymous_id"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     ownerShape: check(
@@ -113,20 +109,11 @@ export const chatBotRuns = pgTable(
     inputTokens: integer("input_tokens"),
     cachedTokens: integer("cached_tokens"),
     outputTokens: integer("output_tokens"),
-    startedAt: timestamp("started_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    statusKnown: check(
-      "chat_bot_runs_status_known",
-      sql`${t.status} IN ('running', 'completed', 'failed')`,
-    ),
-    idxThreadStatusStarted: index("idx_chat_bot_runs_thread_status").on(
-      t.threadId,
-      t.status,
-      t.startedAt,
-    ),
+    statusKnown: check("chat_bot_runs_status_known", sql`${t.status} IN ('running', 'completed', 'failed')`),
+    idxThreadStatusStarted: index("idx_chat_bot_runs_thread_status").on(t.threadId, t.status, t.startedAt),
   }),
 );
 
@@ -150,12 +137,13 @@ export const chatBotMessages = pgTable(
     // Tools that ran this turn, and their
     // cards: { [tool]: { display, results } }.
     // -----
-    toolsUsed: text("tools_used").array().notNull().default(sql`'{}'::text[]`),
+    toolsUsed: text("tools_used")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     structure: jsonb("structure"),
     dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     tenantOfThread: foreignKey({

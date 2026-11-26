@@ -9,7 +9,8 @@ import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf, type SourceProviderId } f
 // -----
 export const checkRepoAddress = (body: { provider?: SourceProviderId; repo: string }, ctx: z.RefinementCtx): void => {
   const provider = sourceProviderOf(body.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
-  if (!provider.addressPattern.test(body.repo)) ctx.addIssue({ code: "custom", path: ["repo"], message: provider.addressMessage });
+  if (!provider.addressPattern.test(body.repo))
+    ctx.addIssue({ code: "custom", path: ["repo"], message: provider.addressMessage });
 };
 
 // -----
@@ -18,9 +19,13 @@ export const checkRepoAddress = (body: { provider?: SourceProviderId; repo: stri
 // provider takes no zip. That it runs only on a Runner is the
 // cloudScans rule of create-scan.
 // -----
-export const checkArchiveSource = (body: { provider?: SourceProviderId; archive_id?: string; ref?: string }, ctx: z.RefinementCtx): void => {
+export const checkArchiveSource = (
+  body: { provider?: SourceProviderId; archive_id?: string; ref?: string },
+  ctx: z.RefinementCtx,
+): void => {
   const isArchive = sourceProviderOf(body.provider ?? DEFAULT_SOURCE_PROVIDER_ID).capabilities.isArchive;
-  const issue = (field: string, message: string) => ctx.addIssue({ code: "custom", path: [field], message: `${field}: ${message}` });
+  const issue = (field: string, message: string) =>
+    ctx.addIssue({ code: "custom", path: [field], message: `${field}: ${message}` });
   if (!isArchive) {
     if (body.archive_id !== undefined) issue("archive_id", "only an upload app takes a zip");
     return;

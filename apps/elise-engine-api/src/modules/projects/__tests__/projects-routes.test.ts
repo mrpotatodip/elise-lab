@@ -2,11 +2,11 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { accessAuditLog, authUser, scanRepos } from "@repo/db-elise/schema";
-import { PROJECT_LIMIT_PER_TENANT, PROJECT_NAME_MAX } from "@repo/contracts/elise";
+import { PROJECT_LIMIT_PER_TENANT, PROJECT_NAME_MAX, type AccessPower } from "@repo/contracts/elise";
 import { openTestDb, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 
-type CallBody = { name: string } | { projectId: string | null };
+type CallBody = { name: string } | { projectId: string | null } | { provider: "upload"; repo: string };
 
 const USER = "projects-user";
 const REPO_B = "https://github.com/octocat/Spoon-Knife";
@@ -18,23 +18,39 @@ let partyId: string;
 let repoA: string;
 let repoB: string;
 let otherRepo: string;
-let holdsPower = true;
+let held: ReadonlySet<AccessPower> = new Set();
 let signedIn: string | undefined = USER;
 let auditSeen = 0;
 
-const app = tenantRouteApp(() => test, { sessionUserId: async () => signedIn, userHasPower: async () => holdsPower });
+const ADMIN: ReadonlySet<AccessPower> = new Set<AccessPower>([
+  "company:dashboard:read",
+  "company:summary:read",
+  "company:repos:delete",
+]);
+const MEMBER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:dashboard:read", "company:summary:read"]);
+
+const app = tenantRouteApp(() => test, {
+  sessionUserId: async () => signedIn,
+  userHasPower: async (_c, _userId, _accountId, power) => held.has(power),
+});
 
 const Envelope = z.object({ data: z.unknown(), error: z.unknown() });
 const ProjectOut = z.object({ id: z.uuid(), name: z.string() });
-const ReposOut = z.object({ repos: z.array(z.object({ id: z.string(), projectId: z.string().nullable().optional() })) });
+const ReposOut = z.object({
+  repos: z.array(z.object({ id: z.string(), projectId: z.string().nullable().optional() })),
+});
 
 const send = async (path: string, method?: string, body?: CallBody, accountId = tenantId) => {
   const res = await callAs(app, accountId, path, { method, body });
   return { status: res.status, data: Envelope.parse(await res.json()) };
 };
 const createProject = async (name: string) => ProjectOut.parse((await send("/projects", "POST", { name })).data.data);
-const projectIdsOfRepos = async () => Object.fromEntries(ReposOut.parse((await send("/repos")).data.data).repos.map((repo) => [repo.id, repo.projectId]));
-const auditRows = async () => (await test.raw.select({ action: accessAuditLog.action, actor: accessAuditLog.actorPartyId }).from(accessAuditLog)).slice(auditSeen);
+const projectIdsOfRepos = async () =>
+  Object.fromEntries(ReposOut.parse((await send("/repos")).data.data).repos.map((repo) => [repo.id, repo.projectId]));
+const auditRows = async () =>
+  (
+    await test.raw.select({ action: accessAuditLog.action, actor: accessAuditLog.actorPartyId }).from(accessAuditLog)
+  ).slice(auditSeen);
 const auditActions = async () => (await auditRows()).map((row) => row.action);
 
 beforeAll(async () => {
@@ -42,7 +58,9 @@ beforeAll(async () => {
   const acme = await seedTenant(test, "acme");
   tenantId = acme.tenantId;
   partyId = acme.partyId;
-  await test.raw.insert(authUser).values({ id: USER, name: "Ada", email: "ada@example.com", emailVerified: true, partyId });
+  await test.raw
+    .insert(authUser)
+    .values({ id: USER, name: "Ada", email: "ada@example.com", emailVerified: true, partyId });
   otherTenantId = (await seedTenant(test, "other")).tenantId;
   repoA = await seedRepo(test, tenantId);
   repoB = await seedRepo(test, tenantId, REPO_B);
@@ -54,7 +72,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  holdsPower = true;
+  held = ADMIN;
   signedIn = USER;
   for (const project of ProjectList(await send("/projects"))) await send(`/projects/${project.id}`, "DELETE");
   auditSeen = (await test.raw.select({ id: accessAuditLog.id }).from(accessAuditLog)).length;
@@ -121,11 +139,15 @@ describe("projects", () => {
   it("answers 404 to renaming or deleting a Project that is not there", async () => {
     const missing = "00000000-0000-4000-8000-0000000000aa";
 
-    expect([(await send(`/projects/${missing}`, "PATCH", { name: "x" })).status, (await send(`/projects/${missing}`, "DELETE")).status]).toEqual([404, 404]);
+    expect([
+      (await send(`/projects/${missing}`, "PATCH", { name: "x" })).status,
+      (await send(`/projects/${missing}`, "DELETE")).status,
+    ]).toEqual([404, 404]);
   });
 });
 
-const createProjectOf = async (accountId: string) => ProjectOut.parse((await send("/projects", "POST", { name: "Other" }, accountId)).data.data);
+const createProjectOf = async (accountId: string) =>
+  ProjectOut.parse((await send("/projects", "POST", { name: "Other" }, accountId)).data.data);
 
 describe("moving a Repo", () => {
   it("moves a Repo into a Project, between Projects and out again, and the Repos list says so", async () => {
@@ -166,6 +188,26 @@ describe("moving a Repo", () => {
 
     expect(answer.status).toBe(404);
   });
+
+  it("takes an Upload app out of its Project when it is removed, and keeps it out when it is added again", async () => {
+    const web = await createProject("Web");
+    const added = await send("/repos", "POST", { provider: "upload", repo: "Ledger" });
+    const appId = z.object({ id: z.string() }).parse(added.data.data).id;
+    await send(`/repos/${appId}/project`, "PUT", { projectId: web.id });
+    const projectOfApp = async () =>
+      (await test.raw.select({ projectId: scanRepos.projectId }).from(scanRepos).where(eq(scanRepos.id, appId)))[0]
+        ?.projectId;
+
+    await send(`/repos/${appId}`, "DELETE");
+    const afterRemove = await projectOfApp();
+    await test.raw.update(scanRepos).set({ projectId: web.id }).where(eq(scanRepos.id, appId));
+    await send("/repos", "POST", { provider: "upload", repo: "Ledger" });
+
+    const afterReAdd = await projectOfApp();
+    await send(`/repos/${appId}`, "DELETE");
+
+    expect({ afterRemove, afterReAdd }).toEqual({ afterRemove: null, afterReAdd: null });
+  });
 });
 
 describe("deleting a Project", () => {
@@ -190,7 +232,12 @@ describe("the audit log", () => {
     await send(`/projects/${web.id}`, "DELETE");
     const rows = await auditRows();
 
-    expect(rows.map((row) => row.action)).toEqual(["project.created", "project.renamed", "repo.project.moved", "project.deleted"]);
+    expect(rows.map((row) => row.action)).toEqual([
+      "project.created",
+      "project.renamed",
+      "repo.project.moved",
+      "project.deleted",
+    ]);
     expect(new Set(rows.map((row) => row.actor))).toEqual(new Set([partyId]));
   });
 
@@ -211,15 +258,24 @@ describe("who may change Projects", () => {
     ["PUT", `/repos/${MISSING}/project`, { projectId: null }],
   ];
 
-  it.each(WRITES)("%s %s is refused with 403 to a Role without the Repo Powers", async (method, path, body) => {
-    holdsPower = false;
+  it.each(WRITES)("%s %s is refused with 403 to a Role without the Repo Power", async (method, path, body) => {
+    held = MEMBER;
 
     expect((await send(path, method, body)).status).toBe(403);
   });
 
-  it.each(WRITES)("%s %s is refused with 401 with no session, the service token notwithstanding", async (method, path, body) => {
-    signedIn = undefined;
+  it("lets that Role read the Projects", async () => {
+    held = MEMBER;
 
-    expect((await send(path, method, body)).status).toBe(401);
+    expect((await send("/projects")).status).toBe(200);
   });
+
+  it.each(WRITES)(
+    "%s %s is refused with 401 with no session, the service token notwithstanding",
+    async (method, path, body) => {
+      signedIn = undefined;
+
+      expect((await send(path, method, body)).status).toBe(401);
+    },
+  );
 });

@@ -1,1 +1,2 @@
-export const dashboardLinkOf = (dashboardUrl: string, path: string): string => `${dashboardUrl.replace(/\/+$/, "")}${path}`;
+export const dashboardLinkOf = (dashboardUrl: string, path: string): string =>
+  `${dashboardUrl.replace(/\/+$/, "")}${path}`;

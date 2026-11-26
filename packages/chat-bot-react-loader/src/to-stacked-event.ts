@@ -1,8 +1,5 @@
 import { EventType, type StreamChunk } from "@tanstack/ai";
-import type {
-  AGUILoadingStackedEvent,
-  AGUILoadingSubagentTag,
-} from "./agui-loading";
+import type { AGUILoadingStackedEvent, AGUILoadingSubagentTag } from "./agui-loading";
 
 // -----
 // A run that ends asking for tools has not ended the turn:
@@ -22,9 +19,7 @@ function isToolTurnEnd(chunk: StreamChunk): boolean {
 // show under its name.
 // -----
 function subagentTag(chunk: StreamChunk): AGUILoadingSubagentTag {
-  return "subagentRunId" in chunk && chunk.subagentRunId
-    ? { subagentRunId: chunk.subagentRunId }
-    : {};
+  return "subagentRunId" in chunk && chunk.subagentRunId ? { subagentRunId: chunk.subagentRunId } : {};
 }
 
 // -----

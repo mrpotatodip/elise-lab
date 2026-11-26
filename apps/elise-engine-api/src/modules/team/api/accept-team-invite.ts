@@ -18,17 +18,24 @@ const app = new Hono<AppEnv>();
 // app.tenant_id to set and the invite tables' policy
 // would hide every row.
 // -----
-app.post("/invites/:token/accept", acceptTeamInviteDoc, requireInviteLimit, zValidator("param", TeamInviteTokenParamSchema), zValidator("json", AcceptTeamInviteBodySchema), async (c) => {
-  const { token } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const sendsCredentials = Boolean(c.req.header("authorization") ?? c.req.header("cookie"));
-  const signedInUserId = sendsCredentials ? await c.get("deps").sessionUserId(c) : undefined;
-  const data = await withPool(
-    c.env.DATABASE_URL,
-    (promise) => c.executionCtx.waitUntil(promise),
-    (db) => runEffect(acceptInviteSvc(db, token, body, signedInUserId)),
-  );
-  return c.json({ data, error: null });
-});
+app.post(
+  "/invites/:token/accept",
+  acceptTeamInviteDoc,
+  requireInviteLimit,
+  zValidator("param", TeamInviteTokenParamSchema),
+  zValidator("json", AcceptTeamInviteBodySchema),
+  async (c) => {
+    const { token } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const sendsCredentials = Boolean(c.req.header("authorization") ?? c.req.header("cookie"));
+    const signedInUserId = sendsCredentials ? await c.get("deps").sessionUserId(c) : undefined;
+    const data = await withPool(
+      c.env.DATABASE_URL,
+      (promise) => c.executionCtx.waitUntil(promise),
+      (db) => runEffect(acceptInviteSvc(db, token, body, signedInUserId)),
+    );
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

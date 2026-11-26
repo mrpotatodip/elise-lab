@@ -20,7 +20,9 @@ app.post(
     const { "x-account-id": accountId } = c.req.valid("header");
     const body = c.req.valid("json");
     const userId = userIdOf(c);
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(createFindingCommentSvc(db, accountId, userId, body)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(createFindingCommentSvc(db, accountId, userId, body)));
     return c.json({ data, error: null }, 201);
   },
 );

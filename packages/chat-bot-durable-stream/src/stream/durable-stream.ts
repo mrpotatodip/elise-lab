@@ -38,10 +38,8 @@ export function createChatBotDurableStream(
   const { runId } = init;
   const key = { streamPrefix: init.streamPrefix ?? CHAT_BOT_DURABLE_STREAM_DEFAULT_PREFIX, runId };
   const resumeOffset = init.offset ?? null;
-  const retainMs =
-    init.retainMs === undefined ? CHAT_BOT_DURABLE_STREAM_DEFAULT_RETAIN_MS : init.retainMs;
-  const staleMs =
-    init.staleMs === undefined ? CHAT_BOT_DURABLE_STREAM_DEFAULT_STALE_MS : init.staleMs;
+  const retainMs = init.retainMs === undefined ? CHAT_BOT_DURABLE_STREAM_DEFAULT_RETAIN_MS : init.retainMs;
+  const staleMs = init.staleMs === undefined ? CHAT_BOT_DURABLE_STREAM_DEFAULT_STALE_MS : init.staleMs;
   const toEntry = (row: { seq: number; chunk: StreamChunk }) => ({
     offset: encodeChatBotDurableStreamOffset(runId, row.seq),
     chunk: row.chunk,
@@ -75,10 +73,7 @@ export function createChatBotDurableStream(
         // One round trip; seeing closed, list again
         // so a batch written before the close drains.
         // -----
-        const [closed, rows] = await Promise.all([
-          store.isClosed(key),
-          store.listAfter(key, seq),
-        ]);
+        const [closed, rows] = await Promise.all([store.isClosed(key), store.listAfter(key, seq)]);
         const rest = closed ? await store.listAfter(key, rows.at(-1)?.seq ?? seq) : [];
         for (const row of [...rows, ...rest]) {
           yield toEntry(row);

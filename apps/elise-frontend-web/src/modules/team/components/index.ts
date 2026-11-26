@@ -8,3 +8,4 @@ export * from "./team-invite-skeleton";
 export * from "./team-members-card";
 export * from "./team-page";
 export * from "./team-page-skeleton";
+export * from "./two-factor-requirement-card";

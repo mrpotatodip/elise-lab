@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { scanRunnerJobs, scans, scanTraceEntries, tenantRunners } from "@repo/db-elise/schema";
-import { TRACE_ENTRIES_PER_SCAN_MAX, TraceSavedSchema, TraceSchema, type SaveTraceBody, type TraceEntry, type RunnerIdentity } from "@repo/contracts/elise";
+import {
+  TRACE_ENTRIES_PER_SCAN_MAX,
+  TraceSavedSchema,
+  TraceSchema,
+  type SaveTraceBody,
+  type TraceEntry,
+  type RunnerIdentity,
+} from "@repo/contracts/elise";
 import { fakeBindings, testExecutionContext } from "#/__tests__/fake-bindings";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
@@ -51,20 +58,36 @@ const entry = (n: number, over: Partial<TraceEntry> = {}): TraceEntry => ({
 const post = (scanId: string, body: SaveTraceBody, token = RUNNER_TOKEN) => {
   const { env } = fakeBindings();
   const headers = new Headers({ authorization: `Bearer ${token}`, "content-type": "application/json" });
-  return app.fetch(new Request(`http://localhost/runners/jobs/${scanId}/trace`, { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
+  return app.fetch(
+    new Request(`http://localhost/runners/jobs/${scanId}/trace`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    }),
+    env,
+    testExecutionContext,
+  );
 };
 
-const save = async (scanId: string, body: SaveTraceBody, token = RUNNER_TOKEN) => SavedEnvelope.parse(await (await post(scanId, body, token)).json()).data;
+const save = async (scanId: string, body: SaveTraceBody, token = RUNNER_TOKEN) =>
+  SavedEnvelope.parse(await (await post(scanId, body, token)).json()).data;
 
 const read = async (scanId: string, after?: string, accountId = tenantId) => {
-  const res = await callAs(app, accountId, `/scans/${scanId}/trace${after ? `?after=${encodeURIComponent(after)}` : ""}`);
+  const res = await callAs(
+    app,
+    accountId,
+    `/scans/${scanId}/trace${after ? `?after=${encodeURIComponent(after)}` : ""}`,
+  );
   return { status: res.status, body: await res.json() };
 };
 
 const readTrace = async (scanId: string, after?: string) => TraceEnvelope.parse((await read(scanId, after)).body).data;
 
 const pairRunner = async (accountId: string, partyId: string, name: string): Promise<RunnerIdentity> => {
-  const [row] = await test.raw.insert(tenantRunners).values({ tenantId: accountId, name, createdBy: partyId, tokenHash: `hash-${name}` }).returning();
+  const [row] = await test.raw
+    .insert(tenantRunners)
+    .values({ tenantId: accountId, name, createdBy: partyId, tokenHash: `hash-${name}` })
+    .returning();
   return { runnerId: row.id, name, accountId, accountName: "acme" };
 };
 
@@ -75,8 +98,19 @@ const runnerScan = async (accountId = tenantId, by = runner) => {
   counter += 1;
   const scanId = `trace-scan-${counter}`;
   const repoId = await seedRepo(test, accountId, `https://github.com/octocat/trace-${counter}`);
-  await test.raw.insert(scans).values(scanValues(accountId, repoId, scanId, NOW, { status: "running", step: "auditing", skill: "full" }));
-  await test.raw.insert(scanRunnerJobs).values({ scanId, tenantId: accountId, runnerId: by.runnerId, state: "claimed", repoUrl: "https://github.com/octocat/Hello-World", prompt: "audit", optionsJson: "{}", priorsJson: "" });
+  await test.raw
+    .insert(scans)
+    .values(scanValues(accountId, repoId, scanId, NOW, { status: "running", step: "auditing", skill: "full" }));
+  await test.raw.insert(scanRunnerJobs).values({
+    scanId,
+    tenantId: accountId,
+    runnerId: by.runnerId,
+    state: "claimed",
+    repoUrl: "https://github.com/octocat/Hello-World",
+    prompt: "audit",
+    optionsJson: "{}",
+    priorsJson: "",
+  });
   return scanId;
 };
 
@@ -125,7 +159,12 @@ describe("a Scan's Trace", () => {
   it("reads a Scan with no entries as an empty Trace", async () => {
     const scanId = await runnerScan();
 
-    expect(await readTrace(scanId)).toEqual({ entries: [], cursor: null, candidateFindings: null, now: expect.any(String) });
+    expect(await readTrace(scanId)).toEqual({
+      entries: [],
+      cursor: null,
+      candidateFindings: null,
+      now: expect.any(String),
+    });
   });
 
   it("keeps a Trace from another Account, and from another Runner", async () => {
@@ -142,8 +181,15 @@ describe("a Scan's Trace", () => {
 
   it("drops new entries past the cap but still lets a kept entry grow, and the Scan runs on", async () => {
     const scanId = await runnerScan();
-    const seeded = Array.from({ length: TRACE_ENTRIES_PER_SCAN_MAX - 1 }, (_, n) => ({ ...entry(n + 100), tenantId, scanId, startedAt: new Date(NOW), endedAt: new Date(NOW) }));
-    for (let from = 0; from < seeded.length; from += SEED_CHUNK) await test.raw.insert(scanTraceEntries).values(seeded.slice(from, from + SEED_CHUNK));
+    const seeded = Array.from({ length: TRACE_ENTRIES_PER_SCAN_MAX - 1 }, (_, n) => ({
+      ...entry(n + 100),
+      tenantId,
+      scanId,
+      startedAt: new Date(NOW),
+      endedAt: new Date(NOW),
+    }));
+    for (let from = 0; from < seeded.length; from += SEED_CHUNK)
+      await test.raw.insert(scanTraceEntries).values(seeded.slice(from, from + SEED_CHUNK));
     const full = await save(scanId, { entries: [entry(1), entry(2), entry(3)] });
     const grown = await save(scanId, { entries: [entry(1, { count: 5 }), entry(4)] });
     const [scan] = await test.raw.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId));

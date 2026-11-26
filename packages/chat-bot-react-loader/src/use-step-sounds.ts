@@ -28,9 +28,7 @@ export type ProgressSoundLevel = keyof ProgressSounds;
 // level) or the levels you pick. `sounds` alone set to `true`
 // turns on both.
 // -----
-export type ProgressSoundsConfig =
-  | boolean
-  | { start?: boolean | ProgressSounds; end?: boolean | ProgressSounds };
+export type ProgressSoundsConfig = boolean | { start?: boolean | ProgressSounds; end?: boolean | ProgressSounds };
 
 const isSound = (value: object): value is ProgressSound => "recipe" in value || "layers" in value;
 
@@ -76,8 +74,7 @@ function soundFor(spec: Spec, step: AGUILoadingStackedStep): Playable | undefine
   }
 }
 
-const turnSound = (spec: Spec | undefined): Playable | undefined =>
-  typeof spec === "string" ? undefined : spec?.turn;
+const turnSound = (spec: Spec | undefined): Playable | undefined => (typeof spec === "string" ? undefined : spec?.turn);
 
 // Each piece is fetched once, on first use.
 let engine: Promise<typeof import("./sounds/react-bits-sound")> | undefined;

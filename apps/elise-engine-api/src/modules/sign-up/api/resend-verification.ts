@@ -10,10 +10,16 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/resend-verification", resendVerificationDoc, requireResendLimit, zValidator("json", ResendVerificationBodySchema), async (c) => {
-  const { email } = c.req.valid("json");
-  await c.get("deps").withOwner(c, (db) => runEffect(resendVerificationSvc(authConfigOf(c, db), email)));
-  return c.json({ data: { requested: true as const }, error: null }, 200);
-});
+app.post(
+  "/resend-verification",
+  resendVerificationDoc,
+  requireResendLimit,
+  zValidator("json", ResendVerificationBodySchema),
+  async (c) => {
+    const { email } = c.req.valid("json");
+    await c.get("deps").withOwner(c, (db) => runEffect(resendVerificationSvc(authConfigOf(c, db), email)));
+    return c.json({ data: { requested: true as const }, error: null }, 200);
+  },
+);
 
 export default app;

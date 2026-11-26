@@ -26,7 +26,13 @@ export function ScanFindingHeader({ finding, aside, badges, titlePrefix, showImp
     <>
       <div className="flex flex-wrap items-center gap-2">
         <ScanSeverityBadge severity={finding.severity} />
-        <Badge variant={finding.state === "confirmed" ? "success" : finding.state === "needs_validation" ? "warning" : "neutral"}>{SCAN_FINDING_STATE_COPY[finding.state].label}</Badge>
+        <Badge
+          variant={
+            finding.state === "confirmed" ? "success" : finding.state === "needs_validation" ? "warning" : "neutral"
+          }
+        >
+          {SCAN_FINDING_STATE_COPY[finding.state].label}
+        </Badge>
         {badges}
         {aside && <span className="ml-auto text-xs tabular-nums text-muted-foreground">{aside}</span>}
       </div>
@@ -35,8 +41,14 @@ export function ScanFindingHeader({ finding, aside, badges, titlePrefix, showImp
         {finding.title}
       </SheetTitle>
       <SheetDescription render={<div />}>
-        {finding.place ? <span className="font-mono text-xs [overflow-wrap:anywhere]">{`${finding.place.file}:${finding.place.line}`}</span> : "No file was recorded for this finding."}
-        {finding.state !== "confirmed" && <span className="mt-2 block">{SCAN_FINDING_STATE_COPY[finding.state].note}</span>}
+        {finding.place ? (
+          <span className="font-mono text-xs [overflow-wrap:anywhere]">{`${finding.place.file}:${finding.place.line}`}</span>
+        ) : (
+          "No file was recorded for this finding."
+        )}
+        {finding.state !== "confirmed" && (
+          <span className="mt-2 block">{SCAN_FINDING_STATE_COPY[finding.state].note}</span>
+        )}
         {showImpact && finding.detail?.impact && <span className="mt-2 line-clamp-3">{finding.detail.impact}</span>}
       </SheetDescription>
     </>

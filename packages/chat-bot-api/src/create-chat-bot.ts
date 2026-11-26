@@ -44,10 +44,7 @@ export type ChatBot<S extends ChatBotServices = ChatBotServices> = {
     request: Request,
   ) => Effect.Effect<Response, ChatBotDbError | ChatBotNotFound | ChatBotInvalid>;
   threads: {
-    list: (
-      owner: ChatBotOwner,
-      query?: ChatBotThreadsQuery,
-    ) => Effect.Effect<ChatBotThreadListItem[], ChatBotDbError>;
+    list: (owner: ChatBotOwner, query?: ChatBotThreadsQuery) => Effect.Effect<ChatBotThreadListItem[], ChatBotDbError>;
     get: (
       owner: ChatBotOwner,
       threadId: string,
@@ -71,9 +68,7 @@ export type ChatBot<S extends ChatBotServices = ChatBotServices> = {
 // gets every chat-bot operation back as an
 // Effect it can run and map to HTTP itself.
 // -----
-export function createChatBot<S extends ChatBotServices = ChatBotServices>(
-  deps: ChatBotDeps<S>,
-): ChatBot<S> {
+export function createChatBot<S extends ChatBotServices = ChatBotServices>(deps: ChatBotDeps<S>): ChatBot<S> {
   const { store, durableStream } = deps;
   return {
     stream: (turn) => streamChatBotSvc({ ...deps, ...turn }),

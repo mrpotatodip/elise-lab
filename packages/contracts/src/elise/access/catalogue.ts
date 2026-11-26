@@ -30,9 +30,12 @@ export const ACCESS_CATALOGUE = [
           { key: "members", label: "Member", actions: ["read", "update", "delete"] },
           { key: "invites", label: "Team invite", actions: ["read", "create", "update", "delete"] },
           { key: "groups", label: "Group", actions: ["read", "create", "update", "delete"] },
+          { key: "two_factor", label: "Two-factor", actions: ["reset"] },
+          { key: "two_factor_requirement", label: "Two-factor requirement", actions: ["update"] },
         ],
       },
       { key: "runners", label: "Runner", actions: ["create", "delete"] },
+      { key: "repos", label: "Repo", actions: ["delete"] },
       { key: "signals", label: "Signals", actions: ["update"] },
       {
         key: "findings",
@@ -84,9 +87,8 @@ export type AccessCatalogue = typeof ACCESS_CATALOGUE;
 
 type NodePowers<Node, Prefix extends string> = Node extends { readonly key: infer Key extends string }
   ? `${Prefix}${Key}` extends infer Path extends string
-    ?
-        | (Node extends { readonly actions: readonly (infer Action extends string)[] } ? `${Path}:${Action}` : never)
-        | (Node extends { readonly children: readonly (infer Child)[] } ? NodePowers<Child, `${Path}:`> : never)
+    ? | (Node extends { readonly actions: readonly (infer Action extends string)[] } ? `${Path}:${Action}` : never)
+      | (Node extends { readonly children: readonly (infer Child)[] } ? NodePowers<Child, `${Path}:`> : never)
     : never
   : never;
 
@@ -99,12 +101,11 @@ export type AccessPower = NodePowers<AccessCatalogue[number], "">;
 
 type BoundNodePowers<Node, Prefix extends string> = Node extends { readonly key: infer Key extends string }
   ? `${Prefix}${Key}` extends infer Path extends string
-    ?
-        | (Node extends { readonly bound: true; readonly actions: readonly (infer Action extends string)[] }
-            ? `${Path}:${Action}`
-            : never)
-        | (Node extends { readonly bound: readonly (infer Action extends string)[] } ? `${Path}:${Action}` : never)
-        | (Node extends { readonly children: readonly (infer Child)[] } ? BoundNodePowers<Child, `${Path}:`> : never)
+    ? | (Node extends { readonly bound: true; readonly actions: readonly (infer Action extends string)[] }
+          ? `${Path}:${Action}`
+          : never)
+      | (Node extends { readonly bound: readonly (infer Action extends string)[] } ? `${Path}:${Action}` : never)
+      | (Node extends { readonly children: readonly (infer Child)[] } ? BoundNodePowers<Child, `${Path}:`> : never)
     : never
   : never;
 
@@ -118,7 +119,7 @@ const collectBoundPowers = (node: AccessNode, prefix: string): string[] => {
   return [...own, ...(node.children ?? []).flatMap((child) => collectBoundPowers(child, path))];
 };
 
-const collectPowers =(node: AccessNode, prefix: string): string[] => {
+const collectPowers = (node: AccessNode, prefix: string): string[] => {
   const path = prefix === "" ? node.key : `${prefix}:${node.key}`;
   const own = (node.actions ?? []).map((action) => `${path}:${action}`);
   const nested = (node.children ?? []).flatMap((child) => collectPowers(child, path));
@@ -135,7 +136,7 @@ const BOUND_POWER_SET: ReadonlySet<string> = new Set(BOUND_POWERS);
 
 export const isBoundPower = (power: AccessPower): power is BoundPower => BOUND_POWER_SET.has(power);
 
-const ACCESS_POWER_SET:ReadonlySet<string> = new Set(ACCESS_POWERS);
+const ACCESS_POWER_SET: ReadonlySet<string> = new Set(ACCESS_POWERS);
 
 export const isAccessPower = (value: string): value is AccessPower => ACCESS_POWER_SET.has(value);
 
@@ -146,7 +147,8 @@ export const hasAccessPower = (grants: readonly string[], power: AccessPower): b
 // are needed, so an engine that does not grant the Summary Power yet
 // (before its migration) restricts nobody.
 // -----
-export const isWatcher = (grants: readonly string[]): boolean => hasAccessPower(grants, "company:summary:read") && !hasAccessPower(grants, "company:dashboard:read");
+export const isWatcher = (grants: readonly string[]): boolean =>
+  hasAccessPower(grants, "company:summary:read") && !hasAccessPower(grants, "company:dashboard:read");
 
 const powerAction = (power: string): string => power.slice(power.lastIndexOf(":") + 1);
 
@@ -170,7 +172,12 @@ const TENANT_READS = TENANT_POWERS.filter((power) => powerAction(power) === "rea
 // risk; a Workspace member does none of it and sees no part of
 // Team.
 // -----
-const OWNER_ONLY = ["company:team:members:update", "company:team:members:delete", "company:plan:manage"] as const;
+const OWNER_ONLY = [
+  "company:team:members:update",
+  "company:team:members:delete",
+  "company:plan:manage",
+  "company:team:two_factor_requirement:update",
+] as const;
 const WORKSPACE_ADMIN_POWERS = TENANT_POWERS.filter((power) => !OWNER_ONLY.some((owner) => owner === power));
 const WORKSPACE_MEMBER_READS = TENANT_READS.filter((power) => !power.startsWith("company:team:"));
 

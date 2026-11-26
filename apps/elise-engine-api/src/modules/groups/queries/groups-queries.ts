@@ -14,7 +14,14 @@ import { Conflict, DbError, Forbidden, NotFound, toDbError } from "#/lib/effect-
 import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import type { GroupFailure } from "#/modules/groups/types";
-import { GROUP_FULL, GROUP_NAME_CONSTRAINT, GROUP_LIMIT_REACHED, GROUP_NAME_TAKEN, GROUP_NOT_FOUND, GROUP_PERSON_NOT_FOUND } from "#/modules/groups/constants";
+import {
+  GROUP_FULL,
+  GROUP_NAME_CONSTRAINT,
+  GROUP_LIMIT_REACHED,
+  GROUP_NAME_TAKEN,
+  GROUP_NOT_FOUND,
+  GROUP_PERSON_NOT_FOUND,
+} from "#/modules/groups/constants";
 
 class Refused extends Data.TaggedError("Refused")<{ failure: Conflict | Forbidden | NotFound }> {}
 
@@ -24,7 +31,8 @@ const refuse = (failure: Conflict | Forbidden | NotFound): never => {
 
 const classify = (cause: unknown): GroupFailure => {
   if (cause instanceof Refused) return cause.failure;
-  if (pgErrorCode(cause) === PG_UNIQUE_VIOLATION && pgErrorConstraint(cause) === GROUP_NAME_CONSTRAINT) return new Conflict({ message: GROUP_NAME_TAKEN });
+  if (pgErrorCode(cause) === PG_UNIQUE_VIOLATION && pgErrorConstraint(cause) === GROUP_NAME_CONSTRAINT)
+    return new Conflict({ message: GROUP_NAME_TAKEN });
   return toDbError(cause);
 };
 
@@ -41,7 +49,8 @@ const toGroup = (row: typeof tenantGroups.$inferSelect, memberIds: string[]): Gr
 export const listGroupsEffect = (db: AppDbType, tenantId: string): Effect.Effect<GroupList, DbError> =>
   Effect.gen(function* () {
     const groups = yield* Effect.tryPromise({
-      try: () => db.select().from(tenantGroups).where(eq(tenantGroups.tenantId, tenantId)).orderBy(asc(tenantGroups.name)),
+      try: () =>
+        db.select().from(tenantGroups).where(eq(tenantGroups.tenantId, tenantId)).orderBy(asc(tenantGroups.name)),
       catch: toDbError,
     });
     const members = yield* Effect.tryPromise({
@@ -67,7 +76,12 @@ const groupOf = async (tx: Pick<AppDbType, "select">, tenantId: string, groupId:
 const actorOf = async (tx: Pick<AppDbType, "select">, userId: string) =>
   (await actorPartyOf(tx, userId)) ?? refuse(new Forbidden({ message: "Forbidden" }));
 
-export const createGroupEffect = (db: AppTxDbType, tenantId: string, userId: string, name: string): Effect.Effect<Group, GroupFailure> =>
+export const createGroupEffect = (
+  db: AppTxDbType,
+  tenantId: string,
+  userId: string,
+  name: string,
+): Effect.Effect<Group, GroupFailure> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
@@ -78,22 +92,47 @@ export const createGroupEffect = (db: AppTxDbType, tenantId: string, userId: str
           .where(eq(tenantGroups.tenantId, tenantId));
         if (total >= GROUP_LIMIT_PER_TENANT) return refuse(new Conflict({ message: GROUP_LIMIT_REACHED }));
         const [row] = await tx.insert(tenantGroups).values({ tenantId, name }).returning();
-        await insertAuditEntry(tx, { actorPartyId, action: "group.created", subjectId: row.id, tenantId, after: { name } });
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "group.created",
+          subjectId: row.id,
+          tenantId,
+          after: { name },
+        });
         return toGroup(row, []);
       }),
     catch: classify,
   });
 
-export const renameGroupEffect = (db: AppTxDbType, tenantId: string, userId: string, groupId: string, name: string): Effect.Effect<Group, GroupFailure> =>
+export const renameGroupEffect = (
+  db: AppTxDbType,
+  tenantId: string,
+  userId: string,
+  groupId: string,
+  name: string,
+): Effect.Effect<Group, GroupFailure> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
         const actorPartyId = await actorOf(tx, userId);
         const before = await groupOf(tx, tenantId, groupId);
         const [row] = await tx.update(tenantGroups).set({ name }).where(eq(tenantGroups.id, groupId)).returning();
-        const members = await tx.select({ partyId: tenantGroupMembers.partyId }).from(tenantGroupMembers).where(eq(tenantGroupMembers.groupId, groupId));
-        await insertAuditEntry(tx, { actorPartyId, action: "group.renamed", subjectId: groupId, tenantId, before: { name: before.name }, after: { name } });
-        return toGroup(row, members.map((member) => member.partyId));
+        const members = await tx
+          .select({ partyId: tenantGroupMembers.partyId })
+          .from(tenantGroupMembers)
+          .where(eq(tenantGroupMembers.groupId, groupId));
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "group.renamed",
+          subjectId: groupId,
+          tenantId,
+          before: { name: before.name },
+          after: { name },
+        });
+        return toGroup(
+          row,
+          members.map((member) => member.partyId),
+        );
       }),
     catch: classify,
   });
@@ -102,14 +141,25 @@ export const renameGroupEffect = (db: AppTxDbType, tenantId: string, userId: str
 // Deleting a Group removes its memberships and
 // nothing else: the people stay in the account.
 // -----
-export const deleteGroupEffect = (db: AppTxDbType, tenantId: string, userId: string, groupId: string): Effect.Effect<GroupDeleted, GroupFailure> =>
+export const deleteGroupEffect = (
+  db: AppTxDbType,
+  tenantId: string,
+  userId: string,
+  groupId: string,
+): Effect.Effect<GroupDeleted, GroupFailure> =>
   Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
         const actorPartyId = await actorOf(tx, userId);
         const group = await groupOf(tx, tenantId, groupId);
         await tx.delete(tenantGroups).where(eq(tenantGroups.id, groupId));
-        await insertAuditEntry(tx, { actorPartyId, action: "group.deleted", subjectId: groupId, tenantId, before: { name: group.name } });
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "group.deleted",
+          subjectId: groupId,
+          tenantId,
+          before: { name: group.name },
+        });
         return { id: groupId };
       }),
     catch: classify,
@@ -148,7 +198,13 @@ export const addGroupMemberEffect = (
           .onConflictDoNothing()
           .returning({ partyId: tenantGroupMembers.partyId });
         if (added.length > 0) {
-          await insertAuditEntry(tx, { actorPartyId, action: "group.member.added", subjectId: groupId, tenantId, after: { partyId } });
+          await insertAuditEntry(tx, {
+            actorPartyId,
+            action: "group.member.added",
+            subjectId: groupId,
+            tenantId,
+            after: { partyId },
+          });
         }
         return { groupId, partyId };
       }),
@@ -172,7 +228,13 @@ export const removeGroupMemberEffect = (
           .where(and(eq(tenantGroupMembers.groupId, groupId), eq(tenantGroupMembers.partyId, partyId)))
           .returning({ partyId: tenantGroupMembers.partyId });
         if (removed.length === 0) return refuse(new NotFound({ message: GROUP_PERSON_NOT_FOUND }));
-        await insertAuditEntry(tx, { actorPartyId, action: "group.member.removed", subjectId: groupId, tenantId, after: { partyId } });
+        await insertAuditEntry(tx, {
+          actorPartyId,
+          action: "group.member.removed",
+          subjectId: groupId,
+          tenantId,
+          after: { partyId },
+        });
         return { groupId, partyId };
       }),
     catch: classify,

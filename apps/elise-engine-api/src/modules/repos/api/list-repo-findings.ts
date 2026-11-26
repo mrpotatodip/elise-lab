@@ -19,7 +19,9 @@ app.get(
     const { "x-account-id": accountId } = c.req.valid("header");
     const { repoId } = c.req.valid("param");
     const query = c.req.valid("query");
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listRepoFindingsSvc(db, accountId, repoId, query)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(listRepoFindingsSvc(db, accountId, repoId, query)));
     return c.json({ data, error: null });
   },
 );

@@ -27,9 +27,7 @@ export function ForgotPasswordFields() {
   });
 
   if (mutation.isSuccess) {
-    return (
-      <output className="block text-sm leading-relaxed">{AUTH_COPY.forgot.sent}</output>
-    );
+    return <output className="block text-sm leading-relaxed">{AUTH_COPY.forgot.sent}</output>;
   }
 
   return (
@@ -46,7 +44,16 @@ export function ForgotPasswordFields() {
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name={field.name} type="email" autoComplete="email" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "email")} />
+            <Input
+              id="email"
+              name={field.name}
+              type="email"
+              autoComplete="email"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "email")}
+            />
             <FieldError id="email" message={fieldMessage(field)} />
           </div>
         )}

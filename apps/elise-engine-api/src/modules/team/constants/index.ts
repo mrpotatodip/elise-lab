@@ -15,6 +15,10 @@ export const teamPlanFullMessage = (maxMembers: number, larger: { label: string;
 export const TEAM_INVITE_RACE = "Another invite for this email was just made. Try again.";
 export const TEAM_INVITE_NOT_FOUND = "Invite not found";
 export const TEAM_EMAIL_TAKEN = "A login with this email already exists";
+export const TEAM_MEMBER_NOT_FOUND = "Member not found";
+export const TEAM_RESET_SELF = "Ask another admin to reset your Two-factor";
+export const TEAM_RESET_ADMIN_FORBIDDEN = "Only an owner can reset another admin's Two-factor";
+export const TEAM_WORKSPACE_ADMIN_ROLE_KEY = "workspace_admin";
 
 // -----
 // Constraint names, to tell one unique clash

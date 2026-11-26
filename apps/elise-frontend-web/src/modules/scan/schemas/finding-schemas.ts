@@ -70,7 +70,13 @@ export const OverviewSchema = z.object({
   total: z.number(),
   hasMore: z.boolean(),
   byState: z.object({ queued: z.number(), running: z.number(), succeeded: z.number(), failed: z.number() }),
-  severity: z.object({ critical: z.number(), high: z.number(), medium: z.number(), low: z.number(), informational: z.number() }),
+  severity: z.object({
+    critical: z.number(),
+    high: z.number(),
+    medium: z.number(),
+    low: z.number(),
+    informational: z.number(),
+  }),
   needsValidation: z.number(),
   repos: z.number(),
 });

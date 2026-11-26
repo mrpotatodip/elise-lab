@@ -18,8 +18,7 @@ export const readChatBotStreamOffsetForRunEffect = (
   runId: string,
 ): Effect.Effect<string, ChatBotInvalid> =>
   Effect.gen(function* () {
-    const offset =
-      readChatBotDurableStreamResumeOffset(request) ?? CHAT_BOT_DURABLE_STREAM_START_OFFSET;
+    const offset = readChatBotDurableStreamResumeOffset(request) ?? CHAT_BOT_DURABLE_STREAM_START_OFFSET;
     const check = checkChatBotDurableStreamOffset(offset, runId);
     if (isChatBotDurableStreamOffsetError(check)) {
       return yield* new ChatBotInvalid({

@@ -37,12 +37,18 @@ describe("progress sounds", () => {
   };
 
   it("plays one sound per level as it finishes, and one for the turn", async () => {
-    const run = { layers: [1] }, tools = { layers: [2] }, reply = { layers: [3] }, turn = { layers: [4] };
+    const run = { layers: [1] },
+      tools = { layers: [2] },
+      reply = { layers: [3] },
+      turn = { layers: [4] };
     render(<Harness sounds={{ end: { run, tools, reply, turn } }} />);
     await act(async () => progress().onTurnStart());
     await send({ type: EventType.TOOL_CALL_START, toolCallId: "c1", toolCallName: "x" });
     await vi.waitFor(() => expect(played).toEqual([run]));
-    await send({ type: EventType.TOOL_CALL_END, toolCallId: "c1" }, { type: EventType.TOOL_CALL_RESULT, toolCallId: "c1", content: "{}" });
+    await send(
+      { type: EventType.TOOL_CALL_END, toolCallId: "c1" },
+      { type: EventType.TOOL_CALL_RESULT, toolCallId: "c1", content: "{}" },
+    );
     await send({ type: EventType.TEXT_MESSAGE_START, messageId: "m1", role: "assistant" });
     await vi.waitFor(() => expect(played).toEqual([run, tools]));
     await send({ type: EventType.TEXT_MESSAGE_END, messageId: "m1" }, { type: EventType.RUN_FINISHED, runId: "r1" });
@@ -66,13 +72,18 @@ describe("progress sounds", () => {
   });
 
   it("plays a start sound as each level appears, and when the turn begins", async () => {
-    const begin = { layers: [5] }, toolStart = { layers: [6] }, replyStart = { layers: [7] };
+    const begin = { layers: [5] },
+      toolStart = { layers: [6] },
+      replyStart = { layers: [7] };
     render(<Harness sounds={{ start: { turn: begin, tools: toolStart, reply: replyStart } }} />);
     await act(async () => progress().onTurnStart());
     await vi.waitFor(() => expect(played).toEqual([begin]));
     await send({ type: EventType.TOOL_CALL_START, toolCallId: "c1", toolCallName: "x" });
     await vi.waitFor(() => expect(played).toEqual([begin, toolStart]));
-    await send({ type: EventType.TOOL_CALL_END, toolCallId: "c1" }, { type: EventType.TOOL_CALL_RESULT, toolCallId: "c1", content: "{}" });
+    await send(
+      { type: EventType.TOOL_CALL_END, toolCallId: "c1" },
+      { type: EventType.TOOL_CALL_RESULT, toolCallId: "c1", content: "{}" },
+    );
     await send({ type: EventType.TEXT_MESSAGE_START, messageId: "m1", role: "assistant" });
     await vi.waitFor(() => expect(played).toEqual([begin, toolStart, replyStart]));
   });
@@ -83,7 +94,10 @@ describe("progress sounds", () => {
     await vi.waitFor(() => expect(played).toEqual([]));
     await send({ type: EventType.TOOL_CALL_START, toolCallId: "c1", toolCallName: "x" });
     await vi.waitFor(() => expect(played).toEqual([ripple]));
-    await send({ type: EventType.TOOL_CALL_END, toolCallId: "c1" }, { type: EventType.TOOL_CALL_RESULT, toolCallId: "c1", content: "{}" });
+    await send(
+      { type: EventType.TOOL_CALL_END, toolCallId: "c1" },
+      { type: EventType.TOOL_CALL_RESULT, toolCallId: "c1", content: "{}" },
+    );
     await send({ type: EventType.TEXT_MESSAGE_START, messageId: "m1", role: "assistant" });
     await vi.waitFor(() => expect(played).toEqual([ripple, petal, ripple]));
     await send({ type: EventType.TEXT_MESSAGE_END, messageId: "m1" }, { type: EventType.RUN_FINISHED, runId: "r1" });

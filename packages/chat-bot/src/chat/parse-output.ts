@@ -1,8 +1,4 @@
-import {
-  ChatBotJsonSchema,
-  ChatBotOutputSchema,
-  type ChatBotJson,
-} from "@repo/contracts/chat-bots";
+import { ChatBotJsonSchema, ChatBotOutputSchema, type ChatBotJson } from "@repo/contracts/chat-bots";
 import type { ParsedChatBotJson } from "./types";
 
 function stripFence(raw: string): string {
@@ -40,7 +36,5 @@ export function isChatBotJsonText(raw: string): boolean {
 // -----
 export function parseChatBotJson(raw: string): ParsedChatBotJson {
   const output = ChatBotOutputSchema.safeParse(parseJsonObject(raw));
-  return output.success
-    ? { answer: output.data.answer, output: output.data }
-    : { answer: null, output: null };
+  return output.success ? { answer: output.data.answer, output: output.data } : { answer: null, output: null };
 }

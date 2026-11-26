@@ -15,6 +15,7 @@ export type NewRunnerJob = {
   prompt: string;
   optionsJson: string;
   priorsJson: string;
+  resumesScanId: string | null;
 };
 
 export type JobReport = {

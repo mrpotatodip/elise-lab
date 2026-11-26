@@ -294,10 +294,18 @@ h2 {
   contain: size;
 }
 
-.frame--tour { aspect-ratio: 1440 / 760; }
-.frame--connect { aspect-ratio: 760 / 740; }
-.frame--audit { aspect-ratio: 760 / 660; }
-.frame--report { aspect-ratio: 760 / 860; }
+.frame--tour {
+  aspect-ratio: 1440 / 760;
+}
+.frame--connect {
+  aspect-ratio: 760 / 740;
+}
+.frame--audit {
+  aspect-ratio: 760 / 660;
+}
+.frame--report {
+  aspect-ratio: 760 / 860;
+}
 
 @media (max-width: 43rem) {
   .frame {

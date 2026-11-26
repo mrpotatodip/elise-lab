@@ -1,6 +1,15 @@
 import { describeRoute } from "hono-openapi";
 import { SignUpSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, bash, envelope, errorResponses, json, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  bash,
+  envelope,
+  errorResponses,
+  json,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const createAccountDoc = describeRoute({
   tags: ["sign-up"],

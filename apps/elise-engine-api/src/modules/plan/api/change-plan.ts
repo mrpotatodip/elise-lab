@@ -10,13 +10,22 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/change", changePlanDoc, requirePower("company:plan:manage"), zValidator("header", AccountHeaderSchema), zValidator("json", PlanChangeBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { planKey, interval } = c.req.valid("json");
-  const userId = userIdOf(c);
-  const deps = c.get("deps");
-  const data = await deps.withTenant(c, accountId, (db) => runEffect(changePlanSvc(db, deps.stripe(c.env), accountId, userId, planKey, interval, new Date())));
-  return c.json({ data, error: null });
-});
+app.post(
+  "/change",
+  changePlanDoc,
+  requirePower("company:plan:manage"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", PlanChangeBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { planKey, interval } = c.req.valid("json");
+    const userId = userIdOf(c);
+    const deps = c.get("deps");
+    const data = await deps.withTenant(c, accountId, (db) =>
+      runEffect(changePlanSvc(db, deps.stripe(c.env), accountId, userId, planKey, interval, new Date())),
+    );
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

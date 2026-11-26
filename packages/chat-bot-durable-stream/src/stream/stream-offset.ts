@@ -32,10 +32,7 @@ export function decodeChatBotDurableStreamOffset(offset: string): ChatBotDurable
 // The seq to read after, inside the run the
 // caller authorised; "-1" means from the start.
 // -----
-export function checkChatBotDurableStreamOffset(
-  offset: string,
-  runId: string,
-): ChatBotDurableStreamOffsetCheck {
+export function checkChatBotDurableStreamOffset(offset: string, runId: string): ChatBotDurableStreamOffsetCheck {
   if (offset === CHAT_BOT_DURABLE_STREAM_START_OFFSET) return { seq: 0 };
   const cursor = decodeChatBotDurableStreamOffset(offset);
   if (!cursor) return { error: CHAT_BOT_DURABLE_STREAM_OFFSET_INVALID };

@@ -9,12 +9,21 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/:repoId/verdict", getVerdictDoc, zValidator("header", AccountHeaderSchema), zValidator("param", RepoParamSchema), zValidator("query", VerdictQuerySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { repoId } = c.req.valid("param");
-  const { commit } = c.req.valid("query");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(verdictSvc(db, accountId, repoId, commit, new Date())));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/:repoId/verdict",
+  getVerdictDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", RepoParamSchema),
+  zValidator("query", VerdictQuerySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { repoId } = c.req.valid("param");
+    const { commit } = c.req.valid("query");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(verdictSvc(db, accountId, repoId, commit, new Date())));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

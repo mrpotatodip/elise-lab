@@ -1,13 +1,4 @@
-import {
-  foreignKey,
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 // -----
 // One row per run's stream. closedAt set
@@ -23,10 +14,7 @@ export const chatBotDurableStreams = pgTable(
   },
   (t) => ({
     pk: primaryKey({ columns: [t.streamPrefix, t.runId] }),
-    idxPrefixClosed: index("idx_chat_bot_durable_streams_prefix_closed").on(
-      t.streamPrefix,
-      t.closedAt,
-    ),
+    idxPrefixClosed: index("idx_chat_bot_durable_streams_prefix_closed").on(t.streamPrefix, t.closedAt),
   }),
 );
 

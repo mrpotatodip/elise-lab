@@ -1,8 +1,18 @@
 import { describeRoute } from "hono-openapi";
 import { CreditBalanceSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, json, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  json,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
-const EXAMPLE = `{ "data": { "planKey": "pro", "keySource": "platform", "balanceUsd": 41.25, "monthlyCreditUsd": 49, "scans": 12, "scanAllowance": null, "profiles": [{ "profile": "quick", "capUsd": 6, "holdUsd": 9 }, { "profile": "standard", "capUsd": 12, "holdUsd": 18 }, { "profile": "deep", "capUsd": 18, "holdUsd": 27 }] }, "error": null }`;
+const EXAMPLE = `{ "data": { "planKey": "pro", "keySource": "platform", "balanceUsd": 41.25, "monthlyCreditUsd": 49, "scans": 12, "scanAllowance": null, "profiles": [{ "profile": "quick", "capUsd": 12, "holdUsd": 18 }, { "profile": "standard", "capUsd": 24, "holdUsd": 36 }, { "profile": "deep", "capUsd": 50, "holdUsd": 75 }] }, "error": null }`;
 
 export const getCreditDoc = describeRoute({
   tags: ["usage"],
@@ -16,7 +26,18 @@ export const getCreditDoc = describeRoute({
       "The Worker reads the account's plan and adds up its credit ledger. The balance already has the holds of running scans taken out.",
       "The Worker returns the plan, the balance, the credit a paid month adds, and the month's scans against the plan's allowance. An account with no plan gets a zero balance and null for the plan. The cap of each scan profile comes with the credit it holds (the cap times the plan's markup); the hold is null for an account on its own key or with no plan.",
     ],
-    example: ["Read the credit:", bash(`curl ${EXAMPLE_BASE_URL}/usage/credit \\`, '  -H "authorization: Bearer $SCAN_API_TOKEN" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`), json(EXAMPLE)],
+    example: [
+      "Read the credit:",
+      bash(
+        `curl ${EXAMPLE_BASE_URL}/usage/credit \\`,
+        '  -H "authorization: Bearer $SCAN_API_TOKEN" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
+      json(EXAMPLE),
+    ],
   }),
-  responses: { 200: jsonResponse("The account's credit.", envelope(CreditBalanceSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("The account's credit.", envelope(CreditBalanceSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });

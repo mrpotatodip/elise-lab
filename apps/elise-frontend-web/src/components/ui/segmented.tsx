@@ -1,14 +1,14 @@
-import { useId, type ReactNode } from "react"
+import { useId, type ReactNode } from "react";
 
-import { cn } from "#/lib/utils"
+import { cn } from "#/lib/utils";
 
 type SegmentedProps<T extends string> = {
-  label: string
-  value: T
-  options: readonly { value: T; label: string; icon?: ReactNode; disabled?: boolean }[]
-  onChange: (value: T) => void
-  className?: string
-}
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string; icon?: ReactNode; disabled?: boolean }[];
+  onChange: (value: T) => void;
+  className?: string;
+};
 
 // -----
 // Equal-width segments over real radio inputs, so the arrow keys and the
@@ -16,11 +16,11 @@ type SegmentedProps<T extends string> = {
 // transform only and holds still under reduced motion.
 // -----
 function Segmented<T extends string>({ label, value, options, onChange, className }: SegmentedProps<T>) {
-  const name = useId()
+  const name = useId();
   const index = Math.max(
     0,
-    options.findIndex((option) => option.value === value)
-  )
+    options.findIndex((option) => option.value === value),
+  );
   return (
     <fieldset
       data-slot="segmented"
@@ -39,16 +39,24 @@ function Segmented<T extends string>({ label, value, options, onChange, classNam
           className={cn(
             "relative flex h-8 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
             option.value === value ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-            option.disabled && "cursor-not-allowed opacity-50 hover:text-muted-foreground"
+            option.disabled && "cursor-not-allowed opacity-50 hover:text-muted-foreground",
           )}
         >
-          <input type="radio" name={name} value={option.value} checked={option.value === value} disabled={option.disabled} onChange={() => onChange(option.value)} className="sr-only" />
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={option.value === value}
+            disabled={option.disabled}
+            onChange={() => onChange(option.value)}
+            className="sr-only"
+          />
           {option.icon}
           {option.label}
         </label>
       ))}
     </fieldset>
-  )
+  );
 }
 
-export { Segmented }
+export { Segmented };

@@ -1,14 +1,34 @@
 import { and, asc, eq, gt, inArray, ne, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { ScanUsage } from "@repo/contracts/elise";
-import { scanFiles, scanFindings, scanRepos, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
+import {
+  scanFiles,
+  scanFindings,
+  scanRepos,
+  scanRunnerJobs,
+  scans,
+  tenantCreditLedger,
+  tenantRunners,
+} from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
 import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
-import { PG_UNIQUE_VIOLATION, pgErrorCode } from "#/lib/pg-error";
+import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
+import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
+import { RESUME_ALREADY_RESUMED_MESSAGE } from "#/modules/scans/constants";
 import type { ScanParams, ScanStatus } from "#/schemas";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
-import { displayRepoUrlOf, liveScansSql, repoIdentityOf, sameRepoIdentity, scanRowToStatus, stalledScansSql, summaryOf } from "#/modules/scan-ledger/utils";
+import {
+  displayRepoUrlOf,
+  liveScansSql,
+  REPO_LIMIT_MESSAGE,
+  repoIdentityOf,
+  restoreRemovedRepo,
+  sameRepoIdentity,
+  scanRowToStatus,
+  stalledScansSql,
+  summaryOf,
+} from "#/modules/scan-ledger/utils";
 
 type ScanRow = typeof scans.$inferSelect;
 
@@ -24,12 +44,22 @@ const runnersOf = (db: AppDbType, ids: string[]) =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ scanId: scanRunnerJobs.scanId, id: tenantRunners.id, name: tenantRunners.name })
+        .select({
+          scanId: scanRunnerJobs.scanId,
+          id: tenantRunners.id,
+          name: tenantRunners.name,
+          optionsJson: scanRunnerJobs.optionsJson,
+        })
         .from(scanRunnerJobs)
-        .innerJoin(tenantRunners, eq(tenantRunners.id, scanRunnerJobs.runnerId))
+        .leftJoin(tenantRunners, eq(tenantRunners.id, scanRunnerJobs.runnerId))
         .where(inArray(scanRunnerJobs.scanId, ids)),
     catch: toDbError,
   });
+
+type RunnerJob = { scanId: string; id: string | null; name: string | null; optionsJson: string };
+
+const runnerOfJob = (job: RunnerJob | undefined) =>
+  job?.id != null && job.name !== null ? { id: job.id, name: job.name } : null;
 
 // -----
 // An Account's live scans. Callers count these scans and add up
@@ -39,14 +69,31 @@ const runnersOf = (db: AppDbType, ids: string[]) =>
 // They do carry their Runner, because a scan on a Runner is counted
 // apart from one in our cloud.
 // -----
-export const activeScansEffect = (db: AppDbType, accountId: string, nowMs: number): Effect.Effect<ScanStatus[], DbError> =>
+export const activeScansEffect = (
+  db: AppDbType,
+  accountId: string,
+  nowMs: number,
+): Effect.Effect<ScanStatus[], DbError> =>
   Effect.gen(function* () {
     const rows = yield* Effect.tryPromise({
-      try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), liveScansSql(nowMs))),
+      try: () =>
+        db
+          .select()
+          .from(scans)
+          .where(and(eq(scans.tenantId, accountId), liveScansSql(nowMs))),
       catch: toDbError,
     });
-    const runners = rows.length === 0 ? [] : yield* runnersOf(db, rows.map((row) => row.id));
-    return rows.map((row) => scanRowToStatus(row, [], null, runners.find((runner) => runner.scanId === row.id) ?? null));
+    const runners =
+      rows.length === 0
+        ? []
+        : yield* runnersOf(
+            db,
+            rows.map((row) => row.id),
+          );
+    return rows.map((row) => {
+      const job = runners.find((runner) => runner.scanId === row.id);
+      return scanRowToStatus(row, [], null, runnerOfJob(job), null, job?.optionsJson);
+    });
   });
 
 // -----
@@ -61,7 +108,12 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
         const files = yield* Effect.tryPromise({
           try: () =>
             db
-              .select({ scanId: scanFiles.scanId, name: scanFiles.name, sizeBytes: scanFiles.sizeBytes, contentType: scanFiles.contentType })
+              .select({
+                scanId: scanFiles.scanId,
+                name: scanFiles.name,
+                sizeBytes: scanFiles.sizeBytes,
+                contentType: scanFiles.contentType,
+              })
               .from(scanFiles)
               .where(inArray(scanFiles.scanId, ids))
               .orderBy(asc(scanFiles.name)),
@@ -70,7 +122,13 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
         const counts = yield* Effect.tryPromise({
           try: () =>
             db
-              .select({ scanId: scanFindings.scanId, status: scanFindings.status, severity: scanFindings.severity, origin: scanFindings.origin, total: sql<number>`count(*)::int` })
+              .select({
+                scanId: scanFindings.scanId,
+                status: scanFindings.status,
+                severity: scanFindings.severity,
+                origin: scanFindings.origin,
+                total: sql<number>`count(*)::int`,
+              })
               .from(scanFindings)
               .where(inArray(scanFindings.scanId, ids))
               .groupBy(scanFindings.scanId, scanFindings.status, scanFindings.severity, scanFindings.origin),
@@ -78,15 +136,31 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
         });
         const runners = yield* runnersOf(db, ids);
         const archives = yield* scanArchivesEffect(db, ids);
-        return rows.map((row) =>
-          scanRowToStatus(
+        const resumers = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select({ id: scans.id, resumes: scans.resumesScanId })
+              .from(scans)
+              .where(inArray(scans.resumesScanId, ids)),
+          catch: toDbError,
+        });
+        return rows.map((row) => {
+          const job = runners.find((runner) => runner.scanId === row.id);
+          return scanRowToStatus(
             row,
-            files.filter((file) => file.scanId === row.id).map(({ name, sizeBytes, contentType }) => ({ name, sizeBytes, contentType })),
-            summaryOf(row, counts.filter((count) => count.scanId === row.id)),
-            runners.find((runner) => runner.scanId === row.id) ?? null,
+            files
+              .filter((file) => file.scanId === row.id)
+              .map(({ name, sizeBytes, contentType }) => ({ name, sizeBytes, contentType })),
+            summaryOf(
+              row,
+              counts.filter((count) => count.scanId === row.id),
+            ),
+            runnerOfJob(job),
             archives.get(row.id) ?? null,
-          ),
-        );
+            job?.optionsJson,
+            resumers.find((resumer) => resumer.resumes === row.id)?.id ?? null,
+          );
+        });
       });
 
 // -----
@@ -124,7 +198,11 @@ export const scanReads = (db: AppDbType): ScanReads => ({
 
   get: (accountId, scanId) =>
     Effect.tryPromise({
-      try: () => db.select().from(scans).where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))),
+      try: () =>
+        db
+          .select()
+          .from(scans)
+          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))),
       catch: toDbError,
     }).pipe(
       Effect.flatMap((rows) => withFiles(db, rows)),
@@ -150,7 +228,10 @@ export const scanReads = (db: AppDbType): ScanReads => ({
 // active scans refuses a second live scan.
 // -----
 const createStatements = (db: AppDbType, params: ScanParams, repoId: string, nowMs: number) => {
-  const stalled = db.select({ id: scans.id }).from(scans).where(and(eq(scans.repoId, repoId), stalledScansSql(nowMs)));
+  const stalled = db
+    .select({ id: scans.id })
+    .from(scans)
+    .where(and(eq(scans.repoId, repoId), stalledScansSql(nowMs)));
   return [
     db
       .insert(tenantCreditLedger)
@@ -177,7 +258,13 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
     db.delete(scanFindings).where(inArray(scanFindings.scanId, stalled)),
     db
       .update(scans)
-      .set({ status: "failed", step: null, finishedAt: new Date(), error: "the scan stalled and was closed by a newer request", updatedAt: new Date() })
+      .set({
+        status: "failed",
+        step: null,
+        finishedAt: new Date(),
+        error: "the scan stalled and was closed by a newer request",
+        updatedAt: new Date(),
+      })
       .where(and(eq(scans.repoId, repoId), stalledScansSql(nowMs))),
     db.insert(scans).values({
       id: params.scanId,
@@ -185,6 +272,7 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
       repo: params.repo,
       repoId,
       ref: params.ref ?? null,
+      resumesScanId: params.resumesScanId ?? null,
       status: "queued",
       skill: params.options.skill,
       model: params.options.model,
@@ -197,13 +285,36 @@ const createStatements = (db: AppDbType, params: ScanParams, repoId: string, now
   ] as const;
 };
 
-const createErrorOf = (cause: unknown): DbError | Conflict => (pgErrorCode(cause) === PG_UNIQUE_VIOLATION ? new Conflict({ message: ACTIVE_SCAN_CONFLICT }) : toDbError(cause));
+const RESUMES_UNIQUE_CONSTRAINT = "uq_scans_resumes_scan_id";
 
-const activeConflictOf = (db: AppDbType, repoId: string) => (): Effect.Effect<never, DbError | Conflict> =>
-  Effect.tryPromise({
-    try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"]))).limit(1),
-    catch: toDbError,
-  }).pipe(Effect.flatMap(([active]) => Effect.fail(new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT }))));
+const createErrorOf = (cause: unknown): DbError | Conflict => {
+  if (pgErrorCode(cause) !== PG_UNIQUE_VIOLATION) return toDbError(cause);
+  return new Conflict({
+    message:
+      pgErrorConstraint(cause) === RESUMES_UNIQUE_CONSTRAINT ? RESUME_ALREADY_RESUMED_MESSAGE : ACTIVE_SCAN_CONFLICT,
+  });
+};
+
+const activeConflictOf =
+  (db: AppDbType, repoId: string) =>
+  (error: Conflict): Effect.Effect<never, DbError | Conflict> =>
+    error.message === RESUME_ALREADY_RESUMED_MESSAGE
+      ? Effect.fail(error)
+      : Effect.tryPromise({
+          try: () =>
+            db
+              .select({ id: scans.id })
+              .from(scans)
+              .where(and(eq(scans.repoId, repoId), inArray(scans.status, ["queued", "running"])))
+              .limit(1),
+          catch: toDbError,
+        }).pipe(
+          Effect.flatMap(([active]) =>
+            Effect.fail(
+              new Conflict({ message: active ? `${ACTIVE_SCAN_CONFLICT}: ${active.id}` : ACTIVE_SCAN_CONFLICT }),
+            ),
+          ),
+        );
 
 const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   ...scanReads(db),
@@ -211,7 +322,9 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   // -----
   // Insert or find the repo's record. The unique index
   // on (account, provider, host, canonical) settles a
-  // race between two first scans of the same repo.
+  // race between two first scans of the same repo. The row
+  // is locked until the transaction ends, so a remove of the
+  // repo waits for the scan being made.
   // -----
   ensureRepo: (accountId, url, provider) =>
     Effect.tryPromise({
@@ -224,10 +337,32 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
         const [row] = await db
           .select({ id: scanRepos.id, canonical: scanRepos.canonical, url: scanRepos.url })
           .from(scanRepos)
-          .where(sameRepoIdentity(accountId, identity));
+          .where(sameRepoIdentity(accountId, identity))
+          .for("update");
         return row;
       },
       catch: toDbError,
+    }),
+
+  restoreRepo: (accountId, repoId, userId) =>
+    Effect.tryPromise({
+      try: async () => {
+        const [row] = await db
+          .select({ removedAt: scanRepos.removedAt })
+          .from(scanRepos)
+          .where(and(eq(scanRepos.tenantId, accountId), eq(scanRepos.id, repoId)));
+        if (!row?.removedAt) return;
+        if (!(await restoreRemovedRepo(db, accountId, eq(scanRepos.id, repoId))))
+          throw new Conflict({ message: REPO_LIMIT_MESSAGE });
+        if (userId === undefined) return;
+        await insertAuditEntry(db, {
+          actorPartyId: await actorPartyOf(db, userId),
+          action: "repo.restored",
+          subjectId: repoId,
+          tenantId: accountId,
+        });
+      },
+      catch: (cause) => (cause instanceof Conflict ? cause : toDbError(cause)),
     }),
 
   mark: (accountId, scanId, patch) => {
@@ -242,6 +377,7 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
             ...(patch.error !== undefined && { error: patch.error }),
             ...(patch.commitSha !== undefined && { commitSha: patch.commitSha }),
             ...(patch.branch !== undefined && { branch: patch.branch }),
+            ...(patch.resumesScanId === null && { resumesScanId: null }),
             ...(ended && { finishedAt: new Date(), step: null }),
             ...(patch.usage && {
               inputTokens: patch.usage.inputTokens,
@@ -254,7 +390,14 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
             }),
             updatedAt: new Date(),
           })
-          .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), ne(scans.status, "stopped"), patch.status === "failed" ? undefined : ne(scans.status, "failed")));
+          .where(
+            and(
+              eq(scans.tenantId, accountId),
+              eq(scans.id, scanId),
+              ne(scans.status, "stopped"),
+              patch.status === "failed" ? undefined : ne(scans.status, "failed"),
+            ),
+          );
         if (patch.status !== "failed") return update;
         const changed = db.$with("changed").as(update.returning({ id: scans.id }));
         const cleared = db.$with("cleared").as(
@@ -288,7 +431,11 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
               )
               .onConflictDoUpdate({
                 target: [scanFiles.scanId, scanFiles.name],
-                set: { sizeBytes: sql`excluded.size_bytes`, contentType: sql`excluded.content_type`, r2Key: sql`excluded.r2_key` },
+                set: {
+                  sizeBytes: sql`excluded.size_bytes`,
+                  contentType: sql`excluded.content_type`,
+                  r2Key: sql`excluded.r2_key`,
+                },
               }),
           catch: toDbError,
         }).pipe(Effect.asVoid),
@@ -296,7 +443,12 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
   activeSince: (accountId, nowMs) => activeScansEffect(db, accountId, nowMs),
 });
 
-export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string, now: Date): Effect.Effect<void, NotFound | Conflict | DbError> =>
+export const stopScanEffect = (
+  db: AppDbType,
+  accountId: string,
+  scanId: string,
+  now: Date,
+): Effect.Effect<void, NotFound | Conflict | DbError> =>
   Effect.gen(function* () {
     const stopped = yield* Effect.tryPromise({
       try: () => {
@@ -304,7 +456,9 @@ export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string,
           db
             .update(scans)
             .set({ status: "stopped", step: null, finishedAt: now, updatedAt: now })
-            .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId), inArray(scans.status, ["queued", "running"])))
+            .where(
+              and(eq(scans.tenantId, accountId), eq(scans.id, scanId), inArray(scans.status, ["queued", "running"])),
+            )
             .returning({ id: scans.id }),
         );
         const cleared = db.$with("cleared").as(
@@ -318,7 +472,14 @@ export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string,
       catch: toDbError,
     });
     if (stopped.length === 0) {
-      const [found] = yield* Effect.tryPromise({ try: () => db.select({ id: scans.id }).from(scans).where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))), catch: toDbError });
+      const [found] = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ id: scans.id })
+            .from(scans)
+            .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))),
+        catch: toDbError,
+      });
       if (!found) return yield* new NotFound({ message: "Scan not found" });
       return yield* new Conflict({ message: SCAN_ALREADY_ENDED });
     }
@@ -332,7 +493,12 @@ export const stopScanEffect = (db: AppDbType, accountId: string, scanId: string,
     });
   });
 
-export const stoppedUsageEffect = (db: AppDbType, accountId: string, scanId: string, usage: ScanUsage): Effect.Effect<void, DbError> =>
+export const stoppedUsageEffect = (
+  db: AppDbType,
+  accountId: string,
+  scanId: string,
+  usage: ScanUsage,
+): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -374,7 +540,12 @@ export const tenantScanRepo = (db: AppTxDbType): ScanRepo => ({
     Effect.tryPromise({
       try: () =>
         db.transaction(async (savepoint) => {
-          const [settleStalled, cancelJobs, expireStalled, insertScan, ...markPrivate] = createStatements(savepoint, params, repoId, nowMs);
+          const [settleStalled, cancelJobs, expireStalled, insertScan, ...markPrivate] = createStatements(
+            savepoint,
+            params,
+            repoId,
+            nowMs,
+          );
           await settleStalled;
           await cancelJobs;
           await expireStalled;

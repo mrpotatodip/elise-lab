@@ -7,7 +7,11 @@ export const ProjectParamSchema = z.object({
   projectId: ProjectIdSchema,
 });
 
-export const ProjectNameSchema = z.string().trim().min(1).max(PROJECT_NAME_MAX);
+export const ProjectNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Give the project a name.")
+  .max(PROJECT_NAME_MAX, `Use ${PROJECT_NAME_MAX} characters or fewer.`);
 
 export const CreateProjectBodySchema = z.object({
   name: ProjectNameSchema,
@@ -25,9 +29,6 @@ export const ProjectListSchema = z.array(ProjectSchema);
 
 export const ProjectDeletedSchema = z.object({ id: ProjectIdSchema });
 
-// -----
-// Move a Repo into a Project, or out of every Project with null.
-// -----
 export const MoveRepoBodySchema = z.object({
   projectId: ProjectIdSchema.nullable(),
 });

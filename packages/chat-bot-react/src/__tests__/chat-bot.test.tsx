@@ -44,9 +44,7 @@ function fakeServer(routes: Array<[string, string, Handler]>) {
     const request = new Request(new URL(String(input), "http://app.test"), init);
     calls.push(request);
     const url = new URL(request.url);
-    const route = routes.find(
-      ([method, path]) => method === request.method && path === `${url.pathname}${url.search}`,
-    );
+    const route = routes.find(([method, path]) => method === request.method && path === `${url.pathname}${url.search}`);
     return route ? route[2](request) : new Response("not found", { status: 404 });
   });
   return { fetch: fetch as unknown as typeof globalThis.fetch, calls };
@@ -149,7 +147,9 @@ describe("<ChatBot />", () => {
         metadata: {
           chatBot: {
             toolsUsed: ["currentTime"],
-            structure: { currentTime: { display: null, displayOptions: null, results: [{ iso: "2026-10-14T12:00:00Z" }] } },
+            structure: {
+              currentTime: { display: null, displayOptions: null, results: [{ iso: "2026-10-14T12:00:00Z" }] },
+            },
           },
         },
       },
@@ -162,12 +162,7 @@ describe("<ChatBot />", () => {
       ["GET", "/api/chat/threads", () => envelope([threadRow(THREAD, "Clock"), threadRow(OTHER, "Other")])],
       ["GET", `/api/chat?threadId=${THREAD}`, () => Response.json(stored)],
     ]);
-    render(
-      <ChatBot
-        fetch={server.fetch}
-        tools={{ currentTime: (call) => <p>custom card for {call.name}</p> }}
-      />,
-    );
+    render(<ChatBot fetch={server.fetch} tools={{ currentTime: (call) => <p>custom card for {call.name}</p> }} />);
 
     fireEvent.click(await screen.findByText("Clock"));
 

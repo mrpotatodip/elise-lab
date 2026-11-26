@@ -9,9 +9,14 @@ import type { RepoBranch } from "../schemas";
 // full Scan is older than the history shown, every one shown is.
 // Empty when the engine sends no fullScanId (an older engine).
 // -----
-export const repoNotFullScanIds = (branch: Pick<RepoBranch, "id" | "fullScanId">, newestFirst: readonly Pick<ScanStatus, "scanId" | "branchId" | "status">[]) => {
+export const repoNotFullScanIds = (
+  branch: Pick<RepoBranch, "id" | "fullScanId">,
+  newestFirst: readonly Pick<ScanStatus, "scanId" | "branchId" | "status">[],
+) => {
   if (branch.fullScanId === undefined) return new Set<string>();
   const tip = newestFirst.findIndex((scan) => scan.scanId === branch.fullScanId);
   const newer = tip === -1 ? newestFirst : newestFirst.slice(0, tip);
-  return new Set(newer.filter((scan) => scan.branchId === branch.id && scan.status === "succeeded").map((scan) => scan.scanId));
+  return new Set(
+    newer.filter((scan) => scan.branchId === branch.id && scan.status === "succeeded").map((scan) => scan.scanId),
+  );
 };

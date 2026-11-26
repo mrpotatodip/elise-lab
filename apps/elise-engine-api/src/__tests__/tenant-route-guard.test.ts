@@ -51,7 +51,9 @@ import {
 } from "#/__tests__/tenant-route-cases";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 
-const EnvelopeSchema = z.object({ data: z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())]).nullable() });
+const EnvelopeSchema = z.object({
+  data: z.union([z.array(z.unknown()), z.record(z.string(), z.unknown())]).nullable(),
+});
 const STATUS_OF = { "not-found": 404, empty: 200, refused: 400, created: 201 };
 const GUARD_USER_ID = "guard-test-user";
 
@@ -62,12 +64,16 @@ let strangerId: string;
 
 const app = tenantRouteApp(() => test, { sessionUserId: async () => GUARD_USER_ID });
 
-const mountedRoutes = [...new Set(app.routes.filter((route) => route.method !== "ALL").map((route) => `${route.method} ${route.path}`))];
+const mountedRoutes = [
+  ...new Set(app.routes.filter((route) => route.method !== "ALL").map((route) => `${route.method} ${route.path}`)),
+];
 const tenantRoutes = mountedRoutes.filter((route) => !NOT_TENANT_ROUTES.includes(route));
 const caseEntries = Object.entries<CrossAccountCase>(CROSS_ACCOUNT_CASES);
 const runCases = caseEntries.flatMap(([route, found]) => (found.kind === "run" ? [{ route, ...found }] : []));
 type RunCase = (typeof runCases)[number];
-const allowedOwnerUses = new Map<string, number>(Object.entries(OWNER_CONNECTION_USES).map(([file, { uses }]) => [file, uses]));
+const allowedOwnerUses = new Map<string, number>(
+  Object.entries(OWNER_CONNECTION_USES).map(([file, { uses }]) => [file, uses]),
+);
 const SRC = resolve(__dirname, "..");
 const OWNER_USE = /\b(dbConnect|poolConnect|withPool|createDb|createPoolDb)\(|\bDATABASE_URL\b/g;
 
@@ -75,7 +81,10 @@ const ownerUsesBySourceFile = () =>
   Object.fromEntries(
     readdirSync(SRC, { recursive: true, encoding: "utf8" })
       .filter((file) => file.endsWith(".ts") && !file.endsWith(".d.ts") && !file.includes("__tests__"))
-      .map((file) => [file.split("\\").join("/"), (readFileSync(join(SRC, file), "utf8").match(OWNER_USE) ?? []).length] as const)
+      .map(
+        (file) =>
+          [file.split("\\").join("/"), (readFileSync(join(SRC, file), "utf8").match(OWNER_USE) ?? []).length] as const,
+      )
       .filter(([, uses]) => uses > 0),
   );
 
@@ -86,17 +95,37 @@ const ownerUsesBySourceFile = () =>
 // -----
 const seedOtherUsage = async (accountId: string, repoId: string) => {
   const [pro] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "pro"));
-  await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: pro.id, status: "active", source: "grant" });
-  await test.raw.insert(tenantCreditLedger).values({ tenantId: accountId, kind: "topup", amountUsd: "40.0000", idempotencyKey: "theirs-topup" });
+  await test.raw
+    .insert(tenantSubscriptions)
+    .values({ tenantId: accountId, planId: pro.id, status: "active", source: "grant" });
+  await test.raw
+    .insert(tenantCreditLedger)
+    .values({ tenantId: accountId, kind: "topup", amountUsd: "40.0000", idempotencyKey: "theirs-topup" });
   await test.raw.update(tenants).set({ monthlyScanBudgetUsd: "99.00" }).where(eq(tenants.id, accountId));
-  await test.raw.insert(accessAuditLog).values({ action: "usage.budget.updated", subjectId: accountId, before: { monthlyBudgetUsd: null }, after: { tenantId: accountId, monthlyBudgetUsd: 99 } });
-  await test.raw.insert(scans).values(scanValues(accountId, repoId, "theirs-spent", new Date().toISOString(), { costUsd: "3.0000", keySource: "platform" }));
+  await test.raw.insert(accessAuditLog).values({
+    action: "usage.budget.updated",
+    subjectId: accountId,
+    before: { monthlyBudgetUsd: null },
+    after: { tenantId: accountId, monthlyBudgetUsd: 99 },
+  });
+  await test.raw.insert(scans).values(
+    scanValues(accountId, repoId, "theirs-spent", new Date().toISOString(), {
+      costUsd: "3.0000",
+      keySource: "platform",
+    }),
+  );
 };
 
 const outcomeOf = (found: RunCase, status: number, data: z.infer<typeof EnvelopeSchema>["data"]) => {
   const fields = Array.isArray(data) ? {} : (data ?? {});
-  if (found.expect === "own") return { got: [status, Object.fromEntries(Object.keys(found.own).map((key) => [key, fields[key]]))], want: [200, found.own] };
-  const lists = Array.isArray(data) ? [data] : ("listedIn" in found && found.listedIn ? [fields[found.listedIn]] : Object.values(fields)).filter(Array.isArray);
+  if (found.expect === "own")
+    return {
+      got: [status, Object.fromEntries(Object.keys(found.own).map((key) => [key, fields[key]]))],
+      want: [200, found.own],
+    };
+  const lists = Array.isArray(data)
+    ? [data]
+    : ("listedIn" in found && found.listedIn ? [fields[found.listedIn]] : Object.values(fields)).filter(Array.isArray);
   const listed = found.expect === "empty" && lists.length === 0 ? "no list in the answer" : lists.flat().length;
   return { got: [status, listed], want: [STATUS_OF[found.expect], 0] };
 };
@@ -105,25 +134,80 @@ beforeAll(async () => {
   test = await openTestDb();
   const acme = await seedTenant(test, "acme");
   tenantId = acme.tenantId;
-  await test.raw.insert(authUser).values({ id: GUARD_USER_ID, name: "Guard", email: "guard@example.com", emailVerified: true, partyId: acme.partyId });
+  await test.raw.insert(authUser).values({
+    id: GUARD_USER_ID,
+    name: "Guard",
+    email: "guard@example.com",
+    emailVerified: true,
+    partyId: acme.partyId,
+  });
   const other = await seedTenant(test, "other");
   otherTenantId = other.tenantId;
-  await test.raw.insert(tenantRunners).values({ id: OTHER_RUNNER_ID, tenantId: otherTenantId, name: OTHER_RUNNER_NAME, createdBy: other.partyId });
+  await test.raw
+    .insert(tenantRunners)
+    .values({ id: OTHER_RUNNER_ID, tenantId: otherTenantId, name: OTHER_RUNNER_NAME, createdBy: other.partyId });
   const stranger = await seedTenant(test, "stranger");
   strangerId = stranger.tenantId;
-  await test.raw.insert(tenantAnthropicKeys).values({ tenantId: strangerId, sealedKey: "strangers", lastFour: "mine", updatedBy: stranger.partyId });
+  await test.raw
+    .insert(tenantAnthropicKeys)
+    .values({ tenantId: strangerId, sealedKey: "strangers", lastFour: "mine", updatedBy: stranger.partyId });
   await seedRepo(test, tenantId);
   const otherRepoId = await seedRepo(test, otherTenantId);
-  await test.raw.insert(scanRepos).values({ id: OTHER_REPO_ID, tenantId: otherTenantId, canonical: "octocat/spoon-knife", url: OTHER_SECOND_REPO, defaultBranch: "main" });
+  await test.raw.insert(scanRepos).values({
+    id: OTHER_REPO_ID,
+    tenantId: otherTenantId,
+    canonical: "octocat/spoon-knife",
+    url: OTHER_SECOND_REPO,
+    defaultBranch: "main",
+  });
   await test.raw.insert(scanRepoBranches).values({ tenantId: otherTenantId, repoId: OTHER_REPO_ID, name: "main" });
   await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"));
-  await test.raw.insert(scans).values(scanValues(otherTenantId, otherRepoId, "theirs-live", new Date().toISOString(), { status: "running", skill: "full" }));
-  await test.raw.insert(scanFiles).values({ tenantId: otherTenantId, scanId: "theirs", name: "REPORT.md", r2Key: `accounts/${otherTenantId}/scans/theirs/REPORT.md`, sizeBytes: 8, contentType: "text/markdown; charset=utf-8" });
-  await test.raw.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: "b".repeat(64), status: "confirmed", severity: "high", title: "theirs", class: "authz" });
-  await test.raw.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
-  await test.raw.insert(scanFindingComments).values({ id: OTHER_COMMENT_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs, to delete or edit" });
-  await test.raw.insert(scanSignals).values({ id: OTHER_SIGNAL_ID, tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), kind: "possible_duplicate", probability: 0.9, modelVersion: "jev-1.14.0" });
-  await test.raw.insert(tenantAnthropicKeys).values({ tenantId: otherTenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
+  await test.raw.insert(scans).values(
+    scanValues(otherTenantId, otherRepoId, "theirs-live", new Date().toISOString(), {
+      status: "running",
+      skill: "full",
+    }),
+  );
+  await test.raw.insert(scanFiles).values({
+    tenantId: otherTenantId,
+    scanId: "theirs",
+    name: "REPORT.md",
+    r2Key: `accounts/${otherTenantId}/scans/theirs/REPORT.md`,
+    sizeBytes: 8,
+    contentType: "text/markdown; charset=utf-8",
+  });
+  await test.raw.insert(scanFindings).values({
+    tenantId: otherTenantId,
+    scanId: "theirs",
+    findingId: "F-THEIRS",
+    fingerprint: "b".repeat(64),
+    status: "confirmed",
+    severity: "high",
+    title: "theirs",
+    class: "authz",
+  });
+  await test.raw
+    .insert(scanFindingComments)
+    .values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: "b".repeat(64), body: "theirs" });
+  await test.raw.insert(scanFindingComments).values({
+    id: OTHER_COMMENT_ID,
+    tenantId: otherTenantId,
+    repoId: otherRepoId,
+    fingerprint: "b".repeat(64),
+    body: "theirs, to delete or edit",
+  });
+  await test.raw.insert(scanSignals).values({
+    id: OTHER_SIGNAL_ID,
+    tenantId: otherTenantId,
+    repoId: otherRepoId,
+    fingerprint: "b".repeat(64),
+    kind: "possible_duplicate",
+    probability: 0.9,
+    modelVersion: "jev-1.14.0",
+  });
+  await test.raw
+    .insert(tenantAnthropicKeys)
+    .values({ tenantId: otherTenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
   await seedOtherUsage(otherTenantId, otherRepoId);
   await ensureTenantRoles(test.raw, otherTenantId);
   const otherRole = await findTenantRole(test.raw, otherTenantId, "workspace_member");
@@ -131,13 +215,29 @@ beforeAll(async () => {
   const [personType] = await test.raw.select().from(partyMasterTypes).where(eq(partyMasterTypes.key, "person"));
   await test.raw.insert(parties).values({ id: OTHER_PARTY_ID, masterTypeId: personType.id });
   await test.raw.insert(partyPersons).values({ partyId: OTHER_PARTY_ID, firstName: "Bo", lastName: "Chen" });
-  await test.raw.insert(partyRoles).values({ partyId: OTHER_PARTY_ID, tenantId: otherTenantId, roleId: otherRole.id, roleScope: "tenant" });
+  await test.raw
+    .insert(partyRoles)
+    .values({ partyId: OTHER_PARTY_ID, tenantId: otherTenantId, roleId: otherRole.id, roleScope: "tenant" });
   await test.raw.insert(tenantGroups).values({ id: OTHER_GROUP_ID, tenantId: otherTenantId, name: OTHER_GROUP_NAME });
-  await test.raw.insert(tenantGroupMembers).values({ groupId: OTHER_GROUP_ID, tenantId: otherTenantId, partyId: OTHER_PARTY_ID });
-  await test.raw.insert(tenantProjects).values({ id: OTHER_PROJECT_ID, tenantId: otherTenantId, name: OTHER_PROJECT_NAME });
+  await test.raw
+    .insert(tenantGroupMembers)
+    .values({ groupId: OTHER_GROUP_ID, tenantId: otherTenantId, partyId: OTHER_PARTY_ID });
+  await test.raw.insert(tenantTeamInvites).values({
+    id: OTHER_INVITE_ID,
+    tenantId: otherTenantId,
+    email: "theirs@example.com",
+    roleId: otherRole.id,
+    tokenHash: "theirs",
+    invitedBy: OTHER_PARTY_ID,
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+  });
+  await test.raw
+    .insert(tenantTeamInviteGroups)
+    .values({ inviteId: OTHER_INVITE_ID, groupId: OTHER_GROUP_ID, tenantId: otherTenantId });
+  await test.raw
+    .insert(tenantProjects)
+    .values({ id: OTHER_PROJECT_ID, tenantId: otherTenantId, name: OTHER_PROJECT_NAME });
   await test.raw.update(scanRepos).set({ projectId: OTHER_PROJECT_ID }).where(eq(scanRepos.id, OTHER_REPO_ID));
-  await test.raw.insert(tenantTeamInvites).values({ id: OTHER_INVITE_ID, tenantId: otherTenantId, email: "theirs@example.com", roleId: otherRole.id, tokenHash: "theirs", invitedBy: OTHER_PARTY_ID, expiresAt: new Date("2099-01-01T00:00:00Z") });
-  await test.raw.insert(tenantTeamInviteGroups).values({ inviteId: OTHER_INVITE_ID, groupId: OTHER_GROUP_ID, tenantId: otherTenantId });
 });
 
 afterAll(async () => {
@@ -163,14 +263,24 @@ describe("every tenant route has a cross-account case", () => {
   });
 
   it.each(runCases)("$route answers one Account with nothing of another's", async (found) => {
-    const res = await callAs(app, found.as === "stranger" ? strangerId : tenantId, found.path, { method: found.method, body: found.body });
+    const res = await callAs(app, found.as === "stranger" ? strangerId : tenantId, found.path, {
+      method: found.method,
+      body: found.body,
+    });
     const { got, want } = outcomeOf(found, res.status, EnvelopeSchema.parse(await res.json()).data);
     expect(got).toEqual(want);
   });
 
   it("keeps a Runner added by one Account out of another Account's list", async () => {
-    const names = async (accountId: string) => z.object({ data: z.array(z.object({ name: z.string() })) }).parse(await (await callAs(app, accountId, "/runners")).json()).data.map((runner) => runner.name);
-    expect({ own: await names(tenantId), other: await names(otherTenantId) }).toEqual({ own: ["Guard laptop"], other: [OTHER_RUNNER_NAME] });
+    const names = async (accountId: string) =>
+      z
+        .object({ data: z.array(z.object({ name: z.string() })) })
+        .parse(await (await callAs(app, accountId, "/runners")).json())
+        .data.map((runner) => runner.name);
+    expect({ own: await names(tenantId), other: await names(otherTenantId) }).toEqual({
+      own: ["Guard laptop"],
+      other: [OTHER_RUNNER_NAME],
+    });
   });
 });
 

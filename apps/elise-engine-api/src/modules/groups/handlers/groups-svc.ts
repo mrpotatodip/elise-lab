@@ -12,16 +12,30 @@ import {
 } from "#/modules/groups/queries";
 import type { GroupFailure } from "#/modules/groups/types";
 
-export const listGroupsSvc = (db: AppDbType, accountId: string): Effect.Effect<GroupList, DbError> => listGroupsEffect(db, accountId);
+export const listGroupsSvc = (db: AppDbType, accountId: string): Effect.Effect<GroupList, DbError> =>
+  listGroupsEffect(db, accountId);
 
-export const createGroupSvc = (db: AppTxDbType, accountId: string, userId: string, name: string): Effect.Effect<Group, GroupFailure> =>
-  createGroupEffect(db, accountId, userId, name);
+export const createGroupSvc = (
+  db: AppTxDbType,
+  accountId: string,
+  userId: string,
+  name: string,
+): Effect.Effect<Group, GroupFailure> => createGroupEffect(db, accountId, userId, name);
 
-export const renameGroupSvc = (db: AppTxDbType, accountId: string, userId: string, groupId: string, name: string): Effect.Effect<Group, GroupFailure> =>
-  renameGroupEffect(db, accountId, userId, groupId, name);
+export const renameGroupSvc = (
+  db: AppTxDbType,
+  accountId: string,
+  userId: string,
+  groupId: string,
+  name: string,
+): Effect.Effect<Group, GroupFailure> => renameGroupEffect(db, accountId, userId, groupId, name);
 
-export const deleteGroupSvc = (db: AppTxDbType, accountId: string, userId: string, groupId: string): Effect.Effect<GroupDeleted, GroupFailure> =>
-  deleteGroupEffect(db, accountId, userId, groupId);
+export const deleteGroupSvc = (
+  db: AppTxDbType,
+  accountId: string,
+  userId: string,
+  groupId: string,
+): Effect.Effect<GroupDeleted, GroupFailure> => deleteGroupEffect(db, accountId, userId, groupId);
 
 export const addGroupMemberSvc = (
   db: AppTxDbType,

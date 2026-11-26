@@ -1,11 +1,7 @@
 import { produceChatBotDurableRun } from "@repo/chat-bot-durable-stream";
 import { resolveResumeRunId, type StreamChunk } from "@tanstack/ai";
 import { Cause, Effect } from "effect";
-import {
-  CHAT_BOT_MODEL_MESSAGE_LIMIT,
-  CHAT_BOT_RUN_FAILED,
-  CHAT_BOT_RUN_SETUP_RETRY,
-} from "../constants";
+import { CHAT_BOT_MODEL_MESSAGE_LIMIT, CHAT_BOT_RUN_FAILED, CHAT_BOT_RUN_SETUP_RETRY } from "../constants";
 import { toChatBotDbError, type ChatBotDbError } from "../errors";
 import { readChatBotStreamOffsetForRunEffect } from "../lib/stream-offset";
 import { chatBotThreadTitleFromContent } from "../lib/thread-title";
@@ -137,9 +133,7 @@ export const startChatBotRunSvc = <S extends ChatBotServices>(
     // Setup reads are safe to repeat; only a
     // DbError is retried, never a NotFound.
     // -----
-    const existing = yield* store
-      .lookupRun(owner, runId)
-      .pipe(Effect.retry(CHAT_BOT_RUN_SETUP_RETRY));
+    const existing = yield* store.lookupRun(owner, runId).pipe(Effect.retry(CHAT_BOT_RUN_SETUP_RETRY));
     if (existing) {
       return { runId: existing.id, threadId: existing.threadId, offset };
     }
@@ -183,15 +177,11 @@ export const startChatBotRunSvc = <S extends ChatBotServices>(
         stream.modelMessageLimit ?? CHAT_BOT_MODEL_MESSAGE_LIMIT,
       );
 
-      yield* Effect.sync(() =>
-        startChatBotTurn({ ...stream, runId, threadId, messages: history }),
-      );
+      yield* Effect.sync(() => startChatBotTurn({ ...stream, runId, threadId, messages: history }));
     }).pipe(
       Effect.onError(() => {
         const logFailedClose = (cause: Cause.Cause<ChatBotDbError>) =>
-          Effect.sync(() =>
-            console.error("chat-bot: failed to close run", runId, Cause.pretty(cause)),
-          );
+          Effect.sync(() => console.error("chat-bot: failed to close run", runId, Cause.pretty(cause)));
         return Effect.all(
           [
             store.closeRun(runId, "failed").pipe(Effect.catchAllCause(logFailedClose)),

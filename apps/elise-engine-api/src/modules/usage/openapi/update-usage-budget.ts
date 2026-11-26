@@ -1,6 +1,15 @@
 import { describeRoute } from "hono-openapi";
 import { UsageSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const updateUsageBudgetDoc = describeRoute({
   tags: ["usage"],
@@ -26,5 +35,8 @@ export const updateUsageBudgetDoc = describeRoute({
       ),
     ],
   }),
-  responses: { 200: jsonResponse("The usage with the new budget.", envelope(UsageSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("The usage with the new budget.", envelope(UsageSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });

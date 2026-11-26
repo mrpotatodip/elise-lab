@@ -14,12 +14,18 @@ const app = new Hono<AppEnv>();
 // Owner role: the token names the Runner, and the Runner
 // names its Account.
 // -----
-app.post("/jobs/:scanId/result", reportJobDoc, zValidator("param", RunnerJobParamSchema), zValidator("json", RunnerJobResultBodySchema), async (c) => {
-  const runner = await runnerOf(c);
-  const { scanId } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const data = await runEffect(reportJobSvc(dbConnect(c.env.DATABASE_URL), runner.runnerId, scanId, body));
-  return c.json({ data, error: null });
-});
+app.post(
+  "/jobs/:scanId/result",
+  reportJobDoc,
+  zValidator("param", RunnerJobParamSchema),
+  zValidator("json", RunnerJobResultBodySchema),
+  async (c) => {
+    const runner = await runnerOf(c);
+    const { scanId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const data = await runEffect(reportJobSvc(dbConnect(c.env.DATABASE_URL), runner.runnerId, scanId, body));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

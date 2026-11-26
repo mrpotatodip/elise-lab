@@ -16,8 +16,8 @@ export const insertRunnerJobEffect = (db: DbConnectType, job: NewRunnerJob): Eff
   Effect.tryPromise({
     try: () =>
       db.execute(sql`
-        insert into scan_runner_jobs (scan_id, tenant_id, runner_id, repo_url, ref, prompt, options_json, priors_json)
-        select ${job.scanId}, ${job.tenantId}::uuid, ${job.runnerId}::uuid, ${job.repoUrl}, ${job.ref}, ${job.prompt}, ${job.optionsJson}, ${job.priorsJson}
+        insert into scan_runner_jobs (scan_id, tenant_id, runner_id, repo_url, ref, prompt, options_json, priors_json, resumes_scan_id)
+        select ${job.scanId}, ${job.tenantId}::uuid, ${job.runnerId}::uuid, ${job.repoUrl}, ${job.ref}, ${job.prompt}, ${job.optionsJson}, ${job.priorsJson}, ${job.resumesScanId}
         from scans
         where id = ${job.scanId} and status <> 'stopped'
         on conflict do nothing
@@ -25,10 +25,35 @@ export const insertRunnerJobEffect = (db: DbConnectType, job: NewRunnerJob): Eff
     catch: toDbError,
   }).pipe(Effect.asVoid);
 
+const EARLIER_SCANS_MAX = 50;
+
+export const earlierScanIdsEffect = (
+  db: DbConnectType,
+  tenantId: string,
+  resumesScanId: string,
+): Effect.Effect<string[], DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const found: string[] = [];
+      let next: string | null = resumesScanId;
+      while (next !== null && !found.includes(next) && found.length < EARLIER_SCANS_MAX) {
+        found.push(next);
+        const [row] = await db
+          .select({ resumes: scans.resumesScanId })
+          .from(scans)
+          .where(and(eq(scans.tenantId, tenantId), eq(scans.id, next)));
+        next = row?.resumes ?? null;
+      }
+      return found;
+    },
+    catch: toDbError,
+  });
+
 export const scanStoppedEffect = (db: DbConnectType, scanId: string): Effect.Effect<boolean, DbError> =>
-  Effect.tryPromise({ try: () => db.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)), catch: toDbError }).pipe(
-    Effect.map(([row]) => row?.status === "stopped"),
-  );
+  Effect.tryPromise({
+    try: () => db.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)),
+    catch: toDbError,
+  }).pipe(Effect.map(([row]) => row?.status === "stopped"));
 
 // -----
 // The Runner takes its oldest queued job in one UPDATE. The state
@@ -42,13 +67,28 @@ export const scanStoppedEffect = (db: DbConnectType, scanId: string): Effect.Eff
 // link to a zip): they wait for a Runner that does, or time out.
 // Null when nothing is waiting.
 // -----
-export const claimRunnerJobEffect = (db: DbConnectType, runnerId: string, now: Date, readsArchive = false): Effect.Effect<TScanRunnerJob | null, DbError> =>
+export const claimRunnerJobEffect = (
+  db: DbConnectType,
+  runnerId: string,
+  now: Date,
+  readsArchive = false,
+): Effect.Effect<TScanRunnerJob | null, DbError> =>
   Effect.tryPromise({
     try: () => {
       const readable = readsArchive
         ? undefined
-        : notExists(db.select({ scanId: scanArchiveLinks.scanId }).from(scanArchiveLinks).where(eq(scanArchiveLinks.scanId, scanRunnerJobs.scanId)));
-      const stillWanted = notExists(db.select({ id: scans.id }).from(scans).where(and(eq(scans.id, scanRunnerJobs.scanId), eq(scans.status, "stopped"))));
+        : notExists(
+            db
+              .select({ scanId: scanArchiveLinks.scanId })
+              .from(scanArchiveLinks)
+              .where(eq(scanArchiveLinks.scanId, scanRunnerJobs.scanId)),
+          );
+      const stillWanted = notExists(
+        db
+          .select({ id: scans.id })
+          .from(scans)
+          .where(and(eq(scans.id, scanRunnerJobs.scanId), eq(scans.status, "stopped"))),
+      );
       const next = db
         .select({ scanId: scanRunnerJobs.scanId })
         .from(scanRunnerJobs)
@@ -83,13 +123,22 @@ export const reportRunnerJobEffect = (db: DbConnectType, report: JobReport): Eff
           filesJson: report.filesJson,
           finishedAt: report.now,
         })
-        .where(and(eq(scanRunnerJobs.scanId, report.scanId), eq(scanRunnerJobs.runnerId, report.runnerId), eq(scanRunnerJobs.state, "claimed")))
+        .where(
+          and(
+            eq(scanRunnerJobs.scanId, report.scanId),
+            eq(scanRunnerJobs.runnerId, report.runnerId),
+            eq(scanRunnerJobs.state, "claimed"),
+          ),
+        )
         .returning({ scanId: scanRunnerJobs.scanId }),
     catch: toDbError,
   }).pipe(Effect.map((rows) => rows.length > 0));
 
 export const readRunnerJobEffect = (db: DbConnectType, scanId: string): Effect.Effect<TScanRunnerJob | null, DbError> =>
-  Effect.tryPromise({ try: () => db.select().from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scanId)), catch: toDbError }).pipe(Effect.map(([row]) => row ?? null));
+  Effect.tryPromise({
+    try: () => db.select().from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scanId)),
+    catch: toDbError,
+  }).pipe(Effect.map(([row]) => row ?? null));
 
 // -----
 // The Scan ended before the Runner reported (it timed out, or
@@ -109,16 +158,25 @@ export const cancelRunnerJobEffect = (db: DbConnectType, scanId: string, now: Da
 // The job sources the Runner reported in its claim, written only
 // when they changed, so a poll every few seconds writes nothing.
 // -----
-export const recordRunnerSourcesEffect = (db: DbConnectType, runnerId: string, sources: RunnerJobSourceValue[]): Effect.Effect<void, DbError> =>
+export const recordRunnerSourcesEffect = (
+  db: DbConnectType,
+  runnerId: string,
+  sources: RunnerJobSourceValue[],
+): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
         .update(tenantRunners)
         .set({ jobSources: sources })
-        .where(and(eq(tenantRunners.id, runnerId), sql`${tenantRunners.jobSources} is distinct from array[${sql.join(
-            sources.map((source) => sql`${source}`),
-            sql`, `,
-          )}]::text[]`)),
+        .where(
+          and(
+            eq(tenantRunners.id, runnerId),
+            sql`${tenantRunners.jobSources} is distinct from array[${sql.join(
+              sources.map((source) => sql`${source}`),
+              sql`, `,
+            )}]::text[]`,
+          ),
+        ),
     catch: toDbError,
   }).pipe(Effect.asVoid);
 
@@ -127,12 +185,23 @@ export const recordRunnerSourcesEffect = (db: DbConnectType, runnerId: string, s
 // job sources it last reported, or null when there is no such
 // Runner.
 // -----
-export const findConnectedRunnerEffect = (db: AppDbType, tenantId: string, runnerId: string): Effect.Effect<string[] | null, DbError> =>
+export const findConnectedRunnerEffect = (
+  db: AppDbType,
+  tenantId: string,
+  runnerId: string,
+): Effect.Effect<string[] | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
         .select({ jobSources: tenantRunners.jobSources })
         .from(tenantRunners)
-        .where(and(eq(tenantRunners.id, runnerId), eq(tenantRunners.tenantId, tenantId), isNotNull(tenantRunners.tokenHash), isNull(tenantRunners.revokedAt))),
+        .where(
+          and(
+            eq(tenantRunners.id, runnerId),
+            eq(tenantRunners.tenantId, tenantId),
+            isNotNull(tenantRunners.tokenHash),
+            isNull(tenantRunners.revokedAt),
+          ),
+        ),
     catch: toDbError,
   }).pipe(Effect.map(([row]) => row?.jobSources ?? null));

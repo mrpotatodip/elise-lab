@@ -65,3 +65,13 @@
 **3.1 `[House]` Branch from `main`.** `main` takes squash merges only and requires a branch that is up to date. A PR stacked on another open branch keeps that branch's original commits, so it conflicts once the base merges and needs `git rebase --onto origin/main <old base tip>` plus a fresh check, one PR at a time. Stack only when the change needs code the base adds and cannot wait for it to merge; say so in the PR description.
 
 **3.2 `[House]` Reviewers check the base.** Flag a PR whose base is not `main` and whose description does not say why it is stacked.
+
+---
+
+## 4. General: Formatting
+
+**4.1 `[House]` oxfmt decides layout.** Run `pnpm format` before you commit; it rewrites TS, TSX, JS, MJS and CSS with the one root config (`.oxfmtrc.json`, line width 120). Don't tune layout by hand and don't add a per-app formatter config. `.astro` files, migrations, patches, the lockfile and the Runner (Rust) are on the ignore list and stay as they are.
+
+**4.2 `[House]` The pre-commit check and CI enforce it.** The hook checks the staged files; `pnpm check:apps` and the CI `check` job check the whole tree. A failure names the files and says to run `pnpm format`. oxfmt is not idempotent in the pinned version: if `pnpm format:check` still reports files after one `pnpm format`, run `pnpm format` again until it is clean.
+
+**4.3 `[House]` A formatting-only change is its own commit.** Don't mix a reformat with a behavior change, so a reviewer can skip it. A repo-wide reformat goes into `.git-blame-ignore-revs`, so `git blame` skips it (`git config blame.ignoreRevsFile .git-blame-ignore-revs`; GitHub reads the file by itself).

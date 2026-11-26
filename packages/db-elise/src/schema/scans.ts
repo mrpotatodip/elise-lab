@@ -68,7 +68,6 @@ export const scanRepos = pgTable(
     isPrivate: boolean("is_private"),
     // Set when a person removes an upload app: its zips are deleted, and the row stays so its Scans keep their History. Adding the app again clears it.
     removedAt: timestamp("removed_at", { withTimezone: true }),
-    // The Project the Repo is grouped under, null for none. Deleting the Project sets it back to null (the migration limits that to this column, because the tenant column stays).
     projectId: uuid("project_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -82,7 +81,9 @@ export const scanRepos = pgTable(
     chkProvider: check("scan_repos_provider", sql`${t.provider} in (${inList(SOURCE_PROVIDER_VALUES)})`),
     chkHost: check("scan_repos_host", sql`${t.host} = lower(${t.host})`),
     // A constraint, not an index: only a constraint takes NULLS NOT DISTINCT in drizzle, and two upload apps of one name both have a null host.
-    uqTenantIdentity: unique("uq_scan_repos_tenant_identity").on(t.tenantId, t.provider, t.host, t.canonical).nullsNotDistinct(),
+    uqTenantIdentity: unique("uq_scan_repos_tenant_identity")
+      .on(t.tenantId, t.provider, t.host, t.canonical)
+      .nullsNotDistinct(),
     uqIdTenant: uniqueIndex("uq_scan_repos_id_tenant").on(t.id, t.tenantId),
   }),
 );
@@ -143,7 +144,7 @@ export const scans = pgTable(
     priorsCarried: integer("priors_carried"),
     priorsClosed: integer("priors_closed"),
     priorsUnchecked: integer("priors_unchecked"),
-    // Set with the findings of a succeeded full-skill Scan: true when it ran out of money (a Report that starts with PARTIAL:, or a unit deferred as money_exhausted). Null on a Scan recorded before this column, a lite Scan and a Scan that did not succeed.
+    // Set with the findings of a succeeded full-skill Scan: true when it ran out of money or a Runner Phase ran out of time (a Report that starts with PARTIAL: money ran out; or PARTIAL: a phase ran out of time;, or a unit deferred as money_exhausted). Null on a Scan recorded before this column, a lite Scan and a Scan that did not succeed.
     partial: boolean("partial"),
     // Set with the findings of a succeeded Runner Scan whose profile check ran: the profile it met (quick, standard or deep) or none. Null: not checked (a cloud Scan, a Partial Scan, a Scan that did not succeed, or a row from before this column). Plain text, not a database enum; the agent's own files are what it measures.
     profileMet: text("profile_met").$type<ProfileMetValue>(),
@@ -151,6 +152,8 @@ export const scans = pgTable(
     traceCandidateFindings: integer("trace_candidate_findings"),
     // How many candidate pairs the possible-duplicate Signal step left unasked because of its per-Scan cap. Null: the step did not run for this Scan.
     signalPairsSkipped: integer("signal_pairs_skipped"),
+    // The Scan this one resumes (ADR 0016). Set once, at creation; the earlier Scan's own row never changes. At most one Scan resumes a given Scan.
+    resumesScanId: text("resumes_scan_id"),
     status: text("status").$type<ScanStateValue>().notNull(),
     step: text("step").$type<ScanStepValue>(),
     skill: text("skill").notNull(),
@@ -191,6 +194,15 @@ export const scans = pgTable(
       columns: [t.branchId, t.tenantId],
       foreignColumns: [scanRepoBranches.id, scanRepoBranches.tenantId],
     }).onDelete("set null"),
+    fkResumesTenant: foreignKey({
+      name: "scans_resumes_tenant_fk",
+      columns: [t.resumesScanId, t.tenantId],
+      foreignColumns: [t.id, t.tenantId],
+    }),
+    // A Scan is resumed at most once, so a chain of attempts is a line.
+    uqResumesScan: uniqueIndex("uq_scans_resumes_scan_id")
+      .on(t.resumesScanId)
+      .where(sql`${t.resumesScanId} is not null`),
     // One active scan per repo. A scan that stalls is expired before a new one is queued.
     uqActivePerRepo: uniqueIndex("uq_scans_active_per_repo")
       .on(t.repoId)
@@ -354,7 +366,10 @@ export const scanFindingTriage = pgTable(
       "scan_finding_triage_accepted",
       sql`(${t.status} = 'accepted_risk') = (${t.acceptedUntil} is not null) and (${t.status} <> 'accepted_risk' or ${t.note} is not null)`,
     ),
-    chkDuplicate: check("scan_finding_triage_duplicate", sql`(${t.status} = 'duplicate') = (${t.duplicateOf} is not null)`),
+    chkDuplicate: check(
+      "scan_finding_triage_duplicate",
+      sql`(${t.status} = 'duplicate') = (${t.duplicateOf} is not null)`,
+    ),
     fkRepoTenant: foreignKey({
       name: "scan_finding_triage_repo_tenant_fk",
       columns: [t.repoId, t.tenantId],

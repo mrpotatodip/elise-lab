@@ -1,13 +1,23 @@
 import { describeRoute } from "hono-openapi";
 import { FindingCommentSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const createFindingCommentDoc = describeRoute({
   tags: ["findings"],
   summary: "Write a comment on a finding",
   security: SERVICE_SECURITY,
   description: routeText({
-    context: "A member writes a comment on a Finding. It is plain text of at most 4,000 characters, kept with the author's name, and stays out of the report and GitHub.",
+    context:
+      "A member writes a comment on a Finding. It is plain text of at most 4,000 characters, kept with the author's name, and stays out of the report and GitHub.",
     steps: [
       "The Worker checks the session and that the login's Role in the account named by `x-account-id` holds the Power `company:findings:comments:create`. The service token names no author, so it is refused (401).",
       "The Worker checks that the account has a finding with this repo and fingerprint. If not, the answer is 404.",
@@ -23,5 +33,8 @@ export const createFindingCommentDoc = describeRoute({
       ),
     ],
   }),
-  responses: { 201: jsonResponse("The saved comment.", envelope(FindingCommentSchema)), ...errorResponses(400, 401, 403, 404) },
+  responses: {
+    201: jsonResponse("The saved comment.", envelope(FindingCommentSchema)),
+    ...errorResponses(400, 401, 403, 404),
+  },
 });

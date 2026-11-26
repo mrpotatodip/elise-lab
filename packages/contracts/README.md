@@ -6,11 +6,11 @@ Depends on `zod` and `@repo/chat-bot-api`. There is no build step: `exports` poi
 
 ## Entry points
 
-| Import | Holds |
-| --- | --- |
-| `@repo/contracts/elise` | Everything EliseLAB: scans, repos, verdicts, files, teams, groups, credit, runners, Scan Traces, sign-up. |
-| `@repo/contracts/response` | `ResponseEnvelope<T>` and `PaginatedResponse<T>`. |
-| `@repo/contracts/chat-bots` | The chat-bot output and turn shapes. |
+| Import                      | Holds                                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `@repo/contracts/elise`     | Everything EliseLAB: scans, repos, verdicts, files, teams, groups, credit, runners, Scan Traces, sign-up. |
+| `@repo/contracts/response`  | `ResponseEnvelope<T>` and `PaginatedResponse<T>`.                                                         |
+| `@repo/contracts/chat-bots` | The chat-bot output and turn shapes.                                                                      |
 
 Every response uses the `{ data, error }` envelope. Success has `error: null`, failure has `data: null`.
 

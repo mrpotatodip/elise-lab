@@ -6,12 +6,12 @@ This package does not store threads or stream to a browser. `@repo/chat-bot-api`
 
 ## Entry points
 
-| Import | Holds |
-| --- | --- |
-| `@repo/chat-bot` | Everything below in one import. |
-| `@repo/chat-bot/chat` | `run-chat-bot.ts` (runs a turn and fails with `ChatBotModelError`), the contract prompt, and `parse-output.ts`. |
-| `@repo/chat-bot/tools` | Tool schemas, `http-executor.ts`, `to-server-tool.ts` (with a per-run call budget), display and structure helpers, tool errors. |
-| `@repo/chat-bot/server` | The server-side entry. |
+| Import                  | Holds                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `@repo/chat-bot`        | Everything below in one import.                                                                                                 |
+| `@repo/chat-bot/chat`   | `run-chat-bot.ts` (runs a turn and fails with `ChatBotModelError`), the contract prompt, and `parse-output.ts`.                 |
+| `@repo/chat-bot/tools`  | Tool schemas, `http-executor.ts`, `to-server-tool.ts` (with a per-run call budget), display and structure helpers, tool errors. |
+| `@repo/chat-bot/server` | The server-side entry.                                                                                                          |
 
 The shape of a turn's output (`ChatBotOutputSchema`, `ChatBotTurn`) lives in `@repo/contracts/chat-bots`, not here.
 

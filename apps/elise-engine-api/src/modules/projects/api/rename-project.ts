@@ -10,12 +10,22 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.patch("/:projectId", renameProjectDoc, requirePower("company:dashboard:read"), zValidator("header", AccountHeaderSchema), zValidator("param", ProjectParamSchema), zValidator("json", RenameProjectBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { projectId } = c.req.valid("param");
-  const { name } = c.req.valid("json");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(renameProjectSvc(db, accountId, userIdOf(c), projectId, name)));
-  return c.json({ data, error: null });
-});
+app.patch(
+  "/:projectId",
+  renameProjectDoc,
+  requirePower("company:repos:delete"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", ProjectParamSchema),
+  zValidator("json", RenameProjectBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { projectId } = c.req.valid("param");
+    const { name } = c.req.valid("json");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(renameProjectSvc(db, accountId, userIdOf(c), projectId, name)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

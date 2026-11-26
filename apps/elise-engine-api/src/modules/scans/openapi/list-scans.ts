@@ -24,7 +24,11 @@ export const listScansDoc = describeRoute({
     ],
     example: [
       "List the scans:",
-      bash(`curl ${EXAMPLE_BASE_URL}/scans \\`, '  -H "authorization: Bearer $SCAN_API_TOKEN" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`),
+      bash(
+        `curl ${EXAMPLE_BASE_URL}/scans \\`,
+        '  -H "authorization: Bearer $SCAN_API_TOKEN" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
     ],
   }),
   responses: { 200: jsonResponse("A page of scans.", envelope(ScanListSchema)), ...errorResponses(400, 401) },

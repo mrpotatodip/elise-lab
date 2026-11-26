@@ -1,10 +1,26 @@
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authUser, ensureTenantRoles, findTenantRole, partyRoles, tenantGroupMembers, tenantGroups, tenantTeamInvites } from "@repo/db-elise";
+import {
+  authUser,
+  ensureTenantRoles,
+  findTenantRole,
+  partyRoles,
+  tenantGroupMembers,
+  tenantGroups,
+  tenantTeamInvites,
+} from "@repo/db-elise";
 import { TENANT_ADMIN_ROLE_KEY } from "@repo/contracts/elise";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { acceptInviteEffect, createInviteEffect, inviteEmailContextEffect, listTeamEffect, markInviteEmailStatusEffect, previewInviteEffect, revokeInviteEffect } from "#/modules/team/queries";
+import {
+  acceptInviteEffect,
+  createInviteEffect,
+  inviteEmailContextEffect,
+  listTeamEffect,
+  markInviteEmailStatusEffect,
+  previewInviteEffect,
+  revokeInviteEffect,
+} from "#/modules/team/queries";
 import type { NewInvite } from "#/modules/team/types";
 
 let test: TestDb;
@@ -50,11 +66,22 @@ beforeAll(async () => {
   const adminRole = await findTenantRole(test.raw, tenantId, TENANT_ADMIN_ROLE_KEY);
   if (!adminRole) throw new Error("tenant_admin role missing");
   adminUserId = "admin-user";
-  await test.raw.insert(authUser).values({ id: adminUserId, name: "Ada Rossi", email: "ada@example.com", emailVerified: true, partyId: adminPartyId });
-  await test.raw.insert(partyRoles).values({ partyId: adminPartyId, tenantId, roleId: adminRole.id, roleScope: "tenant" });
+  await test.raw.insert(authUser).values({
+    id: adminUserId,
+    name: "Ada Rossi",
+    email: "ada@example.com",
+    emailVerified: true,
+    partyId: adminPartyId,
+  });
+  await test.raw
+    .insert(partyRoles)
+    .values({ partyId: adminPartyId, tenantId, roleId: adminRole.id, roleScope: "tenant" });
   [{ id: groupId }] = await test.raw.insert(tenantGroups).values({ tenantId, name: "Backend" }).returning();
   const other = await seedTenant(test, "other");
-  [{ id: otherTenantGroupId }] = await test.raw.insert(tenantGroups).values({ tenantId: other.tenantId, name: "Backend" }).returning();
+  [{ id: otherTenantGroupId }] = await test.raw
+    .insert(tenantGroups)
+    .values({ tenantId: other.tenantId, name: "Backend" })
+    .returning();
 });
 
 afterAll(async () => {
@@ -63,18 +90,26 @@ afterAll(async () => {
 
 describe("createInviteEffect", () => {
   it("saves a pending invite with its Groups and lists it", async () => {
-    const created = await run(createInviteEffect(test.pool, invite({ email: "listed@example.com", groupIds: [groupId, groupId] })));
+    const created = await run(
+      createInviteEffect(test.pool, invite({ email: "listed@example.com", groupIds: [groupId, groupId] })),
+    );
 
     expect(created).toMatchObject({ email: "listed@example.com", role: "workspace_member", groupIds: [groupId] });
     const team = await run(listTeamEffect(test.http, tenantId, NOW));
     expect(team.invites.map((row) => row.email)).toContain("listed@example.com");
-    expect(team.members).toEqual([expect.objectContaining({ partyId: adminPartyId, role: "tenant_admin", groupIds: [] })]);
+    expect(team.members).toEqual([
+      expect.objectContaining({ partyId: adminPartyId, role: "tenant_admin", groupIds: [] }),
+    ]);
   });
 
   it("refuses tenant_admin, an unknown role and a Group of another Tenant", async () => {
-    expect(await fail(createInviteEffect(test.pool, invite({ roleKey: "tenant_admin" })))).toMatchObject({ _tag: "Invalid" });
+    expect(await fail(createInviteEffect(test.pool, invite({ roleKey: "tenant_admin" })))).toMatchObject({
+      _tag: "Invalid",
+    });
     expect(await fail(createInviteEffect(test.pool, invite({ roleKey: "nope" })))).toMatchObject({ _tag: "Invalid" });
-    expect(await fail(createInviteEffect(test.pool, invite({ groupIds: [otherTenantGroupId] })))).toMatchObject({ _tag: "Invalid" });
+    expect(await fail(createInviteEffect(test.pool, invite({ groupIds: [otherTenantGroupId] })))).toMatchObject({
+      _tag: "Invalid",
+    });
   });
 
   it("refuses someone who already holds a Role, whatever the email's case", async () => {
@@ -96,23 +131,36 @@ describe("createInviteEffect", () => {
 
 describe("inviteEmailContextEffect", () => {
   it("gives the account name and the inviter's name, and falls back when either is missing", async () => {
-    expect(await run(inviteEmailContextEffect(test.pool, tenantId, adminUserId))).toEqual({ accountName: "acme", inviterName: "Ada Rossi" });
-    expect(await run(inviteEmailContextEffect(test.pool, crypto.randomUUID(), "nobody"))).toEqual({ accountName: "your team", inviterName: "A teammate" });
+    expect(await run(inviteEmailContextEffect(test.pool, tenantId, adminUserId))).toEqual({
+      accountName: "acme",
+      inviterName: "Ada Rossi",
+    });
+    expect(await run(inviteEmailContextEffect(test.pool, crypto.randomUUID(), "nobody"))).toEqual({
+      accountName: "your team",
+      inviterName: "A teammate",
+    });
   });
 });
 
 describe("markInviteEmailStatusEffect", () => {
-  const statusOf = async (email: string) => (await run(listTeamEffect(test.http, tenantId, NOW))).invites.find((row) => row.email === email);
+  const statusOf = async (email: string) =>
+    (await run(listTeamEffect(test.http, tenantId, NOW))).invites.find((row) => row.email === email);
 
   it("starts as not sent, then records sent or failed with the time, and the list returns it", async () => {
     const created = await run(createInviteEffect(test.pool, invite({ email: "status@example.com" })));
     expect(await statusOf("status@example.com")).toMatchObject({ emailStatus: "not_sent", emailStatusAt: null });
 
     await run(markInviteEmailStatusEffect(test.pool, created.id, "sent", NOW));
-    expect(await statusOf("status@example.com")).toMatchObject({ emailStatus: "sent", emailStatusAt: NOW.toISOString() });
+    expect(await statusOf("status@example.com")).toMatchObject({
+      emailStatus: "sent",
+      emailStatusAt: NOW.toISOString(),
+    });
 
     await run(markInviteEmailStatusEffect(test.pool, created.id, "failed", LATER));
-    expect(await statusOf("status@example.com")).toMatchObject({ emailStatus: "failed", emailStatusAt: LATER.toISOString() });
+    expect(await statusOf("status@example.com")).toMatchObject({
+      emailStatus: "failed",
+      emailStatusAt: LATER.toISOString(),
+    });
   });
 
   it("leaves a revoked invite and an unknown one alone", async () => {
@@ -121,7 +169,10 @@ describe("markInviteEmailStatusEffect", () => {
 
     await run(markInviteEmailStatusEffect(test.pool, created.id, "sent", NOW));
     await run(markInviteEmailStatusEffect(test.pool, crypto.randomUUID(), "sent", NOW));
-    const [row] = await test.raw.select({ status: tenantTeamInvites.emailStatus }).from(tenantTeamInvites).where(eq(tenantTeamInvites.id, created.id));
+    const [row] = await test.raw
+      .select({ status: tenantTeamInvites.emailStatus })
+      .from(tenantTeamInvites)
+      .where(eq(tenantTeamInvites.id, created.id));
 
     expect(row.status).toBe("not_sent");
   });
@@ -131,15 +182,21 @@ describe("revokeInviteEffect", () => {
   it("revokes a pending invite once, then reports NotFound", async () => {
     const created = await run(createInviteEffect(test.pool, invite({ email: "revoke@example.com" })));
 
-    expect(await run(revokeInviteEffect(test.pool, tenantId, created.id, adminUserId, NOW))).toEqual({ id: created.id });
-    expect(await fail(revokeInviteEffect(test.pool, tenantId, created.id, adminUserId, NOW))).toMatchObject({ _tag: "NotFound" });
+    expect(await run(revokeInviteEffect(test.pool, tenantId, created.id, adminUserId, NOW))).toEqual({
+      id: created.id,
+    });
+    expect(await fail(revokeInviteEffect(test.pool, tenantId, created.id, adminUserId, NOW))).toMatchObject({
+      _tag: "NotFound",
+    });
   });
 
   it("cannot reach an invite of another Tenant", async () => {
     const created = await run(createInviteEffect(test.pool, invite({ email: "scoped@example.com" })));
     const other = await seedTenant(test, "third");
 
-    expect(await fail(revokeInviteEffect(test.pool, other.tenantId, created.id, adminUserId, NOW))).toMatchObject({ _tag: "NotFound" });
+    expect(await fail(revokeInviteEffect(test.pool, other.tenantId, created.id, adminUserId, NOW))).toMatchObject({
+      _tag: "NotFound",
+    });
   });
 });
 
@@ -157,7 +214,12 @@ describe("previewInviteEffect", () => {
 
     const preview = await run(previewInviteEffect(test.http, pending.tokenHash, NOW));
 
-    expect(preview).toEqual({ accountName: "acme", role: "workspace_member", roleLabel: expect.any(String), hasAccount: true });
+    expect(preview).toEqual({
+      accountName: "acme",
+      role: "workspace_member",
+      roleLabel: expect.any(String),
+      hasAccount: true,
+    });
   });
 
   it("answers one generic error for an unknown, expired or revoked token", async () => {
@@ -165,7 +227,10 @@ describe("previewInviteEffect", () => {
     await run(createInviteEffect(test.pool, { ...expired, now: new Date("2026-10-25T00:00:00Z") }));
 
     for (const tokenHash of ["unknown", expired.tokenHash]) {
-      expect(await fail(previewInviteEffect(test.http, tokenHash, NOW))).toMatchObject({ _tag: "Forbidden", message: "This invite is invalid or has expired" });
+      expect(await fail(previewInviteEffect(test.http, tokenHash, NOW))).toMatchObject({
+        _tag: "Forbidden",
+        message: "This invite is invalid or has expired",
+      });
     }
   });
 });
@@ -180,7 +245,9 @@ describe("acceptInviteEffect", () => {
     const [login] = await test.raw.select().from(authUser).where(eq(authUser.email, "bo@example.com"));
     expect(login.name).toBe("Bo Chen");
     expect(await test.raw.select().from(partyRoles).where(eq(partyRoles.partyId, login.partyId))).toHaveLength(1);
-    expect(await test.raw.select().from(tenantGroupMembers).where(eq(tenantGroupMembers.partyId, login.partyId))).toHaveLength(1);
+    expect(
+      await test.raw.select().from(tenantGroupMembers).where(eq(tenantGroupMembers.partyId, login.partyId)),
+    ).toHaveLength(1);
   });
 
   it("cannot be used twice", async () => {
@@ -201,11 +268,16 @@ describe("acceptInviteEffect", () => {
 
   it("makes an existing login sign in as the invited email first", async () => {
     const otherTenant = await seedTenant(test, "joiner");
-    await test.raw.insert(authUser).values({ id: "joiner", name: "Jo", email: "jo@example.com", emailVerified: true, partyId: otherTenant.partyId });
+    await test.raw
+      .insert(authUser)
+      .values({ id: "joiner", name: "Jo", email: "jo@example.com", emailVerified: true, partyId: otherTenant.partyId });
     const pending = invite({ email: "jo@example.com" });
     await run(createInviteEffect(test.pool, pending));
 
-    expect(await fail(accept(pending.tokenHash))).toMatchObject({ _tag: "Forbidden", message: "Sign in with the invited email to accept this invite" });
+    expect(await fail(accept(pending.tokenHash))).toMatchObject({
+      _tag: "Forbidden",
+      message: "Sign in with the invited email to accept this invite",
+    });
     expect(await fail(accept(pending.tokenHash, { signedInUserId: adminUserId }))).toMatchObject({ _tag: "Forbidden" });
     expect(await run(accept(pending.tokenHash, { signedInUserId: "joiner" }))).toEqual({ tenantId });
   });

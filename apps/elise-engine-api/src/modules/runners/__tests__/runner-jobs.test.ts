@@ -1,9 +1,8 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { authUser, scanArchiveLinks, scanRunnerJobs, scans, scanUploadArchives } from "@repo/db-elise";
+import { authUser, scanArchiveLinks, scanRunnerJobs, scans, scanUploadArchives, tenantRunners } from "@repo/db-elise";
 import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/elise";
-import { SCAN_PROFILE_CAPS_USD } from "#/constants";
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
@@ -15,7 +14,14 @@ import { saveScanFilesEffect } from "#/modules/scan-store";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { SCAN_SANDBOX_FULL_PHASES, buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox";
 import { monthSpendEffect } from "#/modules/usage";
-import { claimRunnerJobEffect, createRunnerEffect, claimPairingEffect, findConnectedRunnerEffect, readRunnerJobEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
+import {
+  claimRunnerJobEffect,
+  createRunnerEffect,
+  claimPairingEffect,
+  findConnectedRunnerEffect,
+  readRunnerJobEffect,
+  reportRunnerJobEffect,
+} from "#/modules/runners/queries";
 
 let test: TestDb;
 let tenantId: string;
@@ -26,13 +32,29 @@ let otherRunnerId: string;
 let counter = 0;
 
 const NOW = new Date("2026-11-11T09:00:00Z");
-const OPTIONS: ScanOptions = { skill: "lite", model: "claude-sonnet-5-5", effort: "high", profile: "quick", maxBudgetUsd: 2 };
+const OPTIONS: ScanOptions = {
+  skill: "lite",
+  model: "claude-sonnet-5-5",
+  effort: "high",
+  profile: "quick",
+  maxBudgetUsd: 2,
+};
 
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 
 const pair = async (label: string) => {
-  const created = await run(createRunnerEffect(test.http, { tenantId, actorUserId: userId, name: label, codeHash: `jobs-code-${label}`, expiresAt: new Date("2026-11-11T10:00:00Z") }));
-  await run(claimPairingEffect(test.http, { codeHash: `jobs-code-${label}`, tokenHash: `jobs-token-${label}`, now: NOW }));
+  const created = await run(
+    createRunnerEffect(test.http, {
+      tenantId,
+      actorUserId: userId,
+      name: label,
+      codeHash: `jobs-code-${label}`,
+      expiresAt: new Date("2026-11-11T10:00:00Z"),
+    }),
+  );
+  await run(
+    claimPairingEffect(test.http, { codeHash: `jobs-code-${label}`, tokenHash: `jobs-token-${label}`, now: NOW }),
+  );
   return created.id;
 };
 
@@ -59,7 +81,8 @@ const queue = async (scanId: string, over: Partial<ScanParams> = {}, at = NOW, o
   return scanId;
 };
 
-const report = (scanId: string, body: Parameters<typeof reportJobSvc>[3], by = runnerId) => run(reportJobSvc(test.http, by, scanId, body));
+const report = (scanId: string, body: Parameters<typeof reportJobSvc>[3], by = runnerId) =>
+  run(reportJobSvc(test.http, by, scanId, body));
 const jobOf = async (scanId: string) => (await run(readRunnerJobEffect(test.http, scanId)))!;
 
 beforeAll(async () => {
@@ -67,7 +90,9 @@ beforeAll(async () => {
   const seeded = await seedTenant(test, "jobs-account");
   tenantId = seeded.tenantId;
   userId = crypto.randomUUID();
-  await test.raw.insert(authUser).values({ id: userId, name: "Ada", email: "jobs@example.com", emailVerified: true, partyId: seeded.partyId });
+  await test.raw
+    .insert(authUser)
+    .values({ id: userId, name: "Ada", email: "jobs@example.com", emailVerified: true, partyId: seeded.partyId });
   repoId = await seedRepo(test, tenantId);
 });
 
@@ -92,16 +117,27 @@ describe("claiming a job", () => {
     const claimed = await run(claimJobSvc(test.http, runnerId));
     const again = await run(claimJobSvc(test.http, runnerId));
 
-    expect(claimed).toMatchObject({ scanId: first, repo: "https://github.com/octocat/Hello-World", ref: null, skill: "lite", model: "claude-sonnet-5-5", maxBudgetUsd: 2 });
+    expect(claimed).toMatchObject({
+      scanId: first,
+      repo: "https://github.com/octocat/Hello-World",
+      ref: null,
+      skill: "lite",
+      model: "claude-sonnet-5-5",
+      maxBudgetUsd: 2,
+    });
     expect(claimed?.prompt).toContain("./repo");
     expect(again?.scanId).not.toBe(first);
   });
 
-  it("carries the Scan's profile and the cap the table gives it, next to the Runner's own ceiling", async () => {
-    await queue(await newScan(), {}, NOW, { ...OPTIONS, profile: "deep", maxBudgetUsd: RUNNER_MAX_BUDGET_USD });
+  it.each([
+    ["lowered below the profile's cap", 5],
+    ["raised above the profile's cap", 40],
+    ["at the Runner's ceiling", RUNNER_MAX_BUDGET_USD],
+  ])("carries the Scan's profile and its stored limit, %s, as both the cap and the limit", async (_name, limit) => {
+    await queue(await newScan(), {}, NOW, { ...OPTIONS, profile: "quick", maxBudgetUsd: limit });
     const claimed = await run(claimJobSvc(test.http, runnerId));
 
-    expect(claimed).toMatchObject({ profile: "deep", profileCapUsd: SCAN_PROFILE_CAPS_USD.deep, maxBudgetUsd: RUNNER_MAX_BUDGET_USD });
+    expect(claimed).toMatchObject({ profile: "quick", profileCapUsd: limit, maxBudgetUsd: limit });
   });
 
   it("hands over the single prompt as it was and the four Phase prompts in order, built for the Scan's profile and the Runner's place", async () => {
@@ -111,13 +147,65 @@ describe("claiming a job", () => {
 
     expect(claimed?.prompt).toBe(buildAgentPrompt(options, RUNNER_PROMPT_PLACE));
     expect(claimed?.phasePrompts?.map((entry) => entry.phase)).toEqual(["recon", "hunt", "check", "report"]);
-    expect(claimed?.phasePrompts?.map((entry) => entry.prompt)).toEqual(SCAN_SANDBOX_FULL_PHASES.map((phase) => buildPhasePrompt(options, phase, RUNNER_PROMPT_PLACE)));
-    expect(claimed?.phasePrompts?.every((entry) => entry.prompt.includes("Profile: deep") && entry.prompt.includes("./repo"))).toBe(true);
+    expect(claimed?.phasePrompts?.map((entry) => entry.prompt)).toEqual(
+      SCAN_SANDBOX_FULL_PHASES.map((phase) => buildPhasePrompt(options, phase, RUNNER_PROMPT_PLACE)),
+    );
+    expect(
+      claimed?.phasePrompts?.every(
+        (entry) => entry.prompt.includes("Profile: deep") && entry.prompt.includes("./repo"),
+      ),
+    ).toBe(true);
     expect(RunnerJobSchema.parse(claimed).phasePrompts).toHaveLength(4);
   });
 
+  it("carries the folders of a scoped Scan on the job and in every Phase prompt, and none for a Scan of everything", async () => {
+    const scoped: ScanOptions = { ...OPTIONS, skill: "full", scopePaths: ["one", "two/sub"] };
+    const scanId = await queue(await newScan(), {}, NOW, scoped);
+    await queue(await newScan());
+    const claimed = await run(claimJobSvc(test.http, runnerId));
+    const plain = await run(claimJobSvc(test.http, runnerId));
+
+    expect(claimed?.scopePaths).toEqual(["one", "two/sub"]);
+    expect(RunnerJobSchema.parse(claimed).scopePaths).toEqual(["one", "two/sub"]);
+    expect(claimed?.phasePrompts?.every((entry) => entry.prompt.includes("`one`, `two/sub`"))).toBe(true);
+    expect(claimed?.prompt).toContain("`one`, `two/sub`");
+    expect(plain?.scopePaths).toBeUndefined();
+    expect(plain?.prompt).not.toContain("scoped");
+    expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({ scopePaths: ["one", "two/sub"] });
+  });
+
+  it("still reads a Scan's status after its Runner was removed, though the folders go with the job row", async () => {
+    const gone = await pair("gone");
+    const scoped: ScanOptions = { ...OPTIONS, skill: "full", scopePaths: ["one"] };
+    const scanId = await queue(await newScan(), { runnerId: gone }, NOW, scoped);
+    expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({ scopePaths: ["one"] });
+
+    await test.raw.delete(tenantRunners).where(eq(tenantRunners.id, gone));
+    const status = await run(neonScanRepo(test.http).get(tenantId, scanId));
+
+    expect(status).toMatchObject({ scanId, runner: null });
+    expect(status?.scopePaths).toBeUndefined();
+  });
+
+  it("refuses to show a Scan whose stored options cannot be read, so it never looks like a Scan of everything", async () => {
+    const scanId = await queue(await newScan());
+    await test.raw.update(scanRunnerJobs).set({ optionsJson: "not json" }).where(eq(scanRunnerJobs.scanId, scanId));
+
+    await expect(run(neonScanRepo(test.http).get(tenantId, scanId))).rejects.toThrow("options");
+  });
+
   it("still parses a job from before profiles, with no profile or cap", () => {
-    const oldJob = { scanId: "s1", repo: "https://github.com/o/n", ref: null, skill: "lite", model: "claude-sonnet-5-5", effort: "high", maxBudgetUsd: 2, prompt: "audit ./repo", priorsJson: "" };
+    const oldJob = {
+      scanId: "s1",
+      repo: "https://github.com/o/n",
+      ref: null,
+      skill: "lite",
+      model: "claude-sonnet-5-5",
+      effort: "high",
+      maxBudgetUsd: 2,
+      prompt: "audit ./repo",
+      priorsJson: "",
+    };
 
     expect(RunnerJobSchema.parse(oldJob)).toEqual(oldJob);
   });
@@ -139,7 +227,9 @@ describe("claiming a job", () => {
     await test.raw.update(scans).set({ costUsd: "4.0000" }).where(eq(scans.id, onRunner));
     await queue(onRunner);
     counter += 1;
-    await test.raw.insert(scans).values(scanValues(tenantId, repoId, `job-plain-${counter}`, NOW.toISOString(), { costUsd: "0.5000" }));
+    await test.raw
+      .insert(scans)
+      .values(scanValues(tenantId, repoId, `job-plain-${counter}`, NOW.toISOString(), { costUsd: "0.5000" }));
     const after = (await run(monthSpendEffect(test.http, tenantId, monthStart))).spentUsd;
 
     expect(after - before).toBeCloseTo(0.5);
@@ -150,16 +240,26 @@ describe("claiming a job", () => {
     const inCloud = await newScan();
     const repo = neonScanRepo(test.http);
 
-    expect(await run(repo.get(tenantId, onRunner))).toMatchObject({ runner: { id: runnerId, name: expect.stringMatching(/^runner-\d+$/) } });
+    expect(await run(repo.get(tenantId, onRunner))).toMatchObject({
+      runner: { id: runnerId, name: expect.stringMatching(/^runner-\d+$/) },
+    });
     expect((await run(repo.get(tenantId, inCloud)))?.runner).toBeNull();
   });
 
   it("cancels the job of a scan that stalled when a newer scan of the repo starts", async () => {
     counter += 1;
     const stalledId = `job-stalled-${counter}`;
-    await test.raw.insert(scans).values(scanValues(tenantId, repoId, stalledId, NOW.toISOString(), { status: "running" }));
+    await test.raw
+      .insert(scans)
+      .values(scanValues(tenantId, repoId, stalledId, NOW.toISOString(), { status: "running" }));
     await queue(stalledId);
-    await run(neonScanRepo(test.http).create(paramsFor(`job-newer-${counter}`, { runnerId: undefined }), repoId, Date.now() + 200 * 60 * 1000));
+    await run(
+      neonScanRepo(test.http).create(
+        paramsFor(`job-newer-${counter}`, { runnerId: undefined }),
+        repoId,
+        Date.now() + 200 * 60 * 1000,
+      ),
+    );
 
     expect((await jobOf(stalledId)).state).toBe("cancelled");
   });
@@ -194,7 +294,12 @@ describe("reading a job's state", () => {
 
 describe("reporting a job", () => {
   const FILES = { "REPORT.md": "# Report", "findings.json": "{}" };
-  const AGENT_LOG = JSON.stringify({ total_cost_usd: 1.5, num_turns: 4, duration_ms: 9000, usage: { input_tokens: 10, output_tokens: 20 } });
+  const AGENT_LOG = JSON.stringify({
+    total_cost_usd: 1.5,
+    num_turns: 4,
+    duration_ms: 9000,
+    usage: { input_tokens: 10, output_tokens: 20 },
+  });
 
   const claimed = async (over: Partial<ScanParams> = {}) => {
     const scanId = await queue(await newScan(), over);
@@ -209,14 +314,22 @@ describe("reporting a job", () => {
 
     expect(job.state).toBe("succeeded");
     expect(JSON.parse(job.filesJson ?? "{}")).toEqual(FILES);
-    expect(JSON.parse(job.usageJson ?? "{}")).toMatchObject({ inputTokens: 10, outputTokens: 20, costUsd: 1.5, turns: 4 });
+    expect(JSON.parse(job.usageJson ?? "{}")).toMatchObject({
+      inputTokens: 10,
+      outputTokens: 20,
+      costUsd: 1.5,
+      turns: 4,
+    });
   });
 
   it("fails a scan that reports success without REPORT.md", async () => {
     const scanId = await claimed();
     await report(scanId, { state: "succeeded", files: { "findings.json": "{}" } });
 
-    expect(await jobOf(scanId)).toMatchObject({ state: "failed", error: "the audit finished without writing REPORT.md" });
+    expect(await jobOf(scanId)).toMatchObject({
+      state: "failed",
+      error: "the audit finished without writing REPORT.md",
+    });
   });
 
   it("keeps the failure the runner reports", async () => {
@@ -229,7 +342,12 @@ describe("reporting a job", () => {
   it.each([
     ["no ref, HEAD on main", undefined, { commitSha: "a".repeat(40), headBranch: "main", kind: null }, "main"],
     ["no ref, a detached HEAD", undefined, { commitSha: "a".repeat(40), headBranch: "HEAD", kind: null }, null],
-    ["a ref fetched as a branch", "release", { commitSha: "a".repeat(40), headBranch: "HEAD", kind: "branch" }, "release"],
+    [
+      "a ref fetched as a branch",
+      "release",
+      { commitSha: "a".repeat(40), headBranch: "HEAD", kind: "branch" },
+      "release",
+    ],
     ["a ref that is not a branch", "v1.2.0", { commitSha: "a".repeat(40), headBranch: "HEAD", kind: "other" }, null],
   ] as const)("works out the branch for %s", async (_name, ref, checkout, branch) => {
     const scanId = await claimed({ ref });
@@ -243,17 +361,32 @@ describe("reporting a job", () => {
     const sha = "c".repeat(64);
     const [archive] = await test.raw
       .insert(scanUploadArchives)
-      .values({ tenantId, repoId, label: "app-1.3.zip", r2Key: `accounts/${tenantId}/uploads/${repoId}/${scanId}.zip`, sizeBytes: 10, contentSha256: sha })
+      .values({
+        tenantId,
+        repoId,
+        label: "app-1.3.zip",
+        r2Key: `accounts/${tenantId}/uploads/${repoId}/${scanId}.zip`,
+        sizeBytes: 10,
+        contentSha256: sha,
+      })
       .returning();
-    await test.raw.insert(scanArchiveLinks).values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: sha });
-    await report(scanId, { state: "succeeded", checkout: { commitSha: "a".repeat(40), headBranch: "main", kind: null }, files: FILES });
+    await test.raw
+      .insert(scanArchiveLinks)
+      .values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: sha });
+    await report(scanId, {
+      state: "succeeded",
+      checkout: { commitSha: "a".repeat(40), headBranch: "main", kind: null },
+      files: FILES,
+    });
 
     expect(await jobOf(scanId)).toMatchObject({ commitSha: sha, branch: "upload" });
   });
 
   it("refuses a report from a runner that did not claim the scan", async () => {
     const scanId = await claimed();
-    const failure = await Effect.runPromise(Effect.flip(reportJobSvc(test.http, otherRunnerId, scanId, { state: "succeeded", files: FILES })));
+    const failure = await Effect.runPromise(
+      Effect.flip(reportJobSvc(test.http, otherRunnerId, scanId, { state: "succeeded", files: FILES })),
+    );
 
     expect(failure).toMatchObject({ _tag: "NotFound" });
   });
@@ -261,11 +394,15 @@ describe("reporting a job", () => {
   it("refuses a second report, and a report for a scan that ended", async () => {
     const scanId = await claimed();
     await report(scanId, { state: "succeeded", files: FILES });
-    const second = await Effect.runPromise(Effect.flip(reportJobSvc(test.http, runnerId, scanId, { state: "failed", error: "late" })));
+    const second = await Effect.runPromise(
+      Effect.flip(reportJobSvc(test.http, runnerId, scanId, { state: "failed", error: "late" })),
+    );
 
     const cancelledId = await claimed();
     await runnerSandbox(test.http, paramsFor(cancelledId), runnerId, () => NOW).destroy();
-    const late = await Effect.runPromise(Effect.flip(reportJobSvc(test.http, runnerId, cancelledId, { state: "succeeded", files: FILES })));
+    const late = await Effect.runPromise(
+      Effect.flip(reportJobSvc(test.http, runnerId, cancelledId, { state: "succeeded", files: FILES })),
+    );
 
     expect([second._tag, late._tag]).toEqual(["NotFound", "NotFound"]);
     expect((await jobOf(cancelledId)).state).toBe("cancelled");
@@ -317,7 +454,19 @@ describe("the runner as a sandbox", () => {
   it("leaves a finished job as it was when the scan cleans up", async () => {
     const scanId = await queue(await newScan());
     await run(claimRunnerJobEffect(test.http, runnerId, NOW));
-    await run(reportRunnerJobEffect(test.http, { scanId, runnerId, state: "succeeded", error: null, commitSha: null, branch: null, usageJson: null, filesJson: "{}", now: NOW }));
+    await run(
+      reportRunnerJobEffect(test.http, {
+        scanId,
+        runnerId,
+        state: "succeeded",
+        error: null,
+        commitSha: null,
+        branch: null,
+        usageJson: null,
+        filesJson: "{}",
+        now: NOW,
+      }),
+    );
     await runnerSandbox(test.http, paramsFor(scanId), runnerId, () => NOW).destroy();
 
     expect((await jobOf(scanId)).state).toBe("succeeded");
@@ -331,13 +480,19 @@ describe("an upload Scan on a Runner", () => {
   const uploadScan = async (bucket = fakeBindings().env.REPORTS) => {
     const scanId = await queue(await newScan());
     const r2Key = `accounts/${tenantId}/uploads/${repoId}/${scanId}.zip`;
-    const [archive] = await test.raw.insert(scanUploadArchives).values({ tenantId, repoId, label: "app-1.3.zip", r2Key, sizeBytes: 9, contentSha256: "d".repeat(64) }).returning();
-    await test.raw.insert(scanArchiveLinks).values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: archive.contentSha256 });
+    const [archive] = await test.raw
+      .insert(scanUploadArchives)
+      .values({ tenantId, repoId, label: "app-1.3.zip", r2Key, sizeBytes: 9, contentSha256: "d".repeat(64) })
+      .returning();
+    await test.raw
+      .insert(scanArchiveLinks)
+      .values({ scanId, tenantId, archiveId: archive.id, label: archive.label, contentSha256: archive.contentSha256 });
     await bucket.put(r2Key, ZIP_BYTES);
     return { scanId, archiveId: archive.id };
   };
 
-  const download = (scanId: string, by: string, bucket: R2Bucket) => Effect.runPromise(Effect.either(jobArchiveSvc(test.http, bucket, by, scanId)));
+  const download = (scanId: string, by: string, bucket: R2Bucket) =>
+    Effect.runPromise(Effect.either(jobArchiveSvc(test.http, bucket, by, scanId)));
 
   it("hands the job an archive source with the zip's id, and a git job a git source", async () => {
     const { scanId, archiveId } = await uploadScan();
@@ -345,19 +500,27 @@ describe("an upload Scan on a Runner", () => {
     const first = await run(claimJobSvc(test.http, runnerId, BOTH));
     const second = await run(claimJobSvc(test.http, runnerId, BOTH));
 
-    expect([first?.scanId, first?.source, second?.scanId, second?.source]).toEqual([scanId, { kind: "archive", archiveId }, gitScan, { kind: "git" }]);
+    expect([first?.scanId, first?.source, second?.scanId, second?.source]).toEqual([
+      scanId,
+      { kind: "archive", archiveId },
+      gitScan,
+      { kind: "git" },
+    ]);
   });
 
   it.each([
     ["reports only git", ["git"]],
     ["reports nothing", undefined],
-  ])("never hands an archive job to a Runner that %s, and hands it the git job queued after", async (_name, sources) => {
-    const { scanId } = await uploadScan();
-    const gitScan = await queue(await newScan());
-    const claimed = await run(claimJobSvc(test.http, runnerId, sources));
+  ])(
+    "never hands an archive job to a Runner that %s, and hands it the git job queued after",
+    async (_name, sources) => {
+      const { scanId } = await uploadScan();
+      const gitScan = await queue(await newScan());
+      const claimed = await run(claimJobSvc(test.http, runnerId, sources));
 
-    expect([claimed?.scanId, (await jobOf(scanId)).state]).toEqual([gitScan, "queued"]);
-  });
+      expect([claimed?.scanId, (await jobOf(scanId)).state]).toEqual([gitScan, "queued"]);
+    },
+  );
 
   it("remembers what the Runner reported, so an upload Scan can be refused before it is queued", async () => {
     const before = await run(findConnectedRunnerEffect(test.http, tenantId, runnerId));
@@ -398,7 +561,10 @@ describe("an upload Scan on a Runner", () => {
     await run(claimJobSvc(test.http, runnerId, BOTH));
     await test.raw.delete(scanUploadArchives).where(eq(scanUploadArchives.id, archiveId));
 
-    expect(await download(scanId, runnerId, bucket)).toMatchObject({ _tag: "Left", left: { _tag: "NotFound", message: expect.stringContaining("reads was removed") } });
+    expect(await download(scanId, runnerId, bucket)).toMatchObject({
+      _tag: "Left",
+      left: { _tag: "NotFound", message: expect.stringContaining("reads was removed") },
+    });
   });
 
   it("refuses a git job's download", async () => {
@@ -410,15 +576,27 @@ describe("an upload Scan on a Runner", () => {
   });
 });
 
-type LedgerUnit ={ status: string; agent_id: string | null; unresolved: string[] };
-const ledgerUnit = (over: Partial<LedgerUnit>) => ({ status: "covered", agent_id: "hunter-inline", wave: 1, attempts: [], local_checks: [], result_fingerprints: [], unresolved: [], ...over });
+type LedgerUnit = { status: string; agent_id: string | null; unresolved: string[] };
+const ledgerUnit = (over: Partial<LedgerUnit>) => ({
+  status: "covered",
+  agent_id: "hunter-inline",
+  wave: 1,
+  attempts: [],
+  local_checks: [],
+  result_fingerprints: [],
+  unresolved: [],
+  ...over,
+});
 
 describe("the profile met after a Runner's result", () => {
   const FULL_OPTIONS: ScanOptions = { ...OPTIONS, skill: "full", profile: "deep" };
   const FOCUSED_FILES = {
     "REPORT.md": "# Report",
     "findings.json": "[]",
-    "coverage-ledger.json": JSON.stringify([ledgerUnit({}), ledgerUnit({ status: "deferred", agent_id: null, unresolved: ["quick_profile_final_critic"] })]),
+    "coverage-ledger.json": JSON.stringify([
+      ledgerUnit({}),
+      ledgerUnit({ status: "deferred", agent_id: null, unresolved: ["quick_profile_final_critic"] }),
+    ]),
     "run-metadata.json": JSON.stringify({ run_id: "run-1", profile: "quick", run_status: "complete" }),
   };
 
@@ -431,8 +609,25 @@ describe("the profile met after a Runner's result", () => {
     await report(scanId, { state: "succeeded", files });
 
     const bindings = fakeBindings();
-    await run(saveScanFilesEffect(bindings.env.REPORTS, tenantId, scanId, await runnerSandbox(test.http, params, runnerId).readFiles()));
-    const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { id: null, name: null, reason: null }, "succeeded", null, null));
+    await run(
+      saveScanFilesEffect(
+        bindings.env.REPORTS,
+        tenantId,
+        scanId,
+        await runnerSandbox(test.http, params, runnerId).readFiles(),
+      ),
+    );
+    const record = await run(
+      buildScanRecordSvc(
+        bindings.env.REPORTS,
+        params,
+        repoId,
+        { id: null, name: null, reason: null },
+        "succeeded",
+        null,
+        null,
+      ),
+    );
     await run(writeScanRecordEffect(test.http, record));
     return scanId;
   };
@@ -440,8 +635,13 @@ describe("the profile met after a Runner's result", () => {
   it("keeps what the Scan met on its row and shows it on the Scan, an Exhaustive Scan whose files show Balanced work reading standard", async () => {
     const scanId = await recordedAfterResult(FOCUSED_FILES);
 
-    expect((await test.raw.select({ profileMet: scans.profileMet }).from(scans).where(eq(scans.id, scanId)))[0].profileMet).toBe("standard");
-    expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({ profile: "deep", profileMet: "standard" });
+    expect(
+      (await test.raw.select({ profileMet: scans.profileMet }).from(scans).where(eq(scans.id, scanId)))[0].profileMet,
+    ).toBe("standard");
+    expect(await run(neonScanRepo(test.http).get(tenantId, scanId))).toMatchObject({
+      profile: "deep",
+      profileMet: "standard",
+    });
   });
 
   it("keeps none on the row of a result that wrote no ledger, and null on the Scan of an old row", async () => {

@@ -154,7 +154,8 @@ export const UPLOAD_STORAGE_FULL_MESSAGE = `An account can store at most ${UPLOA
 // as a path. Unique in an Account however it is cased.
 // -----
 export const UPLOAD_APP_NAME_PATTERN = /^[A-Za-z0-9](?:[\w .-]{0,78}[\w.-])?$/;
-export const UPLOAD_APP_NAME_MESSAGE = "An app name is letters, digits, spaces, '.', '-' and '_', starts with a letter or digit, has no slash and is at most 80 characters";
+export const UPLOAD_APP_NAME_MESSAGE =
+  "An app name is letters, digits, spaces, '.', '-' and '_', starts with a letter or digit, has no slash and is at most 80 characters";
 
 // -----
 // GitLab addresses (docs/adr/0008-git-providers.md). A path is
@@ -168,8 +169,11 @@ export const UPLOAD_APP_NAME_MESSAGE = "An app name is letters, digits, spaces, 
 // the host, group 2 the path. Twin of the Runner's
 // core/src/providers/address.rs.
 // -----
-export const GITLAB_ADDRESS_MESSAGE = "A GitLab address looks like https://gitlab.com/group/name (groups inside groups are fine)";
-export const GITLAB_SH_ADDRESS_MESSAGE = "A GitLab server address looks like https://git.example.com/group/name, on a host other than github.com or gitlab.com";
-export const GITLAB_ADDRESS_PATTERN = /^https:\/\/(gitlab\.com)\/((?:[a-z0-9_][\w.-]*\/){1,19}[a-z0-9_][\w.-]*?)(?:\.git)?\/?(?:\/-\/.*)?$/i;
+export const GITLAB_ADDRESS_MESSAGE =
+  "A GitLab address looks like https://gitlab.com/group/name (groups inside groups are fine)";
+export const GITLAB_SH_ADDRESS_MESSAGE =
+  "A GitLab server address looks like https://git.example.com/group/name, on a host other than github.com or gitlab.com";
+export const GITLAB_ADDRESS_PATTERN =
+  /^https:\/\/(gitlab\.com)\/((?:[a-z0-9_][\w.-]*\/){1,19}[a-z0-9_][\w.-]*?)(?:\.git)?\/?(?:\/-\/.*)?$/i;
 export const GITLAB_SH_ADDRESS_PATTERN =
   /^https:\/\/(?!(?:github|gitlab)\.com\/)((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\/((?:[a-z0-9_][\w.-]*\/){1,19}[a-z0-9_][\w.-]*?)(?:\.git)?\/?(?:\/-\/.*)?$/i;

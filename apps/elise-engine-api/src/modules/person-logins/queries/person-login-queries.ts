@@ -28,7 +28,21 @@ export const createPersonLogin = (db: PersonLoginDb, person: NewPersonLogin): Pr
       const userId = crypto.randomUUID();
       return db
         .insert(authUser)
-        .values({ id: userId, name: `${person.firstName} ${person.lastName}`, email: person.email, emailVerified: false, partyId })
-        .then(() => db.insert(authAccount).values({ id: crypto.randomUUID(), accountId: userId, providerId: "credential", userId, password: person.passwordHash }))
+        .values({
+          id: userId,
+          name: `${person.firstName} ${person.lastName}`,
+          email: person.email,
+          emailVerified: false,
+          partyId,
+        })
+        .then(() =>
+          db.insert(authAccount).values({
+            id: crypto.randomUUID(),
+            accountId: userId,
+            providerId: "credential",
+            userId,
+            password: person.passwordHash,
+          }),
+        )
         .then(() => ({ userId, partyId }));
     });

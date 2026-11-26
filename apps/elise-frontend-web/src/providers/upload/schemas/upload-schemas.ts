@@ -1,13 +1,28 @@
 import { z } from "zod";
-import { RepoParamSchema, UPLOAD_APP_NAME_MESSAGE, UPLOAD_APP_NAME_PATTERN, UPLOAD_ARCHIVE_LABEL_MAX } from "@repo/contracts/elise";
+import {
+  RepoParamSchema,
+  UPLOAD_APP_NAME_MESSAGE,
+  UPLOAD_APP_NAME_PATTERN,
+  UPLOAD_ARCHIVE_LABEL_MAX,
+} from "@repo/contracts/elise";
 
-export { RepoDetailSchema, RepoListSchema, RepoParamSchema, UploadArchiveListSchema, UploadArchiveParamSchema, UploadArchiveRemovedSchema, UploadArchiveSchema } from "@repo/contracts/elise";
+export {
+  RepoDetailSchema,
+  RepoListSchema,
+  RepoParamSchema,
+  UploadArchiveListSchema,
+  UploadArchiveParamSchema,
+  UploadArchiveRemovedSchema,
+  UploadArchiveSchema,
+} from "@repo/contracts/elise";
 export type { Repo, UploadArchive } from "@repo/contracts/elise";
 
 // -----
 // A new upload app: its name, by the contracts' name rule.
 // -----
-export const CreateUploadAppInputSchema = z.object({ name: z.string().trim().regex(UPLOAD_APP_NAME_PATTERN, UPLOAD_APP_NAME_MESSAGE) });
+export const CreateUploadAppInputSchema = z.object({
+  name: z.string().trim().regex(UPLOAD_APP_NAME_PATTERN, UPLOAD_APP_NAME_MESSAGE),
+});
 
 // -----
 // A zip on its way up: the browser sends it as form data, with

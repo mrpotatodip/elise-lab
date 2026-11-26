@@ -2,13 +2,6 @@ import { sql } from "drizzle-orm";
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { tenants } from "./tenant";
 
-// -----
-// A Project is a named set of a Tenant's Repos, kept
-// together so they can be reviewed together. It grants
-// nothing and scans nothing. Names are unique within a
-// Tenant, ignoring case. A Repo points at it through
-// scan_repos.project_id.
-// -----
 export const tenantProjects = pgTable(
   "tenant_projects",
   {

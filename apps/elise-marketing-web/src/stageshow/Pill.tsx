@@ -4,7 +4,13 @@ import type { HTMLAttributes } from "react";
 // Styled in daylight.css.
 export type PillTone = "success" | "danger" | "warning" | "info" | "neutral" | "outline" | "high" | "medium" | "low";
 
-export function Pill({ tone, dot, pulse, children, ...rest }: HTMLAttributes<HTMLSpanElement> & { tone: PillTone; dot?: boolean; pulse?: boolean }) {
+export function Pill({
+  tone,
+  dot,
+  pulse,
+  children,
+  ...rest
+}: HTMLAttributes<HTMLSpanElement> & { tone: PillTone; dot?: boolean; pulse?: boolean }) {
   return (
     <span {...rest} className="dl-pill" data-tone={tone} data-pulse={pulse || undefined}>
       {dot && <i />}

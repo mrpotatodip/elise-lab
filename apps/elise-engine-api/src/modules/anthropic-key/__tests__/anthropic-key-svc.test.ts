@@ -30,7 +30,9 @@ beforeEach(async () => {
   acme = await seedTenant(test, `acme-${round}`);
   other = await seedTenant(test, `other-${round}`);
   userId = `ada-${round}`;
-  await test.raw.insert(authUser).values({ id: userId, name: "Ada Rossi", email: `ada-${round}@example.com`, partyId: acme.partyId });
+  await test.raw
+    .insert(authUser)
+    .values({ id: userId, name: "Ada Rossi", email: `ada-${round}@example.com`, partyId: acme.partyId });
 });
 
 afterAll(async () => {
@@ -40,20 +42,35 @@ afterAll(async () => {
 const accepts = async () => true;
 const refuses = async () => false;
 const set = (check: (apiKey: string) => Promise<boolean>, apiKey = KEY, secret: string | null = SECRET) =>
-  setAnthropicKeySvc(secret ?? undefined, (run) => asTenantEffect(test, acme.tenantId, run), check, acme.tenantId, userId, apiKey);
+  setAnthropicKeySvc(
+    secret ?? undefined,
+    (run) => asTenantEffect(test, acme.tenantId, run),
+    check,
+    acme.tenantId,
+    userId,
+    apiKey,
+  );
 const remove = () => asTenantEffect(test, acme.tenantId, (db) => removeAnthropicKeySvc(db, acme.tenantId, userId));
-const auditOf = (accountId: string) => test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, accountId));
+const auditOf = (accountId: string) =>
+  test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.subjectId, accountId));
 
 describe("setAnthropicKeySvc", () => {
   it("stores the key sealed, shows only its last four, and records who set it without the key", async () => {
     const saved = await Effect.runPromise(set(accepts));
 
     expect(saved).toMatchObject({ source: "account", lastFour: "w3Zq" });
-    const [row] = await test.raw.select().from(tenantAnthropicKeys).where(eq(tenantAnthropicKeys.tenantId, acme.tenantId));
+    const [row] = await test.raw
+      .select()
+      .from(tenantAnthropicKeys)
+      .where(eq(tenantAnthropicKeys.tenantId, acme.tenantId));
     expect(row.sealedKey).not.toContain("sk-ant");
     expect(await openKey(SECRET, acme.tenantId, row.sealedKey)).toBe(KEY);
     const [entry] = await auditOf(acme.tenantId);
-    expect(entry).toMatchObject({ action: "anthropic.key.set", actorPartyId: acme.partyId, after: { tenantId: acme.tenantId, lastFour: "w3Zq" } });
+    expect(entry).toMatchObject({
+      action: "anthropic.key.set",
+      actorPartyId: acme.partyId,
+      after: { tenantId: acme.tenantId, lastFour: "w3Zq" },
+    });
     expect(JSON.stringify(entry)).not.toContain(KEY);
   });
 
@@ -66,12 +83,18 @@ describe("setAnthropicKeySvc", () => {
   });
 
   it("saves the key for the caller's Account only, and leaves another Account's key as it was", async () => {
-    await test.raw.insert(tenantAnthropicKeys).values({ tenantId: other.tenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
+    await test.raw
+      .insert(tenantAnthropicKeys)
+      .values({ tenantId: other.tenantId, sealedKey: "theirs", lastFour: "rest", updatedBy: other.partyId });
 
     await Effect.runPromise(set(accepts));
 
-    const rows = await test.raw.select({ tenantId: tenantAnthropicKeys.tenantId, sealedKey: tenantAnthropicKeys.sealedKey }).from(tenantAnthropicKeys);
-    expect(rows.filter((row) => row.tenantId === other.tenantId)).toEqual([{ tenantId: other.tenantId, sealedKey: "theirs" }]);
+    const rows = await test.raw
+      .select({ tenantId: tenantAnthropicKeys.tenantId, sealedKey: tenantAnthropicKeys.sealedKey })
+      .from(tenantAnthropicKeys);
+    expect(rows.filter((row) => row.tenantId === other.tenantId)).toEqual([
+      { tenantId: other.tenantId, sealedKey: "theirs" },
+    ]);
     expect(rows.map((row) => row.tenantId).toSorted()).toEqual([acme.tenantId, other.tenantId].toSorted());
   });
 
@@ -107,7 +130,9 @@ describe("the key an account's scans use", () => {
     expect(before).toEqual({ source: "platform", lastFour: null, updatedAt: null });
     expect(await Effect.runPromise(findSealedKeyEffect(test.http, acme.tenantId))).not.toBeNull();
     expect(await Effect.runPromise(findSealedKeyEffect(test.http, other.tenantId))).toBeNull();
-    expect(await Effect.runPromise(getAnthropicKeySvc(test.http, other.tenantId))).toMatchObject({ source: "platform" });
+    expect(await Effect.runPromise(getAnthropicKeySvc(test.http, other.tenantId))).toMatchObject({
+      source: "platform",
+    });
   });
 });
 
@@ -119,7 +144,10 @@ describe("removeAnthropicKeySvc", () => {
 
     expect(removed).toEqual({ key: { source: "platform", lastFour: null, updatedAt: null }, removed: true });
     expect(await test.raw.select().from(tenantAnthropicKeys)).toHaveLength(0);
-    expect((await auditOf(acme.tenantId)).map((entry) => entry.action)).toEqual(["anthropic.key.set", "anthropic.key.removed"]);
+    expect((await auditOf(acme.tenantId)).map((entry) => entry.action)).toEqual([
+      "anthropic.key.set",
+      "anthropic.key.removed",
+    ]);
     expect((await auditOf(acme.tenantId))[1]).toMatchObject({ before: { lastFour: "w3Zq" } });
   });
 

@@ -12,10 +12,17 @@ import type { ScanRecord } from "#/modules/scan-records/types";
 // -----
 export type ScanRowOf = { repoId: string; status: ScanStateValue; branch: string | null; ref: string | null };
 
-export const scanRowOfEffect = (db: DbConnectType, tenantId: string, scanId: string): Effect.Effect<ScanRowOf, DbError> =>
+export const scanRowOfEffect = (
+  db: DbConnectType,
+  tenantId: string,
+  scanId: string,
+): Effect.Effect<ScanRowOf, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const [row] = await db.select({ repoId: scans.repoId, status: scans.status, branch: scans.branch, ref: scans.ref }).from(scans).where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId)));
+      const [row] = await db
+        .select({ repoId: scans.repoId, status: scans.status, branch: scans.branch, ref: scans.ref })
+        .from(scans)
+        .where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId)));
       if (!row) throw new Error(`scan ${scanId} has no row to take its repo from`);
       return row;
     },

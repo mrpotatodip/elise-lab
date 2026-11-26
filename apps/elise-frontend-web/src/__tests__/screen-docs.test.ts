@@ -34,7 +34,9 @@ const pageSegments = (): string[] =>
 
 describe("DESIGN-SCREENS.md", () => {
   it.each([...new Set(pageSegments())])("knows the %s route", (segment) => {
-    expect(isSegment(segment) ? "known" : `add "${segment}" to SCREEN_WORD, and write its entry in DESIGN-SCREENS.md`).toBe("known");
+    expect(
+      isSegment(segment) ? "known" : `add "${segment}" to SCREEN_WORD, and write its entry in DESIGN-SCREENS.md`,
+    ).toBe("known");
   });
 
   it.each(Object.entries(SCREEN_WORD))("has an entry for /%s, named %s", (_segment, word) => {

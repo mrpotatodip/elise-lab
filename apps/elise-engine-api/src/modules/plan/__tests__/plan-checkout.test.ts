@@ -1,5 +1,11 @@
 import { ensureTenantRoles, findTenantRole } from "@repo/db-elise";
-import { authUser, partyRoles, platformMasterPlans, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
+import {
+  authUser,
+  partyRoles,
+  platformMasterPlans,
+  tenantSubscriptions,
+  tenantTeamInvites,
+} from "@repo/db-elise/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -27,7 +33,8 @@ const app = tenantRouteApp(() => test, {
   userHasPower: async (_c, _userId, _accountId, power) => powers.includes(power),
 });
 
-const rowOf = async () => (await test.raw.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, accountId)))[0];
+const rowOf = async () =>
+  (await test.raw.select().from(tenantSubscriptions).where(eq(tenantSubscriptions.tenantId, accountId)))[0];
 const call = (path: string) => callAs(app, accountId, path, { method: "POST", env: { DASHBOARD_URL: DASHBOARD } });
 const answer = async (path: string) => {
   const response = await call(path);
@@ -35,7 +42,13 @@ const answer = async (path: string) => {
 };
 
 const setPeople = async (count: number) => {
-  await test.raw.insert(partyRoles).values(partyIds.slice(0, count).map((partyId) => ({ partyId, tenantId: accountId, roleId, roleScope: "tenant" as const })));
+  await test.raw
+    .insert(partyRoles)
+    .values(
+      partyIds
+        .slice(0, count)
+        .map((partyId) => ({ partyId, tenantId: accountId, roleId, roleScope: "tenant" as const })),
+    );
 };
 const addInvite = async () => {
   await test.raw.insert(tenantTeamInvites).values({
@@ -58,9 +71,17 @@ beforeAll(async () => {
   const role = await findTenantRole(test.raw, accountId, "workspace_member");
   if (!role) throw new Error("workspace_member role missing");
   roleId = role.id;
-  await test.raw.insert(authUser).values({ id: USER, name: "Admin", email: "admin@example.com", emailVerified: true, partyId: acme.partyId });
-  await test.raw.update(platformMasterPlans).set({ stripePriceId: PRICE, stripeYearlyPriceId: YEARLY_PRICE }).where(eq(platformMasterPlans.key, "runner"));
-  [{ id: runnerPlanId }] = await test.raw.select({ id: platformMasterPlans.id }).from(platformMasterPlans).where(eq(platformMasterPlans.key, "runner"));
+  await test.raw
+    .insert(authUser)
+    .values({ id: USER, name: "Admin", email: "admin@example.com", emailVerified: true, partyId: acme.partyId });
+  await test.raw
+    .update(platformMasterPlans)
+    .set({ stripePriceId: PRICE, stripeYearlyPriceId: YEARLY_PRICE })
+    .where(eq(platformMasterPlans.key, "runner"));
+  [{ id: runnerPlanId }] = await test.raw
+    .select({ id: platformMasterPlans.id })
+    .from(platformMasterPlans)
+    .where(eq(platformMasterPlans.key, "runner"));
 });
 
 afterAll(async () => {
@@ -83,7 +104,16 @@ describe("POST /usage/plan/checkout", () => {
     expect([status, body.data?.url, stripe.checkouts]).toEqual([
       200,
       `https://checkout.stripe.test/${stripe.customers[0].id}`,
-      [{ customerId: stripe.customers[0].id, accountId, priceId: PRICE, interval: "month", successUrl: `${DASHBOARD}/settings/plan?checkout=success`, cancelUrl: `${DASHBOARD}/settings/plan?checkout=cancelled` }],
+      [
+        {
+          customerId: stripe.customers[0].id,
+          accountId,
+          priceId: PRICE,
+          interval: "month",
+          successUrl: `${DASHBOARD}/settings/plan?checkout=success`,
+          cancelUrl: `${DASHBOARD}/settings/plan?checkout=cancelled`,
+        },
+      ],
     ]);
     expect(stripe.customers).toMatchObject([{ name: "acme", email: "admin@example.com", accountId }]);
   });
@@ -93,25 +123,53 @@ describe("POST /usage/plan/checkout", () => {
     { name: "month", body: { planKey: "runner", interval: "month" }, priceId: PRICE, interval: "month" },
     { name: "no interval (an old dashboard)", body: { planKey: "runner" }, priceId: PRICE, interval: "month" },
   ])("checks out the price of the interval: $name", async ({ body, priceId, interval }) => {
-    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body, env: { DASHBOARD_URL: DASHBOARD } });
-    expect([response.status, stripe.checkouts.map((checkout) => [checkout.priceId, checkout.interval])]).toEqual([200, [[priceId, interval]]]);
+    const response = await callAs(app, accountId, "/usage/plan/checkout", {
+      method: "POST",
+      body,
+      env: { DASHBOARD_URL: DASHBOARD },
+    });
+    expect([response.status, stripe.checkouts.map((checkout) => [checkout.priceId, checkout.interval])]).toEqual([
+      200,
+      [[priceId, interval]],
+    ]);
   });
 
   it("refuses a yearly checkout for a plan with no yearly price and asks Stripe for nothing", async () => {
-    await test.raw.update(platformMasterPlans).set({ stripePriceId: "price_starter_test", stripeYearlyPriceId: null, enabled: true }).where(eq(platformMasterPlans.key, "starter"));
-    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "starter", interval: "year" }, env: { DASHBOARD_URL: DASHBOARD } });
+    await test.raw
+      .update(platformMasterPlans)
+      .set({ stripePriceId: "price_starter_test", stripeYearlyPriceId: null, enabled: true })
+      .where(eq(platformMasterPlans.key, "starter"));
+    const response = await callAs(app, accountId, "/usage/plan/checkout", {
+      method: "POST",
+      body: { planKey: "starter", interval: "year" },
+      env: { DASHBOARD_URL: DASHBOARD },
+    });
     expect([response.status, stripe.checkouts.length, stripe.customers.length]).toEqual([400, 0, 0]);
   });
 
   it("refuses an interval Stripe does not sell", async () => {
-    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "runner", interval: "week" }, env: { DASHBOARD_URL: DASHBOARD } });
+    const response = await callAs(app, accountId, "/usage/plan/checkout", {
+      method: "POST",
+      body: { planKey: "runner", interval: "week" },
+      env: { DASHBOARD_URL: DASHBOARD },
+    });
     expect([response.status, stripe.checkouts.length]).toEqual([400, 0]);
   });
 
   it("starts a checkout on the Starter price for planKey starter", async () => {
-    await test.raw.update(platformMasterPlans).set({ stripePriceId: "price_starter_test", enabled: true }).where(eq(platformMasterPlans.key, "starter"));
-    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "starter" }, env: { DASHBOARD_URL: DASHBOARD } });
-    expect([response.status, stripe.checkouts.map((checkout) => checkout.priceId)]).toEqual([200, ["price_starter_test"]]);
+    await test.raw
+      .update(platformMasterPlans)
+      .set({ stripePriceId: "price_starter_test", enabled: true })
+      .where(eq(platformMasterPlans.key, "starter"));
+    const response = await callAs(app, accountId, "/usage/plan/checkout", {
+      method: "POST",
+      body: { planKey: "starter" },
+      env: { DASHBOARD_URL: DASHBOARD },
+    });
+    expect([response.status, stripe.checkouts.map((checkout) => checkout.priceId)]).toEqual([
+      200,
+      ["price_starter_test"],
+    ]);
   });
 
   it.each([
@@ -119,8 +177,15 @@ describe("POST /usage/plan/checkout", () => {
     { name: "a disabled plan", planKey: "starter", enabled: false, price: "price_starter_test" },
     { name: "a plan with no price", planKey: "starter", enabled: true, price: null },
   ])("refuses $name and asks Stripe for nothing", async ({ planKey, enabled, price }) => {
-    await test.raw.update(platformMasterPlans).set({ stripePriceId: price, enabled }).where(eq(platformMasterPlans.key, "starter"));
-    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey }, env: { DASHBOARD_URL: DASHBOARD } });
+    await test.raw
+      .update(platformMasterPlans)
+      .set({ stripePriceId: price, enabled })
+      .where(eq(platformMasterPlans.key, "starter"));
+    const response = await callAs(app, accountId, "/usage/plan/checkout", {
+      method: "POST",
+      body: { planKey },
+      env: { DASHBOARD_URL: DASHBOARD },
+    });
     expect([response.status, stripe.checkouts.length]).toEqual([400, 0]);
   });
 
@@ -128,13 +193,27 @@ describe("POST /usage/plan/checkout", () => {
     { name: "people at the cap", members: 2, invite: false, status: 200 },
     { name: "people over the cap", members: 3, invite: false, status: 409 },
     { name: "people plus a pending invite over the cap", members: 2, invite: true, status: 409 },
-  ])("for Starter with $name answers $status and opens a session only when allowed", async ({ members, invite, status }) => {
-    await test.raw.update(platformMasterPlans).set({ stripePriceId: "price_starter_test", enabled: true }).where(eq(platformMasterPlans.key, "starter"));
-    await setPeople(members);
-    if (invite) await addInvite();
-    const response = await callAs(app, accountId, "/usage/plan/checkout", { method: "POST", body: { planKey: "starter" }, env: { DASHBOARD_URL: DASHBOARD } });
-    expect([response.status, stripe.checkouts.length, stripe.customers.length]).toEqual([status, status === 200 ? 1 : 0, status === 200 ? 1 : 0]);
-  });
+  ])(
+    "for Starter with $name answers $status and opens a session only when allowed",
+    async ({ members, invite, status }) => {
+      await test.raw
+        .update(platformMasterPlans)
+        .set({ stripePriceId: "price_starter_test", enabled: true })
+        .where(eq(platformMasterPlans.key, "starter"));
+      await setPeople(members);
+      if (invite) await addInvite();
+      const response = await callAs(app, accountId, "/usage/plan/checkout", {
+        method: "POST",
+        body: { planKey: "starter" },
+        env: { DASHBOARD_URL: DASHBOARD },
+      });
+      expect([response.status, stripe.checkouts.length, stripe.customers.length]).toEqual([
+        status,
+        status === 200 ? 1 : 0,
+        status === 200 ? 1 : 0,
+      ]);
+    },
+  );
 
   it("refuses a login whose Role lacks company:plan:manage and asks Stripe for nothing", async () => {
     powers = ["company:plan:read"];
@@ -143,13 +222,22 @@ describe("POST /usage/plan/checkout", () => {
   });
 
   it.each(["active", "past_due"] as const)("refuses while a Stripe Subscription is %s", async (status) => {
-    await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runnerPlanId, status, source: "stripe", stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1" });
+    await test.raw.insert(tenantSubscriptions).values({
+      tenantId: accountId,
+      planId: runnerPlanId,
+      status,
+      source: "stripe",
+      stripeCustomerId: "cus_1",
+      stripeSubscriptionId: "sub_1",
+    });
     const response = await answer("/usage/plan/checkout");
     expect([response.status, stripe.checkouts.length]).toEqual([409, 0]);
   });
 
   it("lets an Account on an operator grant subscribe, and leaves the grant until the webhook says so", async () => {
-    await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runnerPlanId, status: "active", source: "grant" });
+    await test.raw
+      .insert(tenantSubscriptions)
+      .values({ tenantId: accountId, planId: runnerPlanId, status: "active", source: "grant" });
     const response = await answer("/usage/plan/checkout");
     expect([response.status, (await rowOf()).source]).toEqual([200, "grant"]);
   });
@@ -161,7 +249,14 @@ describe("POST /usage/plan/checkout", () => {
   });
 
   it("reuses the Stripe customer of an Account that cancelled", async () => {
-    await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runnerPlanId, status: "canceled", source: "stripe", stripeCustomerId: "cus_old", stripeSubscriptionId: "sub_old" });
+    await test.raw.insert(tenantSubscriptions).values({
+      tenantId: accountId,
+      planId: runnerPlanId,
+      status: "canceled",
+      source: "stripe",
+      stripeCustomerId: "cus_old",
+      stripeSubscriptionId: "sub_old",
+    });
     await answer("/usage/plan/checkout");
     expect([stripe.customers.length, stripe.checkouts[0].customerId]).toEqual([0, "cus_old"]);
   });
@@ -169,9 +264,20 @@ describe("POST /usage/plan/checkout", () => {
 
 describe("POST /usage/plan/portal", () => {
   it("opens the Billing portal for the Account's Stripe customer", async () => {
-    await test.raw.insert(tenantSubscriptions).values({ tenantId: accountId, planId: runnerPlanId, status: "active", source: "stripe", stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1" });
+    await test.raw.insert(tenantSubscriptions).values({
+      tenantId: accountId,
+      planId: runnerPlanId,
+      status: "active",
+      source: "stripe",
+      stripeCustomerId: "cus_1",
+      stripeSubscriptionId: "sub_1",
+    });
     const { status, body } = await answer("/usage/plan/portal");
-    expect([status, body.data?.url, stripe.portals]).toEqual([200, "https://billing.stripe.test/cus_1", [{ customerId: "cus_1", returnUrl: `${DASHBOARD}/settings/plan` }]]);
+    expect([status, body.data?.url, stripe.portals]).toEqual([
+      200,
+      "https://billing.stripe.test/cus_1",
+      [{ customerId: "cus_1", returnUrl: `${DASHBOARD}/settings/plan` }],
+    ]);
   });
 
   it("refuses a login without company:plan:manage", async () => {
