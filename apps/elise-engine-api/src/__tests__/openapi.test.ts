@@ -28,6 +28,7 @@ describe("GET /openapi.json", () => {
       "DELETE /findings/comments/{commentId}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",
+      "DELETE /projects/{projectId}",
       "DELETE /repos/{repoId}",
       "DELETE /repos/{repoId}/archives/{archiveId}",
       "DELETE /runners/me",
@@ -40,6 +41,7 @@ describe("GET /openapi.json", () => {
       "GET /findings/signals",
       "GET /groups",
       "GET /me",
+      "GET /projects",
       "GET /repos",
       "GET /repos/{repoId}",
       "GET /repos/{repoId}/archives",
@@ -69,11 +71,13 @@ describe("GET /openapi.json", () => {
       "GET /usage/signals",
       "PATCH /findings/comments/{commentId}",
       "PATCH /groups/{groupId}",
+      "PATCH /projects/{projectId}",
       "PATCH /usage/budget",
       "POST /findings/comments",
       "POST /findings/signals/weak-reason",
       "POST /findings/signals/{signalId}/dismiss",
       "POST /groups",
+      "POST /projects",
       "POST /repos",
       "POST /repos/{repoId}/archives",
       "POST /repos/{repoId}/branches",
@@ -99,6 +103,7 @@ describe("GET /openapi.json", () => {
       "POST /usage/plan/portal",
       "PUT /findings/triage",
       "PUT /groups/{groupId}/members/{partyId}",
+      "PUT /repos/{repoId}/project",
       "PUT /usage/anthropic-key",
       "PUT /usage/signals",
     ]);
@@ -110,7 +115,7 @@ describe("GET /openapi.json", () => {
     for (const { route, operation } of operations(spec)) {
       expect({ route, summary: Boolean(operation.summary) }).toEqual({ route, summary: true });
       expect({ route, description: operation.description?.includes("**Context.**") }).toEqual({ route, description: true });
-      const tag = ["groups", "team", "repos", "scans", "files", "runners", "findings", "usage", "me", "sign-up", "stripe"].find((name) => route.includes(`/${name}`));
+      const tag = ["groups", "projects", "team", "repos", "scans", "files", "runners", "findings", "usage", "me", "sign-up", "stripe"].find((name) => route.includes(`/${name}`));
       expect({ route, tags: operation.tags }).toEqual({ route, tags: [tag] });
       const security = tag === "sign-up" || PUBLIC_ROUTES.has(route) ? undefined : [{ bearerAuth: [] }];
       expect({ route, security: operation.security }).toEqual({ route, security });

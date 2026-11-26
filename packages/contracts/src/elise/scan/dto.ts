@@ -352,6 +352,8 @@ export const RepoOpenSchema = z.object({
 // provider and host, with canonical as the path, are the Repo's
 // identity; host is null for an upload app. Optional so an older
 // engine still parses: a Repo without them is github on github.com.
+// projectId is the Project the Repo is grouped under, null for
+// none; an engine that does not send it means none.
 // -----
 export const SourceProviderSchema = z.enum(SOURCE_PROVIDER_VALUES);
 
@@ -362,6 +364,7 @@ export const RepoSchema = z.object({
   url: z.string(),
   canonical: z.string(),
   isPrivate: z.boolean().nullable().optional(),
+  projectId: z.uuid().nullable().optional(),
   defaultBranch: z.string().nullable(),
   branchNames: z.array(z.string()),
   scans: z.number().int().min(0),

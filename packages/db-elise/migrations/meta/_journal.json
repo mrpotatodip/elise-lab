@@ -736,6 +736,13 @@
       "when": 1795400387772,
       "tag": "0104_grandfather_verified_logins",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1795652637524,
+      "tag": "0105_tenant_projects",
+      "breakpoints": true
     }
   ]
 }

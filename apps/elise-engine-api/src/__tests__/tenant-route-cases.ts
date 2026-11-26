@@ -33,6 +33,8 @@ export const OTHER_SECOND_REPO = "https://github.com/octocat/Spoon-Knife";
 export const OTHER_SIGNAL_ID = "00000000-0000-4000-8000-0000000000d1";
 export const OTHER_GROUP_ID = "00000000-0000-4000-8000-0000000000b5";
 export const OTHER_GROUP_NAME = "Backend";
+export const OTHER_PROJECT_ID = "00000000-0000-4000-8000-0000000000b8";
+export const OTHER_PROJECT_NAME = "Storefront";
 export const OTHER_INVITE_ID = "00000000-0000-4000-8000-0000000000b6";
 export const OTHER_PARTY_ID = "00000000-0000-4000-8000-0000000000b7";
 export const OTHER_RUNNER_ID = "00000000-0000-4000-8000-0000000000c1";
@@ -166,6 +168,11 @@ export const CROSS_ACCOUNT_CASES = {
   "DELETE /groups/:groupId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}`, method: "DELETE", expect: "not-found" },
   "PUT /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "PUT", expect: "not-found" },
   "DELETE /groups/:groupId/members/:partyId": { kind: "run", path: `/groups/${OTHER_GROUP_ID}/members/${OTHER_PARTY_ID}`, method: "DELETE", expect: "not-found" },
+  "GET /projects": { kind: "run", path: "/projects", expect: "empty" },
+  "POST /projects": { kind: "run", path: "/projects", method: "POST", body: { name: OTHER_PROJECT_NAME }, expect: "created" },
+  "PATCH /projects/:projectId": { kind: "run", path: `/projects/${OTHER_PROJECT_ID}`, method: "PATCH", body: { name: "Not mine to rename" }, expect: "not-found" },
+  "DELETE /projects/:projectId": { kind: "run", path: `/projects/${OTHER_PROJECT_ID}`, method: "DELETE", expect: "not-found" },
+  "PUT /repos/:repoId/project": { kind: "run", path: `/repos/${OTHER_REPO_ID}/project`, method: "PUT", body: { projectId: OTHER_PROJECT_ID }, expect: "not-found" },
   "GET /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", expect: "own", own: { source: "platform", lastFour: null } },
   "PUT /usage/anthropic-key": serviceTest("modules/anthropic-key/__tests__/anthropic-key-svc.test.ts"),
   "DELETE /usage/anthropic-key": { kind: "run", path: "/usage/anthropic-key", method: "DELETE", expect: "own", own: { source: "platform", lastFour: null } },

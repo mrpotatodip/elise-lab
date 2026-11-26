@@ -16,6 +16,7 @@ import findingCommentsRoutes from "#/modules/finding-comments";
 import findingsRoutes from "#/modules/findings";
 import groupsRoutes from "#/modules/groups";
 import meRoutes from "#/modules/me";
+import projectsRoutes, { moveRepoProjectAPI } from "#/modules/projects";
 import reposRoutes from "#/modules/repos";
 import runnersRoutes from "#/modules/runners";
 import scansRoutes from "#/modules/scans";
@@ -58,6 +59,7 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
   app.use("/findings/*", requireScanAccess);
   app.use("/files/*", requireScanAccess);
   app.use("/repos/*", requireScanAccess);
+  app.use("/projects/*", requireScanAccess);
   app.use(
     "/auth/sign-in/*",
     rateLimitByIp("SIGN_IN_LIMITER", () => new TooManyRequestsError("Too many sign-in attempts. Wait a minute and try again.", "SIGN_IN_RATE_LIMITED")),
@@ -88,7 +90,7 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     return c.json({ data: null, error: { code: "INTERNAL_ERROR", message: "Internal server error" } }, 500);
   });
 
-  const routes = app.route("/scans", scansRoutes).route("/scans", scanTraceRoutes).route("/auth", authRoutes).route("/sign-up", signUpRoutes).route("/me", meRoutes).route("/usage", usageRoutes).route("/usage/anthropic-key", anthropicKeyRoutes).route("/usage/signals", signalsSettingsAPI).route("/findings/signals", findingSignalsAPI).route("/usage/credit", creditRoutes).route("/usage/plan", planRoutes).route("/findings", findingsRoutes).route("/findings/comments", findingCommentsRoutes).route("/files", filesRoutes).route("/team", teamRoutes).route("/groups", groupsRoutes).route("/repos", reposRoutes).route("/repos", verdictRoutes).route("/repos", archivesRoutes).route("/runners", runnersRoutes).route("/stripe", stripeRoutes);
+  const routes = app.route("/scans", scansRoutes).route("/scans", scanTraceRoutes).route("/auth", authRoutes).route("/sign-up", signUpRoutes).route("/me", meRoutes).route("/usage", usageRoutes).route("/usage/anthropic-key", anthropicKeyRoutes).route("/usage/signals", signalsSettingsAPI).route("/findings/signals", findingSignalsAPI).route("/usage/credit", creditRoutes).route("/usage/plan", planRoutes).route("/findings", findingsRoutes).route("/findings/comments", findingCommentsRoutes).route("/files", filesRoutes).route("/team", teamRoutes).route("/groups", groupsRoutes).route("/projects", projectsRoutes).route("/repos", moveRepoProjectAPI).route("/repos", reposRoutes).route("/repos", verdictRoutes).route("/repos", archivesRoutes).route("/runners", runnersRoutes).route("/stripe", stripeRoutes);
 
   // -----
   // The OpenAPI spec, for developers only.

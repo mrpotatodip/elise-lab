@@ -20,6 +20,7 @@ import {
   tenantCreditLedger,
   tenantGroupMembers,
   tenantGroups,
+  tenantProjects,
   tenantRunners,
   tenants,
   tenantSubscriptions,
@@ -40,6 +41,8 @@ import {
   OTHER_GROUP_NAME,
   OTHER_INVITE_ID,
   OTHER_PARTY_ID,
+  OTHER_PROJECT_ID,
+  OTHER_PROJECT_NAME,
   OTHER_REPO_ID,
   OTHER_RUNNER_ID,
   OTHER_RUNNER_NAME,
@@ -131,6 +134,8 @@ beforeAll(async () => {
   await test.raw.insert(partyRoles).values({ partyId: OTHER_PARTY_ID, tenantId: otherTenantId, roleId: otherRole.id, roleScope: "tenant" });
   await test.raw.insert(tenantGroups).values({ id: OTHER_GROUP_ID, tenantId: otherTenantId, name: OTHER_GROUP_NAME });
   await test.raw.insert(tenantGroupMembers).values({ groupId: OTHER_GROUP_ID, tenantId: otherTenantId, partyId: OTHER_PARTY_ID });
+  await test.raw.insert(tenantProjects).values({ id: OTHER_PROJECT_ID, tenantId: otherTenantId, name: OTHER_PROJECT_NAME });
+  await test.raw.update(scanRepos).set({ projectId: OTHER_PROJECT_ID }).where(eq(scanRepos.id, OTHER_REPO_ID));
   await test.raw.insert(tenantTeamInvites).values({ id: OTHER_INVITE_ID, tenantId: otherTenantId, email: "theirs@example.com", roleId: otherRole.id, tokenHash: "theirs", invitedBy: OTHER_PARTY_ID, expiresAt: new Date("2099-01-01T00:00:00Z") });
   await test.raw.insert(tenantTeamInviteGroups).values({ inviteId: OTHER_INVITE_ID, groupId: OTHER_GROUP_ID, tenantId: otherTenantId });
 });
