@@ -1,3 +1,5 @@
+import { RUNNER_SPEND_LIMIT_MAX_USD } from "@repo/contracts/elise";
+
 // -----
 // Messages. A refused pairing code always reads the
 // same, so a guesser cannot tell a wrong code from an
@@ -32,13 +34,15 @@ export const RUNNER_TOKEN_PREFIX = "elr_";
 // is none.
 // -----
 // -----
-// The cap a scan on a Runner carries. It is a safety net, not a
-// price: the scan runs on the person's own Claude, so the agent's
-// estimate at API prices is only for them to read, and the 40
-// minute timeout in the Runner app is the real stop. The number
-// is far above what that time can reach.
+// The most a scan on a Runner may be given as its limit. It is a
+// ceiling, not a price: the scan runs on the person's own Claude,
+// so the agent's estimate at API prices is only for them to read.
+// The contracts hold the number, so the dashboard's field and the
+// engine's refusal read the same one.
 // -----
-export const RUNNER_MAX_BUDGET_USD = 50;
+export const RUNNER_MAX_BUDGET_USD = RUNNER_SPEND_LIMIT_MAX_USD;
+
+export const RUNNER_AGENTS_AT_ONCE = 6;
 
 export const RUNNER_PROMPT_PLACE = {
   repoDir: "./repo",
@@ -46,12 +50,17 @@ export const RUNNER_PROMPT_PLACE = {
   networkRule: "do not use the network",
   validatedBy: "runner",
   metered: false,
+  agentsAtOnce: RUNNER_AGENTS_AT_ONCE,
 } as const;
 export const RUNNER_JOB_NOT_FOUND = "This scan is not waiting for a report from this runner";
-export const RUNNER_PLAN_HOSTED_MESSAGE = "The Runner plan runs Scans on your own computer only. Connect a Runner on the Runners page, then start the Scan there.";
+export const RUNNER_PLAN_HOSTED_MESSAGE =
+  "The Runner plan runs Scans on your own computer only. Connect a Runner on the Runners page, then start the Scan there.";
 export const RUNNER_JOB_NOT_CONNECTED = "runner_id: this runner is not connected to the account";
-export const RUNNER_JOB_NOT_PICKED_UP = "The runner did not pick up this scan in time. Check that the Runner is running and connected on that computer.";
+export const RUNNER_JOB_NOT_PICKED_UP =
+  "The runner did not pick up this scan in time. Check that the Runner is running and connected on that computer.";
 export const RUNNER_JOB_BAD_OPTIONS = "The scan's settings could not be read, so it was not run. Start a new scan.";
-export const RUNNER_JOB_NO_REPORT ="the audit finished without writing REPORT.md";
-export const RUNNER_JOB_ARCHIVE_REMOVED = "The zip this Scan reads was removed before the Runner could download it, so the Scan did not run. Upload the zip again and start a new Scan.";
-export const RUNNER_ARCHIVE_UNSUPPORTED = "runner_id: this Runner cannot read uploaded zips. Update the Runner on that computer and let it connect, then start the Scan again.";
+export const RUNNER_JOB_NO_REPORT = "the audit finished without writing REPORT.md";
+export const RUNNER_JOB_ARCHIVE_REMOVED =
+  "The zip this Scan reads was removed before the Runner could download it, so the Scan did not run. Upload the zip again and start a new Scan.";
+export const RUNNER_ARCHIVE_UNSUPPORTED =
+  "runner_id: this Runner cannot read uploaded zips. Update the Runner on that computer and let it connect, then start the Scan again.";

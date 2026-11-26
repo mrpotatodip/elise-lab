@@ -13,7 +13,13 @@ const repo = (id: string, canonical: string, isPrivate: boolean | null | undefin
   lastScanId: null,
   lastScanStatus: "succeeded",
   lastScanAt: "2026-11-10T09:00:00.000Z",
-  open: { total: 0, severity: { critical: 0, high: 0, medium: 0, low: 0, informational: 0 }, needsValidation: 0, regressed: 0, unchecked: 0 },
+  open: {
+    total: 0,
+    severity: { critical: 0, high: 0, medium: 0, low: 0, informational: 0 },
+    needsValidation: 0,
+    regressed: 0,
+    unchecked: 0,
+  },
 });
 
 describe("scanRepoChoices", () => {

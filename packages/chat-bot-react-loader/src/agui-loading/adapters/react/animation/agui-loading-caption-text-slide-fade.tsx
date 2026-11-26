@@ -34,10 +34,7 @@ export type AGUILoadingCaptionTextSlideFadeProps = {
 // absolute at once leaves nothing in flow to size the
 // box, clipping it down to one character.
 // -----
-export function AGUILoadingCaptionTextSlideFade({
-  text,
-  direction = "up",
-}: AGUILoadingCaptionTextSlideFadeProps) {
+export function AGUILoadingCaptionTextSlideFade({ text, direction = "up" }: AGUILoadingCaptionTextSlideFadeProps) {
   const offset = SLIDE_OFFSETS[direction];
 
   return (

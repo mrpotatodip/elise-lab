@@ -11,8 +11,24 @@ beforeAll(async () => {
   db = await openTestDb();
   const { partyId } = await seedTenant(db);
   const now = new Date();
-  await db.raw.insert(authUser).values({ id: "u1", partyId, name: "Bo", email: "bo@example.com", emailVerified: true, createdAt: now, updatedAt: now });
-  await db.raw.insert(authAccount).values({ id: "a1", accountId: "u1", providerId: "credential", userId: "u1", password: await hashPassword("old-password-1"), createdAt: now, updatedAt: now });
+  await db.raw.insert(authUser).values({
+    id: "u1",
+    partyId,
+    name: "Bo",
+    email: "bo@example.com",
+    emailVerified: true,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.raw.insert(authAccount).values({
+    id: "a1",
+    accountId: "u1",
+    providerId: "credential",
+    userId: "u1",
+    password: await hashPassword("old-password-1"),
+    createdAt: now,
+    updatedAt: now,
+  });
 });
 
 afterAll(() => db.close());

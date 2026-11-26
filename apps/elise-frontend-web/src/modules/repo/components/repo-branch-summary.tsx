@@ -39,7 +39,9 @@ export function RepoBranchSummary({ open, verdict, scans }: RepoBranchSummaryPro
         <Column label="What is open">
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {open.total}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{open.total === 1 ? "problem" : "problems"}</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              {open.total === 1 ? "problem" : "problems"}
+            </span>
           </p>
           {open.total === 0 ? (
             <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Nothing is open on this branch.</p>
@@ -78,10 +80,14 @@ export function RepoBranchSummary({ open, verdict, scans }: RepoBranchSummaryPro
                   >
                     <span className="grid gap-0.5 text-sm">
                       <ScanTime value={scan.createdAt} />
-                      <span className="text-xs text-muted-foreground">{scan.commitSha ? `Commit ${scan.commitSha.slice(0, 7)}` : "Commit not read"}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {scan.commitSha ? `Commit ${scan.commitSha.slice(0, 7)}` : "Commit not read"}
+                      </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
-                      {scan.summary && scan.summary.total > 0 && <Badge variant="outline">{scan.summary.total} found</Badge>}
+                      {scan.summary && scan.summary.total > 0 && (
+                        <Badge variant="outline">{scan.summary.total} found</Badge>
+                      )}
                       <ScanStatusBadge status={scan.status} />
                     </span>
                   </Link>

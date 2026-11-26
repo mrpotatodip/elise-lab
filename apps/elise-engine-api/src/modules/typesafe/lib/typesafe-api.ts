@@ -13,7 +13,11 @@ export const typesafeGateway = (apiKey: string, fetcher: typeof fetch = fetch): 
       method: "POST",
       signal: AbortSignal.timeout(TYPESAFE_TIMEOUT_MS),
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ model: TYPESAFE_MODEL, state, questions: { [NOUL_QUESTION_ID]: { type: "noul", instructions: question } } }),
+      body: JSON.stringify({
+        model: TYPESAFE_MODEL,
+        state,
+        questions: { [NOUL_QUESTION_ID]: { type: "noul", instructions: question } },
+      }),
     });
     if (!response.ok) throw new Error(`TypeSafe answered ${response.status}`);
     const parsed = NoulResponseSchema.parse(await response.json());

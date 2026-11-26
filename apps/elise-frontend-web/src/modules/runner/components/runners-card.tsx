@@ -34,7 +34,9 @@ const columns = column.columns([
     cell: ({ row }) => (
       <>
         <span className="block font-medium">{row.original.runner.name}</span>
-        <span className="block text-xs text-muted-foreground">{[runnerDetail(row.original.runner), runnerAddedBy(row.original.runner)].filter(Boolean).join(" ")}</span>
+        <span className="block text-xs text-muted-foreground">
+          {[runnerDetail(row.original.runner), runnerAddedBy(row.original.runner)].filter(Boolean).join(" ")}
+        </span>
       </>
     ),
   }),
@@ -47,7 +49,9 @@ const columns = column.columns([
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
     meta: { head: "w-24", cell: "text-right" },
-    cell: ({ row }) => <RunnerRemoveDialog runner={row.original.runner} pending={row.original.busy} onConfirm={row.original.remove} />,
+    cell: ({ row }) => (
+      <RunnerRemoveDialog runner={row.original.runner} pending={row.original.busy} onConfirm={row.original.remove} />
+    ),
   }),
 ]);
 
@@ -77,7 +81,9 @@ export function RunnersCard() {
     <Card>
       <CardHeader>
         <CardTitle>All computers</CardTitle>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one runs scans while its Runner is open. Remove a computer to stop it taking scans.</p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          Each one runs scans while its Runner is open. Remove a computer to stop it taking scans.
+        </p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         {rows.length === 0 ? (
@@ -87,7 +93,9 @@ export function RunnersCard() {
                 <Bot aria-hidden="true" />
               </EmptyMedia>
               <EmptyTitle>No runners yet</EmptyTitle>
-              <EmptyDescription>On a computer with Claude Code signed in, run this and approve it here.</EmptyDescription>
+              <EmptyDescription>
+                On a computer with Claude Code signed in, run this and approve it here.
+              </EmptyDescription>
             </EmptyHeader>
             <EmptyContent className="max-w-md">
               <CopyCommand command={RUNNER_LOGIN_COMMAND} />

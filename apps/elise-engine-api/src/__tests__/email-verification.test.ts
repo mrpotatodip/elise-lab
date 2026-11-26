@@ -25,8 +25,18 @@ const auth = () => buildAuth(authConfig());
 const seedLogin = async (id: string, email: string, emailVerified: boolean) => {
   const { partyId } = await seedTenant(db, `acct-${id}`);
   const now = new Date();
-  await db.raw.insert(authUser).values({ id, partyId, name: "Bo", email, emailVerified, createdAt: now, updatedAt: now });
-  await db.raw.insert(authAccount).values({ id: `a-${id}`, accountId: id, providerId: "credential", userId: id, password: await hashPassword("old-password-1"), createdAt: now, updatedAt: now });
+  await db.raw
+    .insert(authUser)
+    .values({ id, partyId, name: "Bo", email, emailVerified, createdAt: now, updatedAt: now });
+  await db.raw.insert(authAccount).values({
+    id: `a-${id}`,
+    accountId: id,
+    providerId: "credential",
+    userId: id,
+    password: await hashPassword("old-password-1"),
+    createdAt: now,
+    updatedAt: now,
+  });
 };
 
 const verificationToken = async (email: string) => {
@@ -37,7 +47,8 @@ const verificationToken = async (email: string) => {
 };
 
 const verify = (token: string) => auth().api.verifyEmail({ query: { token }, asResponse: true });
-const sessionsOf = async (id: string) => (await db.raw.select().from(authSession).where(eq(authSession.userId, id))).length;
+const sessionsOf = async (id: string) =>
+  (await db.raw.select().from(authSession).where(eq(authSession.userId, id))).length;
 
 beforeAll(async () => {
   db = await openTestDb();
@@ -52,7 +63,9 @@ afterEach(() => vi.useRealTimers());
 
 describe("the sign-in gate", () => {
   it("refuses a Login that is not a Verified Login, with the password right", async () => {
-    await expect(auth().api.signInEmail({ body: { email: "new@example.com", password: "old-password-1" } })).rejects.toMatchObject({ status: "FORBIDDEN" });
+    await expect(
+      auth().api.signInEmail({ body: { email: "new@example.com", password: "old-password-1" } }),
+    ).rejects.toMatchObject({ status: "FORBIDDEN" });
     expect(await sessionsOf("u-unverified")).toBe(0);
   });
 
@@ -68,7 +81,9 @@ describe("the sign-in gate", () => {
     const limited = buildAuth({ ...authConfig(), verificationAddressLimiter: limiter });
 
     for (let attempt = 0; attempt < 4; attempt++) {
-      await expect(limited.api.signInEmail({ body: { email: "New@example.com", password: "old-password-1" } })).rejects.toMatchObject({ status: "FORBIDDEN" });
+      await expect(
+        limited.api.signInEmail({ body: { email: "New@example.com", password: "old-password-1" } }),
+      ).rejects.toMatchObject({ status: "FORBIDDEN" });
     }
 
     expect(queued.filter((mail) => mail.kind === "verify-email")).toHaveLength(2);

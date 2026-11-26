@@ -10,12 +10,22 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.patch("/:groupId", renameGroupDoc, requirePower("company:team:groups:update"), zValidator("header", AccountHeaderSchema), zValidator("param", GroupParamSchema), zValidator("json", RenameGroupBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { groupId } = c.req.valid("param");
-  const { name } = c.req.valid("json");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(renameGroupSvc(db, accountId, userIdOf(c), groupId, name)));
-  return c.json({ data, error: null });
-});
+app.patch(
+  "/:groupId",
+  renameGroupDoc,
+  requirePower("company:team:groups:update"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", GroupParamSchema),
+  zValidator("json", RenameGroupBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { groupId } = c.req.valid("param");
+    const { name } = c.req.valid("json");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(renameGroupSvc(db, accountId, userIdOf(c), groupId, name)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

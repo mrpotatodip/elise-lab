@@ -13,7 +13,8 @@ export function useRefreshOnFinish(status: ScanState) {
   const before = useRef(status);
 
   useEffect(() => {
-    if (isScanActive(before.current) && !isScanActive(status)) void queryClient.invalidateQueries({ queryKey: scanKeys.all });
+    if (isScanActive(before.current) && !isScanActive(status))
+      void queryClient.invalidateQueries({ queryKey: scanKeys.all });
     before.current = status;
   }, [status, queryClient]);
 }

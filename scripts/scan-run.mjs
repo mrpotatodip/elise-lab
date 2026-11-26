@@ -5,7 +5,9 @@ import { callEngine, engineUrl, parseArgs } from "./engine-call.mjs";
 
 const { flags, rest } = parseArgs(process.argv.slice(2));
 if (!rest[0]) {
-  console.error("Usage: pnpm scan:run https://github.com/owner/name [--ref BRANCH] [--model ID] [--effort LEVEL] [--skill lite|full] [--local]");
+  console.error(
+    "Usage: pnpm scan:run https://github.com/owner/name [--ref BRANCH] [--model ID] [--effort LEVEL] [--skill lite|full] [--local]",
+  );
   process.exit(1);
 }
 
@@ -25,11 +27,15 @@ let scan;
 for (;;) {
   scan = await callEngine(flags, "GET", `/scans/${queued.scanId}`);
   if (scan.status === "succeeded" || scan.status === "failed") break;
-  if (Date.now() - started > 15 * 60_000) throw new Error(`Gave up after 15 minutes; ${queued.scanId} is still ${scan.status}.`);
+  if (Date.now() - started > 15 * 60_000)
+    throw new Error(`Gave up after 15 minutes; ${queued.scanId} is still ${scan.status}.`);
   await new Promise((resolve) => setTimeout(resolve, 10_000));
 }
 
-const { findings } = scan.status === "succeeded" ? await callEngine(flags, "GET", `/findings?scanId=${queued.scanId}&limit=100`) : { findings: [] };
+const { findings } =
+  scan.status === "succeeded"
+    ? await callEngine(flags, "GET", `/findings?scanId=${queued.scanId}&limit=100`)
+    : { findings: [] };
 console.log(
   JSON.stringify(
     {
@@ -44,7 +50,11 @@ console.log(
       turns: scan.usage?.turns ?? null,
       seconds: scan.usage?.durationMs ? Math.round(scan.usage.durationMs / 1000) : null,
       recheck: scan.summary?.recheck ?? null,
-      findings: findings.map((finding) => ({ severity: finding.severity, title: finding.title, where: finding.file ? `${finding.file}:${finding.line ?? ""}` : null })),
+      findings: findings.map((finding) => ({
+        severity: finding.severity,
+        title: finding.title,
+        where: finding.file ? `${finding.file}:${finding.line ?? ""}` : null,
+      })),
     },
     null,
     2,

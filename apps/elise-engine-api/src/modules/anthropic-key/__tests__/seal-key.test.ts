@@ -25,7 +25,11 @@ describe("sealKey and openKey", () => {
     expect(await openKey(secret, accountId, sealed)).toBeNull();
   });
 
-  it.each([["no dot", "garbage"], ["damaged data", "AAAA.AAAA"], ["empty", ""]])("does not open %s", async (_name, sealed) => {
+  it.each([
+    ["no dot", "garbage"],
+    ["damaged data", "AAAA.AAAA"],
+    ["empty", ""],
+  ])("does not open %s", async (_name, sealed) => {
     expect(await openKey(SECRET, "acme", sealed)).toBeNull();
   });
 });

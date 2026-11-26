@@ -11,12 +11,27 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.delete("/:runnerId", removeRunnerDoc, requirePower("company:runners:delete"), zValidator("header", AccountHeaderSchema), zValidator("param", RunnerParamSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { runnerId } = c.req.valid("param");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(removeRunnerSvc(db, accountId, runnerId)));
-  await notifyRunnerChange(c, { kind: "runner-removed", power: "company:runners:delete", accountId, runnerId, actorUserId: userIdOf(c) });
-  return c.json({ data, error: null });
-});
+app.delete(
+  "/:runnerId",
+  removeRunnerDoc,
+  requirePower("company:runners:delete"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", RunnerParamSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { runnerId } = c.req.valid("param");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(removeRunnerSvc(db, accountId, runnerId)));
+    await notifyRunnerChange(c, {
+      kind: "runner-removed",
+      power: "company:runners:delete",
+      accountId,
+      runnerId,
+      actorUserId: userIdOf(c),
+    });
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

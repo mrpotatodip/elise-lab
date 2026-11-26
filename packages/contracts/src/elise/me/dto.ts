@@ -21,6 +21,9 @@ export const MeSchema = z.object({
   partyType: z.string(),
   isSuperuser: z.boolean(),
   accounts: z.array(MeAccountSchema),
+  // Optional while an older engine does not send them: whether the login has Two-factor, and whether it must set it up before using the dashboard.
+  twoFactorEnabled: z.boolean().optional(),
+  twoFactorSetupRequired: z.boolean().optional(),
 });
 
 export type MeAccount = z.infer<typeof MeAccountSchema>;

@@ -10,12 +10,16 @@ import { defineConfig, type OxlintOverride } from "oxlint";
 // Restricted imports. A later override replaces the rule for its files, so each
 // override repeats SHARED_IMPORT_RULES.
 // -----
-const FORBID_HONO_RPC = { name: "hono/client", message: "No Hono RPC client: call the backend through a server function (React 3.1)." };
+const FORBID_HONO_RPC = {
+  name: "hono/client",
+  message: "No Hono RPC client: call the backend through a server function (React 3.1).",
+};
 const SHARED_IMPORT_RULES = [
   { group: ["@/*"], message: "Use the `#/` alias (React 1.4)." },
   {
     group: ["#/modules/*/*", "#/modules/*/*/*", "!#/modules/auth/server/session"],
-    message: "Import another module through its root barrel, `#/modules/{module}`. Inside a module, import siblings with a relative path (React 1.3).",
+    message:
+      "Import another module through its root barrel, `#/modules/{module}`. Inside a module, import siblings with a relative path (React 1.3).",
   },
 ];
 
@@ -29,7 +33,8 @@ const SHARED_IMPORT_RULES = [
 // -----
 const FORBID_PROVIDER_IN_CORE = {
   group: ["**/providers/*", "**/providers/*/**", "!**/providers/port", "!**/providers/registry"],
-  message: "Modules read a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
+  message:
+    "Modules read a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
 };
 const CORE_IMPORT_RULES = [...SHARED_IMPORT_RULES, FORBID_PROVIDER_IN_CORE];
 const PROVIDER_IDS = readdirSync(new URL("src/providers", import.meta.url), { withFileTypes: true })
@@ -45,8 +50,16 @@ const providerOverride = (id: string): OxlintOverride => ({
         patterns: [
           ...SHARED_IMPORT_RULES,
           {
-            group: ["../**", "**/providers/*", "**/providers/*/**", "!**/providers/port", `!**/providers/${id}`, `!**/providers/${id}/**`],
-            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
+            group: [
+              "../**",
+              "**/providers/*",
+              "**/providers/*/**",
+              "!**/providers/port",
+              `!**/providers/${id}`,
+              `!**/providers/${id}/**`,
+            ],
+            message:
+              "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
           },
         ],
       },
@@ -57,7 +70,16 @@ const providerOverride = (id: string): OxlintOverride => ({
 const forbidModules = (files: string, modules: readonly string[], message: string): OxlintOverride => ({
   files: [files],
   rules: {
-    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [...CORE_IMPORT_RULES, { group: modules.flatMap((name) => [`#/modules/${name}`, `#/modules/${name}/*`]), message }] }],
+    "no-restricted-imports": [
+      "error",
+      {
+        paths: [FORBID_HONO_RPC],
+        patterns: [
+          ...CORE_IMPORT_RULES,
+          { group: modules.flatMap((name) => [`#/modules/${name}`, `#/modules/${name}/*`]), message },
+        ],
+      },
+    ],
   },
 });
 
@@ -80,20 +102,36 @@ export default defineConfig({
     correctness: "error",
     suspicious: "error",
   },
-  jsPlugins: [
-    { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
-  ],
+  jsPlugins: [{ name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" }],
   overrides: [
-    forbidModules("src/modules/shell/**", ["scan", "repo", "finding", "team", "usage", "summary"], "The shell is the frame every screen sits in, so it cannot import a screen's module. Take what it needs as props."),
-    forbidModules("src/modules/scan/**", ["repo", "finding", "team", "summary"], "The scan module sits below repo and finding. Take their parts as props or slots from the route that composes them."),
-    forbidModules("src/modules/usage/**", ["scan", "repo", "finding", "team", "summary"], "The usage module sits below the screens that show it."),
+    forbidModules(
+      "src/modules/shell/**",
+      ["scan", "repo", "finding", "team", "usage", "summary"],
+      "The shell is the frame every screen sits in, so it cannot import a screen's module. Take what it needs as props.",
+    ),
+    forbidModules(
+      "src/modules/scan/**",
+      ["repo", "finding", "team", "summary"],
+      "The scan module sits below repo and finding. Take their parts as props or slots from the route that composes them.",
+    ),
+    forbidModules(
+      "src/modules/usage/**",
+      ["scan", "repo", "finding", "team", "summary"],
+      "The usage module sits below the screens that show it.",
+    ),
     forbidModules("src/modules/finding/**", ["repo", "summary"], "The finding module sits below repo."),
     {
       files: EFFECT_FILES,
       rules: { "anti-slop/no-use-effect": "off" },
     },
     {
-      files: ["src/modules/*/components/**", "src/modules/*/hooks/**", "src/providers/*/components/**", "src/providers/*/hooks/**", "src/routes/**"],
+      files: [
+        "src/modules/*/components/**",
+        "src/modules/*/hooks/**",
+        "src/providers/*/components/**",
+        "src/providers/*/hooks/**",
+        "src/routes/**",
+      ],
       rules: {
         "anti-slop/no-engine-client-import": "error",
       },
@@ -142,7 +180,10 @@ export default defineConfig({
       // -----
       // These render links inside running prose (a report, a comment), where a link is inline and WCAG 2.5.8 exempts it from the 24px size.
       // -----
-      files: ["src/modules/scan/components/scan-markdown.tsx", "src/modules/finding-comment/components/finding-comment-body.tsx"],
+      files: [
+        "src/modules/scan/components/scan-markdown.tsx",
+        "src/modules/finding-comment/components/finding-comment-body.tsx",
+      ],
       rules: {
         "anti-slop/require-link-target-size": "off",
       },
@@ -163,7 +204,10 @@ export default defineConfig({
       // -----
       files: ["src/components/ui/sonner.tsx"],
       rules: {
-        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [SHARED_IMPORT_RULES[0], FORBID_PROVIDER_IN_CORE] }],
+        "no-restricted-imports": [
+          "error",
+          { paths: [FORBID_HONO_RPC], patterns: [SHARED_IMPORT_RULES[0], FORBID_PROVIDER_IN_CORE] },
+        ],
       },
     },
     ...PROVIDER_IDS.map(providerOverride),
@@ -192,7 +236,13 @@ export default defineConfig({
         "vitest/no-disabled-tests": "error",
         "vitest/no-focused-tests": "error",
         "vitest/no-identical-title": "error",
-        "vitest/no-restricted-matchers": ["error", { toMatchSnapshot: "No snapshot tests (General 2.2).", toMatchInlineSnapshot: "No snapshot tests (General 2.2)." }],
+        "vitest/no-restricted-matchers": [
+          "error",
+          {
+            toMatchSnapshot: "No snapshot tests (General 2.2).",
+            toMatchInlineSnapshot: "No snapshot tests (General 2.2).",
+          },
+        ],
       },
     },
   ],

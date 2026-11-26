@@ -17,7 +17,9 @@ beforeAll(async () => {
   const acme = await seedTenant(test, "acme");
   tenantId = acme.tenantId;
   otherTenantId = (await seedTenant(test, "other")).tenantId;
-  await test.raw.insert(authUser).values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: acme.partyId });
+  await test.raw
+    .insert(authUser)
+    .values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: acme.partyId });
 });
 
 afterAll(async () => {
@@ -48,7 +50,8 @@ describe("settingsChangesEffect", () => {
   });
 
   it("stops at the limit", async () => {
-    for (let i = 0; i < USAGE_SETTINGS_CHANGES_LIMIT + 2; i++) await Effect.runPromise(setMonthlyBudgetEffect(test.pool, tenantId, "ada", i));
+    for (let i = 0; i < USAGE_SETTINGS_CHANGES_LIMIT + 2; i++)
+      await Effect.runPromise(setMonthlyBudgetEffect(test.pool, tenantId, "ada", i));
 
     expect(await changes(tenantId)).toHaveLength(USAGE_SETTINGS_CHANGES_LIMIT);
   });

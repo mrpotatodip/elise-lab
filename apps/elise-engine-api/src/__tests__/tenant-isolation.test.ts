@@ -1,4 +1,12 @@
-import { scanFiles, scanRepoBranches, scanRepos, scans, tenantAnthropicKeys, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
+import {
+  scanFiles,
+  scanRepoBranches,
+  scanRepos,
+  scans,
+  tenantAnthropicKeys,
+  tenantCreditLedger,
+  tenantRunners,
+} from "@repo/db-elise/schema";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -12,7 +20,9 @@ import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__t
 // -----
 type Seed = { tenantId: string; partyId: string; repoId: string };
 
-const CatalogRows = z.array(z.object({ name: z.string(), enabled: z.boolean(), forced: z.boolean(), has_policy: z.boolean() }));
+const CatalogRows = z.array(
+  z.object({ name: z.string(), enabled: z.boolean(), forced: z.boolean(), has_policy: z.boolean() }),
+);
 
 let test: TestDb;
 let acme: Seed;
@@ -47,10 +57,21 @@ const seed = async (slug: string, repoSlug: string): Promise<Seed> => {
   const { tenantId, partyId } = await seedTenant(test, slug);
   const repoId = await seedRepo(test, tenantId, `https://github.com/octocat/${repoSlug}`);
   await test.raw.insert(scans).values(scanValues(tenantId, repoId, `scan-${slug}`, "2026-11-01T00:00:00Z"));
-  await test.raw.insert(scanFiles).values({ tenantId, scanId: `scan-${slug}`, name: "REPORT.md", r2Key: `r2/${slug}/REPORT.md`, sizeBytes: 10, contentType: "text/markdown" });
-  await test.raw.insert(tenantCreditLedger).values({ tenantId, kind: "topup", amountUsd: "10", idempotencyKey: `topup-${slug}` });
+  await test.raw.insert(scanFiles).values({
+    tenantId,
+    scanId: `scan-${slug}`,
+    name: "REPORT.md",
+    r2Key: `r2/${slug}/REPORT.md`,
+    sizeBytes: 10,
+    contentType: "text/markdown",
+  });
+  await test.raw
+    .insert(tenantCreditLedger)
+    .values({ tenantId, kind: "topup", amountUsd: "10", idempotencyKey: `topup-${slug}` });
   await test.raw.insert(tenantRunners).values({ tenantId, name: `runner-${slug}`, createdBy: partyId });
-  await test.raw.insert(tenantAnthropicKeys).values({ tenantId, sealedKey: `sealed-${slug}`, lastFour: "1234", updatedBy: partyId });
+  await test.raw
+    .insert(tenantAnthropicKeys)
+    .values({ tenantId, sealedKey: `sealed-${slug}`, lastFour: "1234", updatedBy: partyId });
   return { tenantId, partyId, repoId };
 };
 
@@ -84,7 +105,10 @@ const readEverything = (tx: Tx) =>
 
 describe("two Accounts reading at the same time", () => {
   it("each sees only its own rows in every table, with no filter in the query", async () => {
-    const [mine, theirs] = await Promise.all([asApp(acme.tenantId, readEverything), asApp(other.tenantId, readEverything)]);
+    const [mine, theirs] = await Promise.all([
+      asApp(acme.tenantId, readEverything),
+      asApp(other.tenantId, readEverything),
+    ]);
     expect(mine.map((rows) => rows.map((row) => row.tenantId))).toEqual(mine.map(() => [acme.tenantId]));
     expect(theirs.map((rows) => rows.map((row) => row.tenantId))).toEqual(theirs.map(() => [other.tenantId]));
   });
@@ -97,11 +121,34 @@ describe("two Accounts reading at the same time", () => {
 
 describe("writing across Accounts", () => {
   it.each([
-    ["a credit entry", (tx: Tx) => tx.insert(tenantCreditLedger).values({ tenantId: other.tenantId, kind: "topup", amountUsd: "999", idempotencyKey: "forged" })],
-    ["a Scan file", (tx: Tx) => tx.insert(scanFiles).values({ tenantId: other.tenantId, scanId: "scan-other", name: "FORGED.md", r2Key: "r2/forged", sizeBytes: 1, contentType: "text/plain" })],
-    ["a Runner", (tx: Tx) => tx.insert(tenantRunners).values({ tenantId: other.tenantId, name: "forged", createdBy: other.partyId })],
+    [
+      "a credit entry",
+      (tx: Tx) =>
+        tx
+          .insert(tenantCreditLedger)
+          .values({ tenantId: other.tenantId, kind: "topup", amountUsd: "999", idempotencyKey: "forged" }),
+    ],
+    [
+      "a Scan file",
+      (tx: Tx) =>
+        tx.insert(scanFiles).values({
+          tenantId: other.tenantId,
+          scanId: "scan-other",
+          name: "FORGED.md",
+          r2Key: "r2/forged",
+          sizeBytes: 1,
+          contentType: "text/plain",
+        }),
+    ],
+    [
+      "a Runner",
+      (tx: Tx) =>
+        tx.insert(tenantRunners).values({ tenantId: other.tenantId, name: "forged", createdBy: other.partyId }),
+    ],
   ])("refuses %s for another Account", async (_name, forge) => {
-    await expect(asApp(acme.tenantId, forge)).rejects.toMatchObject({ cause: { message: expect.stringContaining("row-level security") } });
+    await expect(asApp(acme.tenantId, forge)).rejects.toMatchObject({
+      cause: { message: expect.stringContaining("row-level security") },
+    });
   });
 
   it("cannot change or delete a row of another Account", async () => {
@@ -110,10 +157,23 @@ describe("writing across Accounts", () => {
       await tx.delete(tenantAnthropicKeys);
       await tx.delete(tenantCreditLedger);
     });
-    const [runner] = await test.raw.select({ name: tenantRunners.name }).from(tenantRunners).where(sql`${tenantRunners.tenantId} = ${other.tenantId}`);
-    const keys = await test.raw.select().from(tenantAnthropicKeys).where(sql`${tenantAnthropicKeys.tenantId} = ${other.tenantId}`);
-    const ledger = await test.raw.select().from(tenantCreditLedger).where(sql`${tenantCreditLedger.tenantId} = ${other.tenantId}`);
-    expect({ runner: runner.name, keys: keys.length, ledger: ledger.length }).toEqual({ runner: "runner-other", keys: 1, ledger: 1 });
+    const [runner] = await test.raw
+      .select({ name: tenantRunners.name })
+      .from(tenantRunners)
+      .where(sql`${tenantRunners.tenantId} = ${other.tenantId}`);
+    const keys = await test.raw
+      .select()
+      .from(tenantAnthropicKeys)
+      .where(sql`${tenantAnthropicKeys.tenantId} = ${other.tenantId}`);
+    const ledger = await test.raw
+      .select()
+      .from(tenantCreditLedger)
+      .where(sql`${tenantCreditLedger.tenantId} = ${other.tenantId}`);
+    expect({ runner: runner.name, keys: keys.length, ledger: ledger.length }).toEqual({
+      runner: "runner-other",
+      keys: 1,
+      ledger: 1,
+    });
   });
 });
 

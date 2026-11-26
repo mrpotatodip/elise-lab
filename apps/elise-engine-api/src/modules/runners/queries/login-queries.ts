@@ -16,7 +16,9 @@ export type LoginCollection =
   | { kind: "slow_down"; interval: number }
   | { kind: "collected"; identity: RunnerIdentity };
 
-type LoginAttempt = Exclude<LoginCollection, { kind: "collected" }> | { kind: "collected"; rows: { id: string; name: string; tenantId: string }[] };
+type LoginAttempt =
+  | Exclude<LoginCollection, { kind: "collected" }>
+  | { kind: "collected"; rows: { id: string; name: string; tenantId: string }[] };
 
 export const startLoginEffect = (db: DbConnectType, login: NewRunnerLogin): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
@@ -28,7 +30,11 @@ export const startLoginEffect = (db: DbConnectType, login: NewRunnerLogin): Effe
 // What the approval page shows: only a login that is pending and
 // unexpired, and never a hash or the device code.
 // -----
-export const findPendingLoginEffect = (db: DbConnectType, userCodeHash: string, now: Date): Effect.Effect<PendingRunnerLogin | null, DbError> =>
+export const findPendingLoginEffect = (
+  db: DbConnectType,
+  userCodeHash: string,
+  now: Date,
+): Effect.Effect<PendingRunnerLogin | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [login] = await db
@@ -41,7 +47,13 @@ export const findPendingLoginEffect = (db: DbConnectType, userCodeHash: string, 
           expiresAt: platformRunnerDeviceLogins.expiresAt,
         })
         .from(platformRunnerDeviceLogins)
-        .where(and(eq(platformRunnerDeviceLogins.userCodeHash, userCodeHash), eq(platformRunnerDeviceLogins.state, "pending"), gt(platformRunnerDeviceLogins.expiresAt, now)));
+        .where(
+          and(
+            eq(platformRunnerDeviceLogins.userCodeHash, userCodeHash),
+            eq(platformRunnerDeviceLogins.state, "pending"),
+            gt(platformRunnerDeviceLogins.expiresAt, now),
+          ),
+        );
       return login ? { ...login, expiresAt: login.expiresAt.toISOString() } : null;
     },
     catch: toDbError,
@@ -55,14 +67,23 @@ export const findPendingLoginEffect = (db: DbConnectType, userCodeHash: string, 
 // the caller fails so nothing is kept. It writes one Audit trail
 // entry in that same transaction.
 // -----
-export const approveLoginEffect = (db: AppDbType, approval: RunnerLoginApproval): Effect.Effect<{ runnerId: string } | null, DbError> =>
+export const approveLoginEffect = (
+  db: AppDbType,
+  approval: RunnerLoginApproval,
+): Effect.Effect<{ runnerId: string } | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const createdBy = await actorPartyOf(db, approval.actorUserId);
       if (!createdBy) return null;
       const [login] = await db
         .update(platformRunnerDeviceLogins)
-        .set({ state: "approved", tenantId: approval.tenantId, approvedBy: createdBy, approverIp: approval.approverIp, approvedAt: approval.now })
+        .set({
+          state: "approved",
+          tenantId: approval.tenantId,
+          approvedBy: createdBy,
+          approverIp: approval.approverIp,
+          approvedAt: approval.now,
+        })
         .where(
           and(
             eq(platformRunnerDeviceLogins.userCodeHash, approval.userCodeHash),
@@ -70,14 +91,21 @@ export const approveLoginEffect = (db: AppDbType, approval: RunnerLoginApproval)
             gt(platformRunnerDeviceLogins.expiresAt, approval.now),
           ),
         )
-        .returning({ id: platformRunnerDeviceLogins.id, expiresAt: platformRunnerDeviceLogins.expiresAt, requestIp: platformRunnerDeviceLogins.requestIp });
+        .returning({
+          id: platformRunnerDeviceLogins.id,
+          expiresAt: platformRunnerDeviceLogins.expiresAt,
+          requestIp: platformRunnerDeviceLogins.requestIp,
+        });
       if (!login) return null;
       const [runner] = await db
         .insert(tenantRunners)
         .values({ tenantId: approval.tenantId, name: approval.name, pairingExpiresAt: login.expiresAt, createdBy })
         .returning({ id: tenantRunners.id });
       if (!runner) return null;
-      await db.update(platformRunnerDeviceLogins).set({ runnerId: runner.id }).where(eq(platformRunnerDeviceLogins.id, login.id));
+      await db
+        .update(platformRunnerDeviceLogins)
+        .set({ runnerId: runner.id })
+        .where(eq(platformRunnerDeviceLogins.id, login.id));
       await insertAuditEntry(db, {
         actorPartyId: createdBy,
         action: "runner.login.approve",
@@ -100,7 +128,12 @@ export const approveLoginEffect = (db: AppDbType, approval: RunnerLoginApproval)
 // After approval the token hash is set by one UPDATE that needs no
 // token yet, so two checks cannot both collect; the loser is missing.
 // -----
-export const collectLoginEffect = (db: DbConnectType, deviceCodeHash: string, tokenHash: string, now: Date): Effect.Effect<LoginCollection, DbError> =>
+export const collectLoginEffect = (
+  db: DbConnectType,
+  deviceCodeHash: string,
+  tokenHash: string,
+  now: Date,
+): Effect.Effect<LoginCollection, DbError> =>
   Effect.tryPromise({
     try: async (): Promise<LoginAttempt> => {
       const [login] = await db
@@ -117,14 +150,23 @@ export const collectLoginEffect = (db: DbConnectType, deviceCodeHash: string, to
       if (!login || login.state === "collected") return { kind: "missing" };
       if (login.expiresAt <= now) {
         if (login.runnerId) {
-          await db.update(platformRunnerDeviceLogins).set({ runnerId: null }).where(eq(platformRunnerDeviceLogins.id, login.id));
-          await db.delete(tenantRunners).where(and(eq(tenantRunners.id, login.runnerId), isNull(tenantRunners.tokenHash)));
+          await db
+            .update(platformRunnerDeviceLogins)
+            .set({ runnerId: null })
+            .where(eq(platformRunnerDeviceLogins.id, login.id));
+          await db
+            .delete(tenantRunners)
+            .where(and(eq(tenantRunners.id, login.runnerId), isNull(tenantRunners.tokenHash)));
         }
         return { kind: "expired" };
       }
-      const tooEarly = login.lastCheckedAt !== null && now.getTime() - login.lastCheckedAt.getTime() < login.interval * 1000;
+      const tooEarly =
+        login.lastCheckedAt !== null && now.getTime() - login.lastCheckedAt.getTime() < login.interval * 1000;
       const interval = tooEarly ? login.interval + RUNNER_LOGIN_SLOW_DOWN_STEP_S : login.interval;
-      await db.update(platformRunnerDeviceLogins).set({ lastCheckedAt: now, checkIntervalSeconds: interval }).where(eq(platformRunnerDeviceLogins.id, login.id));
+      await db
+        .update(platformRunnerDeviceLogins)
+        .set({ lastCheckedAt: now, checkIntervalSeconds: interval })
+        .where(eq(platformRunnerDeviceLogins.id, login.id));
       if (tooEarly) return { kind: "slow_down", interval };
       if (login.state === "pending") return { kind: "pending" };
       if (login.state === "denied") return { kind: "denied" };
@@ -132,17 +174,24 @@ export const collectLoginEffect = (db: DbConnectType, deviceCodeHash: string, to
       const rows = await db
         .update(tenantRunners)
         .set({ tokenHash, pairingExpiresAt: null, pairedAt: now, lastSeenAt: now })
-        .where(and(eq(tenantRunners.id, login.runnerId), isNull(tenantRunners.tokenHash), isNull(tenantRunners.revokedAt)))
+        .where(
+          and(eq(tenantRunners.id, login.runnerId), isNull(tenantRunners.tokenHash), isNull(tenantRunners.revokedAt)),
+        )
         .returning({ id: tenantRunners.id, name: tenantRunners.name, tenantId: tenantRunners.tenantId });
       if (rows.length === 0) return { kind: "missing" };
-      await db.update(platformRunnerDeviceLogins).set({ state: "collected", collectedAt: now }).where(eq(platformRunnerDeviceLogins.id, login.id));
+      await db
+        .update(platformRunnerDeviceLogins)
+        .set({ state: "collected", collectedAt: now })
+        .where(eq(platformRunnerDeviceLogins.id, login.id));
       return { kind: "collected", rows };
     },
     catch: toDbError,
   }).pipe(
     Effect.flatMap((attempt): Effect.Effect<LoginCollection, DbError> => {
       if (attempt.kind !== "collected") return Effect.succeed(attempt);
-      return identityOrNull(db, attempt.rows).pipe(Effect.map((identity): LoginCollection => (identity ? { kind: "collected", identity } : { kind: "missing" })));
+      return identityOrNull(db, attempt.rows).pipe(
+        Effect.map((identity): LoginCollection => (identity ? { kind: "collected", identity } : { kind: "missing" })),
+      );
     }),
   );
 
@@ -153,7 +202,10 @@ export const collectLoginEffect = (db: DbConnectType, deviceCodeHash: string, to
 // the caller fails. It writes one Audit trail entry there, with the
 // same fields as the approval and the login as its subject.
 // -----
-export const denyLoginEffect = (db: AppDbType, denial: RunnerLoginDenial): Effect.Effect<{ loginId: string } | null, DbError> =>
+export const denyLoginEffect = (
+  db: AppDbType,
+  denial: RunnerLoginDenial,
+): Effect.Effect<{ loginId: string } | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const deniedBy = await actorPartyOf(db, denial.actorUserId);
@@ -168,7 +220,11 @@ export const denyLoginEffect = (db: AppDbType, denial: RunnerLoginDenial): Effec
             gt(platformRunnerDeviceLogins.expiresAt, denial.now),
           ),
         )
-        .returning({ id: platformRunnerDeviceLogins.id, suggestedName: platformRunnerDeviceLogins.suggestedName, requestIp: platformRunnerDeviceLogins.requestIp });
+        .returning({
+          id: platformRunnerDeviceLogins.id,
+          suggestedName: platformRunnerDeviceLogins.suggestedName,
+          requestIp: platformRunnerDeviceLogins.requestIp,
+        });
       if (!login) return null;
       await insertAuditEntry(db, {
         actorPartyId: deniedBy,
@@ -197,8 +253,15 @@ export const deleteExpiredLoginsEffect = (db: DbConnectType, now: Date, limit: n
         .where(and(lte(platformRunnerDeviceLogins.expiresAt, now), eq(platformRunnerDeviceLogins.state, "approved")))
         .limit(limit);
       const runnerIds = uncollected.flatMap((row) => (row.runnerId ? [row.runnerId] : []));
-      if (runnerIds.length > 0) await db.delete(tenantRunners).where(and(inArray(tenantRunners.id, runnerIds), isNull(tenantRunners.tokenHash)));
-      const expired = await db.select({ id: platformRunnerDeviceLogins.id }).from(platformRunnerDeviceLogins).where(lte(platformRunnerDeviceLogins.expiresAt, now)).limit(limit);
+      if (runnerIds.length > 0)
+        await db
+          .delete(tenantRunners)
+          .where(and(inArray(tenantRunners.id, runnerIds), isNull(tenantRunners.tokenHash)));
+      const expired = await db
+        .select({ id: platformRunnerDeviceLogins.id })
+        .from(platformRunnerDeviceLogins)
+        .where(lte(platformRunnerDeviceLogins.expiresAt, now))
+        .limit(limit);
       if (expired.length > 0)
         await db.delete(platformRunnerDeviceLogins).where(
           inArray(

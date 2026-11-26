@@ -43,9 +43,7 @@ describe("pgChatBotDurableStreamStore", () => {
   });
 
   it("numbers later appends from memory with one insert each", async () => {
-    const store = pgChatBotDurableStreamStore(
-      stubDb([], [{ seq: 4 }], [], [], new Error("re-read the max seq")),
-    );
+    const store = pgChatBotDurableStreamStore(stubDb([], [{ seq: 4 }], [], [], new Error("re-read the max seq")));
 
     await store.append(key, [chunk, chunk]);
 
@@ -100,9 +98,7 @@ describe("pgChatBotDurableStreamStore", () => {
   it("returns at once when already aborted", async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(
-      pgChatBotDurableStreamStore(stubDb()).waitForChange(key, controller.signal),
-    ).resolves.toBeUndefined();
+    await expect(pgChatBotDurableStreamStore(stubDb()).waitForChange(key, controller.signal)).resolves.toBeUndefined();
   });
 });
 
@@ -125,8 +121,6 @@ describe("pgChatBotDurableStream", () => {
   });
 
   it("refuses a request that names no run", () => {
-    expect(() =>
-      pgChatBotDurableStream(new Request("https://chat.local/"), { db: stubDb() }),
-    ).toThrow("needs a runId");
+    expect(() => pgChatBotDurableStream(new Request("https://chat.local/"), { db: stubDb() })).toThrow("needs a runId");
   });
 });

@@ -7,6 +7,7 @@ import { useNow } from "#/lib/use-now";
 import { SCAN_PROFILE_OPTIONS } from "../constants";
 import type { ScanStatus } from "../schemas";
 import { scanArchiveNote, scanDuration } from "../utils";
+import { ScanChain } from "./scan-chain";
 import { ScanStatusBadge } from "./scan-status-badge";
 import { ScanTime } from "./scan-time";
 
@@ -47,7 +48,12 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
     return (
       <div className="flex min-w-0 items-center gap-2">
         {scan.branchId ? (
-          <Link to="/repos/$repoId/branches/$branchId" params={{ repoId: scan.repoId, branchId: scan.branchId }} className={CHIP_LINK} title="Open this app's history">
+          <Link
+            to="/repos/$repoId/branches/$branchId"
+            params={{ repoId: scan.repoId, branchId: scan.branchId }}
+            className={CHIP_LINK}
+            title="Open this app's history"
+          >
             {chip}
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
             <span className="sr-only">, open this app's history</span>
@@ -64,7 +70,10 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
   if (!label) {
     return (
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-        <span className={CHIP} title="A one-off scan of this commit. Its findings count toward the commit's answer but are not added to a branch's findings.">
+        <span
+          className={CHIP}
+          title="A one-off scan of this commit. Its findings count toward the commit's answer but are not added to a branch's findings."
+        >
           <GitBranch aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
           One-off scan
         </span>
@@ -88,7 +97,12 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       {scan.branchId ? (
-        <Link to="/repos/$repoId/branches/$branchId" params={{ repoId: scan.repoId, branchId: scan.branchId }} className={CHIP_LINK} title="Open this branch's history">
+        <Link
+          to="/repos/$repoId/branches/$branchId"
+          params={{ repoId: scan.repoId, branchId: scan.branchId }}
+          className={CHIP_LINK}
+          title="Open this branch's history"
+        >
           {chip}
           <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
           <span className="sr-only">, open this branch's history</span>
@@ -97,7 +111,17 @@ function ScanBranchRow({ scan }: { scan: ScanStatus }) {
         <span className={CHIP}>{chip}</span>
       )}
       <Tooltip>
-        <TooltipTrigger render={<a href={`${githubUrl(scan.repo)}/tree/${encodeURI(label)}`} target="_blank" rel="noreferrer" aria-label={`Open this branch on ${repoSiteName(scan.repo)}`} className={ICON_LINK} />}>
+        <TooltipTrigger
+          render={
+            <a
+              href={`${githubUrl(scan.repo)}/tree/${encodeURI(label)}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open this branch on ${repoSiteName(scan.repo)}`}
+              className={ICON_LINK}
+            />
+          }
+        >
           <ExternalLink aria-hidden="true" className="size-4" />
         </TooltipTrigger>
         <TooltipContent>Open this branch on {repoSiteName(scan.repo)}</TooltipContent>
@@ -122,7 +146,8 @@ function ScanStatusLine({ scan }: { scan: ScanStatus }) {
   const wallClockMs = scan.finishedAt ? Date.parse(scan.finishedAt) - Date.parse(scan.createdAt) : null;
   const duration = scanDuration(scan.usage?.durationMs ?? wallClockMs);
   const commit = scan.commitSha?.slice(0, 7);
-  const coverage = scan.skill === "full" ? SCAN_PROFILE_OPTIONS.find((option) => option.value === scan.profile)?.label : undefined;
+  const coverage =
+    scan.skill === "full" ? SCAN_PROFILE_OPTIONS.find((option) => option.value === scan.profile)?.label : undefined;
 
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-relaxed text-muted-foreground">
@@ -176,6 +201,7 @@ export function ScanHeaderMeta({ scan }: { scan: ScanStatus }) {
     <div className="grid gap-3">
       <ScanBranchRow scan={scan} />
       <ScanStatusLine scan={scan} />
+      <ScanChain scan={scan} />
     </div>
   );
 }

@@ -11,7 +11,8 @@ type StoredFile = NewScanFile & { accountId: string; scanId: string };
 // window, as the Neon repo judges it.
 // -----
 const isLive = (row: ScanStatus, nowMs: number) =>
-  (row.status === "queued" || row.status === "running") && Date.parse(row.updatedAt) >= nowMs - activeWindowMsOf(row.skill);
+  (row.status === "queued" || row.status === "running") &&
+  Date.parse(row.updatedAt) >= nowMs - activeWindowMsOf(row.skill);
 
 // -----
 // A faithful in-memory ScanRepo: same rules as the Neon
@@ -40,10 +41,15 @@ export function memoryScanRepo() {
       Effect.sync(() => {
         const identity = repoIdentityOf(url, provider);
         const key = `${accountId}/${identity.provider}/${identity.host ?? ""}/${identity.canonical}`;
-        const found = repos.get(key) ?? { id: crypto.randomUUID(), canonical: identity.canonical, url: displayRepoUrlOf(url, provider) };
+        const found = repos.get(key) ?? {
+          id: crypto.randomUUID(),
+          canonical: identity.canonical,
+          url: displayRepoUrlOf(url, provider),
+        };
         repos.set(key, found);
         return found;
       }),
+    restoreRepo: () => Effect.void,
     create: (params, repoId, nowMs) =>
       Effect.suspend(() => {
         const live = [...rows.values()].find((row) => row.repoId === repoId && isLive(row, nowMs));
@@ -56,6 +62,7 @@ export function memoryScanRepo() {
           repo: params.repo,
           repoId,
           ref: params.ref ?? null,
+          resumesScanId: params.resumesScanId ?? null,
           branch: null,
           branchId: null,
           untrackedReason: null,
@@ -86,6 +93,7 @@ export function memoryScanRepo() {
           ...(patch.error !== undefined && { error: patch.error }),
           ...(patch.commitSha !== undefined && { commitSha: patch.commitSha }),
           ...(patch.branch !== undefined && { branch: patch.branch }),
+          ...(patch.resumesScanId === null && { resumesScanId: null }),
           ...(patch.usage && { usage: patch.usage }),
           ...(ended && { finishedAt: now, step: null }),
           updatedAt: now,
@@ -138,6 +146,7 @@ export function memoryScanRepo() {
 // -----
 export const brokenScanRepo: ScanRepo = {
   ensureRepo: () => Effect.fail(new DbError({ cause: new Error("db down") })),
+  restoreRepo: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   create: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   mark: () => Effect.fail(new DbError({ cause: new Error("db down") })),
   addFiles: () => Effect.fail(new DbError({ cause: new Error("db down") })),

@@ -34,9 +34,9 @@ describe("createChatBotDurableStream", () => {
   it("returns the request's offset from resumeFrom, or null for a producer", () => {
     const store = memoryChatBotDurableStreamStore();
     expect(createChatBotDurableStream(store, { runId: "run-1" }).resumeFrom()).toBeNull();
-    expect(
-      createChatBotDurableStream(store, { runId: "run-1", offset: "pg:v1:run-1:2" }).resumeFrom(),
-    ).toBe("pg:v1:run-1:2");
+    expect(createChatBotDurableStream(store, { runId: "run-1", offset: "pg:v1:run-1:2" }).resumeFrom()).toBe(
+      "pg:v1:run-1:2",
+    );
   });
 
   it("replays from offset=-1 until the producer closes", async () => {
@@ -79,9 +79,7 @@ describe("createChatBotDurableStream", () => {
 
     const reading = consumer.read(encodeChatBotDurableStreamOffset("victim-run", 1));
 
-    await expect(reading[Symbol.asyncIterator]().next()).rejects.toThrow(
-      "offset belongs to another run",
-    );
+    await expect(reading[Symbol.asyncIterator]().next()).rejects.toThrow("offset belongs to another run");
   });
 
   describe("pruning on close", () => {

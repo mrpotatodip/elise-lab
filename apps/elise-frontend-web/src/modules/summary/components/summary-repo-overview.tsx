@@ -37,7 +37,9 @@ export function SummaryRepoOverview({ repo }: { repo: Repo }) {
         <Column label="What is open">
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {totals.total}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{totals.total === 1 ? "problem" : "problems"}</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              {totals.total === 1 ? "problem" : "problems"}
+            </span>
           </p>
           {totals.total === 0 ? (
             <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{SUMMARY_COPY.nothingOpen}</p>
@@ -52,7 +54,10 @@ export function SummaryRepoOverview({ repo }: { repo: Repo }) {
                   </span>
                 )}
               </div>
-              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Medium and Low say how serious a problem is. A problem with no rating still needs a person to look at it.</p>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                Medium and Low say how serious a problem is. A problem with no rating still needs a person to look at
+                it.
+              </p>
             </>
           )}
         </Column>

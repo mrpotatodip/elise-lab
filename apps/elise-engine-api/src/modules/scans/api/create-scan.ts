@@ -9,11 +9,19 @@ import { AccountHeaderSchema, CreateScanBodySchema } from "#/modules/scans/schem
 
 const app = new Hono<AppEnv>();
 
-app.post("/", createScanDoc, zValidator("header", AccountHeaderSchema), zValidator("json", CreateScanBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const body = c.req.valid("json");
-  const data = await runEffect(submitScanSvc(c.env, tenantEffectOf(c, accountId), c.get("deps"), accountId, body));
-  return c.json({ data, error: null }, 201);
-});
+app.post(
+  "/",
+  createScanDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", CreateScanBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const body = c.req.valid("json");
+    const data = await runEffect(
+      submitScanSvc(c.env, tenantEffectOf(c, accountId), c.get("deps"), accountId, body, c.get("userId")),
+    );
+    return c.json({ data, error: null }, 201);
+  },
+);
 
 export default app;

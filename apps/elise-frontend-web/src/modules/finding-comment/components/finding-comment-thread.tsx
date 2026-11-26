@@ -61,7 +61,13 @@ function EditableComment({ event, canEdit, canDelete, editPending, onEdit, onDel
     ) : undefined;
   const editor =
     editing && event.body !== null ? (
-      <FindingCommentEditForm commentId={event.id} initialBody={event.body} pending={editPending} onSave={(body) => onEdit(event.id, body)} onCancel={stopEditing} />
+      <FindingCommentEditForm
+        commentId={event.id}
+        initialBody={event.body}
+        pending={editPending}
+        onSave={(body) => onEdit(event.id, body)}
+        onCancel={stopEditing}
+      />
     ) : undefined;
   return <FindingCommentItem comment={event} markers={markers} actions={actions} editor={editor} />;
 }
@@ -74,13 +80,27 @@ type ThreadEventProps = Omit<EditableCommentProps, "event" | "canEdit" | "canDel
   editingCommentId: string | null;
 };
 
-function ThreadEvent({ event, viewerPartyId, canWrite, canDelete, editingCommentId, onEdit, onDelete }: ThreadEventProps) {
+function ThreadEvent({
+  event,
+  viewerPartyId,
+  canWrite,
+  canDelete,
+  editingCommentId,
+  onEdit,
+  onDelete,
+}: ThreadEventProps) {
   switch (event.kind) {
     case "comment":
       return (
         <EditableComment
           event={event}
-          canEdit={canWrite && viewerPartyId !== null && event.authorPartyId === viewerPartyId && event.deletedAt === null && !isPendingComment(event.id)}
+          canEdit={
+            canWrite &&
+            viewerPartyId !== null &&
+            event.authorPartyId === viewerPartyId &&
+            event.deletedAt === null &&
+            !isPendingComment(event.id)
+          }
           canDelete={event.body !== null && !isPendingComment(event.id) && canDelete(event)}
           editPending={editingCommentId === event.id}
           onEdit={onEdit}
@@ -102,8 +122,16 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
   const canComment = hasAccessPower(user?.powers ?? [], "company:findings:comments:create");
   const canDeleteAny = hasAccessPower(user?.powers ?? [], "company:findings:comments:delete");
   const thread = useFindingThread(repo, fingerprint);
-  const { create, edit, remove } = useFindingCommentActions({ repo, fingerprint, viewer: { partyId: user?.partyId ?? null, name: user?.name ?? null } });
-  const editComment = (commentId: string, body: string) => edit.mutateAsync({ commentId, body }).then(() => true, () => false);
+  const { create, edit, remove } = useFindingCommentActions({
+    repo,
+    fingerprint,
+    viewer: { partyId: user?.partyId ?? null, name: user?.name ?? null },
+  });
+  const editComment = (commentId: string, body: string) =>
+    edit.mutateAsync({ commentId, body }).then(
+      () => true,
+      () => false,
+    );
 
   return (
     <section aria-label="Comments" className="grid gap-4">
@@ -124,7 +152,10 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
                 event={event}
                 viewerPartyId={user?.partyId ?? null}
                 canWrite={canComment}
-                canDelete={(comment) => canDeleteAny || (canComment && comment.authorPartyId !== null && comment.authorPartyId === user?.partyId)}
+                canDelete={(comment) =>
+                  canDeleteAny ||
+                  (canComment && comment.authorPartyId !== null && comment.authorPartyId === user?.partyId)
+                }
                 editingCommentId={edit.isPending ? edit.variables.commentId : null}
                 onEdit={editComment}
                 onDelete={(commentId) => remove.mutate(commentId)}
@@ -132,9 +163,18 @@ export function FindingCommentThread({ repo, fingerprint }: FindingCommentThread
             ))}
           </ol>
         ))}
-      {thread.data && thread.data.events.length > 0 && !hasLiveComment(thread.data.events) && <p className="text-sm text-muted-foreground">There are no comments right now.</p>}
+      {thread.data && thread.data.events.length > 0 && !hasLiveComment(thread.data.events) && (
+        <p className="text-sm text-muted-foreground">There are no comments right now.</p>
+      )}
       {canComment ? (
-        <FindingCommentComposer onPost={(body) => create.mutateAsync(body).then(() => true, () => false)} />
+        <FindingCommentComposer
+          onPost={(body) =>
+            create.mutateAsync(body).then(
+              () => true,
+              () => false,
+            )
+          }
+        />
       ) : (
         <p className="text-sm text-muted-foreground">Your role can read this discussion but not write in it.</p>
       )}

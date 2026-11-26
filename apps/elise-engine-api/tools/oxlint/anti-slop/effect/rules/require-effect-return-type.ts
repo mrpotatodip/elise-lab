@@ -23,7 +23,8 @@ export const requireEffectReturnTypeRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "Require exported functions in handlers and queries to declare an `Effect.Effect<A, E>` return type.",
+      description:
+        "Require exported functions in handlers and queries to declare an `Effect.Effect<A, E>` return type.",
     },
     messages: {
       missingEffectType:

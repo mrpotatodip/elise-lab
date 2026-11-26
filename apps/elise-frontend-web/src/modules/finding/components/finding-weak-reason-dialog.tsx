@@ -1,5 +1,12 @@
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "#/components/ui/dialog";
 
 type FindingWeakReasonDialogProps = {
   open: boolean;
@@ -15,7 +22,9 @@ export function FindingWeakReasonDialog({ open, onOpenChange, pending, onSaveAny
         <DialogHeader>
           <DialogTitle>This reason may be too thin</DialogTitle>
           <DialogDescription>
-            A Signal from TypeSafe suggests the note does not say why the risk is acceptable for this finding. It is only a hint. You can edit the reason or save it as it is, and the Audit trail will record that you saw the warning.
+            A Signal from TypeSafe suggests the note does not say why the risk is acceptable for this finding. It is
+            only a hint. You can edit the reason or save it as it is, and the Audit trail will record that you saw the
+            warning.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

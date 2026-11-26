@@ -41,7 +41,11 @@ function RepoBody({ repo, showOwner }: { repo: ShellRepo; showOwner: boolean }) 
       )}
       {running && (
         <>
-          <LoaderCircle aria-hidden="true" className="size-3.5 shrink-0 animate-spin text-status-info" strokeWidth={1.5} />
+          <LoaderCircle
+            aria-hidden="true"
+            className="size-3.5 shrink-0 animate-spin text-status-info"
+            strokeWidth={1.5}
+          />
           <span className="sr-only">A scan is running</span>
         </>
       )}
@@ -90,7 +94,15 @@ const branchLabel = (name: string, branches: readonly SidebarBranch[]) => {
 // tree: the default first, then the latest scanned, five at a time. The branch
 // being read is always in the list, whatever its rank.
 // -----
-function RepoBranches({ repoId, branches, currentId }: { repoId: string; branches: readonly SidebarBranch[]; currentId: string | undefined }) {
+function RepoBranches({
+  repoId,
+  branches,
+  currentId,
+}: {
+  repoId: string;
+  branches: readonly SidebarBranch[];
+  currentId: string | undefined;
+}) {
   const [expanded, setExpanded] = useState(false);
   const shown = visibleBranches(branches, currentId, expanded);
   const hidden = branches.length - shown.length;
@@ -99,14 +111,23 @@ function RepoBranches({ repoId, branches, currentId }: { repoId: string; branche
     <ul aria-label="Branches" className="mb-2 ml-3 mt-1 grid">
       {shown.map((branch, index) => (
         <li key={branch.id} className={cn(BRANCH_ITEM, index < shown.length - 1 && BRANCH_ITEM_LINE)}>
-          <Link to="/repos/$repoId/branches/$branchId" params={{ repoId, branchId: branch.id }} className={BRANCH_LINK} activeProps={ACTIVE}>
+          <Link
+            to="/repos/$repoId/branches/$branchId"
+            params={{ repoId, branchId: branch.id }}
+            className={BRANCH_LINK}
+            activeProps={ACTIVE}
+          >
             <GitBranch aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.5} />
             <span className="min-w-0 flex-1 truncate" title={branch.name}>
               {branchLabel(branch.name, branches)}
             </span>
             {(branch.status === "running" || branch.status === "queued") && (
               <>
-                <LoaderCircle aria-hidden="true" className="size-3.5 shrink-0 animate-spin text-status-info" strokeWidth={1.5} />
+                <LoaderCircle
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 animate-spin text-status-info"
+                  strokeWidth={1.5}
+                />
                 <span className="sr-only">A scan is running</span>
               </>
             )}
@@ -127,7 +148,12 @@ function RepoBranches({ repoId, branches, currentId }: { repoId: string; branche
       ))}
       {(hidden > 0 || expanded) && branches.length > VISIBLE_BRANCHES && (
         <li className="min-w-0 pl-5">
-          <button type="button" aria-expanded={expanded} onClick={() => setExpanded((open) => !open)} className={cn(BRANCH_LINK, "w-full")}>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((open) => !open)}
+            className={cn(BRANCH_LINK, "w-full")}
+          >
             {expanded ? "Show fewer" : `Show ${hidden} more`}
           </button>
         </li>
@@ -137,7 +163,9 @@ function RepoBranches({ repoId, branches, currentId }: { repoId: string; branche
 }
 
 export function ShellRepoTree({ repos }: ShellRepoTreeProps) {
-  const sharedNames = new Set(repos.map((repo) => repo.name).filter((name, index, names) => names.indexOf(name) !== index));
+  const sharedNames = new Set(
+    repos.map((repo) => repo.name).filter((name, index, names) => names.indexOf(name) !== index),
+  );
   const names = useRouteNames();
 
   return (
@@ -146,7 +174,12 @@ export function ShellRepoTree({ repos }: ShellRepoTreeProps) {
         const active = names?.repoId === repo.id && names.branches && names.branches.length > 0 ? names.branches : null;
         return (
           <li key={repo.id} className={cn(ITEM, index < repos.length - 1 && ITEM_LINE)}>
-            <Link to="/repos/$repoId" params={{ repoId: repo.id }} className={LINK} activeProps={active ? { className: "text-foreground" } : ACTIVE}>
+            <Link
+              to="/repos/$repoId"
+              params={{ repoId: repo.id }}
+              className={LINK}
+              activeProps={active ? { className: "text-foreground" } : ACTIVE}
+            >
               <RepoBody repo={repo} showOwner={sharedNames.has(repo.name)} />
             </Link>
             {active && <RepoBranches repoId={repo.id} branches={active} currentId={names?.branchId} />}

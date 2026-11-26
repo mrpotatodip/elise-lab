@@ -29,7 +29,8 @@ export const stopScanSvc = (
     const plan = yield* planOfEffect(db, accountId);
     if (plan) {
       const settlement = settlementOf({ status: "failed", costUsd: usage?.costUsd ?? null, markup: plan.creditMarkup });
-      if (settlement.ok) yield* settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: settlement.chargeUsd });
+      if (settlement.ok)
+        yield* settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: settlement.chargeUsd });
     }
     return (yield* scanReads(db).get(accountId, scanId)) ?? stopped;
   });

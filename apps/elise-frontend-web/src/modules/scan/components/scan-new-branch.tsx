@@ -25,7 +25,13 @@ export function useScanBranches(pick: ScanRepoPick | null): ScanBranches {
 
   if (fromEngine) {
     const defaultBranch = engine.data?.defaultBranch ?? null;
-    return { kind: "engine", isPending: engine.isPending, isError: engine.isError, defaultBranch, names: (engine.data?.branches ?? []).map((branch) => branch.name).filter((name) => name !== defaultBranch) };
+    return {
+      kind: "engine",
+      isPending: engine.isPending,
+      isError: engine.isError,
+      defaultBranch,
+      names: (engine.data?.branches ?? []).map((branch) => branch.name).filter((name) => name !== defaultBranch),
+    };
   }
   return { kind: "typed", isPending: false, isError: false, defaultBranch: null, names: [] };
 }
@@ -41,7 +47,11 @@ export function ScanNewBranch({ branches, branchPick, onBranchPick }: ScanNewBra
   if (branches.isPending) return <Skeleton className="h-[3.4rem] w-full" />;
 
   const defaultLabel = branches.defaultBranch === null ? "Default branch" : `${branches.defaultBranch} (default)`;
-  const items = [{ value: SCAN_DEFAULT_BRANCH, label: defaultLabel }, ...branches.names.map((name) => ({ value: name, label: name })), { value: SCAN_OTHER_BRANCH, label: "Other…" }];
+  const items = [
+    { value: SCAN_DEFAULT_BRANCH, label: defaultLabel },
+    ...branches.names.map((name) => ({ value: name, label: name })),
+    { value: SCAN_OTHER_BRANCH, label: "Other…" },
+  ];
 
   return (
     <div className="grid gap-1.5">
@@ -49,7 +59,11 @@ export function ScanNewBranch({ branches, branchPick, onBranchPick }: ScanNewBra
         Branch
       </Label>
       <Select value={branchPick} items={items} onValueChange={(next) => next !== null && onBranchPick(next)}>
-        <SelectTrigger id="scan-branch" title={items.find((item) => item.value === branchPick)?.label} className="h-9 w-full min-w-0 font-mono text-[13px] [&>[data-slot=select-icon]]:shrink-0">
+        <SelectTrigger
+          id="scan-branch"
+          title={items.find((item) => item.value === branchPick)?.label}
+          className="h-9 w-full min-w-0 font-mono text-[13px] [&>[data-slot=select-icon]]:shrink-0"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

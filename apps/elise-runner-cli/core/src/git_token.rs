@@ -1,27 +1,21 @@
-use std::fs;
-use std::path::PathBuf;
-
 pub const VARIABLE: &str = "ELISE_GIT_TOKEN";
 
 const CLONE_VARIABLE: &str = "ELISE_CLONE_GIT_TOKEN";
 
 pub struct Helper {
-    folder: PathBuf,
     token: String,
     config: Vec<(String, String)>,
 }
 
 impl Helper {
-    pub fn for_host(scan_id: &str, host: &str) -> Result<Option<Helper>, String> {
-        let Some(token) = std::env::var(VARIABLE).ok().map(|token| token.trim().to_string()).filter(|token| !token.is_empty()) else {
-            return Ok(None);
-        };
-        let folder = std::env::temp_dir().join(format!("eliselab-git-helper-{scan_id}-{}", uuid::Uuid::new_v4().simple()));
-        write_helper(&folder, host).map_err(|e| format!("Could not set up the git token for the clone: {e}"))?;
+    pub fn for_host(host: &str) -> Option<Helper> {
+        if !plain_host(host) {
+            return None;
+        }
+        let token = std::env::var(VARIABLE).ok().map(|token| token.trim().to_string()).filter(|token| !token.is_empty())?;
         let key = format!("credential.https://{host}.helper");
-        let quoted = folder.join("helper.sh").display().to_string().replace('\'', "'\\''");
-        let config = vec![(key.clone(), String::new()), (key, format!("!'{quoted}'"))];
-        Ok(Some(Helper { folder, token, config }))
+        let config = vec![(key.clone(), String::new()), (key, helper_command(host))];
+        Some(Helper { token, config })
     }
 
     pub fn apply(&self, command: &mut tokio::process::Command) {
@@ -32,29 +26,34 @@ impl Helper {
     }
 }
 
-impl Drop for Helper {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.folder);
-    }
+fn plain_host(host: &str) -> bool {
+    !host.is_empty() && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
 }
 
-fn write_helper(folder: &std::path::Path, host: &str) -> std::io::Result<()> {
-    let mut folders = fs::DirBuilder::new();
-    #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut folders, 0o700);
-    folders.create(folder)?;
-    let script = folder.join("helper.sh");
-    fs::write(
-        &script,
-        format!(
-            "#!/bin/sh\n\
-             [ \"$1\" = get ] || exit 0\n\
-             while read -r line; do case \"$line\" in host=*) asked=\"${{line#host=}}\" ;; esac; done\n\
-             [ \"$asked\" = \"{host}\" ] || exit 0\n\
-             printf 'username=x-access-token\\npassword=%s\\n' \"${CLONE_VARIABLE}\"\n"
-        ),
-    )?;
-    #[cfg(unix)]
-    fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o700))?;
-    Ok(())
+fn helper_command(host: &str) -> String {
+    format!(
+        "!f() {{ [ \"$1\" = get ] || exit 0; while read -r line; do case \"$line\" in host=*) asked=\"${{line#host=}}\" ;; esac; done; \
+         [ \"$asked\" = \"{host}\" ] || exit 0; printf 'username=x-access-token\\npassword=%s\\n' \"${CLONE_VARIABLE}\"; }}; f"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_plain_host_name_reaches_the_helper_script() {
+        let cases = [
+            ("github.com", true),
+            ("gitlab.example-corp.com", true),
+            ("", false),
+            ("host\"; rm -rf ~; \"", false),
+            ("a.com$(id)", false),
+            ("a.com:8080", false),
+            ("a b.com", false),
+        ];
+        for (host, accepted) in cases {
+            assert_eq!(plain_host(host), accepted, "{host:?}");
+        }
+    }
 }

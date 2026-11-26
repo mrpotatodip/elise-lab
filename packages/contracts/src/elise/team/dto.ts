@@ -37,6 +37,18 @@ export const TeamRoleSchema = z.object({
   description: z.string().nullable(),
 });
 
+export const TeamTwoFactorResetSchema = z.object({
+  partyId: TeamPartyIdSchema,
+});
+
+export const TeamTwoFactorRequirementSchema = z.object({
+  required: z.boolean(),
+});
+
+export const UpdateTeamTwoFactorRequirementBodySchema = z.object({
+  required: z.boolean(),
+});
+
 export const TeamRolesSchema = z.array(TeamRoleSchema);
 
 export const CreateTeamInviteBodySchema = TeamRoleBodySchema.extend({
@@ -57,6 +69,8 @@ export const TeamMemberSchema = z.object({
   role: z.string(),
   roleLabel: z.string(),
   groupIds: z.array(z.uuid()),
+  // Optional while an older engine does not send it: whether this member has Two-factor on.
+  twoFactorEnabled: z.boolean().optional(),
 });
 
 export const TeamInviteSchema = z.object({
@@ -97,6 +111,9 @@ export const AcceptedTeamInviteSchema = z.object({
 export type TeamInviteParam = z.infer<typeof TeamInviteParamSchema>;
 export type TeamMemberParam = z.infer<typeof TeamMemberParamSchema>;
 export type TeamInviteTokenParam = z.infer<typeof TeamInviteTokenParamSchema>;
+export type TeamTwoFactorReset = z.infer<typeof TeamTwoFactorResetSchema>;
+export type TeamTwoFactorRequirement = z.infer<typeof TeamTwoFactorRequirementSchema>;
+export type UpdateTeamTwoFactorRequirementBody = z.infer<typeof UpdateTeamTwoFactorRequirementBodySchema>;
 export type TeamRole = z.infer<typeof TeamRoleSchema>;
 export type TeamRoles = z.infer<typeof TeamRolesSchema>;
 export type UpdateTeamMemberBody = z.infer<typeof UpdateTeamMemberBodySchema>;

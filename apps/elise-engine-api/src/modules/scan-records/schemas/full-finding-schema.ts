@@ -10,6 +10,8 @@ import { ConfirmedFindingRecordSchema, NeedsValidationFindingRecordSchema } from
 // -----
 const RejectedSchema = z.object({ verdict: z.literal("rejected") });
 
-export const FullFindingsSchema = z.array(z.discriminatedUnion("verdict", [ConfirmedFindingRecordSchema, NeedsValidationFindingRecordSchema, RejectedSchema]));
+export const FullFindingsSchema = z.array(
+  z.discriminatedUnion("verdict", [ConfirmedFindingRecordSchema, NeedsValidationFindingRecordSchema, RejectedSchema]),
+);
 
 export type FullFinding = Exclude<z.infer<typeof FullFindingsSchema>[number], { verdict: "rejected" }>;

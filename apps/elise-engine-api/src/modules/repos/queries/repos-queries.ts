@@ -1,12 +1,34 @@
 import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, max, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import { REPO_LIMIT_PER_TENANT, type DiffEntry, type Repo, type RepoBranch, type RepoFinding, type ScanDiff } from "@repo/contracts/elise";
-import { partyPersons, scanFindings, scanFindingTriage, scanRepoBranches, scanRepoFindings, scanRepos, scans } from "@repo/db-elise/schema";
+import {
+  REPO_LIMIT_PER_TENANT,
+  type DiffEntry,
+  type Repo,
+  type RepoBranch,
+  type RepoFinding,
+  type ScanDiff,
+} from "@repo/contracts/elise";
+import {
+  partyPersons,
+  scanFindings,
+  scanFindingTriage,
+  scanRepoBranches,
+  scanRepoFindings,
+  scanRepos,
+  scans,
+} from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
-import { displayRepoUrlOf, repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
+import {
+  displayRepoUrlOf,
+  REPO_LIMIT_MESSAGE,
+  repoIdentityOf,
+  restoreRemovedRepo,
+  sameRepoIdentity,
+} from "#/modules/scan-ledger";
 import { sourceProviderOf, type SourceProviderId } from "#/providers/registry";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
 import { branchStateOf, openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
@@ -40,7 +62,10 @@ const branchScansWhere = (tenantId: string, scope: BranchScope) =>
 // -----
 const branchTips = (db: AppDbType, tenantId: string, scope: BranchScope) =>
   db
-    .selectDistinctOn([scans.branchId], { branchId: sql<string>`${scans.branchId}`.as("tip_branch_id"), scanId: sql<string>`${scans.id}`.as("tip_scan_id") })
+    .selectDistinctOn([scans.branchId], {
+      branchId: sql<string>`${scans.branchId}`.as("tip_branch_id"),
+      scanId: sql<string>`${scans.id}`.as("tip_scan_id"),
+    })
     .from(scans)
     .where(and(branchScansWhere(tenantId, scope), weighedScanWhere))
     .orderBy(scans.branchId, desc(scans.createdAt), desc(scans.id))
@@ -66,8 +91,14 @@ const latestPerProblem = (db: AppDbType, tenantId: string, scope: BranchScope) =
       repoId: scans.repoId,
       tenantId: scans.tenantId,
       fingerprint: scanFindings.fingerprint,
-      firstSeenScanId: sql<string>`first_value(${scans.id}) over (${problem} order by ${scans.createdAt} asc, ${scans.id} asc)`.as("latest_first_seen_scan_id"),
-      unchecked: sql<boolean>`(${tips.scanId} is not null and not coalesce(bool_or(${scans.id} = ${tips.scanId}) over (${problem}), false))`.as("latest_unchecked"),
+      firstSeenScanId:
+        sql<string>`first_value(${scans.id}) over (${problem} order by ${scans.createdAt} asc, ${scans.id} asc)`.as(
+          "latest_first_seen_scan_id",
+        ),
+      unchecked:
+        sql<boolean>`(${tips.scanId} is not null and not coalesce(bool_or(${scans.id} = ${tips.scanId}) over (${problem}), false))`.as(
+          "latest_unchecked",
+        ),
     })
     .from(scanFindings)
     .innerJoin(scans, eq(scans.id, scanFindings.scanId))
@@ -83,13 +114,20 @@ const historyOn = (latest: LatestPerProblem) =>
   and(eq(scanRepoFindings.branchId, latest.branchId), eq(scanRepoFindings.fingerprint, latest.fingerprint));
 
 const triageOn = (latest: LatestPerProblem) =>
-  and(eq(scanFindingTriage.tenantId, latest.tenantId), eq(scanFindingTriage.repoId, latest.repoId), eq(scanFindingTriage.fingerprint, latest.fingerprint));
+  and(
+    eq(scanFindingTriage.tenantId, latest.tenantId),
+    eq(scanFindingTriage.repoId, latest.repoId),
+    eq(scanFindingTriage.fingerprint, latest.fingerprint),
+  );
 
 // -----
 // Rows of one or more Branches, grouped by Branch in the order
 // they came.
 // -----
-const byBranchOf = <Row extends { branchId: string | null }, Entry>(rows: readonly Row[], entryOf: (row: Row) => Entry) => {
+const byBranchOf = <Row extends { branchId: string | null }, Entry>(
+  rows: readonly Row[],
+  entryOf: (row: Row) => Entry,
+) => {
   const byBranch = new Map<string, Entry[]>();
   for (const row of rows) {
     if (row.branchId === null) continue;
@@ -108,7 +146,11 @@ const byBranchOf = <Row extends { branchId: string | null }, Entry>(rows: readon
 // tens to hundreds, so counts, filters and pages are made from
 // this one list. The map is keyed by branch.
 // -----
-export const repoFindingsEffect = (db: AppDbType, tenantId: string, branchId?: string): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
+export const repoFindingsEffect = (
+  db: AppDbType,
+  tenantId: string,
+  branchId?: string,
+): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
   Effect.tryPromise({
     try: () => {
       const latest = latestPerProblem(db, tenantId, { branchId });
@@ -137,29 +179,29 @@ export const repoFindingsEffect = (db: AppDbType, tenantId: string, branchId?: s
       byBranchOf(rows, (row): RepoFinding => {
         const { finding, firstSeenScanId, unchecked, history, triage, person, url } = row;
         return {
-        id: finding.id,
-        scanId: finding.scanId,
-        repo: url,
-        findingId: finding.findingId,
-        fingerprint: finding.fingerprint,
-        status: finding.status,
-        severity: finding.severity,
-        title: finding.title,
-        class: finding.class,
-        file: finding.file,
-        line: finding.line,
-        actor: finding.actor,
-        impact: finding.impact,
-        evidence: finding.evidence,
-        fix: finding.fix,
-        needs: finding.needs,
-        createdAt: finding.createdAt.toISOString(),
-        triage: triage ? triageView(triage, person) : null,
-        state: branchStateOf(row),
-        unchecked,
-        firstSeenScanId,
-        fixedInScanId: history?.fixedInScanId ?? null,
-        possibleDuplicateOf: history?.possibleDuplicateOf ?? null,
+          id: finding.id,
+          scanId: finding.scanId,
+          repo: url,
+          findingId: finding.findingId,
+          fingerprint: finding.fingerprint,
+          status: finding.status,
+          severity: finding.severity,
+          title: finding.title,
+          class: finding.class,
+          file: finding.file,
+          line: finding.line,
+          actor: finding.actor,
+          impact: finding.impact,
+          evidence: finding.evidence,
+          fix: finding.fix,
+          needs: finding.needs,
+          createdAt: finding.createdAt.toISOString(),
+          triage: triage ? triageView(triage, person) : null,
+          state: branchStateOf(row),
+          unchecked,
+          firstSeenScanId,
+          fixedInScanId: history?.fixedInScanId ?? null,
+          possibleDuplicateOf: history?.possibleDuplicateOf ?? null,
         };
       }),
     ),
@@ -171,7 +213,11 @@ export const repoFindingsEffect = (db: AppDbType, tenantId: string, branchId?: s
 // state rule (branchStateOf) as the list, so the counts always
 // match it. Keyed by branch.
 // -----
-const repoOpenCountRowsEffect = (db: AppDbType, tenantId: string, scope: BranchScope): Effect.Effect<Map<string, OpenCountRow[]>, DbError> =>
+const repoOpenCountRowsEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scope: BranchScope,
+): Effect.Effect<Map<string, OpenCountRow[]>, DbError> =>
   Effect.tryPromise({
     try: () => {
       const latest = latestPerProblem(db, tenantId, scope);
@@ -192,7 +238,12 @@ const repoOpenCountRowsEffect = (db: AppDbType, tenantId: string, scope: BranchS
   }).pipe(
     Effect.map((rows) =>
       byBranchOf(rows, (row): OpenCountRow => {
-        return { state: branchStateOf(row), unchecked: row.unchecked, severity: row.severity, triage: row.triageStatus ? { status: row.triageStatus } : null };
+        return {
+          state: branchStateOf(row),
+          unchecked: row.unchecked,
+          severity: row.severity,
+          triage: row.triageStatus ? { status: row.triageStatus } : null,
+        };
       }),
     ),
   );
@@ -202,7 +253,8 @@ const repoOpenCountRowsEffect = (db: AppDbType, tenantId: string, scope: BranchS
 // A repo whose scans all named a branch has tracked branches and
 // no pointer, so its oldest tracked branch stands in for it.
 // -----
-const effectiveDefaultBranch = (pointer: string | null, trackedNames: readonly string[]): string | null => pointer ?? trackedNames[0] ?? null;
+const effectiveDefaultBranch = (pointer: string | null, trackedNames: readonly string[]): string | null =>
+  pointer ?? trackedNames[0] ?? null;
 
 // -----
 // The account's repos, or one, with how many scans each has,
@@ -210,14 +262,28 @@ const effectiveDefaultBranch = (pointer: string | null, trackedNames: readonly s
 // A removed upload app is not listed, but asked for by id it is
 // still found, so its Scans keep their History.
 // -----
-export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string): Effect.Effect<Repo[], DbError> =>
+export const listReposEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId?: string,
+  removedOnly = false,
+): Effect.Effect<Repo[], DbError> =>
   Effect.gen(function* () {
     const repos = yield* Effect.tryPromise({
       try: () =>
         db
           .select()
           .from(scanRepos)
-          .where(and(eq(scanRepos.tenantId, tenantId), repoId ? eq(scanRepos.id, repoId) : isNull(scanRepos.removedAt)))
+          .where(
+            and(
+              eq(scanRepos.tenantId, tenantId),
+              repoId
+                ? eq(scanRepos.id, repoId)
+                : removedOnly
+                  ? isNotNull(scanRepos.removedAt)
+                  : isNull(scanRepos.removedAt),
+            ),
+          )
           .orderBy(asc(scanRepos.canonical)),
       catch: toDbError,
     });
@@ -233,7 +299,12 @@ export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string
     const latest = yield* Effect.tryPromise({
       try: () =>
         db
-          .selectDistinctOn([scans.repoId], { repoId: scans.repoId, id: scans.id, status: scans.status, createdAt: scans.createdAt })
+          .selectDistinctOn([scans.repoId], {
+            repoId: scans.repoId,
+            id: scans.id,
+            status: scans.status,
+            createdAt: scans.createdAt,
+          })
           .from(scans)
           .where(and(eq(scans.tenantId, tenantId), repoId ? eq(scans.repoId, repoId) : undefined))
           .orderBy(scans.repoId, desc(scans.createdAt), desc(scans.id)),
@@ -255,7 +326,10 @@ export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string
       return { repo, branchNames, defaultBranch, defaultBranchId };
     });
     const defaultBranchIds = tracked.flatMap((entry) => (entry.defaultBranchId ? [entry.defaultBranchId] : []));
-    const findings = defaultBranchIds.length === 0 ? new Map<string, OpenCountRow[]>() : yield* repoOpenCountRowsEffect(db, tenantId, { branchIds: defaultBranchIds });
+    const findings =
+      defaultBranchIds.length === 0
+        ? new Map<string, OpenCountRow[]>()
+        : yield* repoOpenCountRowsEffect(db, tenantId, { branchIds: defaultBranchIds });
     return tracked.map(({ repo, branchNames, defaultBranch, defaultBranchId }) => {
       const last = latest.find((row) => row.repoId === repo.id);
       return {
@@ -272,13 +346,50 @@ export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string
         lastScanStatus: last?.status ?? null,
         lastScanAt: last?.createdAt.toISOString() ?? null,
         open: openCountsOf((defaultBranchId ? findings.get(defaultBranchId) : undefined) ?? []),
+        removedAt: repo.removedAt?.toISOString() ?? null,
       };
     });
   });
 
-export const getRepoEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<Repo, NotFound | DbError> =>
+export const restoreRepoEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+  userId: string,
+): Effect.Effect<void, NotFound | Conflict | DbError> =>
+  Effect.gen(function* () {
+    const [row] = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ removedAt: scanRepos.removedAt })
+          .from(scanRepos)
+          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId))),
+      catch: toDbError,
+    });
+    if (!row?.removedAt) return yield* new NotFound({ message: "Removed repo not found" });
+    const restored = yield* Effect.tryPromise({
+      try: () => restoreRemovedRepo(db, tenantId, eq(scanRepos.id, repoId)),
+      catch: toDbError,
+    });
+    if (!restored) return yield* new Conflict({ message: REPO_LIMIT_MESSAGE });
+    yield* Effect.tryPromise({
+      try: async () => {
+        const actorPartyId = await actorPartyOf(db, userId);
+        await insertAuditEntry(db, { actorPartyId, action: "repo.restored", subjectId: repoId, tenantId });
+      },
+      catch: toDbError,
+    });
+  });
+
+export const getRepoEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+): Effect.Effect<Repo, NotFound | DbError> =>
   listReposEffect(db, tenantId, repoId).pipe(
-    Effect.flatMap(([repo]) => (repo ? Effect.succeed(repo) : Effect.fail(new NotFound({ message: "Repo not found" })))),
+    Effect.flatMap(([repo]) =>
+      repo ? Effect.succeed(repo) : Effect.fail(new NotFound({ message: "Repo not found" })),
+    ),
   );
 
 // -----
@@ -287,10 +398,18 @@ export const getRepoEffect = (db: AppDbType, tenantId: string, repoId: string): 
 // about) and its latest full Scan, from the same tips the merge
 // measures "not in the latest full scan" against.
 // -----
-export const listRepoBranchesEffect = (db: AppDbType, tenantId: string, repoId: string): Effect.Effect<RepoBranch[], DbError> =>
+export const listRepoBranchesEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+): Effect.Effect<RepoBranch[], DbError> =>
   Effect.gen(function* () {
     const [repo] = yield* Effect.tryPromise({
-      try: () => db.select({ defaultBranch: scanRepos.defaultBranch }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId))),
+      try: () =>
+        db
+          .select({ defaultBranch: scanRepos.defaultBranch })
+          .from(scanRepos)
+          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId))),
       catch: toDbError,
     });
     const rows = yield* Effect.tryPromise({
@@ -305,7 +424,12 @@ export const listRepoBranchesEffect = (db: AppDbType, tenantId: string, repoId: 
     const latest = yield* Effect.tryPromise({
       try: () =>
         db
-          .selectDistinctOn([scans.branchId], { branchId: scans.branchId, id: scans.id, commitSha: scans.commitSha, createdAt: scans.createdAt })
+          .selectDistinctOn([scans.branchId], {
+            branchId: scans.branchId,
+            id: scans.id,
+            commitSha: scans.commitSha,
+            createdAt: scans.createdAt,
+          })
           .from(scans)
           .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), eq(scans.status, "succeeded")))
           .orderBy(scans.branchId, desc(scans.createdAt), desc(scans.id)),
@@ -317,7 +441,10 @@ export const listRepoBranchesEffect = (db: AppDbType, tenantId: string, repoId: 
       catch: toDbError,
     });
     const findings = yield* repoOpenCountRowsEffect(db, tenantId, { repoId });
-    const defaultBranch = effectiveDefaultBranch(repo?.defaultBranch ?? null, rows.map((branch) => branch.name));
+    const defaultBranch = effectiveDefaultBranch(
+      repo?.defaultBranch ?? null,
+      rows.map((branch) => branch.name),
+    );
     return rows.map((branch) => {
       const last = latest.find((row) => row.branchId === branch.id);
       return {
@@ -333,7 +460,15 @@ export const listRepoBranchesEffect = (db: AppDbType, tenantId: string, repoId: 
     });
   });
 
-const entryOf = (row: { fingerprint: string; status: DiffEntry["status"]; severity: DiffEntry["severity"]; title: string; class: string; file: string | null; line: number | null }): DiffEntry => ({
+const entryOf = (row: {
+  fingerprint: string;
+  status: DiffEntry["status"];
+  severity: DiffEntry["severity"];
+  title: string;
+  class: string;
+  file: string | null;
+  line: number | null;
+}): DiffEntry => ({
   fingerprint: row.fingerprint,
   status: row.status,
   severity: row.severity,
@@ -353,10 +488,18 @@ const entryOf = (row: { fingerprint: string; status: DiffEntry["status"]; severi
 //   notRechecked in the previous list, missing from this
 //                one with no evidence it was fixed
 // -----
-export const scanDiffEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
+export const scanDiffEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scanId: string,
+): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
   Effect.gen(function* () {
     const [scan] = yield* Effect.tryPromise({
-      try: () => db.select().from(scans).where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId))),
+      try: () =>
+        db
+          .select()
+          .from(scans)
+          .where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId))),
       catch: toDbError,
     });
     if (!scan) return yield* new NotFound({ message: "Scan not found" });
@@ -364,13 +507,21 @@ export const scanDiffEffect = (db: AppDbType, tenantId: string, scanId: string):
       return yield* new Invalid({ message: "Only a succeeded lite scan has recorded findings to compare" });
     }
     const { branchId } = scan;
-    if (branchId === null) return yield* new Invalid({ message: "A scan with no tracked branch has no history to compare with" });
+    if (branchId === null)
+      return yield* new Invalid({ message: "A scan with no tracked branch has no history to compare with" });
     const [previous] = yield* Effect.tryPromise({
       try: () =>
         db
           .select({ id: scans.id })
           .from(scans)
-          .where(and(eq(scans.branchId, branchId), eq(scans.status, "succeeded"), eq(scans.skill, "lite"), lt(scans.createdAt, scan.createdAt)))
+          .where(
+            and(
+              eq(scans.branchId, branchId),
+              eq(scans.status, "succeeded"),
+              eq(scans.skill, "lite"),
+              lt(scans.createdAt, scan.createdAt),
+            ),
+          )
           .orderBy(desc(scans.createdAt), desc(scans.id))
           .limit(1),
       catch: toDbError,
@@ -403,16 +554,30 @@ export const scanDiffEffect = (db: AppDbType, tenantId: string, scanId: string):
         : yield* Effect.tryPromise({
             try: () =>
               db
-                .select({ fingerprint: scanRepoFindings.fingerprint, firstSeenScanId: scanRepoFindings.firstSeenScanId, fixedInScanId: scanRepoFindings.fixedInScanId })
+                .select({
+                  fingerprint: scanRepoFindings.fingerprint,
+                  firstSeenScanId: scanRepoFindings.firstSeenScanId,
+                  fixedInScanId: scanRepoFindings.fixedInScanId,
+                })
                 .from(scanRepoFindings)
-                .where(and(eq(scanRepoFindings.branchId, branchId), inArray(scanRepoFindings.fingerprint, fingerprints))),
+                .where(
+                  and(eq(scanRepoFindings.branchId, branchId), inArray(scanRepoFindings.fingerprint, fingerprints)),
+                ),
             catch: toDbError,
           });
     const historyOf = new Map(history.map((row) => [row.fingerprint, row]));
     const beforeIds = new Set(before.map((row) => row.fingerprint));
     const currentIds = new Set(current.map((row) => row.fingerprint));
 
-    const diff: ScanDiff = { scanId, previousScanId: previous?.id ?? null, new: [], stillOpen: [], regressed: [], fixed: [], notRechecked: [] };
+    const diff: ScanDiff = {
+      scanId,
+      previousScanId: previous?.id ?? null,
+      new: [],
+      stillOpen: [],
+      regressed: [],
+      fixed: [],
+      notRechecked: [],
+    };
     for (const row of current) {
       if (row.origin === "carried" || beforeIds.has(row.fingerprint)) diff.stillOpen.push(entryOf(row));
       else if (historyOf.get(row.fingerprint)?.firstSeenScanId === scanId) diff.new.push(entryOf(row));
@@ -423,9 +588,6 @@ export const scanDiffEffect = (db: AppDbType, tenantId: string, scanId: string):
     }
     return diff;
   });
-
-
-export const REPO_LIMIT_MESSAGE = `An account can have at most ${REPO_LIMIT_PER_TENANT} repos`;
 
 // -----
 // Add a repo without scanning it, with the branches to track.
@@ -447,24 +609,35 @@ export const addRepoEffect = (
     try: () =>
       db.transaction(async (tx) => {
         const identity = repoIdentityOf(url, provider);
-        const [existing] = await tx.select({ id: scanRepos.id, removedAt: scanRepos.removedAt }).from(scanRepos).where(sameRepoIdentity(tenantId, identity));
+        const [existing] = await tx
+          .select({ id: scanRepos.id, removedAt: scanRepos.removedAt })
+          .from(scanRepos)
+          .where(sameRepoIdentity(tenantId, identity));
         let repoId = existing?.id;
-        if (existing?.removedAt) {
-          const [{ total }] = await tx.select({ total: count() }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), isNull(scanRepos.removedAt)));
-          if (total >= REPO_LIMIT_PER_TENANT) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
-          await tx.update(scanRepos).set({ removedAt: null }).where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, existing.id)));
-        }
+        if (existing?.removedAt && !(await restoreRemovedRepo(tx, tenantId, eq(scanRepos.id, existing.id))))
+          throw new Conflict({ message: REPO_LIMIT_MESSAGE });
         if (!repoId) {
-          const [{ total }] = await tx.select({ total: count() }).from(scanRepos).where(and(eq(scanRepos.tenantId, tenantId), isNull(scanRepos.removedAt)));
+          const [{ total }] = await tx
+            .select({ total: count() })
+            .from(scanRepos)
+            .where(and(eq(scanRepos.tenantId, tenantId), isNull(scanRepos.removedAt)));
           if (total >= REPO_LIMIT_PER_TENANT) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
           const [created] = await tx
             .insert(scanRepos)
-            .values({ tenantId, ...identity, url: displayRepoUrlOf(url, provider), defaultBranch: sourceProviderOf(identity.provider).fixedBranch })
+            .values({
+              tenantId,
+              ...identity,
+              url: displayRepoUrlOf(url, provider),
+              defaultBranch: sourceProviderOf(identity.provider).fixedBranch,
+            })
             .onConflictDoNothing()
             .returning({ id: scanRepos.id });
           repoId = created?.id;
           if (!repoId) {
-            const [raced] = await tx.select({ id: scanRepos.id }).from(scanRepos).where(sameRepoIdentity(tenantId, identity));
+            const [raced] = await tx
+              .select({ id: scanRepos.id })
+              .from(scanRepos)
+              .where(sameRepoIdentity(tenantId, identity));
             repoId = raced.id;
           }
         }

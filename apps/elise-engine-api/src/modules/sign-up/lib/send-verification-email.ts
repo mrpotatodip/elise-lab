@@ -7,5 +7,8 @@ export const sendVerificationEmailQuietly = (config: AuthConfig, email: string):
     try: () => buildAuth(config).api.sendVerificationEmail({ body: { email } }),
     catch: (cause) => cause,
   }).pipe(
-    Effect.match({ onSuccess: () => undefined, onFailure: (cause) => console.error(VERIFICATION_EMAIL_NOT_QUEUED_LOG, cause) }),
+    Effect.match({
+      onSuccess: () => undefined,
+      onFailure: (cause) => console.error(VERIFICATION_EMAIL_NOT_QUEUED_LOG, cause),
+    }),
   );

@@ -25,7 +25,11 @@ export const githubProvider = {
     message: "That doesn't look like a GitHub repository link. Use the form https://github.com/owner/name.",
     example: "https://github.com/owner/name",
     linkOf: githubLinkOf,
-    nameOf: (address: string) => address.replace(GITHUB_PREFIX, "").replace(/\.git$/, "").replace(/\/$/, ""),
+    nameOf: (address: string) =>
+      address
+        .replace(GITHUB_PREFIX, "")
+        .replace(/\.git$/, "")
+        .replace(/\/$/, ""),
     searchPlaceholder: "Search your repositories or paste a GitHub link",
     emptyNote: "Paste the link to a public GitHub repository to scan it.",
     linkNote: "Public repository, from the link",

@@ -38,9 +38,13 @@ export function GroupsSummary() {
         <Column label="Groups" footer={<NewGroupDialog />}>
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {groups.length}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{groups.length === 1 ? "group" : "groups"}</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              {groups.length === 1 ? "group" : "groups"}
+            </span>
           </p>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">A group sorts people into a team. It grants nothing: what a person can do comes from their role.</p>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+            A group sorts people into a team. It grants nothing: what a person can do comes from their role.
+          </p>
         </Column>
 
         <Column
@@ -53,23 +57,35 @@ export function GroupsSummary() {
         >
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {grouped}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {everyone} in a group</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              of {everyone} in a group
+            </span>
           </p>
-          <Progress value={percent} indicatorClassName="bg-primary/55" aria-label={`In a group: ${grouped} of ${everyone}`} />
+          <Progress
+            value={percent}
+            indicatorClassName="bg-primary/55"
+            aria-label={`In a group: ${grouped} of ${everyone}`}
+          />
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-            {ungrouped.length === 0 ? "Everyone belongs to at least one group." : `Not in any group yet: ${ungrouped.map((member) => member.name).join(", ")}.`}
+            {ungrouped.length === 0
+              ? "Everyone belongs to at least one group."
+              : `Not in any group yet: ${ungrouped.map((member) => member.name).join(", ")}.`}
           </p>
         </Column>
 
         <Column label="Sizes">
           {bySize.length === 0 ? (
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">No groups yet. Create one to see its size here.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              No groups yet. Create one to see its size here.
+            </p>
           ) : (
             <ul className="divide-y rounded-lg border">
               {bySize.map((group) => (
                 <li key={group.id} className="flex items-center justify-between gap-4 px-4 py-3">
                   <span className="truncate text-sm font-medium">{group.name}</span>
-                  <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{people(group.memberIds.length)}</span>
+                  <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                    {people(group.memberIds.length)}
+                  </span>
                 </li>
               ))}
             </ul>

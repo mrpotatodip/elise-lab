@@ -4,7 +4,7 @@
 
 It is a Runner like the desktop app (the folder above): both run Scans through one shared core, `core/` (`elise-runner-core`), so a Scan behaves the same whichever runs it. Its rules are in `docs/adr/0006-full-worker-and-phase-budget.md`, under "Runner Scans". To Elise the two are two Runners. On one computer each is paired with its own code and holds its own token, so neither reads or changes the other's. The desktop app runs one Scan at a time. The headless Runner runs one by default, and up to three with `--parallel`. The headless Runner shows in the Runners list in Elise like any other Runner, and removing it there stops it claiming Scans.
 
-It supports macOS and Linux. Windows is not supported.
+It supports macOS, Linux and Windows (x64). Windows is new: it needs Git for Windows (Claude Code needs it too) and is not signed yet, so Windows may show a SmartScreen warning on the first run. Windows on ARM runs the x64 build under emulation. Decision record: `docs/adr/0015-windows-runner.md`.
 
 ## What you need
 
@@ -58,8 +58,8 @@ When Elise rejects the token during `run` (an admin removed the Runner), the pro
 In this order:
 
 1. `ELISE_RUNNER_TOKEN`, if set. It is read only: `pair`, `login` and `unpair` refuse to manage a token that came from it, and say so.
-2. The system keychain (macOS Keychain, or a Secret Service on Linux), under the service name `com.eliselab.runner.headless`. The desktop app uses `com.eliselab.runner`, which is why the two are separate Runners.
-3. When the computer has no keychain service, as on many Linux servers, a file in your config folder (`~/.config/elise-runner/token` on Linux), created readable by you only.
+2. The system keychain (macOS Keychain, Windows Credential Manager, or a Secret Service on Linux), under the service name `com.eliselab.runner.headless`. The desktop app uses `com.eliselab.runner`, which is why the two are separate Runners.
+3. When the computer has no keychain service, as on many Linux servers, a file in your config folder (`~/.config/elise-runner/token` on Linux), created readable by you only (on Windows, in your user profile's config folder, `%APPDATA%\elise-runner\token`, where the default folder access rules apply).
 
 `status` names the store in use.
 
@@ -86,6 +86,8 @@ An upload Scan reads a zip instead of a clone. Each claim tells Elise this Runne
 A Scan uses your Claude login but not your Claude Code settings. It runs under its own settings and tool allowlist and never reads or changes your `~/.claude` folder. The agent does not get `ELISE_RUNNER_TOKEN`, and on Linux its settings deny reading `/proc`, so a hostile repository cannot make it copy the token into a report.
 
 A succeeded Scan's work folder is removed once its result is sent. A failed Scan's is kept and its path is printed on the last line, with the agent's log and the files of the Phases that finished.
+
+A kept folder can be resumed (ADR 0016). After the clone and after every Phase that ends cleanly the Runner writes `checkpoint.json` in the folder (Scan id, Phases done, money spent, the commit) and a copy of `out` (`checkpoint-out`). A job that carries `resume: true` and `resumesScanId` (an older Runner ignores both) reuses the folder of that Scan, renamed to the new Scan's id. Nothing is cloned or fetched. The Scan fails with a sentence that ends `Start a new Scan instead.`, and starts no agent, when the checkpoint is missing or unreadable, names another Scan, the `repo` folder is at another commit or has been edited since the checkpoint, or the job is for an upload Scan. The money already spent is the sum of the Phases' own results in the folder's logs, and the Pool is the Budget cap less that; the earlier logs are renamed `earlier-<scan id>-…`, so the engine reads only the new Scan's usage. The Phases that ended are skipped. `recon` and `report` start from the top with their files put back as the checkpoint had them. `hunt` and `check` run the skill's coverage-ledger validator on the kept ledger: when it passes, the Phase prompt gets one added paragraph (keep final units, put `in_progress` units back to `planned`, work only the rest), and after `check` the validators' own words when they failed; when it fails or the ledger is missing, the Phase's files are put back and it runs whole. `resume <scan-id>` says whether a kept folder can be resumed and which Phases it holds; `status` lists the kept folders.
 
 Ctrl-C (`SIGINT`) or `SIGTERM` with no Scan running exits at once with 0. During a Scan it stops the running `claude`, reports the Scan to Elise as failed with a reason that says the Runner was stopped, keeps the work folder and exits with 1. A stop that comes after the Scan already succeeded changes nothing: the result is sent and the program exits with 0. Signals after the first are ignored until the result is sent.
 

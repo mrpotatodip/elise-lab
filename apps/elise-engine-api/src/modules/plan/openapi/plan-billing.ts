@@ -1,6 +1,15 @@
 import { describeRoute } from "hono-openapi";
 import { PlanChangeResultSchema, PlanSessionUrlSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const createPlanCheckoutDoc = describeRoute({
   tags: ["usage"],
@@ -8,7 +17,7 @@ export const createPlanCheckoutDoc = describeRoute({
   security: SERVICE_SECURITY,
   description: routeText({
     context:
-      "An admin subscribes the account to a plan: the JSON body `{ \"planKey\": \"starter\" }` names it, and a request with no body means `runner`. The answer is the Stripe Checkout URL to send the browser to. Checkout changes nothing here: the Subscription is written only when Stripe's webhook arrives.",
+      'An admin subscribes the account to a plan: the JSON body `{ "planKey": "starter" }` names it, and a request with no body means `runner`. The answer is the Stripe Checkout URL to send the browser to. Checkout changes nothing here: the Subscription is written only when Stripe\'s webhook arrives.',
     steps: [
       "The Worker checks the signed-in login and that its role in the account holds the Power `company:plan:manage`.",
       "The Worker answers 409 while the account has an active or past-due Stripe Subscription.",
@@ -19,10 +28,17 @@ export const createPlanCheckoutDoc = describeRoute({
     ],
     example: [
       "Start checkout:",
-      bash(`curl -X POST ${EXAMPLE_BASE_URL}/usage/plan/checkout \\`, '  -H "cookie: $SESSION_COOKIE" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`),
+      bash(
+        `curl -X POST ${EXAMPLE_BASE_URL}/usage/plan/checkout \\`,
+        '  -H "cookie: $SESSION_COOKIE" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
     ],
   }),
-  responses: { 200: jsonResponse("The Stripe Checkout URL.", envelope(PlanSessionUrlSchema)), ...errorResponses(400, 401, 403, 409) },
+  responses: {
+    200: jsonResponse("The Stripe Checkout URL.", envelope(PlanSessionUrlSchema)),
+    ...errorResponses(400, 401, 403, 409),
+  },
 });
 
 export const changePlanDoc = describeRoute({
@@ -41,10 +57,19 @@ export const changePlanDoc = describeRoute({
     ],
     example: [
       "Move to Starter:",
-      bash(`curl -X POST ${EXAMPLE_BASE_URL}/usage/plan/change \\`, '  -H "cookie: $SESSION_COOKIE" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}" \\`, '  -H "content-type: application/json" \\', `  -d '{"planKey":"starter"}'`),
+      bash(
+        `curl -X POST ${EXAMPLE_BASE_URL}/usage/plan/change \\`,
+        '  -H "cookie: $SESSION_COOKIE" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}" \\`,
+        '  -H "content-type: application/json" \\',
+        `  -d '{"planKey":"starter"}'`,
+      ),
     ],
   }),
-  responses: { 200: jsonResponse("The plan the change was requested for.", envelope(PlanChangeResultSchema)), ...errorResponses(400, 401, 403, 409) },
+  responses: {
+    200: jsonResponse("The plan the change was requested for.", envelope(PlanChangeResultSchema)),
+    ...errorResponses(400, 401, 403, 409),
+  },
 });
 
 export const createPlanPortalDoc = describeRoute({
@@ -52,7 +77,8 @@ export const createPlanPortalDoc = describeRoute({
   summary: "Open the Stripe Billing portal",
   security: SERVICE_SECURITY,
   description: routeText({
-    context: "An admin updates the card, reads invoices or cancels at the end of the paid month. The answer is the Billing portal URL to send the browser to.",
+    context:
+      "An admin updates the card, reads invoices or cancels at the end of the paid month. The answer is the Billing portal URL to send the browser to.",
     steps: [
       "The Worker checks the signed-in login and that its role in the account holds the Power `company:plan:manage`.",
       "The Worker answers 404 when the account has no Stripe customer yet.",
@@ -60,8 +86,15 @@ export const createPlanPortalDoc = describeRoute({
     ],
     example: [
       "Open the portal:",
-      bash(`curl -X POST ${EXAMPLE_BASE_URL}/usage/plan/portal \\`, '  -H "cookie: $SESSION_COOKIE" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`),
+      bash(
+        `curl -X POST ${EXAMPLE_BASE_URL}/usage/plan/portal \\`,
+        '  -H "cookie: $SESSION_COOKIE" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
     ],
   }),
-  responses: { 200: jsonResponse("The Billing portal URL.", envelope(PlanSessionUrlSchema)), ...errorResponses(400, 401, 403, 404) },
+  responses: {
+    200: jsonResponse("The Billing portal URL.", envelope(PlanSessionUrlSchema)),
+    ...errorResponses(400, 401, 403, 404),
+  },
 });

@@ -24,7 +24,8 @@ export const profileCapsOf = (plan: PlanState | null): ScanProfileCap[] =>
 export const creditBalanceOf = (spend: { plan: PlanState | null; scans: number }): CreditBalance => {
   const { plan, scans } = spend;
   const profiles = profileCapsOf(plan);
-  if (plan === null) return { planKey: null, keySource: null, balanceUsd: 0, monthlyCreditUsd: 0, scans, scanAllowance: null, profiles };
+  if (plan === null)
+    return { planKey: null, keySource: null, balanceUsd: 0, monthlyCreditUsd: 0, scans, scanAllowance: null, profiles };
   return {
     planKey: plan.planKey,
     keySource: plan.keySource,

@@ -24,7 +24,8 @@ export const repoIdentityOf = (url: string, id: SourceProviderId = DEFAULT_SOURC
   return { provider: id, host: parser.host(url), canonical: parser.canonical(url) };
 };
 
-export const displayRepoUrlOf = (url: string, id: SourceProviderId = DEFAULT_SOURCE_PROVIDER_ID): string => sourceProviderOf(id).display(url);
+export const displayRepoUrlOf = (url: string, id: SourceProviderId = DEFAULT_SOURCE_PROVIDER_ID): string =>
+  sourceProviderOf(id).display(url);
 
 // -----
 // The filter for one Repo of an Account. A null host

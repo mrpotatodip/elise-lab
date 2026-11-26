@@ -1,9 +1,5 @@
 import { valueForEventType } from "./agui-loading-by-event";
-import {
-  DEFAULT_LOADING_TEXTS_KEY,
-  textsForEventType,
-  WAITING_LOADING_TEXTS_KEY,
-} from "./agui-loading-captions";
+import { DEFAULT_LOADING_TEXTS_KEY, textsForEventType, WAITING_LOADING_TEXTS_KEY } from "./agui-loading-captions";
 import type {
   AGUILoadingStackedState,
   AGUILoadingStackedStep,
@@ -17,9 +13,7 @@ import { EventType } from "./agui-loading-machine";
 // from step.toolCallName. Plain values stay the
 // simple case; the function is there when you need it.
 // -----
-export type AGUILoadingStackedStepValue<TValue> =
-  | TValue
-  | ((step: AGUILoadingStackedStep) => TValue);
+export type AGUILoadingStackedStepValue<TValue> = TValue | ((step: AGUILoadingStackedStep) => TValue);
 
 export type AGUILoadingStackedStepTextValue = AGUILoadingStackedStepValue<string>;
 
@@ -54,10 +48,7 @@ export const STACKED_STEP_START_EVENT = {
 // "default", each a value or a function of the row.
 // -----
 export type AGUILoadingStackedByEvent<TValue> = Partial<
-  Record<
-    AGUILoadingStackedStartEvent | typeof DEFAULT_LOADING_TEXTS_KEY,
-    AGUILoadingStackedStepValue<TValue>
-  >
+  Record<AGUILoadingStackedStartEvent | typeof DEFAULT_LOADING_TEXTS_KEY, AGUILoadingStackedStepValue<TValue>>
 >;
 
 // -----
@@ -72,9 +63,7 @@ export function stackedStepValue<TValue>(
   const entry = valueForEventType(STACKED_STEP_START_EVENT[step.kind], byEvent);
   // SAFETY: values are never functions themselves (text, text lists,
   // React nodes), so a function entry is always the (step) => value form.
-  return typeof entry === "function"
-    ? (entry as (step: AGUILoadingStackedStep) => TValue)(step)
-    : entry;
+  return typeof entry === "function" ? (entry as (step: AGUILoadingStackedStep) => TValue)(step) : entry;
 }
 
 // -----
@@ -89,12 +78,7 @@ export function stackedStepBusyTexts(
   if (custom !== undefined) return custom;
   const name = step.kind === "subagent" ? step.subagentName : null;
   if (name) {
-    return [
-      `Delegating to ${name}`,
-      `Handing off to ${name}`,
-      `Briefing ${name}`,
-      `Calling in ${name}`,
-    ];
+    return [`Delegating to ${name}`, `Handing off to ${name}`, `Briefing ${name}`, `Calling in ${name}`];
   }
   return textsForEventType(STACKED_STEP_START_EVENT[step.kind], undefined);
 }
@@ -116,12 +100,10 @@ export function stackedStepWaitingTexts(
 
 export const LOADING_STACKED_DONE_TEXTS = {
   [EventType.RUN_STARTED]: "Started",
-  [EventType.TOOL_CALL_START]: (step) =>
-    step.toolCallName ? `Called ${step.toolCallName}` : "Called a tool",
+  [EventType.TOOL_CALL_START]: (step) => (step.toolCallName ? `Called ${step.toolCallName}` : "Called a tool"),
   [EventType.TEXT_MESSAGE_START]: "Wrote a response",
   [EventType.REASONING_START]: "Thought it through",
-  [EventType.SUBAGENT_STARTED]: (step) =>
-    step.subagentName ? `Asked ${step.subagentName}` : "Asked a subagent",
+  [EventType.SUBAGENT_STARTED]: (step) => (step.subagentName ? `Asked ${step.subagentName}` : "Asked a subagent"),
   // The error row is always failed; this entry only completes the map.
   [EventType.RUN_ERROR]: "Something went wrong",
 } satisfies Record<AGUILoadingStackedStartEvent, AGUILoadingStackedStepTextValue>;

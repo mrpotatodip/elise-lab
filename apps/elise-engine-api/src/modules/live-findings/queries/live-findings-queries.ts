@@ -6,7 +6,11 @@ import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { NewFindingRow } from "#/modules/scan-records/types";
 
-export const lockScanStatusEffect = (db: AppDbType, tenantId: string, scanId: string): Effect.Effect<ScanStateValue | null, DbError> =>
+export const lockScanStatusEffect = (
+  db: AppDbType,
+  tenantId: string,
+  scanId: string,
+): Effect.Effect<ScanStateValue | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -29,7 +33,11 @@ export const countLiveFindingsEffect = (db: AppDbType, scanId: string): Effect.E
     catch: toDbError,
   });
 
-export const knownFindingIdsEffect = (db: AppDbType, scanId: string, ids: readonly string[]): Effect.Effect<Set<string>, DbError> =>
+export const knownFindingIdsEffect = (
+  db: AppDbType,
+  scanId: string,
+  ids: readonly string[],
+): Effect.Effect<Set<string>, DbError> =>
   ids.length === 0
     ? Effect.succeed(new Set<string>())
     : Effect.tryPromise({

@@ -19,8 +19,11 @@ export const fieldErrorId = (id: string) => `${id}-error`;
 // The ARIA link between an input and its error (or its help line).
 // Spread it on the input next to `id`.
 // -----
-export const fieldAria = (field: AnyFieldApi, id: string, helpId?: string) => {
-  const invalid = fieldMessage(field) !== undefined;
+export const fieldAria = (field: AnyFieldApi, id: string, helpId?: string) =>
+  fieldMessageAria(fieldMessage(field), id, helpId);
+
+export const fieldMessageAria = (message: string | undefined, id: string, helpId?: string) => {
+  const invalid = message !== undefined;
   const described = [invalid ? fieldErrorId(id) : undefined, helpId].filter((part) => part !== undefined).join(" ");
   return {
     "aria-invalid": invalid ? true : undefined,

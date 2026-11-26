@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import { NotFound, toExternalError, type DbError } from "#/lib/effect-query";
 import type { ScanStatus } from "#/schemas";
-import type { ScanReads } from "#/modules/scan-ledger";
+import { failureCodeOf, type ScanReads } from "#/modules/scan-ledger";
 import type { DetailScanEnv } from "#/modules/scans/types";
 
 // -----
@@ -25,7 +25,8 @@ export const detailScanSvc = (
       catch: toExternalError,
     }).pipe(Effect.orElseSucceed(() => null));
     if (instance && (instance.status === "errored" || instance.status === "terminated")) {
-      return { ...status, status: "failed" as const, step: null, error: status.error ?? instance.error?.message ?? `workflow ${instance.status}` };
+      const error = status.error ?? instance.error?.message ?? `workflow ${instance.status}`;
+      return { ...status, status: "failed" as const, step: null, error, failureCode: failureCodeOf(error) };
     }
     return status;
   });

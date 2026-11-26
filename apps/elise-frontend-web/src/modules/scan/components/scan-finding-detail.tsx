@@ -25,7 +25,12 @@ const SHEET_TONE = {
   neutral: "text-muted-foreground",
 } as const;
 
-type SheetSectionProps = { title: string; tone: keyof typeof SHEET_TONE; code?: boolean; children: string | null | undefined };
+type SheetSectionProps = {
+  title: string;
+  tone: keyof typeof SHEET_TONE;
+  code?: boolean;
+  children: string | null | undefined;
+};
 
 function SheetSection({ title, tone, code = false, children }: SheetSectionProps) {
   if (!children) return null;
@@ -88,7 +93,11 @@ export function ScanFindingDetail({ finding, layout = "table" }: ScanFindingDeta
       <Section title="Evidence in the code" mono>
         {detail.evidence}
       </Section>
-      {finding.state === "needs_validation" ? <Section title="What a person should check">{detail.needs}</Section> : <Section title="Who could exploit it">{detail.actor}</Section>}
+      {finding.state === "needs_validation" ? (
+        <Section title="What a person should check">{detail.needs}</Section>
+      ) : (
+        <Section title="Who could exploit it">{detail.actor}</Section>
+      )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground lg:col-span-2">
         <span>
           Type <Badge variant="outline">{detail.class}</Badge>
@@ -98,4 +107,3 @@ export function ScanFindingDetail({ finding, layout = "table" }: ScanFindingDeta
     </div>
   );
 }
-

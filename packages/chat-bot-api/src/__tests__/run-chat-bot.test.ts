@@ -122,11 +122,7 @@ describe("runChatBot", () => {
     const chat = stubChat();
     await drain(runChatBot(input({ prompts: ["persona v2", "guard v1"] }), chat));
 
-    expect(mainOptions(chat)?.systemPrompts).toEqual([
-      "persona v2",
-      "guard v1",
-      CHAT_BOT_CONTRACT_PROMPT,
-    ]);
+    expect(mainOptions(chat)?.systemPrompts).toEqual(["persona v2", "guard v1", CHAT_BOT_CONTRACT_PROMPT]);
     expect(mainOptions(chat)?.outputSchema).toBeUndefined();
     expect(mainOptions(chat)?.stream).toBe(true);
   });
@@ -180,12 +176,7 @@ describe("runChatBot", () => {
 
     it("hands chat() the children, the router and the handoff strategy", async () => {
       const chat = stubChat();
-      await drain(
-        runChatBot(
-          input({ subagents: [calculator(new FakeAdapter("c"))], route: pickCalculator }),
-          chat,
-        ),
-      );
+      await drain(runChatBot(input({ subagents: [calculator(new FakeAdapter("c"))], route: pickCalculator }), chat));
 
       const bag = mainOptions(chat)?.subagents;
       expect(bag?.strategy).toBe("handoff");

@@ -1,5 +1,5 @@
 import type { Conflict, DbError, Forbidden, Invalid, NotFound } from "#/lib/effect-query";
-import type { TeamInviteEmail } from "#/modules/email";
+import type { QueuedEmail, TeamInviteEmail } from "#/modules/email";
 
 // -----
 // Failures a team service can end with.
@@ -23,6 +23,11 @@ export type NewInvite = {
 export type InviteMailer = {
   dashboardUrl: string;
   enqueue: (mail: TeamInviteEmail) => Promise<void>;
+};
+
+export type NoticeMailer = {
+  dashboardUrl: string;
+  enqueue: (mail: QueuedEmail) => Promise<void>;
 };
 
 export type AcceptInvite = {

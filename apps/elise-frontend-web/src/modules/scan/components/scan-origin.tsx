@@ -31,7 +31,9 @@ export function ScanOrigin({ scan }: { scan: Pick<ScanStatus, "branch" | "commit
           {scan.branch.split("/").at(-1) || scan.branch}
         </span>
       ) : (
-        <span title="A one-off scan of this commit. Its findings count toward the commit's answer but are not added to a branch's findings.">one-off scan</span>
+        <span title="A one-off scan of this commit. Its findings count toward the commit's answer but are not added to a branch's findings.">
+          one-off scan
+        </span>
       )}
       {commit && <span className="shrink-0 font-mono">{commit}</span>}
     </span>

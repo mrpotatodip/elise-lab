@@ -2,7 +2,13 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scans } from "@repo/db-elise/schema";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { addTopupEffect, balanceEffect, holdCreditEffect, renewCreditEffect, settleCreditEffect } from "#/modules/credit";
+import {
+  addTopupEffect,
+  balanceEffect,
+  holdCreditEffect,
+  renewCreditEffect,
+  settleCreditEffect,
+} from "#/modules/credit";
 
 let test: TestDb;
 let tenantId: string;
@@ -11,8 +17,10 @@ let repoId: string;
 const balance = (tenant = tenantId) => Effect.runPromise(balanceEffect(test.http, tenant));
 const renew = (key: string, grantUsd = 49, capUsd: number | null = 100) =>
   Effect.runPromise(renewCreditEffect(test.pool, { tenantId, grantUsd, capUsd, idempotencyKey: key }));
-const hold = (scanId: string, holdUsd: number) => Effect.runPromise(holdCreditEffect(test.pool, { tenantId, scanId, holdUsd }));
-const settle = (scanId: string, chargeUsd: number) => Effect.runPromise(settleCreditEffect(test.pool, { tenantId, scanId, chargeUsd }));
+const hold = (scanId: string, holdUsd: number) =>
+  Effect.runPromise(holdCreditEffect(test.pool, { tenantId, scanId, holdUsd }));
+const settle = (scanId: string, chargeUsd: number) =>
+  Effect.runPromise(settleCreditEffect(test.pool, { tenantId, scanId, chargeUsd }));
 const addScan = (id: string) => test.raw.insert(scans).values(scanValues(tenantId, repoId, id, "2026-11-11T00:00:00Z"));
 
 beforeAll(async () => {
@@ -54,7 +62,8 @@ describe("the credit balance", () => {
   });
 
   it("adds a topup once and past the cap", async () => {
-    const add = () => Effect.runPromise(addTopupEffect(test.http, { tenantId, amountUsd: 100, idempotencyKey: "cs_1" }));
+    const add = () =>
+      Effect.runPromise(addTopupEffect(test.http, { tenantId, amountUsd: 100, idempotencyKey: "cs_1" }));
 
     expect(await add()).toBe(true);
     expect(await add()).toBe(false);

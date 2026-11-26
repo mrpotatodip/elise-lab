@@ -3,9 +3,19 @@ import type { MeAccount } from "@repo/contracts/elise";
 import { safeRedirectPath } from "#/modules/auth/utils";
 import { denyAccountId, ipDiffers, preselectedAccountId, runnerAccounts } from "#/modules/device/utils";
 
-const account = (id: string, name: string, powers: string[] | undefined): MeAccount => ({ id, name, slug: name, role: "member", roleLabel: "Member", powers });
+const account = (id: string, name: string, powers: string[] | undefined): MeAccount => ({
+  id,
+  name,
+  slug: name,
+  role: "member",
+  roleLabel: "Member",
+  powers,
+});
 
-const ADMIN = account("11111111-1111-4111-8111-111111111111", "Acme", ["company:runners:create", "company:team:members:read"]);
+const ADMIN = account("11111111-1111-4111-8111-111111111111", "Acme", [
+  "company:runners:create",
+  "company:team:members:read",
+]);
 const MEMBER = account("22222222-2222-4222-8222-222222222222", "Beta", ["company:dashboard:read"]);
 const OLD_ENGINE = account("33333333-3333-4333-8333-333333333333", "Gamma", undefined);
 

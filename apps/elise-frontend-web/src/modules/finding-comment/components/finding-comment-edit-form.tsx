@@ -24,7 +24,13 @@ type FindingCommentEditFormProps = {
 // The text of one comment in a box, with Save and Cancel. The id
 // carries the comment id so two forms never share a label.
 // -----
-export function FindingCommentEditForm({ commentId, initialBody, pending, onSave, onCancel }: FindingCommentEditFormProps) {
+export function FindingCommentEditForm({
+  commentId,
+  initialBody,
+  pending,
+  onSave,
+  onCancel,
+}: FindingCommentEditFormProps) {
   const inputId = `finding-comment-edit-${commentId}`;
   const form = useForm({
     defaultValues: { body: initialBody },

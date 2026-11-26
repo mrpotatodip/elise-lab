@@ -1,5 +1,1 @@
-export type {
-  ResponseEnvelope,
-  PaginatedData,
-  PaginatedResponse,
-} from "./response";
+export type { ResponseEnvelope, PaginatedData, PaginatedResponse } from "./response";

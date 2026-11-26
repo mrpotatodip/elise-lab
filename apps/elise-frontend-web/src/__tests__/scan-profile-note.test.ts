@@ -7,7 +7,8 @@ describe("scanProfileNote", () => {
       kind: "lesser",
       badge: "Ran as Balanced",
       title: "Asked for Exhaustive. Ran as Balanced.",
-      detail: "The extra work that Exhaustive needs did not run. The findings are kept. Run the Scan again on a Runner or in the cloud for the full work.",
+      detail:
+        "The extra work that Exhaustive needs did not run. The findings are kept. Run the Scan again on a Runner or in the cloud for the full work.",
     });
   });
 
@@ -20,7 +21,8 @@ describe("scanProfileNote", () => {
       kind: "unmet",
       badge: "Did not run as asked",
       title: "Asked for Balanced. Its work did not run.",
-      detail: "This Scan did not do the work of Focused, Balanced or Exhaustive. The findings are kept, but they do not come from a full review. Run the Scan again on a Runner or in the cloud.",
+      detail:
+        "This Scan did not do the work of Focused, Balanced or Exhaustive. The findings are kept, but they do not come from a full review. Run the Scan again on a Runner or in the cloud.",
     });
   });
 

@@ -7,7 +7,10 @@ import { Client } from "pg";
 // -----
 const oneLine = (row: Record<string, unknown>) =>
   Object.entries(row)
-    .map(([key, value]) => `${key}=${value === null ? "null" : typeof value === "object" ? JSON.stringify(value) : String(value)}`)
+    .map(
+      ([key, value]) =>
+        `${key}=${value === null ? "null" : typeof value === "object" ? JSON.stringify(value) : String(value)}`,
+    )
     .join(" | ");
 
 async function main() {

@@ -1,12 +1,19 @@
 [package]
 name = "elise-runner-cli"
-version = "0.3.0"
+version = "0.6.0"
 description = "The headless Elise Runner: pairs and runs Scans from a terminal"
 edition = "2021"
 
 [[bin]]
 name = "elise-runner"
 path = "src/main.rs"
+
+# The stand-in for git, claude, node and the browser openers in the integration tests (see its header).
+[[bin]]
+name = "elise-stub-tool"
+path = "test-stubs/stub_tool.rs"
+test = false
+doc = false
 
 [dependencies]
 elise-runner-core = { path = "../core" }

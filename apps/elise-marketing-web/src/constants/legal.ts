@@ -16,8 +16,10 @@ export const SUB_PROCESSORS = [
   },
   {
     name: "Cloudflare",
-    purpose: "Hosts the dashboard and the engine, stores finished reports and zip files you upload, and sends the invitations and security notices by email.",
-    receives: "Everything the Runner sends to us, which is the report and its Findings, and the email address and text of each notice. It also receives a zip of source code if you upload one.",
+    purpose:
+      "Hosts the dashboard and the engine, stores finished reports and zip files you upload, and sends the invitations and security notices by email.",
+    receives:
+      "Everything the Runner sends to us, which is the report and its Findings, and the email address and text of each notice. It also receives a zip of source code if you upload one.",
     neverReceives: "Your card number, or code the Runner reads from a Git repository on your computer.",
   },
   {

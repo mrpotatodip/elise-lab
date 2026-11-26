@@ -3,9 +3,11 @@
 // app, so the Account's prefix check holds and removing an app
 // can find every zip of it.
 // -----
-export const archivePrefixOf = (accountId: string, repoId: string): string => `accounts/${accountId}/uploads/${repoId}/`;
+export const archivePrefixOf = (accountId: string, repoId: string): string =>
+  `accounts/${accountId}/uploads/${repoId}/`;
 
-export const archiveKeyOf = (accountId: string, repoId: string, archiveId: string): string => `${archivePrefixOf(accountId, repoId)}${archiveId}.zip`;
+export const archiveKeyOf = (accountId: string, repoId: string, archiveId: string): string =>
+  `${archivePrefixOf(accountId, repoId)}${archiveId}.zip`;
 
 // -----
 // A zip starts with a local file header, PK\3\4. An empty zip
@@ -76,7 +78,11 @@ export const zipContentsOf = (bytes: Uint8Array): ZipContents | null => {
     const name = decoder.decode(bytes.subarray(at + CENTRAL_SIZE, at + CENTRAL_SIZE + nameLength));
     let unpacked = u32(at + 24);
     if (unpacked === U32_MAX) {
-      for (let field = at + CENTRAL_SIZE + nameLength; field + 4 <= at + CENTRAL_SIZE + nameLength + extraLength; field += 4 + u16(field + 2)) {
+      for (
+        let field = at + CENTRAL_SIZE + nameLength;
+        field + 4 <= at + CENTRAL_SIZE + nameLength + extraLength;
+        field += 4 + u16(field + 2)
+      ) {
         if (u16(field) === ZIP64_EXTRA && fits(field + 4, 8)) unpacked = u64(field + 4);
       }
     }
@@ -91,4 +97,6 @@ export const zipContentsOf = (bytes: Uint8Array): ZipContents | null => {
 };
 
 export const sha256HexOf = async (bytes: ArrayBuffer): Promise<string> =>
-  [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");

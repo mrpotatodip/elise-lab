@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, index, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, integer, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { parties } from "./party";
 
@@ -14,6 +14,11 @@ export const authUser = pgTable("auth_user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  // -----
+  // True only after one valid Authenticator code at
+  // enrolment (better-auth's twoFactor plugin).
+  // -----
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   // -----
   // Every login belongs to exactly one Party,
   // a Person or an Organization; set on seed.
@@ -93,6 +98,31 @@ export const authVerification = pgTable(
   }),
 );
 
+// -----
+// One row per Login that started Two-factor setup.
+// secret and backup_codes are sealed by better-auth
+// under AUTH_SECRET. verified is false until the
+// first valid code; failed_verification_count and
+// locked_until are the second step's lockout.
+// -----
+export const authTwoFactor = pgTable(
+  "auth_two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "cascade" }),
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  },
+  (t) => ({
+    idxUserId: index("idx_auth_two_factor_user_id").on(t.userId),
+  }),
+);
+
 export const authUserRelations = relations(authUser, ({ many }) => ({
   sessions: many(authSession),
   accounts: many(authAccount),
@@ -110,4 +140,5 @@ export type TAuthUser = typeof authUser.$inferSelect;
 export type TNewAuthUser = typeof authUser.$inferInsert;
 export type TAuthSession = typeof authSession.$inferSelect;
 export type TAuthAccount = typeof authAccount.$inferSelect;
+export type TAuthTwoFactor = typeof authTwoFactor.$inferSelect;
 export type TAuthVerification = typeof authVerification.$inferSelect;

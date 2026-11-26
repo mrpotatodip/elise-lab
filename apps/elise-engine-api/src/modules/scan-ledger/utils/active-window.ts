@@ -9,7 +9,8 @@ import { SCANS_ACTIVE_FULL_WINDOW_MS, SCANS_ACTIVE_WINDOW_MS } from "#/constants
 // a newer request for its repo may close it. A full Scan runs longer, so
 // its window is longer.
 // -----
-export const activeWindowMsOf = (skill: ScanOptions["skill"]): number => (skill === "full" ? SCANS_ACTIVE_FULL_WINDOW_MS : SCANS_ACTIVE_WINDOW_MS);
+export const activeWindowMsOf = (skill: ScanOptions["skill"]): number =>
+  skill === "full" ? SCANS_ACTIVE_FULL_WINDOW_MS : SCANS_ACTIVE_WINDOW_MS;
 
 const lastLiveAt = (nowMs: number, skill: ScanOptions["skill"]) => new Date(nowMs - activeWindowMsOf(skill));
 
@@ -20,7 +21,10 @@ const lastLiveAt = (nowMs: number, skill: ScanOptions["skill"]) => new Date(nowM
 export const liveScansSql = (nowMs: number): SQL | undefined =>
   and(
     inArray(scans.status, ["queued", "running"]),
-    or(and(eq(scans.skill, "full"), gte(scans.updatedAt, lastLiveAt(nowMs, "full"))), and(ne(scans.skill, "full"), gte(scans.updatedAt, lastLiveAt(nowMs, "lite")))),
+    or(
+      and(eq(scans.skill, "full"), gte(scans.updatedAt, lastLiveAt(nowMs, "full"))),
+      and(ne(scans.skill, "full"), gte(scans.updatedAt, lastLiveAt(nowMs, "lite"))),
+    ),
   );
 
 // -----
@@ -29,5 +33,8 @@ export const liveScansSql = (nowMs: number): SQL | undefined =>
 export const stalledScansSql = (nowMs: number): SQL | undefined =>
   and(
     inArray(scans.status, ["queued", "running"]),
-    or(and(eq(scans.skill, "full"), lt(scans.updatedAt, lastLiveAt(nowMs, "full"))), and(ne(scans.skill, "full"), lt(scans.updatedAt, lastLiveAt(nowMs, "lite")))),
+    or(
+      and(eq(scans.skill, "full"), lt(scans.updatedAt, lastLiveAt(nowMs, "full"))),
+      and(ne(scans.skill, "full"), lt(scans.updatedAt, lastLiveAt(nowMs, "lite"))),
+    ),
   );

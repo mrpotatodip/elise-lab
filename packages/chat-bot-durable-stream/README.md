@@ -8,16 +8,16 @@ A client that drops mid-reply reconnects with `Last-Event-ID` and gets the rest 
 
 1. Add `"@repo/chat-bot-durable-stream": "workspace:*"` to the app, and to the app's DB package.
 2. In the DB package, re-export the tables so drizzle-kit migrates them:
+
    ```ts
    // src/schema/chat-bot-durable-stream.ts
-   export {
-     chatBotDurableStreamChunks,
-     chatBotDurableStreams,
-   } from "@repo/chat-bot-durable-stream/tables";
+   export { chatBotDurableStreamChunks, chatBotDurableStreams } from "@repo/chat-bot-durable-stream/tables";
    ```
+
    Then run `drizzle-kit generate` and `drizzle-kit migrate`. Import from `/tables`, not the root entry: drizzle-kit loads schema files with `require`, and the root pulls in ESM-only `@tanstack/ai`.
 
    No drizzle-kit? Run [`sql/chat-bot-durable-stream.sql`](sql/chat-bot-durable-stream.sql) against the database instead. It's safe to run twice, and a test fails if it drifts from the Drizzle tables.
+
 3. Pick a `streamPrefix` for the app (for example `"my-agent"`). Apps sharing a database keep their runs apart by prefix.
 
 ## Two ways to use it
@@ -51,14 +51,13 @@ export function chatBotDurableStreams(db) {
 }
 
 // handlers
-durableStream({ runId });             // producer, in waitUntil
-durableStream({ runId, offset });     // SSE reader
-durableStream({ runId }).close();     // setup failed before streaming
+durableStream({ runId }); // producer, in waitUntil
+durableStream({ runId, offset }); // SSE reader
+durableStream({ runId }).close(); // setup failed before streaming
 
 // tests
 const store = memoryChatBotDurableStreamStore();
-const durableStream = (init) =>
-  createChatBotDurableStream(store, { ...init, ...chatBotDurableStreamOptions });
+const durableStream = (init) => createChatBotDurableStream(store, { ...init, ...chatBotDurableStreamOptions });
 ```
 
 Handlers pass the run id they already checked, never the raw request, so a request can't pick a run its user doesn't own.
@@ -71,7 +70,7 @@ Use this when you want to call the store directly (for example `store.prune()` w
 import { createChatBotDurableStream } from "@repo/chat-bot-durable-stream";
 import { pgChatBotDurableStreamStore } from "@repo/chat-bot-durable-stream/server";
 
-const store = pgChatBotDurableStreamStore(db);        // tests: memoryChatBotDurableStreamStore()
+const store = pgChatBotDurableStreamStore(db); // tests: memoryChatBotDurableStreamStore()
 const adapter = createChatBotDurableStream(store, { runId, offset, streamPrefix: "my-agent" });
 ```
 
@@ -125,10 +124,10 @@ Readers poll Postgres every `pollMs` (default 50ms, two queries per poll, sent i
 
 ## Entry points and dependencies
 
-| Import | Needs | For |
-|---|---|---|
+| Import                          | Needs          | For                                                                              |
+| ------------------------------- | -------------- | -------------------------------------------------------------------------------- |
 | `@repo/chat-bot-durable-stream` | `@tanstack/ai` | The adapter, offsets, `produceChatBotDurableRun`, the memory store. No database. |
-| `.../server` | `drizzle-orm` | `pgChatBotDurableStream`, the Postgres store and its `db` type. |
-| `.../tables` | `drizzle-orm` | The two Drizzle tables, for your migrations. |
+| `.../server`                    | `drizzle-orm`  | `pgChatBotDurableStream`, the Postgres store and its `db` type.                  |
+| `.../tables`                    | `drizzle-orm`  | The two Drizzle tables, for your migrations.                                     |
 
 `@tanstack/ai` and `zod` are peer dependencies, so the host and the package share one copy. `drizzle-orm` is an optional peer: a host that keeps its stream log in memory never installs it.

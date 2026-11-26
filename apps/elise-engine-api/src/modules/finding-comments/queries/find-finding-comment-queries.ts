@@ -8,7 +8,11 @@ import { toDbError, type DbError } from "#/lib/effect-query";
 // One comment of the Account, or null. The tenant filter
 // stays here as well as in the row-level security.
 // -----
-export const findFindingCommentEffect = (db: AppDbType, tenantId: string, commentId: string): Effect.Effect<TFindingComment | null, DbError> =>
+export const findFindingCommentEffect = (
+  db: AppDbType,
+  tenantId: string,
+  commentId: string,
+): Effect.Effect<TFindingComment | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db

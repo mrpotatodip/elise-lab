@@ -1,0 +1,4 @@
+# Mechanical oxfmt reformats (spec #404). `git blame` skips these commits when
+# `git config blame.ignoreRevsFile .git-blame-ignore-revs` is set; GitHub reads this file by itself.
+# `main` takes squash merges only, so a branch commit's SHA never exists on `main`: list the
+# SHA the squash merge produced, in a follow-up commit.

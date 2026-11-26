@@ -137,10 +137,7 @@ export function createDrizzleChatBotStore(options: DrizzleChatBotStoreOptions): 
       Effect.tryPromise({
         try: () =>
           db.transaction(async (tx) => {
-            const [thread] = await tx
-              .insert(threads)
-              .values({ title, trigger, module })
-              .returning({ id: threads.id });
+            const [thread] = await tx.insert(threads).values({ title, trigger, module }).returning({ id: threads.id });
             if (!thread) throw new Error("insertThreadWithRun() returned no thread");
             await tx.insert(threadSessions).values({
               threadId: thread.id,
@@ -169,9 +166,7 @@ export function createDrizzleChatBotStore(options: DrizzleChatBotStoreOptions): 
       Effect.tryPromise({
         try: () =>
           db.transaction(async (tx) => {
-            await tx
-              .insert(messages)
-              .values({ threadId, scopeId, role: "assistant", content, toolsUsed, structure });
+            await tx.insert(messages).values({ threadId, scopeId, role: "assistant", content, toolsUsed, structure });
             await tx.update(threads).set({ updatedAt: new Date() }).where(eq(threads.id, threadId));
           }),
         catch: toChatBotDbError,
@@ -206,9 +201,7 @@ export function createDrizzleChatBotStore(options: DrizzleChatBotStoreOptions): 
             .set({
               expiresAt: sql`least(now() + ${`${idleMs} milliseconds`}::interval, ${threadSessions.createdAt} + ${`${hardCapMs} milliseconds`}::interval)`,
             })
-            .where(
-              and(eq(threadSessions.threadId, threadId), sql`${threadSessions.anonymousId} IS NOT NULL`),
-            ),
+            .where(and(eq(threadSessions.threadId, threadId), sql`${threadSessions.anonymousId} IS NOT NULL`)),
         catch: toChatBotDbError,
       }).pipe(Effect.asVoid),
 
@@ -303,8 +296,7 @@ export function createDrizzleChatBotStore(options: DrizzleChatBotStoreOptions): 
     deleteThread: (owner, threadId) =>
       Effect.gen(function* () {
         const rows = yield* Effect.tryPromise({
-          try: () =>
-            db.delete(threads).where(ownedThread(owner, threadId)).returning({ id: threads.id }),
+          try: () => db.delete(threads).where(ownedThread(owner, threadId)).returning({ id: threads.id }),
           catch: toChatBotDbError,
         });
         const row = rows[0];

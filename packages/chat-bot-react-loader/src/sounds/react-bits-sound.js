@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from "react";
 
 const TAU = Math.PI * 2;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-const db = value => Math.pow(10, value / 20);
+const db = (value) => Math.pow(10, value / 20);
 
-const random = seed => {
+const random = (seed) => {
   let state = seed >>> 0 || 1;
   return () => {
     state = (state + 1831565813) >>> 0;
@@ -19,7 +19,7 @@ const random = seed => {
   };
 };
 
-const filterType = type => (type === 'highpass' || type === 'bandpass' ? type : 'lowpass');
+const filterType = (type) => (type === "highpass" || type === "bandpass" ? type : "lowpass");
 
 const normalizeTune = (tune = {}) => ({
   pitch: clamp(tune.pitch ?? 0, -24, 24),
@@ -33,7 +33,7 @@ const normalizeTune = (tune = {}) => ({
     ? {
         mix: clamp(tune.reverb.mix ?? 0.25, 0, 1),
         decay: clamp(tune.reverb.decay ?? 1.4, 0.1, 12),
-        tone: clamp(tune.reverb.tone ?? 0, -1, 1)
+        tone: clamp(tune.reverb.tone ?? 0, -1, 1),
       }
     : null,
   echo: tune.echo
@@ -42,7 +42,7 @@ const normalizeTune = (tune = {}) => ({
         feedback: clamp(tune.echo.feedback ?? 0.35, 0, 0.95),
         mix: clamp(tune.echo.mix ?? 0.25, 0, 1),
         tone: clamp(tune.echo.tone ?? 0, -1, 1),
-        pingPong: Boolean(tune.echo.pingPong)
+        pingPong: Boolean(tune.echo.pingPong),
       }
     : null,
   filter: tune.filter
@@ -50,30 +50,30 @@ const normalizeTune = (tune = {}) => ({
         type: filterType(tune.filter.type),
         cutoff: clamp(tune.filter.cutoff ?? 1e3, 20, 2e4),
         resonance: clamp(tune.filter.resonance ?? 0.4, 0, 1),
-        sweep: clamp(tune.filter.sweep ?? 0, -1, 1)
+        sweep: clamp(tune.filter.sweep ?? 0, -1, 1),
       }
     : null,
   chorus: tune.chorus
     ? {
         mix: clamp(tune.chorus.mix ?? 0.5, 0, 1),
         rate: clamp(tune.chorus.rate ?? 0.9, 0.05, 8),
-        depth: clamp(tune.chorus.depth ?? 0.5, 0, 1)
+        depth: clamp(tune.chorus.depth ?? 0.5, 0, 1),
       }
     : null,
   lofi: tune.lofi
     ? {
         bits: clamp(Math.round(tune.lofi.bits ?? 5), 2, 16),
         rate: clamp(tune.lofi.rate ?? 6e3, 500, 48e3),
-        mix: clamp(tune.lofi.mix ?? 0.7, 0, 1)
+        mix: clamp(tune.lofi.mix ?? 0.7, 0, 1),
       }
-    : null
+    : null,
 });
 
 const rampShape = (ramp, scaleTime, log) => {
-  if (typeof ramp === 'number') return () => ramp;
-  if ('points' in ramp) {
+  if (typeof ramp === "number") return () => ramp;
+  if ("points" in ramp) {
     const points = ramp.points.map(([time, value]) => [time * scaleTime, value]);
-    return time => {
+    return (time) => {
       if (time <= points[0][0]) return points[0][1];
       for (let i = 1; i < points.length; i += 1) {
         const [t1, v1] = points[i];
@@ -90,7 +90,7 @@ const rampShape = (ramp, scaleTime, log) => {
   const delay = (ramp.delay ?? 0) * scaleTime;
   const span = Math.max(1e-4, (ramp.time ?? 0.1) * scaleTime);
   const curve = ramp.curve ?? 2;
-  return time => {
+  return (time) => {
     const y = clamp((time - delay) / span, 0, 1);
     const e = curve >= 1 ? 1 - Math.pow(1 - y, curve) : Math.pow(y, 1 / curve);
     return log && ramp.from > 0 && ramp.to > 0
@@ -111,8 +111,8 @@ const envelopeShape = (env, stretch, decayScale = 1) => {
   const release = Math.max(2e-3, (env.release ?? 0.1) * stretch);
   const k = env.curve ?? 5;
   const rise = env.rise;
-  const fall = y => (Math.exp(-k * y) - Math.exp(-k)) / (1 - Math.exp(-k));
-  return time => {
+  const fall = (y) => (Math.exp(-k * y) - Math.exp(-k)) / (1 - Math.exp(-k));
+  return (time) => {
     if (time <= 0) return 0;
     if (time < attack) {
       const y = time / attack;
@@ -129,7 +129,7 @@ const envelopeShape = (env, stretch, decayScale = 1) => {
   };
 };
 
-const applyCurve = (param, shape, start, length, rate, map = v => v) => {
+const applyCurve = (param, shape, start, length, rate, map = (v) => v) => {
   const steps = clamp(Math.ceil(length * rate), 2, 4096);
   const values = new Float32Array(steps);
   for (let i = 0; i < steps; i += 1) values[i] = map(shape((i / (steps - 1)) * length));
@@ -153,9 +153,9 @@ const noiseBuffer = (context, color, length, seed) => {
   const density = 45 / context.sampleRate;
   for (let i = 0; i < frames; i += 1) {
     const white = next() * 2 - 1;
-    if (color === 'crackle') {
+    if (color === "crackle") {
       data[i] = next() < density ? white * (0.4 + next() * 0.6) : 0;
-    } else if (color === 'pink') {
+    } else if (color === "pink") {
       b0 = 0.99886 * b0 + white * 0.0555179;
       b1 = 0.99332 * b1 + white * 0.0750759;
       b2 = 0.969 * b2 + white * 0.153852;
@@ -164,7 +164,7 @@ const noiseBuffer = (context, color, length, seed) => {
       b5 = -0.7616 * b5 - white * 0.016898;
       data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
       b6 = white * 0.115926;
-    } else if (color === 'brown') {
+    } else if (color === "brown") {
       brown = (brown + 0.02 * white) / 1.02;
       data[i] = brown * 3.5;
     } else {
@@ -207,7 +207,7 @@ const impulse = (context, decay, predelay, damp, seed) => {
   return buffer;
 };
 
-const shaper = amount => {
+const shaper = (amount) => {
   const curve = new Float32Array(2048);
   const drive = 1 + amount * 6;
   const norm = Math.tanh(drive);
@@ -218,9 +218,9 @@ const shaper = amount => {
   return curve;
 };
 
-const filters = layer => (layer.filter ? (Array.isArray(layer.filter) ? layer.filter : [layer.filter]) : []);
+const filters = (layer) => (layer.filter ? (Array.isArray(layer.filter) ? layer.filter : [layer.filter]) : []);
 
-const decodePcm = data => {
+const decodePcm = (data) => {
   const bytes = atob(data);
   const pcm = new Float32Array(bytes.length >> 1);
   for (let i = 0; i < pcm.length; i += 1) {
@@ -230,11 +230,11 @@ const decodePcm = data => {
   return pcm;
 };
 
-const variantsOf = recipe =>
+const variantsOf = (recipe) =>
   recipe.layers.reduce(
     (count, layer) =>
-      layer.type === 'sample' ? Math.max(count, (layer.data ?? recipe.samples?.data ?? []).length) : count,
-    1
+      layer.type === "sample" ? Math.max(count, (layer.data ?? recipe.samples?.data ?? []).length) : count,
+    1,
   );
 
 const buildLayer = (context, layer, index, destination, recipe, tune, end, variant) => {
@@ -243,7 +243,7 @@ const buildLayer = (context, layer, index, destination, recipe, tune, end, varia
   const ratio = Math.pow(2, tune.pitch / 12);
   const start = (layer.at ?? 0) * stretch;
   const env = layer.env ?? { attack: 2e-3, decay: 0.2 };
-  const sample = layer.type === 'sample' ? layer : null;
+  const sample = layer.type === "sample" ? layer : null;
   const bank = sample?.data ? { rate: sample.rate ?? 48e3, data: sample.data } : sample ? recipe.samples : void 0;
   const pcm =
     sample && bank?.data.length ? decodePcm(bank.data[(variant + (sample.offset ?? 0)) % bank.data.length]) : null;
@@ -272,25 +272,25 @@ const buildLayer = (context, layer, index, destination, recipe, tune, end, varia
     output.connect(wobble);
     tail = wobble;
   }
-  filters(layer).forEach(spec => {
+  filters(layer).forEach((spec) => {
     const node = context.createBiquadFilter();
     node.type = spec.type;
     if (spec.gain !== void 0) node.gain.value = spec.gain;
     const freqShape2 = rampShape(spec.freq, stretch, true);
-    applyCurve(node.frequency, freqShape2, start, span, 400, value => clamp(value * ratio, 10, nyquist));
+    applyCurve(node.frequency, freqShape2, start, span, 400, (value) => clamp(value * ratio, 10, nyquist));
     if (spec.q !== void 0) applyCurve(node.Q, rampShape(spec.q, stretch, false), start, span, 200);
     tail.connect(node);
     tail = node;
   });
   if (layer.pan !== void 0) {
     const panner = context.createStereoPanner();
-    applyCurve(panner.pan, rampShape(layer.pan, stretch, false), start, span, 200, value => clamp(value, -1, 1));
+    applyCurve(panner.pan, rampShape(layer.pan, stretch, false), start, span, 200, (value) => clamp(value, -1, 1));
     tail.connect(panner);
     tail = panner;
   }
   tail.connect(destination);
   const seed = (recipe.seed ?? 1) * 7919 + index * 104729;
-  if (layer.type === 'sample') {
+  if (layer.type === "sample") {
     if (!pcm || !bank) return;
     const buffer = context.createBuffer(1, pcm.length, bank.rate);
     buffer.copyToChannel(pcm, 0);
@@ -308,9 +308,9 @@ const buildLayer = (context, layer, index, destination, recipe, tune, end, varia
     source.start(start);
     return;
   }
-  if (layer.type === 'noise') {
+  if (layer.type === "noise") {
     const source = context.createBufferSource();
-    source.buffer = noiseBuffer(context, layer.color ?? 'white', span + 0.05, seed);
+    source.buffer = noiseBuffer(context, layer.color ?? "white", span + 0.05, seed);
     const amp = context.createGain();
     applyCurve(amp.gain, envelopeShape(env, stretch), start, span, 600);
     source.connect(amp);
@@ -327,7 +327,7 @@ const buildLayer = (context, layer, index, destination, recipe, tune, end, varia
   const spread = layer.detune ?? 0;
   partials.forEach(([partialRatio, partialGain, decayScale], partialIndex) => {
     const amp = context.createGain();
-    applyCurve(amp.gain, envelopeShape(env, stretch, decayScale), start, span, 600, value => value * partialGain);
+    applyCurve(amp.gain, envelopeShape(env, stretch, decayScale), start, span, 600, (value) => value * partialGain);
     amp.connect(output);
     for (let voice = 0; voice < voices; voice += 1) {
       const osc = context.createOscillator();
@@ -339,10 +339,12 @@ const buildLayer = (context, layer, index, destination, recipe, tune, end, varia
         });
         osc.setPeriodicWave(context.createPeriodicWave(real, imag));
       } else {
-        osc.type = layer.wave ?? 'sine';
+        osc.type = layer.wave ?? "sine";
       }
       const offset = voices > 1 ? (voice / (voices - 1) - 0.5) * 2 * spread : 0;
-      applyCurve(osc.frequency, freqShape, start, span, 400, value => clamp(value * ratio * partialRatio, 1, nyquist));
+      applyCurve(osc.frequency, freqShape, start, span, 400, (value) =>
+        clamp(value * ratio * partialRatio, 1, nyquist),
+      );
       osc.detune.value = offset;
       if (layer.vibrato) {
         const lfo = context.createOscillator();
@@ -358,9 +360,9 @@ const buildLayer = (context, layer, index, destination, recipe, tune, end, varia
         const fm = layer.fm;
         const mod = context.createOscillator();
         const depth = context.createGain();
-        applyCurve(mod.frequency, freqShape, start, span, 400, value => clamp(value * ratio * fm.ratio, 1, nyquist));
+        applyCurve(mod.frequency, freqShape, start, span, 400, (value) => clamp(value * ratio * fm.ratio, 1, nyquist));
         const indexShape = rampShape(fm.index, stretch, false);
-        applyCurve(depth.gain, time => indexShape(time) * freqShape(time) * ratio * fm.ratio, start, span, 400);
+        applyCurve(depth.gain, (time) => indexShape(time) * freqShape(time) * ratio * fm.ratio, start, span, 400);
         mod.connect(depth);
         depth.connect(osc.frequency);
         mod.start(start);
@@ -404,7 +406,7 @@ const finish = (buffer, recipe, tune) => {
   if (recipe.stutter) {
     const next = random((recipe.seed ?? 1) * 131 + 7);
     const slice = Math.max(32, Math.round(recipe.stutter.slice * tune.length * rate));
-    const copies = channels.map(data => data.slice());
+    const copies = channels.map((data) => data.slice());
     for (let start = 0; start < copies[0].length; start += slice) {
       const roll = next();
       const repeat = roll < recipe.stutter.chance;
@@ -421,7 +423,7 @@ const finish = (buffer, recipe, tune) => {
   if (recipe.crush) {
     const levels = Math.pow(2, Math.round(16 - recipe.crush * 12));
     const hold = Math.max(1, Math.round(1 + recipe.crush * 10));
-    channels.forEach(data => {
+    channels.forEach((data) => {
       let held = 0;
       for (let i = 0; i < data.length; i += 1) {
         if (i % hold === 0) held = Math.round(data[i] * levels) / levels;
@@ -429,10 +431,10 @@ const finish = (buffer, recipe, tune) => {
       }
     });
   }
-  if (recipe.reverse) channels.forEach(data => data.reverse());
+  if (recipe.reverse) channels.forEach((data) => data.reverse());
   const floor = db(-70);
   let first = channels[0].length;
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = 0; i < first; i += 1) {
       if (Math.abs(data[i]) > floor) {
         first = i;
@@ -442,13 +444,13 @@ const finish = (buffer, recipe, tune) => {
   });
   const lead = Math.max(0, first - Math.round(rate * 2e-3));
   if (lead > 0) {
-    channels.forEach(data => {
+    channels.forEach((data) => {
       data.copyWithin(0, lead);
       data.fill(0, data.length - lead);
     });
   }
   let last = 0;
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = data.length - 1; i > last; i -= 1) {
       if (Math.abs(data[i]) > floor) {
         last = i;
@@ -460,7 +462,7 @@ const finish = (buffer, recipe, tune) => {
   const fadeOut = Math.min(Math.round(rate * 0.02), length);
   const fadeIn = Math.round(rate * 6e-4);
   let mean = 0;
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = 0; i < length; i += 1) mean += data[i];
   });
   mean /= length * channels.length;
@@ -468,12 +470,12 @@ const finish = (buffer, recipe, tune) => {
   const target = db(recipe.loudness ?? -16);
   let gain = level > 1e-6 ? target / level : 1;
   let peak = 0;
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = 0; i < length; i += 1) peak = Math.max(peak, Math.abs(data[i] - mean));
   });
   if (peak * gain > db(-1)) gain = db(-1) / peak;
   gain *= db(tune.volume) * db(recipe.gain ?? 0);
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = 0; i < data.length; i += 1) {
       if (i >= length) {
         data[i] = 0;
@@ -498,20 +500,20 @@ const trimmed = (source, length) => {
   return buffer;
 };
 
-const channelsOf = buffer =>
+const channelsOf = (buffer) =>
   Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
 
-const peakOf = channels => {
+const peakOf = (channels) => {
   let peak = 0;
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = 0; i < data.length; i += 1) peak = Math.max(peak, Math.abs(data[i]));
   });
   return peak;
 };
 
-const balance = mix => [Math.cos((mix * Math.PI) / 2), Math.sin((mix * Math.PI) / 2)];
+const balance = (mix) => [Math.cos((mix * Math.PI) / 2), Math.sin((mix * Math.PI) / 2)];
 
-const predelayOf = decay => clamp(4e-3 + decay * 6e-3, 4e-3, 0.03);
+const predelayOf = (decay) => clamp(4e-3 + decay * 6e-3, 4e-3, 0.03);
 
 const addEcho = (context, input, echo) => {
   const [dryLevel, wetLevel] = balance(echo.mix);
@@ -526,19 +528,19 @@ const addEcho = (context, input, echo) => {
   const send = context.createGain();
   if (echo.pingPong) {
     send.channelCount = 1;
-    send.channelCountMode = 'explicit';
+    send.channelCountMode = "explicit";
   }
   input.connect(send);
   const nyquist = context.sampleRate / 2 - 200;
-  const taps = (echo.pingPong ? [-0.7, 0.7] : [0]).map(side => {
+  const taps = (echo.pingPong ? [-0.7, 0.7] : [0]).map((side) => {
     const delay = context.createDelay(2.5);
     delay.delayTime.value = echo.time;
     const damp = context.createBiquadFilter();
-    damp.type = 'lowpass';
+    damp.type = "lowpass";
     damp.frequency.value = Math.min(nyquist, 4200 * Math.pow(2, echo.tone * 1.6));
     damp.Q.value = 0.5;
     const thin = context.createBiquadFilter();
-    thin.type = 'highpass';
+    thin.type = "highpass";
     thin.frequency.value = 140;
     thin.Q.value = 0.5;
     const pan = context.createStereoPanner();
@@ -567,7 +569,7 @@ const addReverb = (context, input, reverb, seed) => {
   input.connect(dry);
   dry.connect(output);
   const thin = context.createBiquadFilter();
-  thin.type = 'highpass';
+  thin.type = "highpass";
   thin.frequency.value = 160;
   thin.Q.value = 0.5;
   const convolver = context.createConvolver();
@@ -641,7 +643,7 @@ const crunch = (source, lofi) => {
   const buffer = new AudioBuffer({
     length: source.length,
     numberOfChannels: source.numberOfChannels,
-    sampleRate: rate
+    sampleRate: rate,
   });
   for (let channel = 0; channel < source.numberOfChannels; channel += 1) {
     const input = source.getChannelData(channel);
@@ -674,7 +676,7 @@ const settle = (buffer, reference) => {
   if (peak * gain > ceiling) gain = ceiling / peak;
   const floor = db(-70);
   let last = 0;
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = data.length - 1; i > last; i -= 1) {
       if (Math.abs(data[i] * gain) > floor) {
         last = i;
@@ -684,7 +686,7 @@ const settle = (buffer, reference) => {
   });
   const length = Math.min(buffer.length, last + Math.round(rate * 0.02));
   const fade = Math.min(Math.round(rate * 0.02), length);
-  channels.forEach(data => {
+  channels.forEach((data) => {
     for (let i = 0; i < length; i += 1) {
       let value = data[i] * gain;
       const remaining = length - i;
@@ -736,19 +738,19 @@ async function renderSound(recipe, tune = {}, options = {}) {
   const variant = Math.max(0, Math.floor(options.variant ?? 0));
   recipe.layers.forEach((layer, index) => buildLayer(context, layer, index, bus, recipe, t, body, variant));
   const highpass = context.createBiquadFilter();
-  highpass.type = 'highpass';
+  highpass.type = "highpass";
   highpass.frequency.value = recipe.highpass ?? 24;
   highpass.Q.value = 0.6;
   const lowpass = context.createBiquadFilter();
-  lowpass.type = 'lowpass';
+  lowpass.type = "lowpass";
   lowpass.frequency.value = clamp((recipe.lowpass ?? 16e3) * (1 + t.tone * 0.35), 400, rate / 2 - 200);
   lowpass.Q.value = 0.5;
   const low = context.createBiquadFilter();
-  low.type = 'lowshelf';
+  low.type = "lowshelf";
   low.frequency.value = 280;
   low.gain.value = -t.tone * 4;
   const high = context.createBiquadFilter();
-  high.type = 'highshelf';
+  high.type = "highshelf";
   high.frequency.value = 3600;
   high.gain.value = t.tone * 7;
   bus.connect(highpass);
@@ -762,7 +764,7 @@ async function renderSound(recipe, tune = {}, options = {}) {
     headroom.gain.value = 0.5;
     const shape = context.createWaveShaper();
     shape.curve = shaper(drive);
-    shape.oversample = '4x';
+    shape.oversample = "4x";
     chain.connect(headroom);
     headroom.connect(shape);
     chain = shape;
@@ -777,7 +779,7 @@ async function renderSound(recipe, tune = {}, options = {}) {
     wet.gain.value = spaceMix * 2.2;
     if (reverb.lowcut) {
       const lowcut = context.createBiquadFilter();
-      lowcut.type = 'highpass';
+      lowcut.type = "highpass";
       lowcut.frequency.value = reverb.lowcut;
       lowcut.Q.value = 0.5;
       chain.connect(lowcut);
@@ -794,7 +796,7 @@ async function renderSound(recipe, tune = {}, options = {}) {
     const feedback = context.createGain();
     feedback.gain.value = clamp(recipe.echo.feedback, 0, 0.92);
     const damp = context.createBiquadFilter();
-    damp.type = 'lowpass';
+    damp.type = "lowpass";
     damp.frequency.value = recipe.echo.damp ?? 4200;
     const wet = context.createGain();
     wet.gain.value = recipe.echo.mix;
@@ -825,7 +827,7 @@ const lastVariant = /* @__PURE__ */ new WeakMap();
 
 let nextId = 1;
 
-const recipeId = recipe => {
+const recipeId = (recipe) => {
   let id = ids.get(recipe);
   if (!id) {
     id = nextId;
@@ -838,12 +840,12 @@ const recipeId = recipe => {
 const audio = () => {
   if (!sharedContext) {
     const Context = window.AudioContext || window.webkitAudioContext;
-    sharedContext = new Context({ latencyHint: 'interactive' });
+    sharedContext = new Context({ latencyHint: "interactive" });
   }
   return sharedContext;
 };
 
-const pickVariant = recipe => {
+const pickVariant = (recipe) => {
   const count = variantsOf(recipe);
   if (count < 2) return 0;
   const last = lastVariant.get(recipe) ?? -1;
@@ -864,7 +866,7 @@ const bufferFor = (recipe, tune, rate, variant = 0) => {
     echo: tune.echo,
     filter: tune.filter,
     chorus: tune.chorus,
-    lofi: tune.lofi
+    lofi: tune.lofi,
   };
   const key = `${recipeId(recipe)}:${rate}:${variant}:${JSON.stringify(shape)}`;
   let pending = cache.get(key);
@@ -885,16 +887,16 @@ function setSoundMuted(value) {
 }
 
 function preloadSound(recipe, tune = {}) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   for (let variant = 0; variant < variantsOf(recipe); variant += 1) {
     bufferFor(recipe, tune, audio().sampleRate, variant).catch(() => void 0);
   }
 }
 
 async function playSound(recipe, tune = {}) {
-  if (typeof window === 'undefined' || muted || masterVolume <= 0) return;
+  if (typeof window === "undefined" || muted || masterVolume <= 0) return;
   const context = audio();
-  if (context.state === 'suspended') await context.resume();
+  if (context.state === "suspended") await context.resume();
   const buffer = await bufferFor(recipe, tune, context.sampleRate, pickVariant(recipe));
   const source = context.createBufferSource();
   source.buffer = buffer;
@@ -905,7 +907,7 @@ async function playSound(recipe, tune = {}) {
   source.connect(gain);
   gain.connect(context.destination);
   source.start();
-  await new Promise(resolve => {
+  await new Promise((resolve) => {
     source.onended = () => resolve();
   });
 }

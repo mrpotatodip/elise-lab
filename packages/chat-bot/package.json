@@ -1,9 +1,9 @@
 {
   "name": "@repo/chat-bot",
   "version": "1.0.0",
+  "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./chat": "./src/chat/index.ts",

@@ -7,6 +7,10 @@ export const Route = createFileRoute("/_app/groups")({
   beforeLoad: ({ context }) => {
     if (!hasAccessPower(context.user?.powers ?? [], "company:team:members:read")) throw redirect({ to: "/overview" });
   },
-  loader: ({ context }) => Promise.all([context.queryClient.query({ ...teamQuery(), staleTime: "static" }), context.queryClient.query({ ...groupsQuery(), staleTime: "static" })]),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.query({ ...teamQuery(), staleTime: "static" }),
+      context.queryClient.query({ ...groupsQuery(), staleTime: "static" }),
+    ]),
   component: GroupsPage,
 });

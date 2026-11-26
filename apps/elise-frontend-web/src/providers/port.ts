@@ -55,10 +55,9 @@ export type SourceArchivePickerProps = { startRepoId?: string; onPick: (pick: So
 
 // -----
 // The provider's own part of a Repo page: an upload app's zips,
-// with upload and remove. onRemoved runs once the whole app is
-// gone, so the page can leave.
+// with upload and remove.
 // -----
-export type SourceRepoPanelProps = { repoId: string; name: string; onRemoved: () => void };
+export type SourceRepoPanelProps = { repoId: string };
 
 // -----
 // available: the provider's flow is built, so the picker

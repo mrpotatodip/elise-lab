@@ -40,16 +40,24 @@ function SummaryOverview({ repos }: { repos: readonly Repo[] }) {
         <Column label="Where you stand">
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {needing.length}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {scanned.length} need attention</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              of {scanned.length} need attention
+            </span>
           </p>
-          <Progress value={percent} indicatorClassName="bg-primary/55" aria-label={`Clear: ${clear} of ${scanned.length} repositories`} />
+          <Progress
+            value={percent}
+            indicatorClassName="bg-primary/55"
+            aria-label={`Clear: ${clear} of ${scanned.length} repositories`}
+          />
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{summaryStanding(repos)}</p>
         </Column>
 
         <Column label="What is still open">
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">{totals.total}</p>
           {totals.total === 0 ? (
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Nothing is open across your repositories.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Nothing is open across your repositories.
+            </p>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -62,9 +70,21 @@ function SummaryOverview({ repos }: { repos: readonly Repo[] }) {
                 )}
               </div>
               <ul className="grid gap-1 text-sm leading-relaxed text-muted-foreground">
-                <li>{totals.regressed > 0 ? `${totals.regressed} came back after a fix. Look at these first.` : "Nothing that was fixed has returned."}</li>
-                <li>{totals.needsValidation > 0 ? `${totals.needsValidation} likely but unverified. Check by hand before acting.` : "Every open finding was verified."}</li>
-                {totals.unchecked > 0 && <li>{totals.unchecked} not seen by the latest full scan. They stay open until a person decides them.</li>}
+                <li>
+                  {totals.regressed > 0
+                    ? `${totals.regressed} came back after a fix. Look at these first.`
+                    : "Nothing that was fixed has returned."}
+                </li>
+                <li>
+                  {totals.needsValidation > 0
+                    ? `${totals.needsValidation} likely but unverified. Check by hand before acting.`
+                    : "Every open finding was verified."}
+                </li>
+                {totals.unchecked > 0 && (
+                  <li>
+                    {totals.unchecked} not seen by the latest full scan. They stay open until a person decides them.
+                  </li>
+                )}
               </ul>
             </>
           )}
@@ -78,10 +98,16 @@ function SummaryOverview({ repos }: { repos: readonly Repo[] }) {
               <ul className="divide-y rounded-lg border">
                 {needing.slice(0, 3).map((repo) => (
                   <li key={repo.id}>
-                    <Link to="/summary/$repoId" params={{ repoId: repo.id }} className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                    <Link
+                      to="/summary/$repoId"
+                      params={{ repoId: repo.id }}
+                      className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
                       <span className="truncate text-sm font-medium">{repoName(repo.url)}</span>
                       <span className="flex shrink-0 items-center gap-2">
-                        {repo.open.regressed > 0 && <Badge variant="destructive">{repo.open.regressed} came back</Badge>}
+                        {repo.open.regressed > 0 && (
+                          <Badge variant="destructive">{repo.open.regressed} came back</Badge>
+                        )}
                         <span className="text-sm tabular-nums text-muted-foreground">{repo.open.total} open</span>
                       </span>
                     </Link>
@@ -110,7 +136,11 @@ const columns = column.columns([
         <span className="grid gap-0.5">
           <span className="flex items-center gap-2.5">
             {repoStatus(repo) === "attention" ? (
-              <Link to="/summary/$repoId" params={{ repoId: repo.id }} className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Link
+                to="/summary/$repoId"
+                params={{ repoId: repo.id }}
+                className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 {repoName(repo.url)}
               </Link>
             ) : (
@@ -123,7 +153,11 @@ const columns = column.columns([
       );
     },
   }),
-  column.display({ id: "open", header: "What is open", cell: ({ row }) => <RepoOpenFindings open={row.original.open} /> }),
+  column.display({
+    id: "open",
+    header: "What is open",
+    cell: ({ row }) => <RepoOpenFindings open={row.original.open} />,
+  }),
   column.display({
     id: "last",
     header: "Last scan",
@@ -145,7 +179,9 @@ function SummaryTable({ repos }: { repos: readonly Repo[] }) {
     <Card>
       <CardHeader>
         <CardTitle>All repositories</CardTitle>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{SUMMARY_COPY.readMore} {SUMMARY_COPY.listLegend}</p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          {SUMMARY_COPY.readMore} {SUMMARY_COPY.listLegend}
+        </p>
       </CardHeader>
       <CardContent className="overflow-hidden p-0">
         <DataTable table={table} />
@@ -160,7 +196,10 @@ export function SummaryPage() {
 
   return (
     <>
-      <ShellPageHeader title="Security status" description="Where each repository stands, and what is still open. Nothing here changes anything." />
+      <ShellPageHeader
+        title="Security status"
+        description="Where each repository stands, and what is still open. Nothing here changes anything."
+      />
 
       {ranked.length === 0 ? (
         <Card>

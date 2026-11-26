@@ -24,18 +24,18 @@ A bright, quiet page led by the product. Neutral surfaces carry the page, the pr
 - **Verified** Glass: in Daylight, Greenfields and Moonlight, cards, the outline button and the theme button blur what is behind them (`blur(10px) saturate(1.4)`), and the theme dialog blurs harder (`--dialog-blur`, 32px). Default and Midnight are solid.
 - **Verified** Text halo: the hero sits on the sky with no glass behind it, so `--halo` and a stronger ink `--lede` keep it readable (a light halo in Daylight and Greenfields, a dark one in Moonlight).
 
-| Role | Token | Default value (oklch) |
-|---|---|---|
-| Page | `--background` | 0.958 |
-| Card | `--card` | 0.99 |
-| Popover | `--popover` | 0.998 |
-| Muted fill | `--muted` | 0.94 |
-| Text | `--foreground` | 0.22 |
-| Secondary text | `--muted-foreground` | 0.36 |
-| Border | `--border` | black at 9% |
-| Field border | `--input` | black at 16% |
-| Hover fill | `--accent` | black at 5.5% |
-| Primary | `--primary` | 0.27, text on it near-white |
+| Role           | Token                | Default value (oklch)       |
+| -------------- | -------------------- | --------------------------- |
+| Page           | `--background`       | 0.958                       |
+| Card           | `--card`             | 0.99                        |
+| Popover        | `--popover`          | 0.998                       |
+| Muted fill     | `--muted`            | 0.94                        |
+| Text           | `--foreground`       | 0.22                        |
+| Secondary text | `--muted-foreground` | 0.36                        |
+| Border         | `--border`           | black at 9%                 |
+| Field border   | `--input`            | black at 16%                |
+| Hover fill     | `--accent`           | black at 5.5%               |
+| Primary        | `--primary`          | 0.27, text on it near-white |
 
 Baseline values, from the dashboard's table. Re-measure against `tokens.css` before quoting them.
 

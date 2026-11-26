@@ -25,7 +25,17 @@ const LABELS: ChatBotProgressLabels = {
 
 const STATUS_TONE = { running: "info", waiting: "info", done: "success", failed: "danger" } as const;
 
-function Option({ label, hint, checked, onChange }: { label: string; hint?: ReactNode; checked: boolean; onChange: (value: boolean) => void }) {
+function Option({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint?: ReactNode;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
   return (
     <label className="option">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
@@ -92,7 +102,8 @@ function Demo() {
       <header className="header">
         <h1>Progress loader</h1>
         <p>
-          Preview of <code>@repo/chat-bot-react-loader</code>. Pick a scripted stream and watch the steps, tree lines and sounds.
+          Preview of <code>@repo/chat-bot-react-loader</code>. Pick a scripted stream and watch the steps, tree lines
+          and sounds.
         </p>
       </header>
 
@@ -105,7 +116,12 @@ function Demo() {
             <ul className="scenarios">
               {SCENARIOS.map((s) => (
                 <li key={s.name}>
-                  <button className="scenario" aria-current={current === s.name} disabled={playing === s.name} onClick={() => play(s)}>
+                  <button
+                    className="scenario"
+                    aria-current={current === s.name}
+                    disabled={playing === s.name}
+                    onClick={() => play(s)}
+                  >
                     <span className="scenario-name">{s.name}</span>
                     <span className="scenario-desc">{s.description}</span>
                   </button>
@@ -119,18 +135,44 @@ function Demo() {
               <h2 className="card-title">Options</h2>
             </div>
             <div className="options">
-              <Option label="Custom labels" hint="Your wording instead of the generic lines" checked={useLabels} onChange={setUseLabels} />
-              <Option label="Tree lines" hint="Hang a specialist's rows under its own row" checked={tree} onChange={setTree} />
+              <Option
+                label="Custom labels"
+                hint="Your wording instead of the generic lines"
+                checked={useLabels}
+                onChange={setUseLabels}
+              />
+              <Option
+                label="Tree lines"
+                hint="Hang a specialist's rows under its own row"
+                checked={tree}
+                onChange={setTree}
+              />
               <hr />
-              <Option label="Start sounds" hint="Ripple as each step starts. Browsers play sound only after a click." checked={startSounds} onChange={setStartSounds} />
-              <Option label="End sounds" hint="Petal as each step finishes" checked={endSounds} onChange={setEndSounds} />
+              <Option
+                label="Start sounds"
+                hint="Ripple as each step starts. Browsers play sound only after a click."
+                checked={startSounds}
+                onChange={setStartSounds}
+              />
+              <Option
+                label="End sounds"
+                hint="Petal as each step finishes"
+                checked={endSounds}
+                onChange={setEndSounds}
+              />
               <hr />
               <label className="option option-number">
                 <span>
                   Rows shown
                   <span className="option-hint">maxVisible: older rows fold into "earlier steps"</span>
                 </span>
-                <input type="number" min={1} max={20} value={maxVisible} onChange={(e) => setMaxVisible(Number(e.target.value) || 1)} />
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={maxVisible}
+                  onChange={(e) => setMaxVisible(Number(e.target.value) || 1)}
+                />
               </label>
             </div>
           </section>
@@ -140,7 +182,10 @@ function Demo() {
               <h2 className="card-title">Short tune</h2>
             </div>
             <div className="options">
-              <p className="tune-copy">Its own phrase, not the loader's Ripple and Petal. Pluck, Tine, Chime, then Uplift from React Bits Sound Lab.</p>
+              <p className="tune-copy">
+                Its own phrase, not the loader's Ripple and Petal. Pluck, Tine, Chime, then Uplift from React Bits Sound
+                Lab.
+              </p>
               <button type="button" className="tune" onClick={playTune}>
                 Play a short tune
               </button>
@@ -152,7 +197,10 @@ function Demo() {
               <h2 className="card-title">Ta-dum</h2>
             </div>
             <div className="options">
-              <p className="tune-copy">Two wood knocks, a low anvil, then a reverse-guitar blossom on D. Built in the Sound Lab engine, not the Netflix file.</p>
+              <p className="tune-copy">
+                Two wood knocks, a low anvil, then a reverse-guitar blossom on D. Built in the Sound Lab engine, not the
+                Netflix file.
+              </p>
               <button type="button" className="tune" onClick={playIntro}>
                 Play ta-dum
               </button>

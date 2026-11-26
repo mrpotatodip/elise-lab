@@ -31,7 +31,8 @@ const sharesOf = (repos: readonly Repo[], count: (repo: Repo) => number): Overvi
     .filter((share) => share.count > 0)
     .toSorted((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
-const whereOf = (shares: readonly OverviewRepoShare[]) => (shares.length === 1 ? (shares[0]?.name ?? "") : `${shares.length} repositories`);
+const whereOf = (shares: readonly OverviewRepoShare[]) =>
+  shares.length === 1 ? (shares[0]?.name ?? "") : `${shares.length} repositories`;
 const top = (shares: readonly OverviewRepoShare[]) => shares[0];
 const sum = (shares: readonly OverviewRepoShare[]) => shares.reduce((total, share) => total + share.count, 0);
 const serious = (repo: Repo) => repo.open.severity.critical + repo.open.severity.high;
@@ -63,7 +64,8 @@ export function overviewActions(repos: readonly Repo[], budget?: OverviewBudget)
       key: "serious",
       tone: "danger",
       title: `${plural(count, "serious problem is", "serious problems are")} open`,
-      detail: "Critical and high problems are the ones an attacker is most likely to use. Fix them, or record why the risk is accepted, before shipping.",
+      detail:
+        "Critical and high problems are the ones an attacker is most likely to use. Fix them, or record why the risk is accepted, before shipping.",
       who: "an engineer",
       where: whereOf(seriousShares),
       primary: `Fix the serious ${count === 1 ? "problem" : "problems"} in ${short(top(seriousShares)?.name ?? "")}`,
@@ -79,7 +81,8 @@ export function overviewActions(repos: readonly Repo[], budget?: OverviewBudget)
       key: "check",
       tone: "warning",
       title: `${plural(count, "finding needs", "findings need")} a person to check`,
-      detail: "The scan thinks these are real but could not prove it. Someone reads the evidence, then confirms or dismisses each one.",
+      detail:
+        "The scan thinks these are real but could not prove it. Someone reads the evidence, then confirms or dismisses each one.",
       who: "a reviewer",
       where: whereOf(check),
       primary: `Review ${plural(count, "finding", "findings")} in ${short(top(check)?.name ?? "")}`,
@@ -110,7 +113,8 @@ export function overviewActions(repos: readonly Repo[], budget?: OverviewBudget)
       key: "failed",
       tone: "warning",
       title: `The latest scan failed on ${plural(failed.length, "repository", "repositories")}`,
-      detail: "A failed scan finds nothing, so these results may be out of date. Open the scan to see why, then run it again.",
+      detail:
+        "A failed scan finds nothing, so these results may be out of date. Open the scan to see why, then run it again.",
       who: "an engineer",
       where: whereOf(failed),
       primary: `Retry the scan on ${short(top(failed)?.name ?? "")}`,
@@ -174,14 +178,27 @@ export function overviewVerdict(actions: readonly OverviewAction[]): OverviewVer
   const urgent = actions.filter((a) => a.tone === "danger");
   const failed = actions.find((a) => a.key === "failed");
   const parts = [
-    urgent.length > 0 ? `Fix ${plural(urgent.length, "urgent item", "urgent items")} in ${urgent.every((a) => a.where === urgent[0]?.where) ? (urgent[0]?.where ?? "") : "several repositories"}.` : null,
+    urgent.length > 0
+      ? `Fix ${plural(urgent.length, "urgent item", "urgent items")} in ${urgent.every((a) => a.where === urgent[0]?.where) ? (urgent[0]?.where ?? "") : "several repositories"}.`
+      : null,
     failed ? `The latest scan failed on ${failed.repos.map((r) => short(r.name)).join(", ")}.` : null,
   ].filter((part): part is string => part !== null);
 
   if (urgent.length > 0) return { tone: "danger", word: "Not ready to ship", line: parts.join(" ") };
-  if (actions.some((a) => a.tone === "warning")) return { tone: "warning", word: "Almost there", line: parts.join(" ") || "Nothing is urgent, but some things need a look." };
+  if (actions.some((a) => a.tone === "warning"))
+    return {
+      tone: "warning",
+      word: "Almost there",
+      line: parts.join(" ") || "Nothing is urgent, but some things need a look.",
+    };
   return { tone: "success", word: "Ready to ship", line: "Nothing needs anyone right now." };
 }
 
 export const overviewLatestScanAt = (repos: readonly Repo[]) =>
-  repos.reduce<string | null>((latest, repo) => (repo.lastScanStatus === "succeeded" && repo.lastScanAt !== null && (latest === null || repo.lastScanAt > latest) ? repo.lastScanAt : latest), null);
+  repos.reduce<string | null>(
+    (latest, repo) =>
+      repo.lastScanStatus === "succeeded" && repo.lastScanAt !== null && (latest === null || repo.lastScanAt > latest)
+        ? repo.lastScanAt
+        : latest,
+    null,
+  );

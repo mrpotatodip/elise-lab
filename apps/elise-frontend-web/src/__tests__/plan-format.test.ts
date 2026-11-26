@@ -14,7 +14,16 @@ import {
   planSwitchPending,
 } from "#/modules/plan/utils/plan-format";
 
-const onPlan = (key: string) => ({ key, label: key, monthlyPriceUsd: 0, includedCreditUsd: 0, carryCapUsd: null, keySource: "account" as const, scanAllowance: null, maxMembers: 5 });
+const onPlan = (key: string) => ({
+  key,
+  label: key,
+  monthlyPriceUsd: 0,
+  includedCreditUsd: 0,
+  carryCapUsd: null,
+  keySource: "account" as const,
+  scanAllowance: null,
+  maxMembers: 5,
+});
 
 const seats = (members: number, pendingInvites: number) => ({ members, pendingInvites });
 
@@ -45,26 +54,70 @@ describe("planCardViews", () => {
   const none = { plan: null, source: null, status: null } as const;
 
   it.each([
-    ["no plan, 1 person: both subscribe", { ...none, seats: seats(1, 0) }, [["subscribe", null, false], ["subscribe", null, false]]],
+    [
+      "no plan, 1 person: both subscribe",
+      { ...none, seats: seats(1, 0) },
+      [
+        ["subscribe", null, false],
+        ["subscribe", null, false],
+      ],
+    ],
     [
       "no plan, 3 people: Starter is blocked",
       { ...none, seats: seats(3, 0) },
-      [["subscribe", "Your account has 3 people. Starter holds 2. Remove 1 to subscribe.", false], ["subscribe", null, false]],
+      [
+        ["subscribe", "Your account has 3 people. Starter holds 2. Remove 1 to subscribe.", false],
+        ["subscribe", null, false],
+      ],
     ],
-    ["Runner, active, 2 people: can switch to Starter", { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(1, 1) }, [["switch", null, false], ["none", null, true]]],
+    [
+      "Runner, active, 2 people: can switch to Starter",
+      { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(1, 1) },
+      [
+        ["switch", null, false],
+        ["none", null, true],
+      ],
+    ],
     [
       "Runner, active, 3 people and 1 invite: Starter switch blocked",
       { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(3, 1) },
-      [["switch", "Your account has 3 people and 1 pending invite. Starter holds 2. Remove 2 to switch.", false], ["none", null, true]],
+      [
+        ["switch", "Your account has 3 people and 1 pending invite. Starter holds 2. Remove 2 to switch.", false],
+        ["none", null, true],
+      ],
     ],
     [
       "Runner, active, 2 people and 2 invites: invites are plural",
       { plan: onPlan("runner"), source: "stripe", status: "active", seats: seats(2, 2) },
-      [["switch", "Your account has 2 people and 2 pending invites. Starter holds 2. Remove 2 to switch.", false], ["none", null, true]],
+      [
+        ["switch", "Your account has 2 people and 2 pending invites. Starter holds 2. Remove 2 to switch.", false],
+        ["none", null, true],
+      ],
     ],
-    ["Starter, active: can switch to Runner", { plan: onPlan("starter"), source: "stripe", status: "active", seats: seats(2, 0) }, [["none", null, true], ["switch", null, false]]],
-    ["past due: no card has an action, the plan stays current", { plan: onPlan("runner"), source: "stripe", status: "past_due", seats: seats(1, 0) }, [["none", null, false], ["none", null, true]]],
-    ["canceled: subscribe again, no plan is current", { plan: onPlan("runner"), source: "stripe", status: "canceled", seats: seats(1, 0) }, [["subscribe", null, false], ["subscribe", null, false]]],
+    [
+      "Starter, active: can switch to Runner",
+      { plan: onPlan("starter"), source: "stripe", status: "active", seats: seats(2, 0) },
+      [
+        ["none", null, true],
+        ["switch", null, false],
+      ],
+    ],
+    [
+      "past due: no card has an action, the plan stays current",
+      { plan: onPlan("runner"), source: "stripe", status: "past_due", seats: seats(1, 0) },
+      [
+        ["none", null, false],
+        ["none", null, true],
+      ],
+    ],
+    [
+      "canceled: subscribe again, no plan is current",
+      { plan: onPlan("runner"), source: "stripe", status: "canceled", seats: seats(1, 0) },
+      [
+        ["subscribe", null, false],
+        ["subscribe", null, false],
+      ],
+    ],
   ] as const)("%s", (_name, data, expected) => {
     expect(planCardViews(data, offers).map((view) => [view.action, view.blocked, view.current])).toEqual(expected);
   });
@@ -75,28 +128,68 @@ describe("planPriceView", () => {
 
   it.each([
     ["monthly", starter, "month", { amount: "$15.00", unit: "month", perMonth: null }],
-    ["yearly, with the per-month figure", starter, "year", { amount: "$150.00", unit: "year", perMonth: "$12.50 per month" }],
+    [
+      "yearly, with the per-month figure",
+      starter,
+      "year",
+      { amount: "$150.00", unit: "year", perMonth: "$12.50 per month" },
+    ],
     ["yearly, a plan with no yearly price", { monthlyPriceUsd: 15, yearlyPriceUsd: null }, "year", null],
     ["yearly, an engine that sends no yearly price", { monthlyPriceUsd: 15 }, "year", null],
   ] as const)("reads %s", (_name, offer, interval, expected) => {
     expect(planPriceView(offer, interval)).toEqual(expected);
   });
+
+  it("reads Solo as $6.00 a month and $5.00 per month when billed yearly", () => {
+    const solo = { monthlyPriceUsd: 6, yearlyPriceUsd: 60 };
+    expect([planPriceView(solo, "month")?.amount, planPriceView(solo, "year")?.perMonth]).toEqual(["$6.00", "$5.00 per month"]);
+  });
 });
 
-const actions = (data: Parameters<typeof planCardViews>[0], interval: "month" | "year", list: Parameters<typeof planCardViews>[1]) => planCardViews(data, list, interval).map((view) => view.action);
+const actions = (
+  data: Parameters<typeof planCardViews>[0],
+  interval: "month" | "year",
+  list: Parameters<typeof planCardViews>[1],
+) => planCardViews(data, list, interval).map((view) => view.action);
 
 describe("yearly billing in planCardViews", () => {
   const offers = [
     { key: "starter", label: "Starter", monthlyPriceUsd: 15, yearlyPriceUsd: 150, includedCreditUsd: 0, maxMembers: 2 },
     { key: "runner", label: "Runner", monthlyPriceUsd: 35, yearlyPriceUsd: null, includedCreditUsd: 0, maxMembers: 5 },
   ];
-  const sub = (key: string, interval: "month" | "year") => ({ plan: onPlan(key), source: "stripe" as const, status: "active" as const, interval, seats: seats(1, 0) });
+  const sub = (key: string, interval: "month" | "year") => ({
+    plan: onPlan(key),
+    source: "stripe" as const,
+    status: "active" as const,
+    interval,
+    seats: seats(1, 0),
+  });
 
   it.each([
-    ["a new subscriber on the yearly toggle subscribes only where a yearly price exists", { plan: null, source: null, status: null, seats: seats(1, 0) }, "year", ["subscribe", "none"]],
-    ["a monthly Subscription viewed yearly can switch its own plan to yearly, and no other", sub("starter", "month"), "year", ["switchInterval", "none"]],
-    ["a monthly Subscription viewed monthly keeps the plan switch", sub("starter", "month"), "month", ["none", "switch"]],
-    ["a yearly Subscription never offers monthly, whatever the toggle says", sub("starter", "year"), "month", ["none", "none"]],
+    [
+      "a new subscriber on the yearly toggle subscribes only where a yearly price exists",
+      { plan: null, source: null, status: null, seats: seats(1, 0) },
+      "year",
+      ["subscribe", "none"],
+    ],
+    [
+      "a monthly Subscription viewed yearly can switch its own plan to yearly, and no other",
+      sub("starter", "month"),
+      "year",
+      ["switchInterval", "none"],
+    ],
+    [
+      "a monthly Subscription viewed monthly keeps the plan switch",
+      sub("starter", "month"),
+      "month",
+      ["none", "switch"],
+    ],
+    [
+      "a yearly Subscription never offers monthly, whatever the toggle says",
+      sub("starter", "year"),
+      "month",
+      ["none", "none"],
+    ],
   ] as const)("%s", (_name, data, interval, expected) => {
     expect(actions(data, interval, offers)).toEqual(expected);
   });
@@ -109,11 +202,36 @@ describe("yearly billing in planCardViews", () => {
 
 describe("planSwitchPending", () => {
   it.each([
-    ["a plan change waits until the plan is the new one", { planKey: "starter" }, { plan: onPlan("runner"), interval: "month" as const }, true],
-    ["a plan change is done once the plan matches", { planKey: "starter" }, { plan: onPlan("starter"), interval: "month" as const }, false],
-    ["a switch to yearly waits while the Subscription is monthly", { planKey: "starter", interval: "year" as const }, { plan: onPlan("starter"), interval: "month" as const }, true],
-    ["a switch to yearly is done once the Subscription is yearly", { planKey: "starter", interval: "year" as const }, { plan: onPlan("starter"), interval: "year" as const }, false],
-    ["nothing is pending when no switch was made", null, { plan: onPlan("starter"), interval: "month" as const }, false],
+    [
+      "a plan change waits until the plan is the new one",
+      { planKey: "starter" },
+      { plan: onPlan("runner"), interval: "month" as const },
+      true,
+    ],
+    [
+      "a plan change is done once the plan matches",
+      { planKey: "starter" },
+      { plan: onPlan("starter"), interval: "month" as const },
+      false,
+    ],
+    [
+      "a switch to yearly waits while the Subscription is monthly",
+      { planKey: "starter", interval: "year" as const },
+      { plan: onPlan("starter"), interval: "month" as const },
+      true,
+    ],
+    [
+      "a switch to yearly is done once the Subscription is yearly",
+      { planKey: "starter", interval: "year" as const },
+      { plan: onPlan("starter"), interval: "year" as const },
+      false,
+    ],
+    [
+      "nothing is pending when no switch was made",
+      null,
+      { plan: onPlan("starter"), interval: "month" as const },
+      false,
+    ],
   ])("%s", (_name, target, data, expected) => {
     expect(planSwitchPending(target, data)).toBe(expected);
   });
@@ -174,7 +292,12 @@ describe("creditAmountLabel", () => {
 
 describe("plan words", () => {
   it("names who bills the plan and whose key a scan uses", () => {
-    expect([planSourceLabel("grant"), planSourceLabel("stripe"), planKeyLabel("account"), planKeyLabel("platform")]).toEqual([
+    expect([
+      planSourceLabel("grant"),
+      planSourceLabel("stripe"),
+      planKeyLabel("account"),
+      planKeyLabel("platform"),
+    ]).toEqual([
       "Granted by Elise, no invoice",
       "Card, through Stripe",
       "Your own Claude, through a Runner",

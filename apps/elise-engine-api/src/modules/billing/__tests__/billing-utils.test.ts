@@ -25,8 +25,18 @@ describe("scanBlockOf", () => {
     ["a canceled plan, even when billing is not enforced", plan({ status: "canceled" }), false, "NO_ACTIVE_PLAN"],
     ["an incomplete plan", plan({ status: "incomplete" }), true, "NO_ACTIVE_PLAN"],
     ["an unpaid plan", plan({ status: "unpaid" }), true, "PAYMENT_FAILED"],
-    ["a past due plan one second inside the grace period", plan({ status: "past_due", pastDueSince: ago(BILLING_GRACE_MS - 1000) }), true, null],
-    ["a past due plan exactly at the end of the grace period", plan({ status: "past_due", pastDueSince: ago(BILLING_GRACE_MS) }), true, "PAYMENT_FAILED"],
+    [
+      "a past due plan one second inside the grace period",
+      plan({ status: "past_due", pastDueSince: ago(BILLING_GRACE_MS - 1000) }),
+      true,
+      null,
+    ],
+    [
+      "a past due plan exactly at the end of the grace period",
+      plan({ status: "past_due", pastDueSince: ago(BILLING_GRACE_MS) }),
+      true,
+      "PAYMENT_FAILED",
+    ],
     ["a past due plan with no start date", plan({ status: "past_due" }), true, null],
   ])("for %s the block is %s", (_name, subject, enforced, code) => {
     expect(scanBlockOf(subject, enforced, NOW)?.code ?? null).toBe(code);

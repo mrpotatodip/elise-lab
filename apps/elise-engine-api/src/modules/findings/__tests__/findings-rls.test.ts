@@ -17,10 +17,33 @@ beforeAll(async () => {
   otherTenantId = (await seedTenant(test, "other")).tenantId;
   repoId = await seedRepo(test, tenantId);
   otherRepoId = await seedRepo(test, otherTenantId);
-  await test.raw.insert(scans).values([scanValues(tenantId, repoId, "mine", "2026-11-01T00:00:00Z"), scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z")]);
+  await test.raw
+    .insert(scans)
+    .values([
+      scanValues(tenantId, repoId, "mine", "2026-11-01T00:00:00Z"),
+      scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"),
+    ]);
   await test.raw.insert(scanFindings).values([
-    { tenantId, scanId: "mine", findingId: "F-1", fingerprint: fp("a"), status: "confirmed", severity: "high", title: "mine", class: "authz" },
-    { tenantId: otherTenantId, scanId: "theirs", findingId: "F-2", fingerprint: fp("b"), status: "confirmed", severity: "high", title: "theirs", class: "authz" },
+    {
+      tenantId,
+      scanId: "mine",
+      findingId: "F-1",
+      fingerprint: fp("a"),
+      status: "confirmed",
+      severity: "high",
+      title: "mine",
+      class: "authz",
+    },
+    {
+      tenantId: otherTenantId,
+      scanId: "theirs",
+      findingId: "F-2",
+      fingerprint: fp("b"),
+      status: "confirmed",
+      severity: "high",
+      title: "theirs",
+      class: "authz",
+    },
   ]);
   await test.raw.insert(scanFindingComments).values([
     { tenantId, repoId, fingerprint: fp("a"), body: "mine" },
@@ -36,7 +59,10 @@ afterAll(async () => {
 // Runs as elise_app, the role that has no BYPASSRLS, inside one
 // transaction, the way the Worker will. A null tenant sets nothing.
 // -----
-const asApp = <T>(tenant: string | null, run: (tx: Parameters<Parameters<TestDb["raw"]["transaction"]>[0]>[0]) => Promise<T>) =>
+const asApp = <T>(
+  tenant: string | null,
+  run: (tx: Parameters<Parameters<TestDb["raw"]["transaction"]>[0]>[0]) => Promise<T>,
+) =>
   test.raw.transaction(async (tx) => {
     await tx.execute(sql`set local role elise_app`);
     if (tenant) await tx.execute(sql`select set_config('app.tenant_id', ${tenant}, true)`);
@@ -64,13 +90,26 @@ describe("row-level security on scans and findings", () => {
   });
 
   it("refuses to write a comment for another account", async () => {
-    const write = asApp(tenantId, (tx) => tx.insert(scanFindingComments).values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: fp("b"), body: "forged" }));
+    const write = asApp(tenantId, (tx) =>
+      tx
+        .insert(scanFindingComments)
+        .values({ tenantId: otherTenantId, repoId: otherRepoId, fingerprint: fp("b"), body: "forged" }),
+    );
     await expect(write).rejects.toMatchObject({ cause: { message: expect.stringContaining("row-level security") } });
   });
 
   it("refuses to write a row for another account", async () => {
     const write = asApp(tenantId, (tx) =>
-      tx.insert(scanFindings).values({ tenantId: otherTenantId, scanId: "theirs", findingId: "F-3", fingerprint: fp("c"), status: "confirmed", severity: "low", title: "x", class: "authz" }),
+      tx.insert(scanFindings).values({
+        tenantId: otherTenantId,
+        scanId: "theirs",
+        findingId: "F-3",
+        fingerprint: fp("c"),
+        status: "confirmed",
+        severity: "low",
+        title: "x",
+        class: "authz",
+      }),
     );
     await expect(write).rejects.toMatchObject({ cause: { message: expect.stringContaining("row-level security") } });
   });

@@ -65,8 +65,17 @@ export type Bindings = {
 export type AppDeps = {
   scanRepo: (env: Bindings, db: TenantDbType) => ScanRepo;
   monthSpend: (db: TenantDbType, accountId: string) => Effect.Effect<MonthSpend, DbError>;
-  holdCredit: (db: TenantDbType, accountId: string, scanId: string, holdUsd: number) => Effect.Effect<HoldResult, DbError>;
-  connectedRunnerSources: (db: TenantDbType, accountId: string, runnerId: string) => Effect.Effect<string[] | null, DbError>;
+  holdCredit: (
+    db: TenantDbType,
+    accountId: string,
+    scanId: string,
+    holdUsd: number,
+  ) => Effect.Effect<HoldResult, DbError>;
+  connectedRunnerSources: (
+    db: TenantDbType,
+    accountId: string,
+    runnerId: string,
+  ) => Effect.Effect<string[] | null, DbError>;
   linkArchive: (db: TenantDbType, accountId: string, link: ScanArchiveLink) => Effect.Effect<void, Invalid | DbError>;
   releaseCredit: (db: TenantDbType, accountId: string, scanId: string) => Effect.Effect<SettleResult, DbError>;
   teardownScan: (env: Bindings, scanId: string) => Promise<ScanUsage | null>;
@@ -74,6 +83,7 @@ export type AppDeps = {
   runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
+  twoFactorSetupRequired: (c: Context<AppEnv>, userId: string) => Promise<boolean>;
   enqueueEmail: (env: Bindings, mail: QueuedEmail) => Promise<void>;
   verifyTurnstile: (env: Bindings, token: string | undefined, ip: string | undefined) => Promise<boolean>;
   withTenant: <T>(c: Context<AppEnv>, accountId: string, run: (db: TenantDbType) => Promise<T>) => Promise<T>;

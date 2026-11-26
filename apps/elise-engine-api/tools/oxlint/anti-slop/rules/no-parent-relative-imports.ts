@@ -12,8 +12,7 @@ export const noParentRelativeImportsRule = defineRule({
       description: "Disallow `../` imports; use the `#/` alias. JSON files outside `src/` are exempt.",
     },
     messages: {
-      parentRelative:
-        "Import through the `#/` alias (for example `#/modules/{module}/handlers`), not `{{source}}`.",
+      parentRelative: "Import through the `#/` alias (for example `#/modules/{module}/handlers`), not `{{source}}`.",
     },
   },
   createOnce(context) {

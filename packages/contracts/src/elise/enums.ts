@@ -26,6 +26,7 @@ export const ACCESS_ACTION_VALUES = [
   "publish",
   "dismiss",
   "manage",
+  "reset",
 ] as const;
 
 export type AccessActionValue = (typeof ACCESS_ACTION_VALUES)[number];
@@ -136,9 +137,37 @@ export const RUNNER_JOB_PHASE_VALUES = ["recon", "hunt", "check", "report"] as c
 // it does not know is calling_tool. Twin of the CHECK on
 // scan_trace_entries.label.
 // -----
-export const TRACE_LABEL_VALUES = ["reasoning", "reading_files", "searching", "running_command", "writing", "calling_tool", "phase_started", "phase_ended"] as const;
+export const TRACE_LABEL_VALUES = [
+  "reasoning",
+  "reading_files",
+  "searching",
+  "running_command",
+  "writing",
+  "calling_tool",
+  "phase_started",
+  "phase_ended",
+] as const;
+
+// -----
+// Why a failed scan failed, as the engine reads it from the error text it
+// holds. The dashboard picks its advice from the code, never from the words.
+// A new value needs the dashboard deployed first (contracts.md 5.2). Not
+// stored: the engine works it out each time a scan is read.
+// -----
+export const SCAN_FAILURE_CODE_VALUES = [
+  "out_of_memory",
+  "plan_usage_limit",
+  "ref_not_found",
+  "clone_timeout",
+  "repo_unreadable",
+  "clone_failed",
+  "no_report",
+  "budget_spent",
+  "timed_out",
+] as const;
 
 export type ScanStepValue = (typeof SCAN_STEP_VALUES)[number];
+export type ScanFailureCodeValue = (typeof SCAN_FAILURE_CODE_VALUES)[number];
 export type RunnerJobPhaseValue = (typeof RUNNER_JOB_PHASE_VALUES)[number];
 export type TraceLabelValue = (typeof TRACE_LABEL_VALUES)[number];
 

@@ -11,7 +11,9 @@ const app = new Hono<AppEnv>();
 
 app.get("/", getPlanDoc, requirePower("company:plan:read"), zValidator("header", AccountHeaderSchema), async (c) => {
   const { "x-account-id": accountId } = c.req.valid("header");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(planDetailsEffect(db, accountId, new Date())));
+  const data = await c
+    .get("deps")
+    .withTenant(c, accountId, (db) => runEffect(planDetailsEffect(db, accountId, new Date())));
   return c.json({ data, error: null });
 });
 

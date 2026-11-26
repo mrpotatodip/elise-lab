@@ -29,8 +29,10 @@ export const DEFAULT_PROGRESS_LABELS = {
   fallback: { busy: "Working on it", done: "Finished a step" },
 } satisfies Required<ChatBotProgressLabels>;
 
-const pick = (table: Record<string, ChatBotStepLabel> | undefined, name: string | null | undefined): ChatBotStepLabel | undefined =>
-  name == null ? undefined : table?.[name];
+const pick = (
+  table: Record<string, ChatBotStepLabel> | undefined,
+  name: string | null | undefined,
+): ChatBotStepLabel | undefined => (name == null ? undefined : table?.[name]);
 
 // -----
 // Which text each kind of event gets.

@@ -33,6 +33,10 @@ describe("scanBranchScans", () => {
   it("breaks a tie on the same second by id, so the order never flickers", () => {
     const tied = [scan("x1", "b1", "2026-11-06T09:00:00.000Z"), scan("x2", "b1", "2026-11-06T09:00:00.000Z")];
 
-    expect(scanBranchScans(tied, tied[0] ?? scan("x1", "b1", "2026-11-06T09:00:00.000Z"), 5).scans.map((item) => item.scanId)).toEqual(["x2", "x1"]);
+    expect(
+      scanBranchScans(tied, tied[0] ?? scan("x1", "b1", "2026-11-06T09:00:00.000Z"), 5).scans.map(
+        (item) => item.scanId,
+      ),
+    ).toEqual(["x2", "x1"]);
   });
 });

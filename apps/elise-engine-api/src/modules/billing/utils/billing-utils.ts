@@ -17,7 +17,9 @@ export const scanBlockOf = (plan: PlanState | null, enforced: boolean, now: Date
     case "active":
       return null;
     case "past_due":
-      return plan.pastDueSince !== null && now.getTime() - plan.pastDueSince.getTime() >= BILLING_GRACE_MS ? PAYMENT_FAILED : null;
+      return plan.pastDueSince !== null && now.getTime() - plan.pastDueSince.getTime() >= BILLING_GRACE_MS
+        ? PAYMENT_FAILED
+        : null;
     case "unpaid":
       return PAYMENT_FAILED;
     default:

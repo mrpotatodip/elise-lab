@@ -29,10 +29,13 @@ const ErrorBodySchema = z.union([
 // -----
 // What a failed schema parse carries, whichever zod copy threw it.
 // -----
-const ParseFailureSchema = z.object({ issues: z.array(z.object({ path: z.array(z.union([z.string(), z.number()])), message: z.string() })) });
+const ParseFailureSchema = z.object({
+  issues: z.array(z.object({ path: z.array(z.union([z.string(), z.number()])), message: z.string() })),
+});
 
 const EXTERNAL_SERVICE_CODE = "EXTERNAL_SERVICE_ERROR";
-const EXTERNAL_SERVICE_MESSAGE = "An outside service did not answer. Try again, and contact support if it keeps failing.";
+const EXTERNAL_SERVICE_MESSAGE =
+  "An outside service did not answer. Try again, and contact support if it keeps failing.";
 
 export type EngineAuth = { token?: string; accountId?: string };
 
@@ -46,7 +49,12 @@ export async function engineFetch(path: string, init: RequestInit = {}, auth: En
     console.error(`engine: ${init.method ?? "GET"} ${path} answered ${res.status}`);
     const body = ErrorBodySchema.safeParse(await res.json().catch(() => null));
     const code = body.success ? body.data.code : undefined;
-    const message = code === EXTERNAL_SERVICE_CODE ? EXTERNAL_SERVICE_MESSAGE : body.success ? body.data.message : `Engine error ${res.status}`;
+    const message =
+      code === EXTERNAL_SERVICE_CODE
+        ? EXTERNAL_SERVICE_MESSAGE
+        : body.success
+          ? body.data.message
+          : `Engine error ${res.status}`;
     throw new EngineError(message, res.status, code);
   }
   return res;
@@ -58,7 +66,12 @@ export async function engineFetch(path: string, init: RequestInit = {}, auth: En
 // -----
 type Parser<T> = Pick<z.ZodType<T>, "parse">;
 
-export async function engineJson<T>(schema: Parser<T>, path: string, init: RequestInit = {}, auth: EngineAuth = {}): Promise<T> {
+export async function engineJson<T>(
+  schema: Parser<T>,
+  path: string,
+  init: RequestInit = {},
+  auth: EngineAuth = {},
+): Promise<T> {
   const res = await engineFetch(path, init, auth);
   const body = z.object({ data: z.unknown() }).parse(await res.json());
   try {
@@ -69,7 +82,10 @@ export async function engineJson<T>(schema: Parser<T>, path: string, init: Reque
     const [first] = broken.data.issues;
     const more = broken.data.issues.length > 1 ? ` (and ${broken.data.issues.length - 1} more)` : "";
     console.error(`engine: ${path} broke the contract`, JSON.stringify(broken.data.issues));
-    throw new EngineError(`The engine sent an unexpected response for ${path}: ${first?.path.join(".") || "body"} ${first?.message}${more}. The engine may be older than this dashboard.`, 502);
+    throw new EngineError(
+      `The engine sent an unexpected response for ${path}: ${first?.path.join(".") || "body"} ${first?.message}${more}. The engine may be older than this dashboard.`,
+      502,
+    );
   }
 }
 

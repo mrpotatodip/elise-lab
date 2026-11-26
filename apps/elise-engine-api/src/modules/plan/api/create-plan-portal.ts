@@ -9,12 +9,20 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/portal", createPlanPortalDoc, requirePower("company:plan:manage"), zValidator("header", AccountHeaderSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const userId = userIdOf(c);
-  const deps = c.get("deps");
-  const data = await deps.withTenant(c, accountId, (db) => runEffect(openBillingPortalSvc(db, deps.stripe(c.env), c.env.DASHBOARD_URL, accountId, userId)));
-  return c.json({ data, error: null });
-});
+app.post(
+  "/portal",
+  createPlanPortalDoc,
+  requirePower("company:plan:manage"),
+  zValidator("header", AccountHeaderSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const userId = userIdOf(c);
+    const deps = c.get("deps");
+    const data = await deps.withTenant(c, accountId, (db) =>
+      runEffect(openBillingPortalSvc(db, deps.stripe(c.env), c.env.DASHBOARD_URL, accountId, userId)),
+    );
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

@@ -3,7 +3,12 @@ import { accessAuditLog, scanFindings, scanSignals, scans, tenants } from "@repo
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { AcceptedRiskCheckSchema, type AccessPower, type CheckAcceptedRiskBody, type FindingTriageBody } from "@repo/contracts/elise";
+import {
+  AcceptedRiskCheckSchema,
+  type AccessPower,
+  type CheckAcceptedRiskBody,
+  type FindingTriageBody,
+} from "@repo/contracts/elise";
 import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
 import { fakeTypeSafe } from "#/__tests__/fake-typesafe";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
@@ -19,7 +24,10 @@ let gateway: TypeSafeGateway | null = fake.gateway;
 
 const REPO = "https://github.com/octocat/Hello-World";
 const FP = "a".repeat(64);
-const ACCEPTER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:dashboard:read", "company:findings:accepted_risk:update"]);
+const ACCEPTER: ReadonlySet<AccessPower> = new Set<AccessPower>([
+  "company:dashboard:read",
+  "company:findings:accepted_risk:update",
+]);
 const MEMBER: ReadonlySet<AccessPower> = new Set<AccessPower>(["company:dashboard:read"]);
 
 const app = tenantRouteApp(() => test, {
@@ -30,20 +38,34 @@ const app = tenantRouteApp(() => test, {
 
 const call = (path: string, body: CheckAcceptedRiskBody | FindingTriageBody, method: "POST" | "PUT" = "POST") => {
   const { env } = fakeBindings();
-  const headers = new Headers({ authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": tenantId, "content-type": "application/json" });
-  return app.fetch(new Request(`http://localhost${path}`, { method, headers, body: JSON.stringify(body) }), env, testExecutionContext);
+  const headers = new Headers({
+    authorization: `Bearer ${TEST_TOKEN}`,
+    "x-account-id": tenantId,
+    "content-type": "application/json",
+  });
+  return app.fetch(
+    new Request(`http://localhost${path}`, { method, headers, body: JSON.stringify(body) }),
+    env,
+    testExecutionContext,
+  );
 };
 
-const check = (note = "Behind the VPN until the rewrite") => call("/findings/signals/weak-reason", { repo: REPO, fingerprint: FP, note });
-const signalOf = async (res: Response) => z.object({ data: AcceptedRiskCheckSchema }).parse(await res.json()).data.signal;
+const check = (note = "Behind the VPN until the rewrite") =>
+  call("/findings/signals/weak-reason", { repo: REPO, fingerprint: FP, note });
+const signalOf = async (res: Response) =>
+  z.object({ data: AcceptedRiskCheckSchema }).parse(await res.json()).data.signal;
 
 beforeAll(async () => {
   test = await openTestDb();
   const seeded = await seedTenant(test, "acme");
   tenantId = seeded.tenantId;
   repoId = await seedRepo(test, tenantId, REPO);
-  await test.raw.insert(authUser).values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: seeded.partyId });
-  await test.raw.insert(scans).values(scanValues(tenantId, repoId, "s1", "2026-11-01T00:00:00Z", { status: "succeeded" }));
+  await test.raw
+    .insert(authUser)
+    .values({ id: "ada", name: "Ada Rossi", email: "ada@example.com", partyId: seeded.partyId });
+  await test.raw
+    .insert(scans)
+    .values(scanValues(tenantId, repoId, "s1", "2026-11-01T00:00:00Z", { status: "succeeded" }));
   await test.raw.insert(scanFindings).values({
     tenantId,
     scanId: "s1",
@@ -74,8 +96,19 @@ describe("the weak-reason check", () => {
   it("returns a stored Signal for a reason the model finds weak, and sends the Finding text and the note", async () => {
     const signal = await signalOf(await check("we will fix it later"));
 
-    expect(signal).toMatchObject({ kind: "weak_reason", fingerprint: FP, relatedFingerprint: null, probability: 0.1, modelVersion: "jev-fake" });
-    expect(await test.raw.select().from(scanSignals).where(eq(scanSignals.id, signal?.id ?? ""))).toHaveLength(1);
+    expect(signal).toMatchObject({
+      kind: "weak_reason",
+      fingerprint: FP,
+      relatedFingerprint: null,
+      probability: 0.1,
+      modelVersion: "jev-fake",
+    });
+    expect(
+      await test.raw
+        .select()
+        .from(scanSignals)
+        .where(eq(scanSignals.id, signal?.id ?? "")),
+    ).toHaveLength(1);
     expect(JSON.stringify(fake.calls[0]?.state)).toContain("Missing authz on export");
     expect(JSON.stringify(fake.calls[0]?.state)).toContain("we will fix it later");
   });
@@ -122,8 +155,15 @@ describe("the weak-reason check", () => {
 });
 
 describe("saving an accepted risk over a warning", () => {
-  const save = (signalId?: string) => call("/findings/triage", { repo: REPO, fingerprint: FP, status: "accepted_risk", note: "we will fix it later", acceptDays: 30, signalId }, "PUT");
-  const auditAfter = async () => (await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.action, "finding.risk.accepted"))).at(-1)?.after;
+  const save = (signalId?: string) =>
+    call(
+      "/findings/triage",
+      { repo: REPO, fingerprint: FP, status: "accepted_risk", note: "we will fix it later", acceptDays: 30, signalId },
+      "PUT",
+    );
+  const auditAfter = async () =>
+    (await test.raw.select().from(accessAuditLog).where(eq(accessAuditLog.action, "finding.risk.accepted"))).at(-1)
+      ?.after;
 
   it("records the Signal in the Audit trail", async () => {
     const signal = await signalOf(await check("we will fix it later"));
@@ -142,7 +182,14 @@ describe("saving an accepted risk over a warning", () => {
   it("refuses a Signal that is not a weak reason of this Finding", async () => {
     const [other] = await test.raw
       .insert(scanSignals)
-      .values({ tenantId, repoId, fingerprint: "c".repeat(64), kind: "weak_reason", probability: 0.1, modelVersion: "jev-fake" })
+      .values({
+        tenantId,
+        repoId,
+        fingerprint: "c".repeat(64),
+        kind: "weak_reason",
+        probability: 0.1,
+        modelVersion: "jev-fake",
+      })
       .returning();
 
     expect((await save(other.id)).status).toBe(400);

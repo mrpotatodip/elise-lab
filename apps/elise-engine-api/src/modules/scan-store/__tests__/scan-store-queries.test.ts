@@ -14,16 +14,30 @@ const reportsOf = () => fakeBindings().env;
 describe("files", () => {
   it("saves files and says what each one is", async () => {
     const reports = reportsOf().REPORTS;
-    const saved = await Effect.runPromise(saveScanFilesEffect(reports, "acme", "abc", { "REPORT.md": "# r", "findings.json": "[]" }));
+    const saved = await Effect.runPromise(
+      saveScanFilesEffect(reports, "acme", "abc", { "REPORT.md": "# r", "findings.json": "[]" }),
+    );
 
     expect(saved.toSorted((a, b) => (a.name < b.name ? -1 : 1))).toEqual([
-      { name: "REPORT.md", r2Key: "accounts/acme/scans/abc/REPORT.md", sizeBytes: 3, contentType: "text/markdown; charset=utf-8" },
-      { name: "findings.json", r2Key: "accounts/acme/scans/abc/findings.json", sizeBytes: 2, contentType: "application/json" },
+      {
+        name: "REPORT.md",
+        r2Key: "accounts/acme/scans/abc/REPORT.md",
+        sizeBytes: 3,
+        contentType: "text/markdown; charset=utf-8",
+      },
+      {
+        name: "findings.json",
+        r2Key: "accounts/acme/scans/abc/findings.json",
+        sizeBytes: 2,
+        contentType: "application/json",
+      },
     ]);
   });
 
   it("counts bytes, not characters", async () => {
-    const saved = await Effect.runPromise(saveScanFilesEffect(reportsOf().REPORTS, "acme", "abc", { "REPORT.md": "é" }));
+    const saved = await Effect.runPromise(
+      saveScanFilesEffect(reportsOf().REPORTS, "acme", "abc", { "REPORT.md": "é" }),
+    );
 
     expect(saved[0].sizeBytes).toBe(2);
   });
@@ -37,17 +51,23 @@ describe("files", () => {
   });
 
   it("returns null for a key that holds nothing", async () => {
-    expect(await Effect.runPromise(readScanFileEffect(reportsOf().REPORTS, "accounts/acme/scans/none/REPORT.md"))).toBeNull();
+    expect(
+      await Effect.runPromise(readScanFileEffect(reportsOf().REPORTS, "accounts/acme/scans/none/REPORT.md")),
+    ).toBeNull();
   });
 
   it("fails with ExternalError when a save rejects", async () => {
-    const error = await Effect.runPromise(Effect.flip(saveScanFilesEffect(brokenReports, "acme", "abc", { "REPORT.md": "# r" })));
+    const error = await Effect.runPromise(
+      Effect.flip(saveScanFilesEffect(brokenReports, "acme", "abc", { "REPORT.md": "# r" })),
+    );
 
     expect(error._tag).toBe("ExternalError");
   });
 
   it("fails with ExternalError when a read rejects", async () => {
-    const error = await Effect.runPromise(Effect.flip(readScanFileEffect(brokenReports, "accounts/acme/scans/abc/REPORT.md")));
+    const error = await Effect.runPromise(
+      Effect.flip(readScanFileEffect(brokenReports, "accounts/acme/scans/abc/REPORT.md")),
+    );
 
     expect(error._tag).toBe("ExternalError");
   });

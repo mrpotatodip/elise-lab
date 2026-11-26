@@ -23,7 +23,16 @@ type ScanFindingSheetProps = {
 // without going back to the list. The list keeps the selection, so closing
 // the panel leaves the reviewer where they were.
 // -----
-export function ScanFindingSheet({ findings, selected, onSelect, status, facts, decision, decisionHint, comment }: ScanFindingSheetProps) {
+export function ScanFindingSheet({
+  findings,
+  selected,
+  onSelect,
+  status,
+  facts,
+  decision,
+  decisionHint,
+  comment,
+}: ScanFindingSheetProps) {
   const [closing, setClosing] = useState(false);
   const finding = selected === undefined ? undefined : findings[selected];
   const hasPrevious = selected !== undefined && selected > 0;
@@ -46,7 +55,13 @@ export function ScanFindingSheet({ findings, selected, onSelect, status, facts, 
         className="max-w-[48rem] [transition-property:transform,right] data-[nested-dialog-open]:right-[36rem]"
         aria-keyshortcuts="ArrowLeft ArrowRight"
         onKeyDown={(event) => {
-          if (selected === undefined || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+          if (
+            selected === undefined ||
+            event.target instanceof HTMLInputElement ||
+            event.target instanceof HTMLTextAreaElement ||
+            event.target instanceof HTMLSelectElement
+          )
+            return;
           if (event.target instanceof HTMLElement && event.target.getAttribute("role") === "combobox") return;
           if (event.key === "ArrowLeft" && hasPrevious) onSelect(selected - 1);
           if (event.key === "ArrowRight" && hasNext) onSelect(selected + 1);
