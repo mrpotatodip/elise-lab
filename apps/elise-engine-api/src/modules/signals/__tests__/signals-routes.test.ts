@@ -27,22 +27,45 @@ const app = tenantRouteApp(() => test, {
 
 const call = (path: string, init: { method?: string; body?: unknown; token?: boolean } = {}) => {
   const { env } = fakeBindings();
-  const headers = new Headers({ authorization: `Bearer ${init.token ? TEST_TOKEN : "session-token"}`, "x-account-id": tenantId });
+  const headers = new Headers({
+    authorization: `Bearer ${init.token ? TEST_TOKEN : "session-token"}`,
+    "x-account-id": tenantId,
+  });
   if (init.body !== undefined) headers.set("content-type", "application/json");
   const body = init.body === undefined ? undefined : JSON.stringify(init.body);
-  return app.fetch(new Request(`http://localhost${path}`, { method: init.method, headers, body }), env, testExecutionContext);
+  return app.fetch(
+    new Request(`http://localhost${path}`, { method: init.method, headers, body }),
+    env,
+    testExecutionContext,
+  );
 };
 
 const setSwitch = (enabled: boolean) => call("/usage/signals", { method: "PUT", body: { enabled } });
-const switchOf = async () => z.object({ data: SignalsSettingsSchema }).parse(await (await call("/usage/signals")).json()).data.enabled;
-const shown = async () => z.object({ data: z.array(SignalSchema) }).parse(await (await call(`/findings/signals?repo=${REPO}`)).json()).data;
+const switchOf = async () =>
+  z.object({ data: SignalsSettingsSchema }).parse(await (await call("/usage/signals")).json()).data.enabled;
+const shown = async () =>
+  z.object({ data: z.array(SignalSchema) }).parse(await (await call(`/findings/signals?repo=${REPO}`)).json()).data;
 
-const switchEntries = () => test.raw.select().from(accessAuditLog).where(and(eq(accessAuditLog.subjectId, tenantId), eq(accessAuditLog.action, "signals.switched"))).orderBy(asc(accessAuditLog.createdAt));
+const switchEntries = () =>
+  test.raw
+    .select()
+    .from(accessAuditLog)
+    .where(and(eq(accessAuditLog.subjectId, tenantId), eq(accessAuditLog.action, "signals.switched")))
+    .orderBy(asc(accessAuditLog.createdAt));
 
-const seedSignal =async (overrides: Partial<typeof scanSignals.$inferInsert> = {}) => {
+const seedSignal = async (overrides: Partial<typeof scanSignals.$inferInsert> = {}) => {
   const [row] = await test.raw
     .insert(scanSignals)
-    .values({ tenantId, repoId, fingerprint: "a".repeat(64), relatedFingerprint: "b".repeat(64), kind: "possible_duplicate", probability: 0.9, modelVersion: "jev-1.14.0", ...overrides })
+    .values({
+      tenantId,
+      repoId,
+      fingerprint: "a".repeat(64),
+      relatedFingerprint: "b".repeat(64),
+      kind: "possible_duplicate",
+      probability: 0.9,
+      modelVersion: "jev-1.14.0",
+      ...overrides,
+    })
     .returning();
   return row.id;
 };
@@ -77,7 +100,12 @@ describe("the Signals switch", () => {
     const entry = (await switchEntries()).at(-1);
 
     expect([res.status, await switchOf()]).toEqual([200, false]);
-    expect(entry).toMatchObject({ action: "signals.switched", actorPartyId: partyId, before: { enabled: true }, after: { tenantId, enabled: false } });
+    expect(entry).toMatchObject({
+      action: "signals.switched",
+      actorPartyId: partyId,
+      before: { enabled: true },
+      after: { tenantId, enabled: false },
+    });
   });
 
   it("refuses a member without the Power and changes nothing", async () => {
@@ -100,7 +128,9 @@ describe("reading Signals", () => {
   it("returns the stored Signals of the repo", async () => {
     await seedSignal();
 
-    expect((await shown()).map((signal) => [signal.kind, signal.probability, signal.modelVersion])).toEqual([["possible_duplicate", 0.9, "jev-1.14.0"]]);
+    expect((await shown()).map((signal) => [signal.kind, signal.probability, signal.modelVersion])).toEqual([
+      ["possible_duplicate", 0.9, "jev-1.14.0"],
+    ]);
   });
 
   it("hides every Signal while the switch is off and shows them again when it is on", async () => {

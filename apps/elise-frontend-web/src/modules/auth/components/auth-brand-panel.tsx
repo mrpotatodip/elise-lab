@@ -23,7 +23,9 @@ export function AuthBrandPanel() {
             const Icon = POINT_ICONS[index];
             return (
               <li key={point.title} className="flex items-start gap-4">
-                {Icon && <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
+                {Icon && (
+                  <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                )}
                 <div className="grid gap-1">
                   <p className="text-[15px] font-medium">{point.title}</p>
                   <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{point.text}</p>

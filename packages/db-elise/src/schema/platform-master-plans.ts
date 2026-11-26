@@ -52,11 +52,20 @@ export const platformMasterPlans = pgTable(
     chkMonthlyPrice: check("platform_master_plans_monthly_price", sql`${t.monthlyPriceUsd} >= 0`),
     chkIncludedCredit: check("platform_master_plans_included_credit", sql`${t.includedCreditUsd} >= 0`),
     chkMaxMembers: check("platform_master_plans_max_members", sql`${t.maxMembers} >= 1`),
-    chkYearlyPrice: check("platform_master_plans_yearly_price", sql`${t.yearlyPriceUsd} is null or ${t.yearlyPriceUsd} >= 0`),
+    chkYearlyPrice: check(
+      "platform_master_plans_yearly_price",
+      sql`${t.yearlyPriceUsd} is null or ${t.yearlyPriceUsd} >= 0`,
+    ),
     chkCreditMarkup: check("platform_master_plans_credit_markup", sql`${t.creditMarkup} >= 1`),
-    chkCarryCap: check("platform_master_plans_carry_cap", sql`${t.carryCapUsd} is null or ${t.carryCapUsd} >= ${t.includedCreditUsd}`),
+    chkCarryCap: check(
+      "platform_master_plans_carry_cap",
+      sql`${t.carryCapUsd} is null or ${t.carryCapUsd} >= ${t.includedCreditUsd}`,
+    ),
     chkKeySource: check("platform_master_plans_key_source", sql`${t.keySource} in (${inList(SCAN_KEY_SOURCE_VALUES)})`),
-    chkScanAllowance: check("platform_master_plans_scan_allowance", sql`${t.monthlyScanAllowance} is null or ${t.monthlyScanAllowance} >= 1`),
+    chkScanAllowance: check(
+      "platform_master_plans_scan_allowance",
+      sql`${t.monthlyScanAllowance} is null or ${t.monthlyScanAllowance} >= 1`,
+    ),
   }),
 );
 

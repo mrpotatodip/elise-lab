@@ -17,6 +17,7 @@ jobs:
           - { runner: macos-15-intel, asset: elise-runner-darwin-x64 }
           - { runner: ubuntu-24.04, asset: elise-runner-linux-x64 }
           - { runner: ubuntu-24.04-arm, asset: elise-runner-linux-arm64 }
+          - { runner: windows-2022, asset: elise-runner-windows-x64.exe }
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -36,10 +37,15 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match cli/Cargo.toml version ${version}" >&2
             exit 1
           }
-      - run: cargo build --release --locked -p elise-runner-cli
+      - run: cargo build --release --locked -p elise-runner-cli --bin elise-runner
       - name: Name the binary
         shell: bash
-        run: cp target/release/elise-runner "${{ matrix.asset }}"
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/release/elise-runner.exe "${{ matrix.asset }}"
+          else
+            cp target/release/elise-runner "${{ matrix.asset }}"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}

@@ -18,7 +18,17 @@ export function AuthSignOutButton() {
 
   return (
     <Tooltip>
-      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Sign out" className="text-muted-foreground" onClick={signOut} />}>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Sign out"
+            className="text-muted-foreground"
+            onClick={signOut}
+          />
+        }
+      >
         <LogOut strokeWidth={1.5} />
       </TooltipTrigger>
       <TooltipContent>Sign out</TooltipContent>

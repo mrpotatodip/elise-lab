@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EventType, toolDefinition, type StreamChunk } from "@tanstack/ai";
 import { Effect } from "effect";
 import { z } from "zod";
-import {
-  createChatBotDurableStream,
-  memoryChatBotDurableStreamStore,
-} from "@repo/chat-bot-durable-stream";
+import { createChatBotDurableStream, memoryChatBotDurableStreamStore } from "@repo/chat-bot-durable-stream";
 import {
   createChatBot,
   createChatBotToolFactory,
@@ -75,8 +72,7 @@ const setup = (answer: () => AsyncIterable<StreamChunk> = () => reply("Hel", "lo
   const chat = createChatBot<Services>({
     store,
     runner,
-    durableStream: (init) =>
-      createChatBotDurableStream(log, { ...init, streamPrefix: "chat-bot" }),
+    durableStream: (init) => createChatBotDurableStream(log, { ...init, streamPrefix: "chat-bot" }),
     services: { greeting: "hi" },
     waitUntil: (job) => {
       jobs.push(job);
@@ -171,10 +167,7 @@ describe("createChatBot", () => {
     const get = await Effect.runPromise(Effect.either(chat.threads.get(stranger, threadId)));
     const join = await Effect.runPromise(
       Effect.either(
-        chat.join(
-          stranger,
-          new Request("https://chat.local/?runId=" + runId, { headers: { "X-Run-Id": runId } }),
-        ),
+        chat.join(stranger, new Request("https://chat.local/?runId=" + runId, { headers: { "X-Run-Id": runId } })),
       ),
     );
 

@@ -1,9 +1,11 @@
 import { DEFAULT_SOURCE_PROVIDER } from "@repo/contracts/elise";
 import type { CreateScanInput } from "../schemas";
 
-type ScanCreateBody = Omit<CreateScanInput, "runnerId" | "provider" | "archiveId"> & {
+type ScanCreateBody = Omit<CreateScanInput, "runnerId" | "provider" | "archiveId" | "maxBudgetUsd" | "scopePaths"> & {
   provider?: CreateScanInput["provider"];
   archive_id?: string;
+  max_budget_usd?: number;
+  scope_paths?: string[];
   runner_id: string | undefined;
 };
 
@@ -15,8 +17,10 @@ type ScanCreateBody = Omit<CreateScanInput, "runnerId" | "provider" | "archiveId
 // plan names its zip by id.
 // -----
 export function scanCreateBodyOf(input: CreateScanInput): ScanCreateBody {
-  const { runnerId, provider, archiveId, ...scan } = input;
+  const { runnerId, provider, archiveId, maxBudgetUsd, scopePaths, ...scan } = input;
   const body: ScanCreateBody = { ...scan, runner_id: runnerId };
+  if (scopePaths !== undefined && scopePaths.length > 0) body.scope_paths = scopePaths;
+  if (maxBudgetUsd !== undefined) body.max_budget_usd = maxBudgetUsd;
   if (provider !== undefined && provider !== DEFAULT_SOURCE_PROVIDER) body.provider = provider;
   if (archiveId !== undefined) body.archive_id = archiveId;
   return body;

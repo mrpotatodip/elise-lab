@@ -7,7 +7,9 @@ import { classifyAgentLine, drainTrace, emptyTraceState } from "#/modules/scan-t
 
 const FIXTURES = resolve(__dirname, "../../../../../../packages/contracts/fixtures/trace-classifier");
 const ndjson = readFileSync(resolve(FIXTURES, "agent-stream.ndjson"), "utf8");
-const { lines: expectedLines } = z.object({ lines: z.array(z.array(z.string())) }).parse(JSON.parse(readFileSync(resolve(FIXTURES, "agent-stream.expected.json"), "utf8")));
+const { lines: expectedLines } = z
+  .object({ lines: z.array(z.array(z.string())) })
+  .parse(JSON.parse(readFileSync(resolve(FIXTURES, "agent-stream.expected.json"), "utf8")));
 
 const labelsOf = (text: string) => text.split("\n").flatMap(classifyAgentLine);
 
@@ -17,7 +19,12 @@ const labelsOf = (text: string) => text.split("\n").flatMap(classifyAgentLine);
 // -----
 describe("classifyAgentLine", () => {
   it("gives the labels of each line of the shared fixture", () => {
-    expect(ndjson.split("\n").filter((line) => line !== "").map(classifyAgentLine)).toEqual(expectedLines);
+    expect(
+      ndjson
+        .split("\n")
+        .filter((line) => line !== "")
+        .map(classifyAgentLine),
+    ).toEqual(expectedLines);
   });
 
   it.each([
@@ -32,7 +39,9 @@ describe("classifyAgentLine", () => {
   });
 
   it("labels a tool it does not know as calling a tool", () => {
-    expect(classifyAgentLine('{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__x__y"}]}}')).toEqual(["calling_tool"]);
+    expect(
+      classifyAgentLine('{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__x__y"}]}}'),
+    ).toEqual(["calling_tool"]);
   });
 
   it("keeps nothing but the label", () => {
@@ -46,11 +55,17 @@ describe("classifyAgentLine", () => {
 // -----
 const T0 = Date.parse("2026-11-19T09:00:00.000Z");
 const at = (seconds: number) => new Date(T0 + seconds * 1000);
-const line = (name: string) => `${JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name }] } })}\n`;
+const line = (name: string) =>
+  `${JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", name }] } })}\n`;
 
 describe("drainTrace", () => {
   it("merges consecutive identical labels into one entry with a count", () => {
-    const first = drainTrace(emptyTraceState(), line("Read") + line("Glob") + line("Read") + line("Grep"), "hunt", at(0));
+    const first = drainTrace(
+      emptyTraceState(),
+      line("Read") + line("Glob") + line("Read") + line("Grep"),
+      "hunt",
+      at(0),
+    );
 
     expect(first.entries.map((entry) => [entry.label, entry.count])).toEqual([
       ["reading_files", 3],
@@ -64,7 +79,13 @@ describe("drainTrace", () => {
     const second = drainTrace(first.state, line("Grep") + line("Grep"), "hunt", at(10));
 
     expect(second.entries).toHaveLength(1);
-    expect(second.entries[0]).toMatchObject({ id: first.entries[0]?.id, label: "searching", count: 3, startedAt: at(0).toISOString(), endedAt: at(10).toISOString() });
+    expect(second.entries[0]).toMatchObject({
+      id: first.entries[0]?.id,
+      label: "searching",
+      count: 3,
+      startedAt: at(0).toISOString(),
+      endedAt: at(10).toISOString(),
+    });
   });
 
   it("returns nothing when no line is new", () => {
@@ -85,11 +106,18 @@ describe("drainTrace", () => {
   it("counts the bytes it consumed, so a non-ASCII line moves the offset by bytes", () => {
     const text = `${JSON.stringify({ type: "system", note: "é" })}\n`;
 
-    expect(drainTrace(emptyTraceState(), text, "recon", at(0)).state.offset).toBe(new TextEncoder().encode(text).length);
+    expect(drainTrace(emptyTraceState(), text, "recon", at(0)).state.offset).toBe(
+      new TextEncoder().encode(text).length,
+    );
   });
 
   it("orders entries of one poll by id", () => {
-    const { entries } = drainTrace(emptyTraceState(), line("Read") + line("Grep") + line("Bash") + line("Write"), "hunt", at(0));
+    const { entries } = drainTrace(
+      emptyTraceState(),
+      line("Read") + line("Grep") + line("Bash") + line("Write"),
+      "hunt",
+      at(0),
+    );
 
     expect(entries.map((entry) => entry.id)).toEqual(entries.map((entry) => entry.id).toSorted());
   });

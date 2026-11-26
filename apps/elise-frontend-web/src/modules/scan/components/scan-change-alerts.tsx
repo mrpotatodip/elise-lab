@@ -25,7 +25,11 @@ export function ScanChangeAlerts({ scanId }: { scanId: string }) {
         <Alert variant="destructive">
           <Undo2 />
           <AlertDescription>
-            <span className="font-medium">{scanPlural(back, "problem came", "problems came")} back after being fixed.</span> This scan reported {back === 1 ? "it" : "them"} again. Find the change that brought {back === 1 ? "it" : "them"} back.
+            <span className="font-medium">
+              {scanPlural(back, "problem came", "problems came")} back after being fixed.
+            </span>{" "}
+            This scan reported {back === 1 ? "it" : "them"} again. Find the change that brought{" "}
+            {back === 1 ? "it" : "them"} back.
           </AlertDescription>
         </Alert>
       )}
@@ -33,7 +37,10 @@ export function ScanChangeAlerts({ scanId }: { scanId: string }) {
         <Alert variant="warning">
           <CircleAlert />
           <AlertDescription>
-            <span className="font-medium">{scanPlural(unchecked, "open problem was", "open problems were")} not re-checked by this scan.</span> Treat {unchecked === 1 ? "it" : "them"} as still open.
+            <span className="font-medium">
+              {scanPlural(unchecked, "open problem was", "open problems were")} not re-checked by this scan.
+            </span>{" "}
+            Treat {unchecked === 1 ? "it" : "them"} as still open.
           </AlertDescription>
         </Alert>
       )}

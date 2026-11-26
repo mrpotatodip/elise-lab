@@ -1,13 +1,35 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { ScanOptions } from "#/schemas";
+import { RUNNER_AGENTS_AT_ONCE, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { SCAN_SANDBOX_FULL_PHASES, SCAN_SANDBOX_PHASE_SKILL_PHASES } from "#/modules/scan-sandbox/constants";
-import { buildAgentPrompt, buildAgentScript, buildCloneScript, buildPhasePrompt, phaseAgentFiles, type PromptPlace } from "#/modules/scan-sandbox/utils";
+import {
+  buildAgentPrompt,
+  buildAgentScript,
+  buildCloneScript,
+  buildPhasePrompt,
+  phaseAgentFiles,
+  type PromptPlace,
+} from "#/modules/scan-sandbox/utils";
 
-const RUNNER_PLACE: PromptPlace = { repoDir: "./repo", outDir: "./out", networkRule: "do not use the network", validatedBy: "runner", metered: false };
+const RUNNER_PLACE: PromptPlace = {
+  repoDir: "./repo",
+  outDir: "./out",
+  networkRule: "do not use the network",
+  validatedBy: "runner",
+  metered: false,
+};
 
-const options: ScanOptions = { skill: "full", model: "claude-haiku-5-5", effort: "low", profile: "quick", maxBudgetUsd: 1 };
+const options: ScanOptions = {
+  skill: "full",
+  model: "claude-haiku-5-5",
+  effort: "low",
+  profile: "quick",
+  maxBudgetUsd: 1,
+};
 
-const CRITIC_SENTENCE = "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.";
+const CRITIC_SENTENCE =
+  "After the last hunter wave, run the critic pass with a separate sub-agent. Record it in `critic_passes` in run-metadata.json.";
 const VERIFIER_SENTENCE =
   "Verify each candidate with a separate sub-agent, not with yourself. Record its ID as the `agent_id` of the check in the ledger. If you cannot start a sub-agent, set `run_status` to `incomplete` and `incomplete_reason` to `verification_unavailable`. If the hunt left no candidates there is nothing to verify and no verifier is needed: that is a finished run, not `verification_unavailable`.";
 const DEEP_CRITIC_SENTENCE =
@@ -16,7 +38,10 @@ const DEEP_FINAL_SENTENCE =
   "Then verify each final record with another separate sub-agent. It must not be the unit's owner or a verifier that checked the unit. Record each in `final_verifiers` in run-metadata.json.";
 const ASKED_SENTENCES = [CRITIC_SENTENCE, VERIFIER_SENTENCE, DEEP_CRITIC_SENTENCE, DEEP_FINAL_SENTENCE];
 
-const sharedLines =(text: string) => text.split("\n").filter((line) => !/^(Target|Output directory|The money|Do not use the network|There is no network)/.test(line));
+const sharedLines = (text: string) =>
+  text
+    .split("\n")
+    .filter((line) => !/^(Target|Output directory|The money|Do not use the network|There is no network)/.test(line));
 
 describe("buildAgentScript", () => {
   it("takes an atomic lock first, so a retry starts no second agent", () => {
@@ -28,7 +53,9 @@ describe("buildAgentScript", () => {
   it("writes the exit code to a temp file, then renames it", () => {
     const script = buildAgentScript(options);
 
-    expect(script).toContain("echo $? > /workspace/agent.exit.tmp && mv /workspace/agent.exit.tmp /workspace/agent.exit");
+    expect(script).toContain(
+      "echo $? > /workspace/agent.exit.tmp && mv /workspace/agent.exit.tmp /workspace/agent.exit",
+    );
   });
 
   it("passes the model, the effort and the dollar cap", () => {
@@ -44,7 +71,9 @@ describe("buildAgentScript", () => {
     expect(script).toContain("--max-budget-usd 1.25");
     expect(script).toContain('"$(cat /workspace/prompt-hunt.txt)"');
     expect(script).toContain("> /workspace/agent-hunt.log 2> /workspace/agent-hunt.err");
-    expect(script).toContain("echo $? > /workspace/agent-hunt.exit.tmp && mv /workspace/agent-hunt.exit.tmp /workspace/agent-hunt.exit");
+    expect(script).toContain(
+      "echo $? > /workspace/agent-hunt.exit.tmp && mv /workspace/agent-hunt.exit.tmp /workspace/agent-hunt.exit",
+    );
     expect(script).not.toContain("/workspace/agent.");
   });
 
@@ -66,15 +95,15 @@ describe("buildCloneScript", () => {
   it("kills a slow clone and takes the URL as an argument, not as script text", () => {
     const script = buildCloneScript();
 
-    expect(script).toContain("timeout --kill-after=5 300 git clone --depth 1 -- \"$1\"");
+    expect(script).toContain('timeout --kill-after=5 300 git clone --depth 1 -- "$1"');
     expect(script).not.toContain("github.com");
   });
 
   it("fetches a ref given as the second argument, never as script text, and writes the commit it read", () => {
     const script = buildCloneScript();
 
-    expect(script).toContain("git fetch --depth 1 origin \"$2\"");
-    expect(script).toContain("git fetch --depth 1 origin \"refs/heads/$2\"");
+    expect(script).toContain('git fetch --depth 1 origin "$2"');
+    expect(script).toContain('git fetch --depth 1 origin "refs/heads/$2"');
     expect(script).toContain("echo branch > /workspace/repo.kind");
     expect(script).toContain("echo other > /workspace/repo.kind");
     expect(script).toContain("rev-parse --abbrev-ref HEAD > /workspace/repo.branch");
@@ -84,50 +113,73 @@ describe("buildCloneScript", () => {
 });
 
 describe("buildAgentPrompt", () => {
-  it.each(["lite", "full"] as const)("names the full skill and the profile whatever the options' skill (%s), and sets no count of agents", (skill) => {
-    const prompt = buildAgentPrompt({ ...options, skill, profile: "deep" });
+  it.each(["lite", "full"] as const)(
+    "names the full skill and the profile whatever the options' skill (%s), and sets no count of agents",
+    (skill) => {
+      const prompt = buildAgentPrompt({ ...options, skill, profile: "deep" });
 
-    expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
-    expect(prompt).not.toContain("security-audit-lite");
-    expect(prompt).toContain("Profile: deep");
-    expect(prompt).not.toContain("agent invocations");
-  });
+      expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
+      expect(prompt).not.toContain("security-audit-lite");
+      expect(prompt).toContain("Profile: deep");
+      expect(prompt).not.toContain("agent invocations");
+    },
+  );
 
   it.each([
     ["recon", "Phase 1 (Reconnaissance)", "This is the first run", { quick: [], standard: [], deep: [] }],
-    ["hunt", "Phase 2 (Coverage-led hunting waves)", "Do not redo reconnaissance", { quick: [], standard: [CRITIC_SENTENCE], deep: [DEEP_CRITIC_SENTENCE] }],
-    ["check", "Phases 3, 4 and 5", "Do not hunt again", { quick: [VERIFIER_SENTENCE], standard: [VERIFIER_SENTENCE], deep: [VERIFIER_SENTENCE, DEEP_FINAL_SENTENCE] }],
-    ["report", "Phase 6 (Target-neutral report)", "Do not hunt or validate again", { quick: [], standard: [], deep: [] }],
-  ] as const)("tells the %s run which part of the skill it does and what the earlier runs left", (phase, skillPhases, handoff, asked) => {
-    const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase);
+    [
+      "hunt",
+      "Phase 2 (Coverage-led hunting waves)",
+      "Do not redo reconnaissance",
+      { quick: [], standard: [CRITIC_SENTENCE], deep: [DEEP_CRITIC_SENTENCE] },
+    ],
+    [
+      "check",
+      "Phases 3, 4 and 5",
+      "Do not hunt again",
+      { quick: [VERIFIER_SENTENCE], standard: [VERIFIER_SENTENCE], deep: [VERIFIER_SENTENCE, DEEP_FINAL_SENTENCE] },
+    ],
+    [
+      "report",
+      "Phase 6 (Target-neutral report)",
+      "Do not hunt or validate again",
+      { quick: [], standard: [], deep: [] },
+    ],
+  ] as const)(
+    "tells the %s run which part of the skill it does and what the earlier runs left",
+    (phase, skillPhases, handoff, asked) => {
+      const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase);
 
-    const sentencesOf = (profile: ScanOptions["profile"], place?: PromptPlace) =>
-      ASKED_SENTENCES.filter((sentence) => buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence));
-    expect({
-      cloud: { quick: sentencesOf("quick"), standard: sentencesOf("standard"), deep: sentencesOf("deep") },
-      runner: {
-        quick: sentencesOf("quick", RUNNER_PLACE),
-        standard: sentencesOf("standard", RUNNER_PLACE),
-        deep: sentencesOf("deep", RUNNER_PLACE),
-      },
-    }).toEqual({ cloud: asked, runner: asked });
+      const sentencesOf = (profile: ScanOptions["profile"], place?: PromptPlace) =>
+        ASKED_SENTENCES.filter((sentence) =>
+          buildPhasePrompt({ ...options, skill: "full", profile }, phase, place).includes(sentence),
+        );
+      expect({
+        cloud: { quick: sentencesOf("quick"), standard: sentencesOf("standard"), deep: sentencesOf("deep") },
+        runner: {
+          quick: sentencesOf("quick", RUNNER_PLACE),
+          standard: sentencesOf("standard", RUNNER_PLACE),
+          deep: sentencesOf("deep", RUNNER_PLACE),
+        },
+      }).toEqual({ cloud: asked, runner: asked });
 
-    expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
-    expect(prompt).toContain(`This run does ${skillPhases}`);
-    expect(prompt).toContain(handoff);
-    expect(prompt).toContain("Profile: deep");
+      expect(prompt).toContain("security-audit skill in FULL AUDIT mode");
+      expect(prompt).toContain(`This run does ${skillPhases}`);
+      expect(prompt).toContain(handoff);
+      expect(prompt).toContain("Profile: deep");
 
-    const onRunner = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
-    const otherParts = Object.entries(SCAN_SANDBOX_PHASE_SKILL_PHASES).filter(([other]) => other !== phase);
+      const onRunner = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
+      const otherParts = Object.entries(SCAN_SANDBOX_PHASE_SKILL_PHASES).filter(([other]) => other !== phase);
 
-    expect(onRunner).toContain(`This run does ${skillPhases}`);
-    expect(otherParts.filter(([, part]) => onRunner.includes(part))).toEqual([]);
-    expect(onRunner).toContain("so stop when yours is done");
-    expect(onRunner).toContain("./repo");
-    expect(onRunner).not.toMatch(/node command|money|deferred/i);
-    expect(onRunner).not.toMatch(/(do not|never|no|without)\s+(start\s+|use\s+|run\s+|spawn\s+)?sub-?agents?/i);
-    expect(sharedLines(onRunner).slice(0, 5)).toEqual(sharedLines(prompt).slice(0, 5));
-  });
+      expect(onRunner).toContain(`This run does ${skillPhases}`);
+      expect(otherParts.filter(([, part]) => onRunner.includes(part))).toEqual([]);
+      expect(onRunner).toContain("so stop when yours is done");
+      expect(onRunner).toContain("./repo");
+      expect(onRunner).not.toMatch(/node command|money|deferred/i);
+      expect(onRunner).not.toMatch(/(do not|never|no|without)\s+(start\s+|use\s+|run\s+|spawn\s+)?sub-?agents?/i);
+      expect(sharedLines(onRunner).slice(0, 3)).toEqual(sharedLines(prompt).slice(0, 3));
+    },
+  );
 
   it.each([
     ["recon", false],
@@ -140,8 +192,12 @@ describe("buildAgentPrompt", () => {
       buildPhasePrompt({ ...options, skill: "full", profile }, phase, RUNNER_PLACE),
     ]);
 
-    expect(prompts.map((prompt) => prompt.includes("Run each sub-agent in the foreground and wait for its result"))).toEqual(prompts.map(() => told));
-    expect(prompts.map((prompt) => prompt.includes("never sleep or schedule a wakeup"))).toEqual(prompts.map(() => told));
+    expect(
+      prompts.map((prompt) => prompt.includes("Run each sub-agent in the foreground and wait for its result")),
+    ).toEqual(prompts.map(() => told));
+    expect(prompts.map((prompt) => prompt.includes("never sleep or schedule a wakeup"))).toEqual(
+      prompts.map(() => told),
+    );
   });
 
   it("has only the check and report runs validate, and only the report run write the report files", () => {
@@ -153,6 +209,41 @@ describe("buildAgentPrompt", () => {
     expect(buildPhasePrompt(full, "check")).toContain("Do not write the report files in this run");
     expect(buildPhasePrompt(full, "report")).toContain("Finish by producing REPORT.md");
   });
+
+  it.each([
+    ["recon", "builds coverage-ledger.json from recon-list.json and runs the skill's validators on it"],
+    ["hunt", "merges ledger-updates.json into coverage-ledger.json and runs the skill's validators on it"],
+  ] as const)("tells a Runner's %s run that the app builds the ledger and the agent runs no code", (phase, appDoes) => {
+    const prompt = buildPhasePrompt({ ...options, skill: "full", profile: "deep" }, phase, RUNNER_PLACE);
+
+    expect(prompt).toContain(appDoes);
+    expect(prompt).toContain("do not run node or any other script");
+    expect(prompt).toContain("A command refused to you is expected here");
+  });
+
+  it.each([
+    ["recon", "write recon-list.json, a short list of what you found", "Do not write coverage-ledger.json"],
+    [
+      "hunt",
+      "write ledger-updates.json, a JSON array of only the units you changed",
+      "Do not rewrite coverage-ledger.json",
+    ],
+    [
+      "check",
+      "write ledger-updates.json, a JSON array of only the units you changed",
+      "Do not rewrite coverage-ledger.json",
+    ],
+  ] as const)(
+    "asks a Runner's %s run for the short list or the changed units, and a cloud run does not",
+    (phase, asked, refused) => {
+      const onRunner = buildPhasePrompt({ ...options, skill: "full" }, phase, RUNNER_PLACE);
+      const inCloud = buildPhasePrompt({ ...options, skill: "full" }, phase);
+
+      expect(onRunner).toContain(asked);
+      expect(onRunner).toContain(refused);
+      expect(inCloud).not.toMatch(/recon-list|ledger-updates/);
+    },
+  );
 
   it("tells a Runner's check run that a refused validator is expected and that no candidates need no verifier", () => {
     const full: ScanOptions = { ...options, skill: "full" };
@@ -176,5 +267,88 @@ describe("buildAgentPrompt", () => {
     expect(buildAgentPrompt(full)).toContain("run the skill's validators");
     expect(onRunner).toContain("Do not run the validators or any node command");
     expect(onRunner).not.toContain("run the skill's validators");
+  });
+
+  it("sends a Runner's hunt to the app's hunter-assignments.json and leaves the cloud hunt as it was", () => {
+    const full: ScanOptions = { ...options, skill: "full" };
+
+    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).toContain("hunter-assignments.json");
+    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).toContain(
+      "If it is missing, group the planned units yourself",
+    );
+    expect(buildPhasePrompt(full, "hunt", RUNNER_PROMPT_PLACE)).not.toContain("do not regroup");
+    expect(buildPhasePrompt(full, "hunt")).not.toContain("hunter-assignments");
+    expect(buildPhasePrompt(full, "check", RUNNER_PROMPT_PLACE)).not.toContain("hunter-assignments");
+  });
+
+  it("keeps the Runner app's copy of the agents-at-once number equal to the engine's", () => {
+    const source = readFileSync(
+      new URL("../../../../../elise-runner-cli/core/src/scan.rs", import.meta.url).pathname,
+      "utf8",
+    );
+
+    expect(source.match(/const AGENTS_AT_ONCE: usize = (\d+);/)?.[1]).toBe(String(RUNNER_AGENTS_AT_ONCE));
+  });
+
+  it.each([
+    ["hunt", "hunters"],
+    ["check", "verifiers"],
+  ] as const)("gives a Runner's %s run its own limit on agents at once, and a cloud run none", (phase, agents) => {
+    const full: ScanOptions = { ...options, skill: "full" };
+
+    expect(RUNNER_AGENTS_AT_ONCE).toBe(6);
+    expect(buildPhasePrompt(full, phase, RUNNER_PROMPT_PLACE)).toContain(
+      `Run up to ${RUNNER_AGENTS_AT_ONCE} ${agents} at the same time.`,
+    );
+    expect(buildPhasePrompt(full, phase)).not.toContain("at the same time");
+    expect(buildPhasePrompt(full, "recon", RUNNER_PROMPT_PLACE)).not.toContain("at the same time");
+    expect(buildPhasePrompt(full, "report", RUNNER_PROMPT_PLACE)).not.toContain("at the same time");
+  });
+});
+
+describe("a scoped Scan's prompts", () => {
+  const scoped: ScanOptions = { ...options, skill: "full", scopePaths: ["one", "two/sub"] };
+  const folders = "`one`, `two/sub`";
+
+  it.each(SCAN_SANDBOX_FULL_PHASES)("names the folders in the %s Phase", (phase) => {
+    expect(buildPhasePrompt(scoped, phase, RUNNER_PROMPT_PLACE)).toContain(folders);
+  });
+
+  it("has recon list only in-scope entries, hunt and check stay inside, and the report say it is partial", () => {
+    expect(buildPhasePrompt(scoped, "recon", RUNNER_PROMPT_PLACE)).toContain(
+      "List an entry in recon-list.json only when its entry point, boundary and subsystem are inside these folders",
+    );
+    expect(buildPhasePrompt(scoped, "hunt", RUNNER_PROMPT_PLACE)).toContain("Hunt only inside these folders");
+    expect(buildPhasePrompt(scoped, "check", RUNNER_PROMPT_PLACE)).toContain("Validate only candidates");
+    expect(buildPhasePrompt(scoped, "report", RUNNER_PROMPT_PLACE)).toContain("partial coverage and not a full audit");
+  });
+
+  it("asks only the run it is for, so recon says nothing of the report", () => {
+    expect(buildPhasePrompt(scoped, "recon", RUNNER_PROMPT_PLACE)).not.toContain("partial coverage");
+    expect(buildPhasePrompt(scoped, "hunt", RUNNER_PROMPT_PLACE)).not.toContain("recon-list.json only");
+  });
+
+  it.each([
+    ["a Runner", RUNNER_PLACE],
+    ["our cloud", undefined],
+  ])(
+    "gives a single run on %s one consistent scope: units outside are out_of_scope and never hunted",
+    (_name, place) => {
+      const single = buildAgentPrompt(scoped, place);
+
+      expect(single).toContain(folders);
+      expect(single).toContain("record the surfaces you notice outside them as `out_of_scope` units");
+      expect(single).toContain("never hunt or check an `out_of_scope` unit");
+      expect(single).toContain("partial coverage and not a full audit");
+      expect(single).not.toContain("add no unit for anything outside them");
+      expect(single).not.toContain("recon-list.json");
+    },
+  );
+
+  it.each([...SCAN_SANDBOX_FULL_PHASES])("leaves the %s prompt of a Scan of everything as it was", (phase) => {
+    expect(buildPhasePrompt({ ...scoped, scopePaths: undefined }, phase, RUNNER_PROMPT_PLACE)).toBe(
+      buildPhasePrompt(options, phase, RUNNER_PROMPT_PLACE),
+    );
+    expect(buildPhasePrompt({ ...scoped, scopePaths: [] }, phase)).not.toContain("scoped");
   });
 });

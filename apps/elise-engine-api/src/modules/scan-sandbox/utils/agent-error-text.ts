@@ -14,7 +14,11 @@ export const agentErrorText = (log: string, maxChars: number): string => {
       const parsed = ErrorLineSchema.safeParse(JSON.parse(line));
       if (!parsed.success) return [];
       const { type, subtype, is_error, result } = parsed.data;
-      return [[type, subtype, is_error ? "error" : undefined, result].filter((part) => part !== undefined && part !== "").join(" ")];
+      return [
+        [type, subtype, is_error ? "error" : undefined, result]
+          .filter((part) => part !== undefined && part !== "")
+          .join(" "),
+      ];
     } catch {
       return [];
     }

@@ -71,7 +71,7 @@ One of the four runs of a full Scan, in order: `recon`, `hunt`, `check` and `rep
 _Avoid_: Step (that is cloning, auditing or saving), stage
 
 **Runner**:
-A program on a person's computer (`apps/elise-runner-cli`) that claims a Scan and runs it there: it clones the repo (or unpacks the Archive of an Upload app, which only a Runner that reports it can read), runs `claude` on the person's own login under its own permission rules, and sends back what the agent wrote. There are two: the desktop app (a window and a tray) and the headless Runner (`elise-runner`, a command line for a server or a terminal, on macOS and Linux). Both run Scans through one shared core (`elise-runner-core`), so a Runner Scan behaves the same whichever runs it. To Elise a headless Runner is a Runner like any other: it shows in the Runners list and is picked in the dashboard the same way. A Runner gets its Runner token one of three ways: a Runner login (the headless Runner's `elise-runner login`, approved on the dashboard), a pairing code (`pair <code>`, and the desktop app's Add a Runner), or `ELISE_RUNNER_TOKEN` set from outside, for CI and containers. On one computer the two are two Runners, each holding its own token (separate keychain entries), and neither reads or changes the other's. A Runner Scan takes no credit. It has no server meter: the Runner holds the Pool itself, through the agent's own `--max-budget-usd`. ADR 0006 holds the rules.
+A program on a person's computer (`apps/elise-runner-cli`) that claims a Scan and runs it there: it clones the repo (or unpacks the Archive of an Upload app, which only a Runner that reports it can read), runs `claude` on the person's own login under its own permission rules, and sends back what the agent wrote. There are two: the desktop app (a window and a tray) and the headless Runner (`elise-runner`, a command line for a server or a terminal, on macOS, Linux and Windows x64). Both run Scans through one shared core (`elise-runner-core`), so a Runner Scan behaves the same whichever runs it. To Elise a headless Runner is a Runner like any other: it shows in the Runners list and is picked in the dashboard the same way. A Runner gets its Runner token one of three ways: a Runner login (the headless Runner's `elise-runner login`, approved on the dashboard), a pairing code (`pair <code>`, and the desktop app's Add a Runner), or `ELISE_RUNNER_TOKEN` set from outside, for CI and containers. On one computer the two are two Runners, each holding its own token (separate keychain entries), and neither reads or changes the other's. A Runner Scan takes no credit. It has no server meter: the Runner holds the Pool itself, through the agent's own `--max-budget-usd`. ADR 0006 holds the rules.
 _Avoid_: Worker (that is the Cloudflare Worker), agent (that is the program it starts), CLI (a headless Runner is a Runner, not a separate kind of thing)
 
 **Runner login**:
@@ -86,8 +86,12 @@ _Avoid_: onboarding, tutorial, steps (a Step is the agent's)
 A Scan a person ended on purpose before it finished, from the dashboard: by stopping it, or by removing the Runner that runs it. It is not a failure and not a Partial Scan: it keeps no Report and no findings, weighs 0 in a Verdict and adds nothing to a Branch. A cloud Scan is charged what was metered up to the stop; a Runner Scan takes no credit.
 _Avoid_: Cancelled Scan, aborted Scan, killed Scan
 
+**Resumed Scan**:
+A new Runner Scan that carries on from the kept work folder of an earlier Runner Scan that failed, was stopped by the Runner, or was a Stopped Scan, instead of starting from the clone. It is its own Scan with its own Scan ID, and it points at the Scan it resumes; the earlier Scan stays as it ended. It runs on the same Runner that ran the earlier one, on the same commit, and spends from the Pool left after what the earlier Scan already spent. A Scan that ended because the Pool was spent cannot be resumed.
+_Avoid_: Retry (that starts over), restart, continued Scan
+
 **Partial Scan**:
-A profile Scan (any Profile) that ran out of money while the Skill could still write its files, so it ended with a Report that starts `PARTIAL: money ran out;` and a findings file, both naming the units it did not cover. Only money sets the flag: a Scan is partial when the Report's first line is that Skill line, a ledger unit holds `money_exhausted`, or `run-metadata.json` says `incomplete_reason: "money_exhausted"`. Any other first line that starts with `PARTIAL:` (the agent could not verify something, say) does not make a Partial Scan, on a Runner or in the cloud. It is charged only what was metered. It is not a failed Scan. It weighs 0 in a Verdict (whatever its Profile), and its findings still count as open. It is not given a Profile check, so it stores no `profile_met` (null), apart from the `partial` flag, which says only that money ran out. A Scan that spends its whole Budget cap with no Report fails instead.
+A profile Scan (any Profile) that ran out of money while the Skill could still write its files, so it ended with a Report that starts `PARTIAL: money ran out;` and a findings file, both naming the units it did not cover. A Runner Scan whose Phase the Budget cap or its time slot stopped is partial too: the Runner app sends the earlier Phases' files with a Report that starts `PARTIAL: money ran out;` or `PARTIAL: a phase ran out of time;`. Money and time set the flag: a Scan is partial when the Report's first line is one of those two lines, a ledger unit holds `money_exhausted`, or `run-metadata.json` says `incomplete_reason: "money_exhausted"`. A Scan stopped on time counts the same way in the Verdict as one stopped on money: weight 0, findings still open. Any other first line that starts with `PARTIAL:` (the agent could not verify something, say) does not make a Partial Scan, on a Runner or in the cloud. It is charged only what was metered. It is not a failed Scan. It weighs 0 in a Verdict (whatever its Profile), and its findings still count as open. It is not given a Profile check, so it stores no `profile_met` (null), apart from the `partial` flag, which says that money ran out or a Phase ran out of time. A Scan that spends its whole Budget cap with no Report fails instead.
 _Avoid_: Incomplete, failed Scan
 
 **Profile check**:
@@ -115,6 +119,10 @@ _Avoid_: Output, result
 **Repo**:
 One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included.
 _Avoid_: Project, target
+
+**Removed Repo**:
+A Repo a person took off the list. Its History stays, but it is not in the Repo list, the findings across Repos, the overview's Repo count and findings tiles, the Verdict or the Signals, and it does not take one of the 200 places. Its Scans still show on the Scans page and in the overview's Scan counts. Only an admin removes one, and not while a Scan of it is queued or running. Adding it again, or a Scan of it, brings it back with its History, if the Account has a free place.
+_Avoid_: Deleted Repo, soft delete, archived Repo
 
 **Provider**:
 Where the code of a Scan comes from: `github`, `gitlab`, `gitlab-sh` or `upload`. The user picks it first, and each Provider is its own flow with its own address or file rules, contract schemas and dashboard screens. Core knows only the `SourceProvider` port and one registry, and lint fails when core reads a Provider's folder or one Provider reads another. A request with no `provider` means `github`. On a Runner the clone happens on the user's computer with their own git login, so EliseLAB stores no token for any Provider. `gitlab-sh` takes only hosts the user listed in their own Runner settings: a host that only the job names is refused. ADR 0008 (git providers) holds the rules.
@@ -207,7 +215,7 @@ A value stored in the Worker, not in git, such as `ANTHROPIC_API_KEY` or `SCAN_A
 _Avoid_: Env var (an env var is not always secret)
 
 **Budget cap**:
-The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`, provisional). A request may lower it, never raise it. `MAX_BUDGET_FULL_USD` is the ceiling that guards that table for full Scans. A Runner Scan keeps `RUNNER_MAX_BUDGET_USD` as its own ceiling. ADR 0006 holds the rules.
+The most dollars the agent may spend in one Scan (`--max-budget-usd`), and the one pool that all its Phases spend from. A new Scan's cap is its Profile's cap (`SCAN_PROFILE_CAPS_USD`: $12, $24 and $50, provisional). A request may lower it, never raise it, except a Runner Scan's, which may raise it up to `RUNNER_MAX_BUDGET_USD` ($50, its own ceiling). `MAX_BUDGET_FULL_USD` ($50) is the ceiling that guards that table for full Scans. ADR 0006 holds the rules.
 _Avoid_: Limit, quota
 
 **Pool**:
@@ -223,7 +231,7 @@ The most an admin may set as the Monthly budget: `tenants.monthly_scan_budget_al
 _Avoid_: Ceiling (the ceiling of a Budget cap is in its own entry), limit
 
 **Plan**:
-What an Account pays for. Two Plans are offered, both paid through Stripe: Starter (`starter`, $15 a month or $150 a year, 2 members) and Runner (`runner`, $35 a month or $350 a year, 5 members); the yearly price needs its Stripe yearly price ID on the row before it is offered. Older rows stay because subscriptions still point to them: Pro (`pro`, $49 a month, $49 of Included credit) and Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month). A Plan is a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap. The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Solo and Team are disabled rows kept because subscriptions still point to them. This is the subscription, not the Instance type.
+What an Account pays for. Three Plans are offered, all paid through Stripe and all on the Account's own key: Solo (`solo`, $6 a month or $60 a year, 1 member), Starter (`starter`, $15 a month or $150 a year, 2 members) and Runner (`runner`, $35 a month or $350 a year, 5 members); the yearly price needs its Stripe yearly price ID on the row before it is offered. Older rows stay because subscriptions still point to them: Pro (`pro`, $49 a month, $49 of Included credit) and Bring your own key (`byok`, $19 a month, no credit, 300 Scans a month). A Plan is a row of `platform_master_plans` with a monthly price, an Included credit, a credit markup (1.5), a carry cap, a Key source and a member cap. The Plan decides the key: Pro always uses the platform's key and takes credit, Bring your own key needs the Account's own key and takes none. An Account's Plan is its `tenant_subscriptions` row; no row means no Plan. A full Scan on the platform's key needs a Plan (`NO_ACTIVE_PLAN` otherwise, whatever `BILLING_ENFORCED` says); an Account with no Plan that has its own key, and any Runner Scan, runs without one. A `grant` row is a Plan the operator gave, never charged. Team is a disabled row kept because subscriptions still point to it. Solo stays disabled until its Stripe price IDs are on the row. This is the subscription, not the Instance type.
 _Avoid_: Tier, subscription (for the Plan itself)
 
 **Subscription**:
@@ -311,6 +319,41 @@ A Party of the type `organization`. It has one name (`party_organizations`).
 
 **Login**:
 A way to sign in (`auth_user`). It belongs to one Party. Its `name` column always has a value; first and last name exist only for a Person.
+
+**Session**:
+One signed-in browser of one Login (`auth_session`): created by a sign-in, ended by sign-out, expiry, a password reset or a Two-factor reset. A Runner never has one.
+_Avoid_: instance, device login
+
+**Session limit**:
+The most Sessions one Login may hold at once: 3, the same for every Plan and Role. A sign-in over the limit signs out that Login's oldest Session (the newest wins); it is never refused. It counts only Sessions, so Runners are untouched. It makes sharing one Login awkward and does not stop it: people who work together are meant to join the Team by invite.
+
+**Verified Login**:
+A Login whose email has been confirmed. Only a Verified Login can sign in. A person confirms by opening the link in a Verification email, by accepting a Team invite sent to that address, or by completing a password reset. A new sign-up for an email held by an unverified Login replaces that Login.
+_Avoid_: confirmed email, activated user
+
+**Verification email**:
+The email that holds the one-time link that makes a Login a Verified Login. The link lasts 24 hours and works once. It is always sent, has no unsubscribe link, and is neither a Security notice nor an Activity email.
+_Avoid_: confirmation email, welcome email
+
+**Two-factor**:
+A second step at sign-in: after the password, a Login types a code from its Authenticator, or a Backup code. A Login has Two-factor only once it has typed one valid code at enrolment; an abandoned setup leaves it off. A Login with `tenant_admin` or `workspace_admin` in any Account must have it and is sent to set it up at its next sign-in, with no skip. Every other Login chooses, unless its Account has a Two-factor requirement. A Runner token never passes through it.
+_Avoid_: MFA, 2FA (in text people read), device login
+
+**Authenticator**:
+The app on a person's phone or computer (a TOTP app) that holds a Login's Two-factor secret and shows the six-digit code. Emailed codes are not a second factor here.
+_Avoid_: token, OTP app
+
+**Backup code**:
+One of ten single-use codes shown once when a Login enrols in Two-factor, each good in place of an Authenticator code. A Login can regenerate them with its password, which voids the old ten.
+_Avoid_: recovery code, reset code
+
+**Two-factor requirement**:
+An Account setting a `tenant_admin` turns on so that every Login in the Account must have Two-factor. A member without it is sent to set it up at the next sign-in.
+_Avoid_: enforce MFA, mandatory 2FA
+
+**2FA reset**:
+An admin clearing another member's Two-factor because the Login lost both its Authenticator and its Backup codes. A `tenant_admin` can reset any other member, a `workspace_admin` only a non-admin, and nobody their own. It writes an Audit trail entry, sends a Security notice and signs the Login out everywhere.
+_Avoid_: unlock, disable (for an admin's action)
 
 **Service token**:
 The secret `SCAN_API_TOKEN`. Only a server holds it, and every `/scans` route needs it as a bearer token.

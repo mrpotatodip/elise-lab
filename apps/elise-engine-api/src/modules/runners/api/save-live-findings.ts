@@ -9,12 +9,20 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/jobs/:scanId/findings", saveLiveFindingsDoc, zValidator("param", RunnerJobParamSchema), zValidator("json", SaveLiveFindingsBodySchema), async (c) => {
-  const runner = await runnerOf(c);
-  const { scanId } = c.req.valid("param");
-  const body = c.req.valid("json");
-  const data = await c.get("deps").withTenant(c, runner.accountId, (db) => runEffect(saveLiveFindingsSvc(db, runner, scanId, body)));
-  return c.json({ data, error: null });
-});
+app.post(
+  "/jobs/:scanId/findings",
+  saveLiveFindingsDoc,
+  zValidator("param", RunnerJobParamSchema),
+  zValidator("json", SaveLiveFindingsBodySchema),
+  async (c) => {
+    const runner = await runnerOf(c);
+    const { scanId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const data = await c
+      .get("deps")
+      .withTenant(c, runner.accountId, (db) => runEffect(saveLiveFindingsSvc(db, runner, scanId, body)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

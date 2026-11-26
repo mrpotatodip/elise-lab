@@ -22,7 +22,7 @@ import "@repo/chat-bot-react-loader/loader.css";
   labels={{
     tools: { lookupOrder: { busy: "Looking up your order", done: "Found your order" } },
   }}
-/>
+/>;
 ```
 
 `ChatBotWithProgress` takes everything `ChatBot` does, plus `labels`, `maxVisible` (rows shown at once; older ones fold into "earlier steps", default 6), `tree` (draw tree lines so a specialist's rows hang under its own row, including nested specialists; default off) and `sounds`.
@@ -31,13 +31,13 @@ import "@repo/chat-bot-react-loader/loader.css";
 
 Tool and specialist names are code names, so a row never shows them: it shows what you wrote in `labels`, or a generic line.
 
-| `labels` key | Row for | Default |
-|---|---|---|
-| `run` | the turn starting | "Thinking" / "Getting started", then "Got your message" |
-| `reply` | the model writing text | "Writing a reply" / "Almost ready", then "Reply written" |
-| `tools` | a tool call, by tool name `{ busy, done }` | the `fallback` |
-| `subagents` | a specialist, by name `{ busy, done }` | the `fallback` |
-| `fallback` | any tool or specialist not listed | "Working on it" / "Finished a step" |
+| `labels` key | Row for                                    | Default                                                  |
+| ------------ | ------------------------------------------ | -------------------------------------------------------- |
+| `run`        | the turn starting                          | "Thinking" / "Getting started", then "Got your message"  |
+| `reply`      | the model writing text                     | "Writing a reply" / "Almost ready", then "Reply written" |
+| `tools`      | a tool call, by tool name `{ busy, done }` | the `fallback`                                           |
+| `subagents`  | a specialist, by name `{ busy, done }`     | the `fallback`                                           |
+| `fallback`   | any tool or specialist not listed          | "Working on it" / "Finished a step"                      |
 
 Busy texts that are lists rotate while the step runs.
 
@@ -58,7 +58,7 @@ import { petalSound, rippleSound } from "@repo/chat-bot-react-loader/sounds";
     start: { turn: rippleSound, tools: { lookupOrder: rippleSound } },
     end: { reply: petalSound, tools: petalSound, turn: petalSound },
   }}
-/>
+/>;
 ```
 
 `start` and `end` each take `true` or a pick of levels. `true` covers every level except `run` and `turn`, which always start or end together with another level and would only double up; name them yourself if you want them. Level keys match `labels`: `run`, `reply`, `tools`, `subagents`, plus `reasoning` and `turn` (the whole turn). `tools` and `subagents` take one sound for all, or a map by name; a name not in the map is silent. A level or side you leave out is silent. A value is a sound recipe, or `{ recipe, tune }`.

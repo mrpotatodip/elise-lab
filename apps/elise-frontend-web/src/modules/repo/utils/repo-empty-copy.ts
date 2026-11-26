@@ -11,17 +11,32 @@ type EmptyCopy = { title: string; text: string };
 // -----
 export function repoEmptyCopy(filter: FindingFilter, hasMore: boolean): EmptyCopy {
   if (hasMore && filter !== "all") {
-    return { title: "None in the findings loaded so far", text: "Some findings are not loaded yet. Load more findings to check them." };
+    return {
+      title: "None in the findings loaded so far",
+      text: "Some findings are not loaded yet. Load more findings to check them.",
+    };
   }
   switch (filter) {
     case "action":
-      return { title: "Nothing needs action", text: "No problem is open on this branch. That is not proof the code is safe: a scan does not find every problem." };
+      return {
+        title: "Nothing needs action",
+        text: "No problem is open on this branch. That is not proof the code is safe: a scan does not find every problem.",
+      };
     case "decided":
-      return { title: "No one has decided anything yet", text: "When someone marks a finding fixed, dismisses it or accepts the risk, it appears here." };
+      return {
+        title: "No one has decided anything yet",
+        text: "When someone marks a finding fixed, dismisses it or accepts the risk, it appears here.",
+      };
     case "duplicate":
-      return { title: "No duplicates", text: "When someone marks a finding as a duplicate of another, it appears here." };
+      return {
+        title: "No duplicates",
+        text: "When someone marks a finding as a duplicate of another, it appears here.",
+      };
     case "scan":
-      return { title: "No scan has closed a problem", text: "Scans do not close problems now: a person does, once the code is fixed. Only earlier scans closed some, and none of those is on this branch." };
+      return {
+        title: "No scan has closed a problem",
+        text: "Scans do not close problems now: a person does, once the code is fixed. Only earlier scans closed some, and none of those is on this branch.",
+      };
     case "all":
       return { title: "No findings", text: "Run a scan to check this repository." };
   }

@@ -9,4 +9,5 @@ export const uploadKeys = {
 
 export const uploadAppsQuery = () => queryOptions({ queryKey: uploadKeys.apps(), queryFn: () => fetchUploadApps() });
 
-export const uploadArchivesQuery = (repoId: string) => queryOptions({ queryKey: uploadKeys.archives(repoId), queryFn: () => fetchUploadArchives({ data: { repoId } }) });
+export const uploadArchivesQuery = (repoId: string) =>
+  queryOptions({ queryKey: uploadKeys.archives(repoId), queryFn: () => fetchUploadArchives({ data: { repoId } }) });

@@ -9,6 +9,7 @@ import { rateLimitByIp } from "#/lib/rate-limit";
 import { openApiDocument, requireOpenApiEnabled, validationErrorResponse } from "#/lib/openapi-document";
 import { errorChainForLog } from "#/lib/redact-log";
 import { requireScanAccess } from "#/lib/require-scan-access";
+import { requireTwoFactor } from "#/lib/require-two-factor";
 import archivesRoutes, { runUploadRetention } from "#/modules/archives";
 import authRoutes from "#/modules/auth";
 import filesRoutes from "#/modules/files";
@@ -45,6 +46,8 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     c.header("x-content-type-options", "nosniff");
   });
 
+  app.use("*", requireTwoFactor);
+
   // -----
   // Every /scans route needs the service token or a
   // signed-in session. /auth, /sign-up and /me do
@@ -60,18 +63,31 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
   app.use("/repos/*", requireScanAccess);
   app.use(
     "/auth/sign-in/*",
-    rateLimitByIp("SIGN_IN_LIMITER", () => new TooManyRequestsError("Too many sign-in attempts. Wait a minute and try again.", "SIGN_IN_RATE_LIMITED")),
+    rateLimitByIp(
+      "SIGN_IN_LIMITER",
+      () => new TooManyRequestsError("Too many sign-in attempts. Wait a minute and try again.", "SIGN_IN_RATE_LIMITED"),
+    ),
   );
 
   app.use(
     "/auth/request-password-reset",
-    rateLimitByIp("PASSWORD_RESET_LIMITER", () => new TooManyRequestsError("Too many reset requests. Wait a minute and try again.", "PASSWORD_RESET_RATE_LIMITED")),
+    rateLimitByIp(
+      "PASSWORD_RESET_LIMITER",
+      () =>
+        new TooManyRequestsError(
+          "Too many reset requests. Wait a minute and try again.",
+          "PASSWORD_RESET_RATE_LIMITED",
+        ),
+    ),
   );
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
       // SAFETY: an error response always has a body, so its status is never 1xx, 204 or 304.
-      return c.json({ data: null, error: { code: "HTTP_ERROR", message: err.message } }, err.status as ContentfulStatusCode);
+      return c.json(
+        { data: null, error: { code: "HTTP_ERROR", message: err.message } },
+        err.status as ContentfulStatusCode,
+      );
     }
 
     if (err instanceof AppError) {
@@ -88,7 +104,28 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     return c.json({ data: null, error: { code: "INTERNAL_ERROR", message: "Internal server error" } }, 500);
   });
 
-  const routes = app.route("/scans", scansRoutes).route("/scans", scanTraceRoutes).route("/auth", authRoutes).route("/sign-up", signUpRoutes).route("/me", meRoutes).route("/usage", usageRoutes).route("/usage/anthropic-key", anthropicKeyRoutes).route("/usage/signals", signalsSettingsAPI).route("/findings/signals", findingSignalsAPI).route("/usage/credit", creditRoutes).route("/usage/plan", planRoutes).route("/findings", findingsRoutes).route("/findings/comments", findingCommentsRoutes).route("/files", filesRoutes).route("/team", teamRoutes).route("/groups", groupsRoutes).route("/repos", reposRoutes).route("/repos", verdictRoutes).route("/repos", archivesRoutes).route("/runners", runnersRoutes).route("/stripe", stripeRoutes);
+  const routes = app
+    .route("/scans", scansRoutes)
+    .route("/scans", scanTraceRoutes)
+    .route("/auth", authRoutes)
+    .route("/sign-up", signUpRoutes)
+    .route("/me", meRoutes)
+    .route("/usage", usageRoutes)
+    .route("/usage/anthropic-key", anthropicKeyRoutes)
+    .route("/usage/signals", signalsSettingsAPI)
+    .route("/findings/signals", findingSignalsAPI)
+    .route("/usage/credit", creditRoutes)
+    .route("/usage/plan", planRoutes)
+    .route("/findings", findingsRoutes)
+    .route("/findings/comments", findingCommentsRoutes)
+    .route("/files", filesRoutes)
+    .route("/team", teamRoutes)
+    .route("/groups", groupsRoutes)
+    .route("/repos", reposRoutes)
+    .route("/repos", verdictRoutes)
+    .route("/repos", archivesRoutes)
+    .route("/runners", runnersRoutes)
+    .route("/stripe", stripeRoutes);
 
   // -----
   // The OpenAPI spec, for developers only.
@@ -97,7 +134,10 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
   app.get(
     "/openapi.json",
     requireOpenApiEnabled,
-    openAPIRouteHandler(app, { documentation: openApiDocument, defaultValidationErrorResponse: validationErrorResponse }),
+    openAPIRouteHandler(app, {
+      documentation: openApiDocument,
+      defaultValidationErrorResponse: validationErrorResponse,
+    }),
   );
 
   // -----
@@ -117,7 +157,12 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
 
 export default {
   fetch: buildApp().app.fetch,
-  queue: (batch: MessageBatch<QueueBody>, env: Bindings, ctx: ExecutionContext) => handleEmailQueue(batch, env, recordInviteStatusOf(env, (promise) => ctx.waitUntil(promise))),
+  queue: (batch: MessageBatch<QueueBody>, env: Bindings, ctx: ExecutionContext) =>
+    handleEmailQueue(
+      batch,
+      env,
+      recordInviteStatusOf(env, (promise) => ctx.waitUntil(promise)),
+    ),
   // -----
   // The daily cron (wrangler.jsonc "triggers"): deletes the zips
   // no Scan has read 30 days after upload, and stored objects

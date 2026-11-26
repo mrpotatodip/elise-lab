@@ -13,11 +13,7 @@ export type AGUILoadingSubagentProps = Omit<ComponentProps<"span">, "children"> 
 // Name of the subagent behind the latest event.
 // Nothing while the parent agent works.
 // -----
-export function AGUILoadingSubagent({
-  separator = "·",
-  className,
-  ...props
-}: AGUILoadingSubagentProps) {
+export function AGUILoadingSubagent({ separator = "·", className, ...props }: AGUILoadingSubagentProps) {
   const { subagent } = useAGUILoadingContext("AGUILoadingSubagent");
 
   if (!subagent) return null;

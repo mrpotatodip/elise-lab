@@ -53,24 +53,52 @@ const bare = (url: string) => url.toLowerCase().replace(/(\.git)?\/?$/, "");
 export const scanRepoPickSame = (a: string, b: string) => bare(a) === bare(b);
 const sameRepo = scanRepoPickSame;
 
-export function scanRepoLinkPick(text: string, providerId: SourceProviderValue = DEFAULT_SOURCE_PROVIDER_ID): ScanRepoPick | null {
+export function scanRepoLinkPick(
+  text: string,
+  providerId: SourceProviderValue = DEFAULT_SOURCE_PROVIDER_ID,
+): ScanRepoPick | null {
   const provider = sourceProviderOf(providerId);
   if (!provider.available || !isGitSourceProvider(provider)) return null;
   const link = provider.address.linkOf(text);
   if (link === null || !provider.address.pattern.test(link.url)) return null;
-  return { provider: providerId, url: link.url, label: link.label, note: provider.address.linkNote, isPrivate: false, running: false, repoId: null, fromLink: true };
+  return {
+    provider: providerId,
+    url: link.url,
+    label: link.label,
+    note: provider.address.linkNote,
+    isPrivate: false,
+    running: false,
+    repoId: null,
+    fromLink: true,
+  };
 }
 
-export function scanRepoPicks(known: readonly KnownRepo[], providerId: SourceProviderValue = DEFAULT_SOURCE_PROVIDER_ID): ScanRepoPick[] {
+export function scanRepoPicks(
+  known: readonly KnownRepo[],
+  providerId: SourceProviderValue = DEFAULT_SOURCE_PROVIDER_ID,
+): ScanRepoPick[] {
   return known
     .filter((item) => item.provider === providerId)
     .map((item): ScanRepoPick => {
       const note = LAST_SCAN_NOTE[item.running ? "running" : (item.last ?? "none")];
-      return { provider: providerId, url: item.url, label: item.label, note, isPrivate: item.isPrivate, running: item.running, repoId: item.repoId, fromLink: false };
+      return {
+        provider: providerId,
+        url: item.url,
+        label: item.label,
+        note,
+        isPrivate: item.isPrivate,
+        running: item.running,
+        repoId: item.repoId,
+        fromLink: false,
+      };
     });
 }
 
-export function scanRepoPickMatches(picks: readonly ScanRepoPick[], query: string, providerId: SourceProviderValue = DEFAULT_SOURCE_PROVIDER_ID): ScanRepoPick[] {
+export function scanRepoPickMatches(
+  picks: readonly ScanRepoPick[],
+  query: string,
+  providerId: SourceProviderValue = DEFAULT_SOURCE_PROVIDER_ID,
+): ScanRepoPick[] {
   const needle = query.trim().toLowerCase();
   const found = needle === "" ? [...picks] : picks.filter((item) => item.label.toLowerCase().includes(needle));
   const link = scanRepoLinkPick(query, providerId);

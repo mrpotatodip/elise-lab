@@ -1,6 +1,7 @@
 import { defineRule } from "@oxlint/plugins";
 
-const PALETTE = "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone";
+const PALETTE =
+  "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone";
 const RAW_PALETTE_CLASS = new RegExp(`(?:^|[\\s:])(?:[a-z]+-)?(?:${PALETTE})-\\d{2,3}(?:/\\d+)?(?:$|\\s)`);
 const RAW_HEX_COLOR = /^#[0-9a-fA-F]{3,8}$|\[#[0-9a-fA-F]{3,8}\]/;
 
@@ -16,7 +17,8 @@ export const noRawColorsRule = defineRule({
     },
   },
   createOnce(context) {
-    const rawColorIn = (value: string) => value.split(/\s+/).find((word) => RAW_HEX_COLOR.test(word) || RAW_PALETTE_CLASS.test(` ${word} `));
+    const rawColorIn = (value: string) =>
+      value.split(/\s+/).find((word) => RAW_HEX_COLOR.test(word) || RAW_PALETTE_CLASS.test(` ${word} `));
     return {
       Literal(node) {
         if (typeof node.value !== "string") return;

@@ -14,7 +14,13 @@ export type StripeSubscription = {
   accountId: string | null;
 };
 
-export type CheckoutInput = { customerId: string; accountId: string; priceId: string; successUrl: string; cancelUrl: string };
+export type CheckoutInput = {
+  customerId: string;
+  accountId: string;
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+};
 
 // -----
 // The only door to Stripe. The real one calls Stripe's REST API

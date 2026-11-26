@@ -1,6 +1,12 @@
-const RSA = { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" } as const;
+const RSA = {
+  name: "RSASSA-PKCS1-v1_5",
+  modulusLength: 2048,
+  publicExponent: new Uint8Array([1, 0, 1]),
+  hash: "SHA-256",
+} as const;
 
-const base64Bytes = (text: string): Uint8Array => Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (char) => char.charCodeAt(0));
+const base64Bytes = (text: string): Uint8Array =>
+  Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (char) => char.charCodeAt(0));
 
 // -----
 // A throwaway RSA key in the shape the App Secret has: PKCS#8 PEM.
@@ -15,7 +21,12 @@ export const makeRsaKey = async () => {
   return {
     pem: `-----BEGIN PRIVATE KEY-----\n${body}\n-----END PRIVATE KEY-----\n`,
     verify: (signed: string, signature: string): Promise<boolean> =>
-      crypto.subtle.verify("RSASSA-PKCS1-v1_5", pair.publicKey, base64Bytes(signature), new TextEncoder().encode(signed)),
+      crypto.subtle.verify(
+        "RSASSA-PKCS1-v1_5",
+        pair.publicKey,
+        base64Bytes(signature),
+        new TextEncoder().encode(signed),
+      ),
   };
 };
 

@@ -2,14 +2,7 @@ import { defineRule } from "@oxlint/plugins";
 
 import { isEffectMember } from "../shared/effect-member.ts";
 
-const RUN_FUNCTIONS = new Set([
-  "runPromise",
-  "runPromiseExit",
-  "runSync",
-  "runSyncExit",
-  "runFork",
-  "runCallback",
-]);
+const RUN_FUNCTIONS = new Set(["runPromise", "runPromiseExit", "runSync", "runSyncExit", "runFork", "runCallback"]);
 
 /** Run effects through the shared runner only (CODING_STANDARDS Effect 4.1, 6.3). */
 export const noEffectRunOutsideRunnerRule = defineRule({

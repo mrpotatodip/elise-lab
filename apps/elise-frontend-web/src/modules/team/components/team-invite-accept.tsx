@@ -40,7 +40,9 @@ export function TeamInviteAccept({ token, signedIn }: { token: string; signedIn:
   });
 
   const roleLabel = teamRoleLabel(invite.role, invite.roleLabel);
-  const hint = needsDetails ? `You were invited as ${roleLabel}. Set up your login to join.` : `You were invited as ${roleLabel}.`;
+  const hint = needsDetails
+    ? `You were invited as ${roleLabel}. Set up your login to join.`
+    : `You were invited as ${roleLabel}.`;
 
   return (
     <main className="mx-auto grid min-h-svh w-full max-w-lg content-center gap-8 p-6">
@@ -67,7 +69,15 @@ export function TeamInviteAccept({ token, signedIn }: { token: string; signedIn:
                   {(field) => (
                     <div className="grid gap-2">
                       <Label htmlFor="first-name">What is your first name?</Label>
-                      <Input id="first-name" name={field.name} autoComplete="given-name" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "first-name")} />
+                      <Input
+                        id="first-name"
+                        name={field.name}
+                        autoComplete="given-name"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(event) => field.handleChange(event.target.value)}
+                        {...fieldAria(field, "first-name")}
+                      />
                       <FieldError id="first-name" message={fieldMessage(field)} />
                     </div>
                   )}
@@ -76,7 +86,15 @@ export function TeamInviteAccept({ token, signedIn }: { token: string; signedIn:
                   {(field) => (
                     <div className="grid gap-2">
                       <Label htmlFor="last-name">And your last name?</Label>
-                      <Input id="last-name" name={field.name} autoComplete="family-name" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "last-name")} />
+                      <Input
+                        id="last-name"
+                        name={field.name}
+                        autoComplete="family-name"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(event) => field.handleChange(event.target.value)}
+                        {...fieldAria(field, "last-name")}
+                      />
                       <FieldError id="last-name" message={fieldMessage(field)} />
                     </div>
                   )}
@@ -85,7 +103,16 @@ export function TeamInviteAccept({ token, signedIn }: { token: string; signedIn:
                   {(field) => (
                     <div className="grid gap-2">
                       <Label htmlFor="password">Choose a password</Label>
-                      <Input id="password" name={field.name} type="password" autoComplete="new-password" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "password", "password-help")} />
+                      <Input
+                        id="password"
+                        name={field.name}
+                        type="password"
+                        autoComplete="new-password"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(event) => field.handleChange(event.target.value)}
+                        {...fieldAria(field, "password", "password-help")}
+                      />
                       {fieldMessage(field) ? (
                         <FieldError id="password" message={fieldMessage(field)} />
                       ) : (
@@ -108,7 +135,9 @@ export function TeamInviteAccept({ token, signedIn }: { token: string; signedIn:
               </Button>
             )}
             <p className="text-center text-xs text-muted-foreground">
-              {needsSignIn ? "You already have a login. Sign in, then open this link again." : `You will join ${invite.accountName} as ${roleLabel}.`}
+              {needsSignIn
+                ? "You already have a login. Sign in, then open this link again."
+                : `You will join ${invite.accountName} as ${roleLabel}.`}
             </p>
           </form>
         </CardContent>

@@ -24,7 +24,7 @@ const read = (): Theme => {
 
 const readOnServer = (): Theme => "default";
 
-const subscribe =(onChange: () => void) => {
+const subscribe = (onChange: () => void) => {
   window.addEventListener("storage", onChange);
   window.addEventListener(CHANGE_EVENT, onChange);
   return () => {

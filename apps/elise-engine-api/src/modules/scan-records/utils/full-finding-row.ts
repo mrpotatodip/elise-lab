@@ -5,7 +5,10 @@ import type { FullFinding } from "#/modules/scan-records/schemas";
 import type { NewFindingRow } from "#/modules/scan-records/types";
 
 const validationPlanText = (plan: { local?: string; deployment?: string }): string | null => {
-  const parts = [plan.local ? `Local: ${plan.local}` : null, plan.deployment ? `Deployment: ${plan.deployment}` : null].filter((part) => part !== null);
+  const parts = [
+    plan.local ? `Local: ${plan.local}` : null,
+    plan.deployment ? `Deployment: ${plan.deployment}` : null,
+  ].filter((part) => part !== null);
   return parts.length === 0 ? null : parts.join("\n");
 };
 
@@ -16,7 +19,10 @@ const validationPlanText = (plan: { local?: string; deployment?: string }): stri
 // fingerprint is its SHA-256, as triage needs. An open problem
 // of a full scan is never in the History, so origin stays "new".
 // -----
-export const fullFindingRowOf = async (finding: FullFinding, params: Pick<ScanParams, "accountId" | "scanId">): Promise<NewFindingRow> => {
+export const fullFindingRowOf = async (
+  finding: FullFinding,
+  params: Pick<ScanParams, "accountId" | "scanId">,
+): Promise<NewFindingRow> => {
   const first = finding.evidence[0];
   const confirmed = finding.verdict === "confirmed";
   return {

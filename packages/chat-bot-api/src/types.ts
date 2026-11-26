@@ -22,12 +22,7 @@ import type {
   ChatBotToolError,
   ChatBotTurn,
 } from "./contracts";
-import type {
-  ChatBotConflict,
-  ChatBotDbError,
-  ChatBotInvalid,
-  ChatBotNotFound,
-} from "./errors";
+import type { ChatBotConflict, ChatBotDbError, ChatBotInvalid, ChatBotNotFound } from "./errors";
 import type {
   ChatBotAssistantMessage,
   ChatBotHydrateMessage,
@@ -76,21 +71,14 @@ export type ChatBotToolConfig<
   S extends ChatBotServices = ChatBotServices,
 > = Partial<ChatBotToolDisplayConfig> & {
   definition: ChatBotToolDefinition & { inputSchema: TInput; outputSchema: TOutput };
-  run: (
-    input: z.output<TInput>,
-    runtime: ChatBotRuntime<S>,
-  ) => z.input<TOutput> | Promise<z.input<TOutput>>;
+  run: (input: z.output<TInput>, runtime: ChatBotRuntime<S>) => z.input<TOutput> | Promise<z.input<TOutput>>;
   timeoutMs?: number;
 };
 
-export type ChatBotToolSpec<S extends ChatBotServices = ChatBotServices> =
-  ChatBotToolDisplayConfig & {
-    definition: ChatBotToolDefinition;
-    execute: (
-      input: ChatBotJson,
-      runtime: ChatBotRuntime<S>,
-    ) => Effect.Effect<ChatBotJson | ChatBotToolError>;
-  };
+export type ChatBotToolSpec<S extends ChatBotServices = ChatBotServices> = ChatBotToolDisplayConfig & {
+  definition: ChatBotToolDefinition;
+  execute: (input: ChatBotJson, runtime: ChatBotRuntime<S>) => Effect.Effect<ChatBotJson | ChatBotToolError>;
+};
 
 export type ChatBotAgent<S extends ChatBotServices = ChatBotServices> = {
   id: string;
@@ -161,9 +149,7 @@ export type ChatBotRunner<S extends ChatBotServices = ChatBotServices> = {
 // -----
 // Stream log
 // -----
-export type ChatBotDurableStreams = (
-  init: Pick<ChatBotDurableStreamInit, "runId" | "offset">,
-) => StreamDurability;
+export type ChatBotDurableStreams = (init: Pick<ChatBotDurableStreamInit, "runId" | "offset">) => StreamDurability;
 
 // -----
 // Storage port. Every method is already bound to
@@ -190,10 +176,7 @@ export type ChatBotStore = {
     trigger: string;
     module: string;
   }) => Effect.Effect<void, ChatBotDbError | ChatBotInvalid>;
-  lookupRun: (
-    owner: ChatBotOwner,
-    runId: string,
-  ) => Effect.Effect<ChatBotRunRef | null, ChatBotDbError>;
+  lookupRun: (owner: ChatBotOwner, runId: string) => Effect.Effect<ChatBotRunRef | null, ChatBotDbError>;
   findThread: (
     owner: ChatBotOwner,
     threadId: string,
@@ -210,25 +193,12 @@ export type ChatBotStore = {
     scopeId: string;
     content: string;
   }) => Effect.Effect<void, ChatBotDbError>;
-  insertAssistantMessage: (
-    message: ChatBotAssistantMessage,
-  ) => Effect.Effect<void, ChatBotDbError>;
-  listMessagesForModel: (
-    threadId: string,
-    limit: number,
-  ) => Effect.Effect<ChatBotTurn[], ChatBotDbError>;
-  closeRun: (
-    runId: string,
-    status: ChatBotRunCloseStatus,
-  ) => Effect.Effect<void, ChatBotDbError>;
+  insertAssistantMessage: (message: ChatBotAssistantMessage) => Effect.Effect<void, ChatBotDbError>;
+  listMessagesForModel: (threadId: string, limit: number) => Effect.Effect<ChatBotTurn[], ChatBotDbError>;
+  closeRun: (runId: string, status: ChatBotRunCloseStatus) => Effect.Effect<void, ChatBotDbError>;
   extendAnonymousThread: (threadId: string) => Effect.Effect<void, ChatBotDbError>;
-  recordRunUsage: (
-    runId: string,
-    usage: ChatBotTurnUsage,
-  ) => Effect.Effect<void, ChatBotDbError>;
-  findActiveRun: (
-    threadId: string,
-  ) => Effect.Effect<{ id: string } | null, ChatBotDbError>;
+  recordRunUsage: (runId: string, usage: ChatBotTurnUsage) => Effect.Effect<void, ChatBotDbError>;
+  findActiveRun: (threadId: string) => Effect.Effect<{ id: string } | null, ChatBotDbError>;
   listThreads: (
     owner: ChatBotOwner,
     query: ChatBotThreadsQuery,
@@ -272,11 +242,7 @@ export type ChatBotHydrateResult = {
 
 export type StreamChatBotResult = { runId: string; threadId: string; offset: string };
 
-export type StreamChatBotError =
-  | ChatBotDbError
-  | ChatBotNotFound
-  | ChatBotInvalid
-  | ChatBotConflict;
+export type StreamChatBotError = ChatBotDbError | ChatBotNotFound | ChatBotInvalid | ChatBotConflict;
 
 // -----
 // What a host binds once per request: its store,
@@ -300,8 +266,7 @@ export type ChatBotTurnRequest<S extends ChatBotServices = ChatBotServices> = {
   attrs?: ChatBotThreadAttrs;
 };
 
-export type ChatBotStreamRequest<S extends ChatBotServices = ChatBotServices> = ChatBotDeps<S> &
-  ChatBotTurnRequest<S>;
+export type ChatBotStreamRequest<S extends ChatBotServices = ChatBotServices> = ChatBotDeps<S> & ChatBotTurnRequest<S>;
 
 export type ChatBotTurnStart<S extends ChatBotServices = ChatBotServices> = Pick<
   ChatBotStreamRequest<S>,

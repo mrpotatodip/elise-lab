@@ -18,7 +18,9 @@ export type MessagesBody = z.infer<typeof MessagesBodySchema>;
 // -----
 export const messagesBlockedReason = (body: MessagesBody): string | null => {
   if (body.mcp_servers !== undefined) return "mcp_servers is not allowed";
-  const tool = body.tools?.find((candidate) => candidate.type !== undefined && !SCAN_SANDBOX_CLIENT_TOOL_TYPE.test(candidate.type));
+  const tool = body.tools?.find(
+    (candidate) => candidate.type !== undefined && !SCAN_SANDBOX_CLIENT_TOOL_TYPE.test(candidate.type),
+  );
   return tool === undefined ? null : `the ${tool.type} tool is not allowed`;
 };
 

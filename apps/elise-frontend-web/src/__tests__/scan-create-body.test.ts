@@ -8,7 +8,9 @@ const ZIP = "0d6f7a1e-9c1b-4f7e-8a43-5b2e9d4c7a10";
 
 describe("scanCreateBodyOf", () => {
   it("sends a github plan as before providers: no provider, the ref as typed", () => {
-    expect(scanCreateBodyOf({ ...OPTIONS, provider: "github", repo: "https://github.com/acme/app", ref: "main" })).toEqual({
+    expect(
+      scanCreateBodyOf({ ...OPTIONS, provider: "github", repo: "https://github.com/acme/app", ref: "main" }),
+    ).toEqual({
       ...OPTIONS,
       repo: "https://github.com/acme/app",
       ref: "main",
@@ -17,7 +19,9 @@ describe("scanCreateBodyOf", () => {
   });
 
   it("starts an upload Scan from the chosen zip, by its id, on the Runner and with no ref", () => {
-    expect(scanCreateBodyOf({ ...OPTIONS, provider: "upload", repo: "Billing API", archiveId: ZIP, runnerId: RUNNER })).toEqual({
+    expect(
+      scanCreateBodyOf({ ...OPTIONS, provider: "upload", repo: "Billing API", archiveId: ZIP, runnerId: RUNNER }),
+    ).toEqual({
       ...OPTIONS,
       provider: "upload",
       repo: "Billing API",
@@ -43,19 +47,37 @@ describe("scanStartProblem", () => {
 describe("VerdictInputSchema", () => {
   it.each([
     ["a git commit", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", true],
-    ["the SHA-256 of an uploaded zip, its commit", "3ff652db2f06f3e24d5eb0824d3e1ee38401754fe10663f374417be55ce39061", true],
+    [
+      "the SHA-256 of an uploaded zip, its commit",
+      "3ff652db2f06f3e24d5eb0824d3e1ee38401754fe10663f374417be55ce39061",
+      true,
+    ],
     ["a short commit", "4b825dc", false],
   ])("asks the Verdict of %s", (_, commit, accepted) => {
-    expect(VerdictInputSchema.safeParse({ repoId: "0d6f7a1e-9c1b-4f7e-8a43-5b2e9d4c7a10", commit }).success).toBe(accepted);
+    expect(VerdictInputSchema.safeParse({ repoId: "0d6f7a1e-9c1b-4f7e-8a43-5b2e9d4c7a10", commit }).success).toBe(
+      accepted,
+    );
   });
 });
 
 describe("CreateScanInputSchema", () => {
   it.each([
-    ["an upload plan with no zip", { ...OPTIONS, provider: "upload", repo: "Billing API", runnerId: RUNNER }, ["archiveId"]],
-    ["an upload plan with a ref", { ...OPTIONS, provider: "upload", repo: "Billing API", archiveId: ZIP, runnerId: RUNNER, ref: "main" }, ["ref"]],
+    [
+      "an upload plan with no zip",
+      { ...OPTIONS, provider: "upload", repo: "Billing API", runnerId: RUNNER },
+      ["archiveId"],
+    ],
+    [
+      "an upload plan with a ref",
+      { ...OPTIONS, provider: "upload", repo: "Billing API", archiveId: ZIP, runnerId: RUNNER, ref: "main" },
+      ["ref"],
+    ],
     ["a github plan with a zip", { ...OPTIONS, repo: "https://github.com/acme/app", archiveId: ZIP }, ["archiveId"]],
-    ["an upload plan with a zip and a Runner", { ...OPTIONS, provider: "upload", repo: "Billing API", archiveId: ZIP, runnerId: RUNNER }, []],
+    [
+      "an upload plan with a zip and a Runner",
+      { ...OPTIONS, provider: "upload", repo: "Billing API", archiveId: ZIP, runnerId: RUNNER },
+      [],
+    ],
   ])("refuses the fields that are wrong in %s", (_, plan, fields) => {
     const parsed = CreateScanInputSchema.safeParse(plan);
     expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.path[0])).toEqual(fields);

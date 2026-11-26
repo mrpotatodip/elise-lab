@@ -31,7 +31,10 @@ export const VerifyEmailSchema = z.object({ token: z.string().min(1) });
 // -----
 export const ResetPasswordSchema = z.object({
   token: z.string().min(1),
-  password: z.string().min(SIGN_UP_PASSWORD_MIN, AUTH_ERRORS.newPasswordTooShort(SIGN_UP_PASSWORD_MIN)).max(SIGN_UP_PASSWORD_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PASSWORD_MAX)),
+  password: z
+    .string()
+    .min(SIGN_UP_PASSWORD_MIN, AUTH_ERRORS.newPasswordTooShort(SIGN_UP_PASSWORD_MIN))
+    .max(SIGN_UP_PASSWORD_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PASSWORD_MAX)),
 });
 
 // -----
@@ -40,11 +43,30 @@ export const ResetPasswordSchema = z.object({
 // apart on what is allowed, only on what is said.
 // -----
 export const SignUpInputSchema = SignUpBodySchema.extend({
-  firstName: z.string().trim().min(1, AUTH_ERRORS.firstName).max(SIGN_UP_PERSON_NAME_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PERSON_NAME_MAX)),
-  lastName: z.string().trim().min(1, AUTH_ERRORS.lastName).max(SIGN_UP_PERSON_NAME_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PERSON_NAME_MAX)),
-  email: z.string().trim().min(1, AUTH_ERRORS.emailEmpty).pipe(z.email(AUTH_ERRORS.email).max(SIGN_UP_EMAIL_MAX, AUTH_ERRORS.tooLong(SIGN_UP_EMAIL_MAX)).toLowerCase()),
-  password: z.string().min(SIGN_UP_PASSWORD_MIN, AUTH_ERRORS.newPasswordTooShort(SIGN_UP_PASSWORD_MIN)).max(SIGN_UP_PASSWORD_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PASSWORD_MAX)),
-  accountName: z.string().trim().min(1, AUTH_ERRORS.accountName).max(SIGN_UP_ACCOUNT_NAME_MAX, AUTH_ERRORS.tooLong(SIGN_UP_ACCOUNT_NAME_MAX)),
+  firstName: z
+    .string()
+    .trim()
+    .min(1, AUTH_ERRORS.firstName)
+    .max(SIGN_UP_PERSON_NAME_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PERSON_NAME_MAX)),
+  lastName: z
+    .string()
+    .trim()
+    .min(1, AUTH_ERRORS.lastName)
+    .max(SIGN_UP_PERSON_NAME_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PERSON_NAME_MAX)),
+  email: z
+    .string()
+    .trim()
+    .min(1, AUTH_ERRORS.emailEmpty)
+    .pipe(z.email(AUTH_ERRORS.email).max(SIGN_UP_EMAIL_MAX, AUTH_ERRORS.tooLong(SIGN_UP_EMAIL_MAX)).toLowerCase()),
+  password: z
+    .string()
+    .min(SIGN_UP_PASSWORD_MIN, AUTH_ERRORS.newPasswordTooShort(SIGN_UP_PASSWORD_MIN))
+    .max(SIGN_UP_PASSWORD_MAX, AUTH_ERRORS.tooLong(SIGN_UP_PASSWORD_MAX)),
+  accountName: z
+    .string()
+    .trim()
+    .min(1, AUTH_ERRORS.accountName)
+    .max(SIGN_UP_ACCOUNT_NAME_MAX, AUTH_ERRORS.tooLong(SIGN_UP_ACCOUNT_NAME_MAX)),
   turnstileToken: z.string().min(1, AUTH_ERRORS.turnstile).max(SIGN_UP_TURNSTILE_TOKEN_MAX),
 });
 

@@ -1,7 +1,14 @@
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ensureTenantRoles, findTenantRole, partyRoles, platformMasterPlans, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise";
+import {
+  ensureTenantRoles,
+  findTenantRole,
+  partyRoles,
+  platformMasterPlans,
+  tenantSubscriptions,
+  tenantTeamInvites,
+} from "@repo/db-elise";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { planDetailsEffect } from "#/modules/plan";
 
@@ -24,7 +31,9 @@ describe("planDetailsEffect", () => {
     await ensureTenantRoles(test.raw, tenantId);
     const role = await findTenantRole(test.raw, tenantId, "workspace_member");
     const [plan] = await test.raw.select().from(platformMasterPlans).where(eq(platformMasterPlans.key, "pro"));
-    await test.raw.insert(tenantSubscriptions).values({ tenantId, planId: plan.id, status: "past_due", source: "grant" });
+    await test.raw
+      .insert(tenantSubscriptions)
+      .values({ tenantId, planId: plan.id, status: "past_due", source: "grant" });
     await test.raw.insert(partyRoles).values({ partyId, tenantId, roleId: role!.id, roleScope: "tenant" });
     const invite = (email: string, extra: Partial<typeof tenantTeamInvites.$inferInsert> = {}) => ({
       tenantId,
@@ -35,16 +44,26 @@ describe("planDetailsEffect", () => {
       expiresAt: new Date("2026-11-18T00:00:00Z"),
       ...extra,
     });
-    await test.raw.insert(tenantTeamInvites).values([
-      invite("waiting@example.com"),
-      invite("expired@example.com", { expiresAt: new Date("2026-11-01T00:00:00Z") }),
-      invite("revoked@example.com", { revokedAt: new Date("2026-11-10T00:00:00Z") }),
-    ]);
+    await test.raw
+      .insert(tenantTeamInvites)
+      .values([
+        invite("waiting@example.com"),
+        invite("expired@example.com", { expiresAt: new Date("2026-11-01T00:00:00Z") }),
+        invite("revoked@example.com", { revokedAt: new Date("2026-11-10T00:00:00Z") }),
+      ]);
 
     const result = await details(tenantId);
 
     expect(result).toMatchObject({
-      plan: { key: "pro", monthlyPriceUsd: 49, includedCreditUsd: 49, carryCapUsd: 100, keySource: "platform", scanAllowance: null, maxMembers: 5 },
+      plan: {
+        key: "pro",
+        monthlyPriceUsd: 49,
+        includedCreditUsd: 49,
+        carryCapUsd: 100,
+        keySource: "platform",
+        scanAllowance: null,
+        maxMembers: 5,
+      },
       status: "past_due",
       source: "grant",
       currentPeriodEnd: null,
@@ -59,6 +78,15 @@ describe("planDetailsEffect", () => {
     const role = await findTenantRole(test.raw, tenantId, "workspace_member");
     await test.raw.insert(partyRoles).values({ partyId, tenantId, roleId: role!.id, roleScope: "tenant" });
 
-    expect(await details(tenantId)).toEqual({ plan: null, status: null, source: null, interval: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, scans: 0, seats: { members: 1, pendingInvites: 0 } });
+    expect(await details(tenantId)).toEqual({
+      plan: null,
+      status: null,
+      source: null,
+      interval: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      scans: 0,
+      seats: { members: 1, pendingInvites: 0 },
+    });
   });
 });

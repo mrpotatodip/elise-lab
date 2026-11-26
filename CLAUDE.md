@@ -14,7 +14,9 @@ EliseLAB: a pnpm workspace. A Worker clones a public GitHub repo into a Cloudfla
 ## Commands
 
 ```bash
-pnpm check:apps                              # tsc, oxlint and vitest for every project: one line on success, the tail of each failure; the pre-commit hook runs the changed ones
+pnpm check:apps                              # tsc, oxlint, vitest and the oxfmt format check for every project: one line on success, the tail of each failure; the pre-commit hook runs the changed ones and checks the staged files' format
+pnpm format                                  # rewrite TS, TSX, JS, MJS and CSS with oxfmt (root `.oxfmtrc.json`); run it again if `pnpm format:check` still lists files
+pnpm format:check                            # list the files oxfmt would change, counted per project; writes nothing
 pnpm dev                                     # engine (8787), dashboard (3100) and marketing site (3200) together; first run: copy `.dev.vars.example` to `.dev.vars` in both apps (engine `DATABASE_URL`: `packages/db-elise/.env`). Up when `curl -s -o /dev/null -w "%{http_code}" localhost:8787/me` prints 401
 pnpm --filter elise-engine-api dev:log       # wrangler dev, output teed to apps/elise-engine-api/.dev.log (the dashboard has the same `dev:log`)
 pnpm dev:stop                                # free ports 8787 and 3100 from stale servers

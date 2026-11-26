@@ -12,7 +12,8 @@ export const noDeprecatedQueryClientCallsRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "Disallow QueryClient.ensureQueryData and prefetchQuery; TanStack Query replaced them with query and infiniteQuery.",
+      description:
+        "Disallow QueryClient.ensureQueryData and prefetchQuery; TanStack Query replaced them with query and infiniteQuery.",
     },
     messages: {
       deprecated: "`{{name}}` is deprecated and will be removed in the next major version. Use `{{replacement}}`.",

@@ -34,7 +34,12 @@ export function ChatBotRoom({ tools, placeholder, emptyText, className, progress
           {chat.error.message}
         </p>
       ) : null}
-      <Composer onSend={(text) => void chat.send(text)} onStop={chat.stop} isLoading={chat.isLoading} placeholder={placeholder} />
+      <Composer
+        onSend={(text) => void chat.send(text)}
+        onStop={chat.stop}
+        isLoading={chat.isLoading}
+        placeholder={placeholder}
+      />
     </section>
   );
 }

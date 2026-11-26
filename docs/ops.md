@@ -24,6 +24,15 @@ Claude Code in the sandbox image is `linux/amd64`. On Apple Silicon, Docker (Col
 
 A migration that changes a key or adds a NOT NULL column that the new code writes (for example `0062`, the History key by Branch) breaks the old Worker, and the new Worker breaks without it. Check that no Scan is running (`status in ('queued','running')`), apply the migration, then deploy at once.
 
+## A sole `tenant_admin` is locked out of Two-factor
+
+Another admin does a 2FA reset from the Team list: ask for that first. Only when the Account has no other admin who can reset the Login, the operator does the same by hand, after confirming by another channel that the person asking is the owner.
+
+1. Find the Login: `pnpm -s --filter @repo/db-elise db:query "select id, email, two_factor_enabled from auth_user where email = '<email>'" --table`.
+2. Clear it in one transaction (live database: ask first; try `--dry` before): `pnpm --filter @repo/db-elise db:exec "delete from auth_two_factor where user_id = '<id>'; update auth_user set two_factor_enabled = false where id = '<id>'; delete from auth_session where user_id = '<id>'"`.
+3. Tell the person to sign in with the password: the dashboard sends them straight to setup, with no skip. A lock after wrong codes needs no step of its own, as the `auth_two_factor` row holding it is gone.
+4. Note it in the Audit trail by hand if the Account needs it; the manual route writes no entry and sends no Security notice.
+
 ## Reading live data without a token
 
 - SQL: `pnpm -s --filter @repo/db-elise db:query "select ..."`.

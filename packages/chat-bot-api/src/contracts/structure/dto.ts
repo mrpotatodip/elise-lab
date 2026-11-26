@@ -34,7 +34,7 @@ export const ChatBotToolErrorSchema = z.object({
   error: z.string(),
 });
 
-export const ChatBotToolEntrySchema =ChatBotToolDisplayConfigSchema.extend({
+export const ChatBotToolEntrySchema = ChatBotToolDisplayConfigSchema.extend({
   results: z.array(ChatBotJsonSchema),
 });
 

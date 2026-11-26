@@ -1,12 +1,20 @@
-import { FINDING_SEVERITY_VALUES, VERDICT_MIN_SCANS, type FindingSeverityValue, type SeverityCounts, type Verdict, type VerdictReasonCode } from "@repo/contracts/elise";
+import {
+  FINDING_SEVERITY_VALUES,
+  VERDICT_MIN_SCANS,
+  type FindingSeverityValue,
+  type SeverityCounts,
+  type Verdict,
+  type VerdictReasonCode,
+} from "@repo/contracts/elise";
 import { SCAN_RECORDS_PRIOR_LIMIT } from "#/modules/scan-records";
 import { VERDICT_LIMITS } from "#/modules/verdict/constants";
 import type { JudgedFinding, JudgedScan, JudgeInput } from "#/modules/verdict/types";
-import { scanWeight } from "./scan-weight";
+import { scanWasRead, scanWeight } from "./scan-weight";
 
 type Reason = Verdict["reasons"][number];
 
-const rank = (severity: FindingSeverityValue | null): number => (severity === null ? FINDING_SEVERITY_VALUES.length : FINDING_SEVERITY_VALUES.indexOf(severity));
+const rank = (severity: FindingSeverityValue | null): number =>
+  severity === null ? FINDING_SEVERITY_VALUES.length : FINDING_SEVERITY_VALUES.indexOf(severity);
 
 // -----
 // One entry per problem, however many scans found it. The words
@@ -23,12 +31,32 @@ const unionOf = (findings: JudgedFinding[], newestFirst: JudgedScan[]): JudgedFi
     const severity = seen && rank(seen.severity) < rank(finding.severity) ? seen.severity : finding.severity;
     byFingerprint.set(finding.fingerprint, { ...finding, severity });
   }
-  return [...byFingerprint.values()].toSorted((a, b) => rank(a.severity) - rank(b.severity) || a.title.localeCompare(b.title));
+  return [...byFingerprint.values()].toSorted(
+    (a, b) => rank(a.severity) - rank(b.severity) || a.title.localeCompare(b.title),
+  );
 };
 
-const detail = ({ fingerprint, title, severity, class: kind, file, line, impact, evidence, fix, needs }: JudgedFinding) => ({ fingerprint, title, severity, class: kind, file, line, impact, evidence, fix, needs });
+const detail = ({
+  fingerprint,
+  title,
+  severity,
+  class: kind,
+  file,
+  line,
+  impact,
+  evidence,
+  fix,
+  needs,
+}: JudgedFinding) => ({ fingerprint, title, severity, class: kind, file, line, impact, evidence, fix, needs });
 
-const emptyCounts = (): SeverityCounts & { needsValidation: number } => ({ critical: 0, high: 0, medium: 0, low: 0, informational: 0, needsValidation: 0 });
+const emptyCounts = (): SeverityCounts & { needsValidation: number } => ({
+  critical: 0,
+  high: 0,
+  medium: 0,
+  low: 0,
+  informational: 0,
+  needsValidation: 0,
+});
 
 // -----
 // The newest scans that have a weight, taken until their
@@ -57,13 +85,19 @@ const trustReasons = (read: JudgedScan[], counted: number, window: JudgedScan[])
   if (read.length === 0) return [{ code: "not_scanned", message: "No succeeded scan of this commit that counts" }];
   const reasons: Reason[] = [];
   if (counted < VERDICT_MIN_SCANS) {
-    reasons.push({ code: "too_few_scans", message: `Scans of this commit weigh ${counted} of ${VERDICT_MIN_SCANS}; run another` });
+    reasons.push({
+      code: "too_few_scans",
+      message: `Scans of this commit weigh ${counted} of ${VERDICT_MIN_SCANS}; run another`,
+    });
   }
   if (window.some((scan) => (scan.priorsUnchecked ?? 0) > 0)) {
     reasons.push({ code: "unchecked_priors", message: "A scan did not check every problem the History had open" });
   }
   if (window.some((scan) => (scan.priorsGiven ?? 0) >= SCAN_RECORDS_PRIOR_LIMIT)) {
-    reasons.push({ code: "too_many_priors", message: `The History has ${SCAN_RECORDS_PRIOR_LIMIT} or more open problems, more than a scan can check` });
+    reasons.push({
+      code: "too_many_priors",
+      message: `The History has ${SCAN_RECORDS_PRIOR_LIMIT} or more open problems, more than a scan can check`,
+    });
   }
   return reasons;
 };
@@ -102,7 +136,7 @@ export const judgeCommit = ({ commit, scans, findings, triage, now }: JudgeInput
   const weighted = weights.filter(({ weight }) => weight > 0);
   const counted = weighted.reduce((sum, { weight }) => sum + weight, 0);
   const window = windowOf(weighted);
-  const read = weights.filter(({ weight, scan }) => weight > 0 || scan.partial === true || scan.profileMet === "none").map(({ scan }) => scan);
+  const read = newestFirst.filter(scanWasRead);
   const decisions = new Map(triage.map((row) => [row.fingerprint, row]));
 
   const open: Verdict["open"] = [];

@@ -212,6 +212,12 @@ pub fn job(scan_id: &str, phase_prompts: [&str; 4]) -> String {
     job_at(scan_id, REPO_URL, phase_prompts)
 }
 
+pub fn job_with_profile(scan_id: &str, profile: &str, phase_prompts: [&str; 4]) -> String {
+    let mut job: serde_json::Value = serde_json::from_str(&job_at(scan_id, REPO_URL, phase_prompts)).unwrap();
+    job["profile"] = profile.into();
+    job.to_string()
+}
+
 pub fn job_at(scan_id: &str, repo: &str, phase_prompts: [&str; 4]) -> String {
     let phases: Vec<serde_json::Value> = ["recon", "hunt", "check", "report"]
         .iter()
@@ -555,9 +561,9 @@ impl Runner {
         let (bin, record) = (root.join("bin"), root.join("opened"));
         std::fs::create_dir_all(&bin).unwrap();
         for opener in ["open", "xdg-open"] {
-            executable(&bin.join(opener), &format!("#!/bin/sh\necho \"$1\" >> \"{}\"\n", record.display()));
+            install_stub(&bin, opener);
         }
-        self.env.push(("PATH", format!("{}:/usr/bin:/bin", bin.display())));
+        self.env.push(("PATH", path_with(&bin, system_path())));
         self.env.push(("DISPLAY", ":0".to_string()));
         Browser { record }
     }
@@ -577,19 +583,21 @@ impl Runner {
             std::fs::create_dir_all(dir).unwrap();
         }
         if with_git {
-            executable(&bin.join("git"), &STUB_GIT.replace("__RECORD__", &record.display().to_string()));
+            install_stub(&bin, "git");
         }
         for tool in tools {
-            let text = match *tool {
-                "claude" => STUB_CLAUDE.replace("__RECORD__", &record.display().to_string()),
-                "node" => STUB_NODE.to_string(),
-                other => panic!("no stub for {other}"),
-            };
-            executable(&bin.join(tool), &text);
+            assert!(["claude", "node", "real-node"].contains(tool), "no stub for {tool}");
+            if *tool == "real-node" {
+                install_real_node(&bin);
+            } else {
+                install_stub(&bin, tool);
+            }
         }
-        let rest = if with_git { ":/usr/bin:/bin" } else { "" };
-        self.env.push(("PATH", format!("{}{rest}", bin.display())));
-        self.env.push(("TMPDIR", tmp.display().to_string()));
+        let rest = if with_git { system_path() } else { vec![] };
+        self.env.push(("PATH", path_with(&bin, rest)));
+        for name in ["TMPDIR", "TEMP", "TMP"] {
+            self.env.push((name, tmp.display().to_string()));
+        }
         Stubs { record, tmp }
     }
 }
@@ -612,6 +620,7 @@ impl Running {
         assert!(ready, "no {text:?} in the error output: {}", self.stderr.lock().unwrap());
     }
 
+    #[cfg(unix)]
     pub fn signal(&self, name: &str) {
         let sent = Command::new("kill").args(["-s", name, &self.child.id().to_string()]).status().unwrap();
         assert!(sent.success(), "kill -s {name} failed");
@@ -651,8 +660,15 @@ fn until(mut done: impl FnMut() -> bool) -> bool {
     false
 }
 
+#[cfg(unix)]
 pub fn alive(pid: u32) -> bool {
     Command::new("kill").args(["-0", &pid.to_string()]).stderr(Stdio::null()).status().unwrap().success()
+}
+
+#[cfg(windows)]
+pub fn alive(pid: u32) -> bool {
+    let listed = Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/NH"]).output().unwrap();
+    String::from_utf8_lossy(&listed.stdout).split_whitespace().any(|word| word == pid.to_string())
 }
 
 pub struct Browser {
@@ -697,6 +713,10 @@ impl Stubs {
         std::fs::read_to_string(self.record.join("git-helper.txt")).unwrap_or_default()
     }
 
+    pub fn repair_prompt(&self) -> String {
+        std::fs::read_to_string(self.record.join("repair-prompt.txt")).unwrap_or_default()
+    }
+
     pub fn work_folder(&self, scan_id: &str) -> PathBuf {
         self.tmp.join(format!("eliselab-runner-{scan_id}"))
     }
@@ -718,80 +738,31 @@ impl Stubs {
     }
 }
 
-fn executable(path: &std::path::Path, text: &str) {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::write(path, text).unwrap();
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+fn install_stub(bin: &std::path::Path, tool: &str) {
+    std::fs::copy(env!("CARGO_BIN_EXE_elise-stub-tool"), bin.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX))).unwrap();
 }
 
-const STUB_GIT: &str = r#"#!/bin/sh
-echo "$@" >> "__RECORD__/git.txt"
-# The credential helper the Runner set for this call, and what it answers for two hosts.
-if [ -n "$GIT_CONFIG_COUNT" ]; then
-  : > "__RECORD__/git-config.txt"
-  : > "__RECORD__/git-helper.txt"
-  i=0
-  while [ "$i" -lt "$GIT_CONFIG_COUNT" ]; do
-    eval "key=\$GIT_CONFIG_KEY_$i; value=\$GIT_CONFIG_VALUE_$i"
-    echo "$key=$value" >> "__RECORD__/git-config.txt"
-    case "$value" in
-      '!'*)
-        for host in github.com gitlab.com evil.example; do
-          printf 'protocol=https\nhost=%s\n\n' "$host" | sh -c "${value#!} get" | sed "s/^/$host /" >> "__RECORD__/git-helper.txt"
-        done ;;
-    esac
-    i=$((i + 1))
-  done
-fi
-if [ -n "$STUB_GIT_FAILS" ] && [ "$1" != ls-remote ]; then echo "fatal: Authentication failed" >&2; exit 128; fi
-case "$1" in
-  ls-remote) if [ -f "__RECORD__/ls-remote.stderr" ]; then cat "__RECORD__/ls-remote.stderr" >&2; exit 128; fi ;;
-  clone) for a in "$@"; do last="$a"; done; mkdir -p "$last"; echo hello > "$last/README" ;;
-  -C) case "$3 $4" in
-        "rev-parse HEAD") echo 0123456789abcdef0123456789abcdef01234567 ;;
-        "rev-parse --abbrev-ref") echo main ;;
-      esac ;;
-esac
-"#;
+fn install_real_node(bin: &std::path::Path) {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let node = std::env::split_paths(&path)
+        .map(|folder| folder.join(format!("node{}", std::env::consts::EXE_SUFFIX)))
+        .find(|candidate| candidate.is_file())
+        .expect("a test with the real validators needs node on PATH");
+    let target = bin.join(format!("node{}", std::env::consts::EXE_SUFFIX));
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&node, &target).unwrap();
+    #[cfg(not(unix))]
+    std::fs::copy(&node, &target).unwrap();
+}
 
-const STUB_CLAUDE: &str = r#"#!/bin/sh
-if [ "$1 $2" = "auth status" ]; then
-  if [ -f "__RECORD__/claude-signed-out" ]; then echo "Not logged in" >&2; exit 1; fi
-  echo "Logged in"; exit 0
-fi
-for a in "$@"; do prompt="$a"; done
-case "$prompt" in
-  *phase=recon*)
-    env > "__RECORD__/env.txt"
-    cp .claude/settings.json "__RECORD__/settings.json"
-    cp .claude/skills/security-audit/SKILL.md "__RECORD__/SKILL.md"
-    (cd repo && find . -type f | sort) > "__RECORD__/repo.txt" ;;
-esac
-case "$prompt" in *stop=crash*) echo "the agent said: boom" >&2; exit 2 ;; esac
-case "$prompt" in *stop=slow*) sleep 2 ;; esac
-case "$prompt" in
-  *stop=wait*)
-    echo "the agent was half way through"
-    echo $$ >> "__RECORD__/waiting-all.txt"
-    echo $$ > "__RECORD__/waiting.tmp"; mv "__RECORD__/waiting.tmp" "__RECORD__/waiting.pid"
-    exec sleep 600 ;;
-esac
-case "$prompt" in
-  *phase=check*) echo '{"findings":[]}' > out/findings.json; echo '{"units":[]}' > out/coverage-ledger.json ;;
-  *phase=report*) echo '# Report' > out/REPORT.md ;;
-esac
-case "$prompt" in
-  *phase=check*live=spread*)
-    echo '{"verdict":"confirmed","fingerprint":"fp-1"}' >> out/live-findings.jsonl
-    echo 'not json' >> out/live-findings.jsonl
-    echo '{"verdict":"rejected","fingerprint":"fp-no"}' >> out/live-findings.jsonl
-    echo '{"verdict":"needs_validation","fingerprint":"fp-2"}' >> out/live-findings.jsonl
-    sleep 3
-    echo '{"verdict":"confirmed","fingerprint":"fp-3"}' >> out/live-findings.jsonl ;;
-  *phase=check*live=late*) echo '{"verdict":"confirmed","fingerprint":"fp-late"}' >> out/live-findings.jsonl ;;
-esac
-cost=$(printf '%s' "$prompt" | sed -n 's/.*cost=\([0-9.]*\).*/\1/p')
-printf '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":%s,"num_turns":1,"duration_ms":10,"usage":{}}\n' "${cost:-0}"
-"#;
+fn system_path() -> Vec<PathBuf> {
+    if cfg!(unix) {
+        vec!["/usr/bin".into(), "/bin".into()]
+    } else {
+        vec![r"C:\Program Files\Git\usr\bin".into(), r"C:\Program Files\Git\bin".into()]
+    }
+}
 
-const STUB_NODE: &str = "#!/bin/sh\nexit 0\n";
+fn path_with(first: &std::path::Path, rest: Vec<PathBuf>) -> String {
+    std::env::join_paths(std::iter::once(first.to_path_buf()).chain(rest)).unwrap().to_string_lossy().into_owned()
+}

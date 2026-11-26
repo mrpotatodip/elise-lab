@@ -1,4 +1,30 @@
-import { ArrowLeft, ArrowRight, Bot, Check, ChevronDown, ChevronRight, ClipboardCheck, CreditCard, ExternalLink, FileText, FolderGit2, GitBranch, LayoutDashboard, LoaderCircle, Lock, MessageSquare, Pencil, RefreshCw, ScanSearch, Search, ShieldCheck, Terminal, Users, X, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  CreditCard,
+  ExternalLink,
+  FileText,
+  FolderGit2,
+  GitBranch,
+  LayoutDashboard,
+  LoaderCircle,
+  Lock,
+  MessageSquare,
+  Pencil,
+  RefreshCw,
+  ScanSearch,
+  Search,
+  ShieldCheck,
+  Terminal,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { Caret, Collapse, Count, Prompt, Scroll, Stage, Swap, Window, type Act } from "./kit";
 import { DASHBOARD_LOOK } from "./look";
 import { Pill, type PillTone } from "./Pill";
@@ -45,10 +71,28 @@ const LOG = [
 const PACE = [800, 400, 600, 1500, 700, 300, 700, 500, 600, 500, 900];
 
 type Page = "list" | "scan";
-type S = { cmd: string; waiting: boolean; added: boolean; lines: number; step: number; found: number; page: Page; open: boolean };
+type S = {
+  cmd: string;
+  waiting: boolean;
+  added: boolean;
+  lines: number;
+  step: number;
+  found: number;
+  page: Page;
+  open: boolean;
+};
 
 const initial: S = { cmd: "", waiting: false, added: false, lines: 0, step: 0, found: 0, page: "list", open: false };
-const poster: S = { cmd: COMMAND, waiting: true, added: true, lines: LOG.length, step: 0, found: 4, page: "scan", open: true };
+const poster: S = {
+  cmd: COMMAND,
+  waiting: true,
+  added: true,
+  lines: LOG.length,
+  step: 0,
+  found: 4,
+  page: "scan",
+  open: true,
+};
 
 const statusOf = (lines: number) => (lines === 0 ? "queued" : lines >= LOG.length ? "done" : "running");
 
@@ -96,12 +140,54 @@ export const created = (phase: number, step: number) => ENTRIES[phase].filter((e
 export const countOf = (e: Entry, step: number) => Math.max(0, Math.min(step, e.to) - e.from);
 
 // The findings, in the table's order (worst first). `at` is the order the checks decide them in.
-export type Row = { at: number; tone: PillTone; severity: string; title: string; file: string; folder: string; line: number; needsPerson?: boolean };
+export type Row = {
+  at: number;
+  tone: PillTone;
+  severity: string;
+  title: string;
+  file: string;
+  folder: string;
+  line: number;
+  needsPerson?: boolean;
+};
 export const FINDINGS: Row[] = [
-  { at: 3, tone: "high", severity: "High", title: "Open redirect on the login page", file: "login.ts", folder: "src/routes", line: 42 },
-  { at: 1, tone: "medium", severity: "Medium", title: "Session cookie is missing the Secure flag", file: "session.ts", folder: "src/auth", line: 58 },
-  { at: 4, tone: "medium", severity: "Medium", title: "Webhook signature is not compared in constant time", file: "stripe.ts", folder: "src/webhooks", line: 17, needsPerson: true },
-  { at: 2, tone: "low", severity: "Low", title: "Error message names the database", file: "errors.ts", folder: "src/api", line: 21 },
+  {
+    at: 3,
+    tone: "high",
+    severity: "High",
+    title: "Open redirect on the login page",
+    file: "login.ts",
+    folder: "src/routes",
+    line: 42,
+  },
+  {
+    at: 1,
+    tone: "medium",
+    severity: "Medium",
+    title: "Session cookie is missing the Secure flag",
+    file: "session.ts",
+    folder: "src/auth",
+    line: 58,
+  },
+  {
+    at: 4,
+    tone: "medium",
+    severity: "Medium",
+    title: "Webhook signature is not compared in constant time",
+    file: "stripe.ts",
+    folder: "src/webhooks",
+    line: 17,
+    needsPerson: true,
+  },
+  {
+    at: 2,
+    tone: "low",
+    severity: "Low",
+    title: "Error message names the database",
+    file: "errors.ts",
+    folder: "src/api",
+    line: 21,
+  },
 ];
 
 const NAV = [
@@ -267,7 +353,9 @@ export default function RunnerScene() {
                         {label === "Scans" && (
                           <>
                             <span className="dash-live" data-on={status === "running" || undefined} />
-                            <span className="dash-count"><Swap id={all}>{all}</Swap></span>
+                            <span className="dash-count">
+                              <Swap id={all}>{all}</Swap>
+                            </span>
                           </>
                         )}
                       </div>
@@ -299,8 +387,12 @@ export default function RunnerScene() {
                       </Swap>
                     </span>
                     <span className="dash-actions">
-                      <span className="dash-iconbtn" aria-hidden><RefreshCw size={16} strokeWidth={1.5} /></span>
-                      <span className="dash-btn" data-target="new" data-cursor="pointer">New scan</span>
+                      <span className="dash-iconbtn" aria-hidden>
+                        <RefreshCw size={16} strokeWidth={1.5} />
+                      </span>
+                      <span className="dash-btn" data-target="new" data-cursor="pointer">
+                        New scan
+                      </span>
                     </span>
                   </header>
 
@@ -308,14 +400,20 @@ export default function RunnerScene() {
                     <section className="dash-page" data-active={page === "list" || undefined}>
                       <div className="pg-head">
                         <div className="pg-head__text">
-                          <div className="pg-head__title"><h3 className="dash-title">Scans</h3></div>
-                          <p className="dash-desc">Every audit you have run, newest first. Open one to read its report.</p>
+                          <div className="pg-head__title">
+                            <h3 className="dash-title">Scans</h3>
+                          </div>
+                          <p className="dash-desc">
+                            Every audit you have run, newest first. Open one to read its report.
+                          </p>
                         </div>
                       </div>
                       <div className="dl-card">
                         <div className="dl-card__head">
                           <span className="dl-card__title">All scans</span>
-                          <span className="dl-card__count"><Swap id={all}>{all} scans</Swap></span>
+                          <span className="dl-card__count">
+                            <Swap id={all}>{all} scans</Swap>
+                          </span>
                         </div>
                         <div className="dl-card__body">
                           <div className="dash-filter">
@@ -328,7 +426,9 @@ export default function RunnerScene() {
                               ].map(([label, count, on]) => (
                                 <span key={String(label)} className="dash-tab" data-on={on || undefined}>
                                   {label}
-                                  <span className="dash-tab__n"><Swap id={String(count)}>{String(count)}</Swap></span>
+                                  <span className="dash-tab__n">
+                                    <Swap id={String(count)}>{String(count)}</Swap>
+                                  </span>
                                 </span>
                               ))}
                             </div>
@@ -351,10 +451,24 @@ export default function RunnerScene() {
 
                             <Collapse open={s.added}>
                               <div className="dt-row" data-target="fresh" data-cursor="pointer">
-                                <div className="dt-cell dt-cell--repo"><Repo scan={FRESH} /></div>
+                                <div className="dt-cell dt-cell--repo">
+                                  <Repo scan={FRESH} />
+                                </div>
                                 <div className="dt-cell dt-cell--status">
                                   <Swap id={status}>
-                                    {done ? <Pill tone="success" dot>Succeeded</Pill> : status === "running" ? <Pill tone="info" dot pulse>Running</Pill> : <Pill tone="neutral" dot>Queued</Pill>}
+                                    {done ? (
+                                      <Pill tone="success" dot>
+                                        Succeeded
+                                      </Pill>
+                                    ) : status === "running" ? (
+                                      <Pill tone="info" dot pulse>
+                                        Running
+                                      </Pill>
+                                    ) : (
+                                      <Pill tone="neutral" dot>
+                                        Queued
+                                      </Pill>
+                                    )}
                                   </Swap>
                                 </div>
                                 <div className="dt-cell dt-cell--found">
@@ -363,9 +477,18 @@ export default function RunnerScene() {
                                       <span className="dt-found">
                                         <span className="dt-found__row">
                                           <span className="dt-strong">4 findings</span>
-                                          <span className="dt-sev"><i data-tone="high" /><span className="dt-num">1</span> high</span>
-                                          <span className="dt-sev"><i data-tone="medium" /><span className="dt-num">2</span> medium</span>
-                                          <span className="dt-sev"><i data-tone="low" /><span className="dt-num">1</span> low</span>
+                                          <span className="dt-sev">
+                                            <i data-tone="high" />
+                                            <span className="dt-num">1</span> high
+                                          </span>
+                                          <span className="dt-sev">
+                                            <i data-tone="medium" />
+                                            <span className="dt-num">2</span> medium
+                                          </span>
+                                          <span className="dt-sev">
+                                            <i data-tone="low" />
+                                            <span className="dt-num">1</span> low
+                                          </span>
                                         </span>
                                         <span className="dt-byhand">1 to check by hand</span>
                                       </span>
@@ -378,9 +501,13 @@ export default function RunnerScene() {
                                   <span className="dt-review">{FRESH.review}</span>
                                   <span className="dt-origin">{MODEL}</span>
                                 </div>
-                                <div className="dt-cell dt-cell--cost"><Swap id={done ? "done" : "wait"}>{done ? "$3.24" : "-"}</Swap></div>
+                                <div className="dt-cell dt-cell--cost">
+                                  <Swap id={done ? "done" : "wait"}>{done ? "$3.24" : "-"}</Swap>
+                                </div>
                                 <div className="dt-cell dt-cell--time">{FRESH.started}</div>
-                                <div className="dt-cell dt-cell--open"><ChevronRight size={16} strokeWidth={1.5} aria-hidden /></div>
+                                <div className="dt-cell dt-cell--open">
+                                  <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+                                </div>
                               </div>
                             </Collapse>
 
@@ -401,30 +528,59 @@ export default function RunnerScene() {
                             <div className="pg-head">
                               <div className="pg-head__text">
                                 <div className="pg-head__title">
-                                  <h3 className="dash-title"><span className="dt-owner">acme/</span>example-app</h3>
-                                  <Pill tone="outline"><Lock size={12} strokeWidth={1.5} />Private</Pill>
+                                  <h3 className="dash-title">
+                                    <span className="dt-owner">acme/</span>example-app
+                                  </h3>
+                                  <Pill tone="outline">
+                                    <Lock size={12} strokeWidth={1.5} />
+                                    Private
+                                  </Pill>
                                 </div>
                               </div>
                               <Swap id={done ? "again" : "stop"}>
-                                {done ? <span className="pg-obtn">Scan this branch again</span> : <span className="pg-obtn">Stop</span>}
+                                {done ? (
+                                  <span className="pg-obtn">Scan this branch again</span>
+                                ) : (
+                                  <span className="pg-obtn">Stop</span>
+                                )}
                               </Swap>
                             </div>
                             <div className="pg-branch">
                               <span className="pg-branch__row">
-                                <span className="pg-chip"><GitBranch size={14} strokeWidth={1.5} /><span className="dt-mono">main</span><ChevronRight size={14} strokeWidth={1.5} /></span>
-                                <span className="pg-sq"><ExternalLink size={16} strokeWidth={1.5} /></span>
+                                <span className="pg-chip">
+                                  <GitBranch size={14} strokeWidth={1.5} />
+                                  <span className="dt-mono">main</span>
+                                  <ChevronRight size={14} strokeWidth={1.5} />
+                                </span>
+                                <span className="pg-sq">
+                                  <ExternalLink size={16} strokeWidth={1.5} />
+                                </span>
                               </span>
                               <span className="pg-meta">
                                 <Swap id={done ? "done" : "run"}>
-                                  {done ? <Pill tone="success" dot>Succeeded</Pill> : <Pill tone="info" dot pulse>Running</Pill>}
+                                  {done ? (
+                                    <Pill tone="success" dot>
+                                      Succeeded
+                                    </Pill>
+                                  ) : (
+                                    <Pill tone="info" dot pulse>
+                                      Running
+                                    </Pill>
+                                  )}
                                 </Swap>
-                                <span>Started <span className="pg-time">Nov 12, 10:12 AM</span></span>
+                                <span>
+                                  Started <span className="pg-time">Nov 12, 10:12 AM</span>
+                                </span>
                                 <span aria-hidden>·</span>
-                                <span><Swap id={done ? "took" : "for"}>{done ? "Took 3m 12s" : "Running for 2m 05s"}</Swap></span>
+                                <span>
+                                  <Swap id={done ? "took" : "for"}>{done ? "Took 3m 12s" : "Running for 2m 05s"}</Swap>
+                                </span>
                                 <span aria-hidden>·</span>
                                 <span>Coverage {FRESH.review}</span>
                                 <span aria-hidden>·</span>
-                                <span>Commit <span className="dt-mono">4f2a9c1</span></span>
+                                <span>
+                                  Commit <span className="dt-mono">4f2a9c1</span>
+                                </span>
                               </span>
                             </div>
 
@@ -433,7 +589,10 @@ export default function RunnerScene() {
                                 <LoaderCircle className="sp-spin" size={16} strokeWidth={1.5} />
                                 <div className="sp-alert__text">
                                   <span className="sp-alert__title">Scanning.</span>
-                                  <span className="sp-alert__note">A scan usually takes a few minutes. This page updates by itself. You can leave and come back.</span>
+                                  <span className="sp-alert__note">
+                                    A scan usually takes a few minutes. This page updates by itself. You can leave and
+                                    come back.
+                                  </span>
                                 </div>
                               </div>
                             </Collapse>
@@ -441,32 +600,57 @@ export default function RunnerScene() {
                             <Card
                               data-target="findings"
                               title={done ? "Findings" : "Findings so far"}
-                              sub={<Swap id={done ? "done" : "live"}>{done ? "4 findings: 3 confirmed, 1 need a person to check. Open a row for the impact, evidence and fix." : "Found so far, still being checked. They can change before the Report."}</Swap>}
+                              sub={
+                                <Swap id={done ? "done" : "live"}>
+                                  {done
+                                    ? "4 findings: 3 confirmed, 1 need a person to check. Open a row for the impact, evidence and fix."
+                                    : "Found so far, still being checked. They can change before the Report."}
+                                </Swap>
+                              }
                               flush
                             >
                               <Collapse open={done}>
-                                <div className="sp-copyrow"><span className="pg-obtn pg-obtn--sm">Copy all 4 findings for coding agent</span></div>
+                                <div className="sp-copyrow">
+                                  <span className="pg-obtn pg-obtn--sm">Copy all 4 findings for coding agent</span>
+                                </div>
                               </Collapse>
                               <Collapse open={s.found === 0 && !done}>
                                 <div className="sp-empty">
-                                  <span className="sp-empty__icon"><ShieldCheck size={20} strokeWidth={1.5} /></span>
+                                  <span className="sp-empty__icon">
+                                    <ShieldCheck size={20} strokeWidth={1.5} />
+                                  </span>
                                   <span className="sp-empty__title">Nothing verified yet</span>
-                                  <span className="sp-empty__text">A finding shows here as soon as it is checked. This page updates by itself.</span>
+                                  <span className="sp-empty__text">
+                                    A finding shows here as soon as it is checked. This page updates by itself.
+                                  </span>
                                 </div>
                               </Collapse>
                               <Collapse open={s.found > 0}>
                                 <div className="sp-table">
-                                  <div className="sp-tr sp-tr--head"><span>Severity</span><span>Finding</span><span>Where</span><span /></div>
+                                  <div className="sp-tr sp-tr--head">
+                                    <span>Severity</span>
+                                    <span>Finding</span>
+                                    <span>Where</span>
+                                    <span />
+                                  </div>
                                   {FINDINGS.map((row, index) => (
                                     <Collapse key={row.title} open={s.found >= row.at}>
-                                      <div className="sp-tr" data-target={index === 0 ? "row-0" : undefined} data-cursor={index === 0 ? "pointer" : undefined}>
+                                      <div
+                                        className="sp-tr"
+                                        data-target={index === 0 ? "row-0" : undefined}
+                                        data-cursor={index === 0 ? "pointer" : undefined}
+                                      >
                                         <span className="sp-sev">
-                                          <Pill tone={row.tone} dot>{row.severity}</Pill>
+                                          <Pill tone={row.tone} dot>
+                                            {row.severity}
+                                          </Pill>
                                           {row.needsPerson && <Pill tone="warning">Needs a person</Pill>}
                                         </span>
                                         <span className="sp-title">{row.title}</span>
                                         <span className="sp-where">
-                                          <span className="sp-where__file">{row.file}:{row.line}</span>
+                                          <span className="sp-where__file">
+                                            {row.file}:{row.line}
+                                          </span>
                                           <span className="sp-where__folder">{row.folder}</span>
                                         </span>
                                         <ChevronRight size={16} strokeWidth={1.5} />
@@ -481,23 +665,34 @@ export default function RunnerScene() {
                               data-target="trace"
                               title={done ? "Trace" : "Trace"}
                               sub={done ? "What the scan did, by phase." : "What the scan is doing now."}
-                              right={done ? <ChevronDown className="sp-node__chev" size={16} strokeWidth={1.5} /> : undefined}
+                              right={
+                                done ? <ChevronDown className="sp-node__chev" size={16} strokeWidth={1.5} /> : undefined
+                              }
                             >
                               <Collapse open={!done}>
                                 <div className="sp-trace">
                                   <div className="sp-now">
-                                    <span className="sp-ping"><i /><i /></span>
+                                    <span className="sp-ping">
+                                      <i />
+                                      <i />
+                                    </span>
                                     <span className="sp-now__label">
-                                      <Swap id={newest ? `${now}-${newest.from}` : "none"}>{newest ? ACT_LABEL[newest.act].label : "Waiting for the first entries"}</Swap>
+                                      <Swap id={newest ? `${now}-${newest.from}` : "none"}>
+                                        {newest ? ACT_LABEL[newest.act].label : "Waiting for the first entries"}
+                                      </Swap>
                                       {newest && newestCount > 1 && <span className="sp-times">×{newestCount}</span>}
                                       {newest && <span className="sp-time">just now</span>}
                                     </span>
                                     <Collapse open={s.lines >= 4 && candidates > 0}>
-                                      <span className="sp-cand"><Count value={candidates} format={(n) => `${n} candidates`} duration={500} /></span>
+                                      <span className="sp-cand">
+                                        <Count value={candidates} format={(n) => `${n} candidates`} duration={500} />
+                                      </span>
                                     </Collapse>
                                   </div>
                                   <ol className="sp-phases">
-                                    {[3, 2, 1, 0].map((i) => <Phase key={i} i={i} lines={s.lines} step={s.step} done={done} />)}
+                                    {[3, 2, 1, 0].map((i) => (
+                                      <Phase key={i} i={i} lines={s.lines} step={s.step} done={done} />
+                                    ))}
                                   </ol>
                                 </div>
                               </Collapse>
@@ -513,10 +708,14 @@ export default function RunnerScene() {
                   <>
                     <div className="dash-scrim" data-open={s.open || undefined} aria-hidden />
                     <aside className="dash-sheet" data-open={s.open || undefined} aria-hidden>
-                      <span className="dash-sheet__close"><X size={16} strokeWidth={1.5} /></span>
+                      <span className="dash-sheet__close">
+                        <X size={16} strokeWidth={1.5} />
+                      </span>
                       <header className="dash-sheet__head">
                         <div className="dash-sheet__badges">
-                          <Pill tone="high" dot>High</Pill>
+                          <Pill tone="high" dot>
+                            High
+                          </Pill>
                           <Pill tone="success">Confirmed</Pill>
                           <span className="dash-sheet__n">1 of 4</span>
                         </div>
@@ -525,29 +724,49 @@ export default function RunnerScene() {
                       </header>
                       <div className="dash-sheet__body">
                         <section>
-                          <h5 className="dash-sec" data-tone="danger">What could happen</h5>
-                          <p className="dash-sheet__p">A crafted link can send people from your login page to another site, where a lookalike page can ask for their password.</p>
+                          <h5 className="dash-sec" data-tone="danger">
+                            What could happen
+                          </h5>
+                          <p className="dash-sheet__p">
+                            A crafted link can send people from your login page to another site, where a lookalike page
+                            can ask for their password.
+                          </p>
                         </section>
                         <section>
                           <h5 className="dash-sec">Evidence in the code</h5>
                           <div className="dash-evidence">
-                            <p className="dash-sheet__p">The login route sends people to whatever address the next parameter holds.</p>
+                            <p className="dash-sheet__p">
+                              The login route sends people to whatever address the next parameter holds.
+                            </p>
                             <code className="dash-code">res.redirect(req.query.next)</code>
                           </div>
                         </section>
                         <section>
-                          <h5 className="dash-sec" data-tone="success">Suggested fix</h5>
-                          <p className="dash-sheet__p">Check the address against a list of allowed pages before redirecting.</p>
+                          <h5 className="dash-sec" data-tone="success">
+                            Suggested fix
+                          </h5>
+                          <p className="dash-sheet__p">
+                            Check the address against a list of allowed pages before redirecting.
+                          </p>
                         </section>
                       </div>
                       <footer className="dash-sheet__foot">
                         <span className="dash-decide">
                           <span className="dash-decide__label">Your decision</span>
-                          <span className="dash-select">Open<ChevronDown size={16} strokeWidth={1.5} /></span>
+                          <span className="dash-select">
+                            Open
+                            <ChevronDown size={16} strokeWidth={1.5} />
+                          </span>
                         </span>
                         <span className="dash-nav-btns">
-                          <span className="dash-obtn" data-off><ArrowLeft size={16} strokeWidth={1.5} />Previous</span>
-                          <span className="dash-obtn">Next<ArrowRight size={16} strokeWidth={1.5} /></span>
+                          <span className="dash-obtn" data-off>
+                            <ArrowLeft size={16} strokeWidth={1.5} />
+                            Previous
+                          </span>
+                          <span className="dash-obtn">
+                            Next
+                            <ArrowRight size={16} strokeWidth={1.5} />
+                          </span>
                         </span>
                       </footer>
                     </aside>

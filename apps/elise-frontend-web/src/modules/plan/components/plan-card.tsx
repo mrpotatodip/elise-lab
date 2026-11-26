@@ -16,13 +16,38 @@ import { PLAN_CONFIRM_POLL_MAX, PLAN_CONFIRM_POLL_MS, PLAN_REFUND_LINE, PLAN_YEA
 import { planKeys, planOffersQuery, planQuery, useCanManagePlan, usePlanActions } from "../hooks";
 import type { PlanDetails, PlanOffer } from "../schemas";
 import type { PlanCheckoutReturn } from "../types";
-import { PLAN_STATUS_VIEW, planBilledYearlySentence, planBillingAction, planConfirmingPayment, planPeriodSentence, planSourceLabel, planSwitchPending, type PlanSwitchTarget } from "../utils";
+import {
+  PLAN_STATUS_VIEW,
+  planBilledYearlySentence,
+  planBillingAction,
+  planConfirmingPayment,
+  planPeriodSentence,
+  planSourceLabel,
+  planSwitchPending,
+  type PlanSwitchTarget,
+} from "../utils";
 import { ComparePlans } from "./compare-plans";
 import { PriceLine } from "./price-line";
 
-function RedirectButton({ label, variant = "default", busy, onClick }: { label: string; variant?: "default" | "outline"; busy: boolean; onClick: () => void }) {
+function RedirectButton({
+  label,
+  variant = "default",
+  busy,
+  onClick,
+}: {
+  label: string;
+  variant?: "default" | "outline";
+  busy: boolean;
+  onClick: () => void;
+}) {
   return (
-    <Button variant={variant} size="sm" className="h-auto min-h-8 max-w-full justify-self-start whitespace-normal py-1.5 text-left" disabled={busy} onClick={onClick}>
+    <Button
+      variant={variant}
+      size="sm"
+      className="h-auto min-h-8 max-w-full justify-self-start whitespace-normal py-1.5 text-left"
+      disabled={busy}
+      onClick={onClick}
+    >
       {label}
     </Button>
   );
@@ -31,10 +56,25 @@ function RedirectButton({ label, variant = "default", busy, onClick }: { label: 
 function PortalButton() {
   const { portal } = usePlanActions();
 
-  return <RedirectButton label="Manage billing" variant="outline" busy={portal.isPending || portal.isSuccess} onClick={() => portal.mutate()} />;
+  return (
+    <RedirectButton
+      label="Manage billing"
+      variant="outline"
+      busy={portal.isPending || portal.isSuccess}
+      onClick={() => portal.mutate()}
+    />
+  );
 }
 
-function CheckoutNote({ checkout, confirming, gaveUp }: { checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
+function CheckoutNote({
+  checkout,
+  confirming,
+  gaveUp,
+}: {
+  checkout: PlanCheckoutReturn | undefined;
+  confirming: boolean;
+  gaveUp: boolean;
+}) {
   if (checkout === "cancelled") {
     return (
       <Alert variant="info">
@@ -45,7 +85,11 @@ function CheckoutNote({ checkout, confirming, gaveUp }: { checkout: PlanCheckout
   if (confirming) {
     return (
       <Alert variant="info">
-        <AlertDescription>{gaveUp ? "Still waiting: refresh in a minute." : "Confirming payment. This page updates on its own in a moment."}</AlertDescription>
+        <AlertDescription>
+          {gaveUp
+            ? "Still waiting: refresh in a minute."
+            : "Confirming payment. This page updates on its own in a moment."}
+        </AlertDescription>
       </Alert>
     );
   }
@@ -56,14 +100,33 @@ const ALERT_VARIANT = { success: "success", warning: "warning", destructive: "de
 
 const ACTION = buttonVariants({ variant: "outline", size: "sm" });
 
-function NoPlanView({ data, offers, checkout, confirming, gaveUp }: { data: PlanDetails; offers: ReadonlyArray<PlanOffer>; checkout: PlanCheckoutReturn | undefined; confirming: boolean; gaveUp: boolean }) {
+function NoPlanView({
+  data,
+  offers,
+  checkout,
+  confirming,
+  gaveUp,
+}: {
+  data: PlanDetails;
+  offers: ReadonlyArray<PlanOffer>;
+  checkout: PlanCheckoutReturn | undefined;
+  confirming: boolean;
+  gaveUp: boolean;
+}) {
   const canManage = useCanManagePlan();
 
   return (
     <>
       <ShellPageHeader title="Plan and billing" description="No plan yet. Scans start once this account has a plan." />
       <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
-      <ComparePlans data={data} offers={offers} from={null} canManage={canManage} switching={false} onSwitched={() => undefined} />
+      <ComparePlans
+        data={data}
+        offers={offers}
+        from={null}
+        canManage={canManage}
+        switching={false}
+        onSwitched={() => undefined}
+      />
     </>
   );
 }
@@ -92,7 +155,10 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
       const { data: latest, dataUpdateCount } = query.state;
       if (latest === undefined) return false;
       const checkoutPolling = planConfirmingPayment(checkout, latest) && dataUpdateCount < PLAN_CONFIRM_POLL_MAX;
-      const switchPolling = switching !== null && planSwitchPending(switching, latest) && dataUpdateCount - switching.baseline < PLAN_CONFIRM_POLL_MAX;
+      const switchPolling =
+        switching !== null &&
+        planSwitchPending(switching, latest) &&
+        dataUpdateCount - switching.baseline < PLAN_CONFIRM_POLL_MAX;
       return checkoutPolling || switchPolling ? PLAN_CONFIRM_POLL_MS : false;
     },
   });
@@ -124,7 +190,11 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
 
   return (
     <>
-      <ShellPageHeader title="Plan and billing" description="What this account pays for." badges={<Badge variant={status.variant}>{status.label}</Badge>} />
+      <ShellPageHeader
+        title="Plan and billing"
+        description="What this account pays for."
+        badges={<Badge variant={status.variant}>{status.label}</Badge>}
+      />
 
       <CheckoutNote checkout={checkout} confirming={confirming} gaveUp={gaveUp} />
 
@@ -139,7 +209,11 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
 
       {switchWaiting && (
         <Alert variant="info">
-          <AlertDescription>{switchGaveUp ? "Switching is taking longer than expected. Reload this page later to see the new plan." : "Switching plan. This page updates on its own in a moment."}</AlertDescription>
+          <AlertDescription>
+            {switchGaveUp
+              ? "Switching is taking longer than expected. Reload this page later to see the new plan."
+              : "Switching plan. This page updates on its own in a moment."}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -151,7 +225,9 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
               canManage ? (
                 <PortalButton />
               ) : (
-                <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Ask an account admin to change the plan.</p>
+                <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                  Ask an account admin to change the plan.
+                </p>
               )
             ) : undefined
           }
@@ -162,7 +238,9 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
               <p className="text-sm tabular-nums text-muted-foreground">
                 <s>{usageUsd(plan.monthlyPriceUsd)}</s> per month
               </p>
-              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{planSourceLabel(data.source)}, with no end date. Elise charges nothing per scan.</p>
+              <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                {planSourceLabel(data.source)}, with no end date. Elise charges nothing per scan.
+              </p>
             </>
           ) : (
             <>
@@ -173,7 +251,9 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
               </p>
               {yearly && (
                 <>
-                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{planBilledYearlySentence(data)}</p>
+                  <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+                    {planBilledYearlySentence(data)}
+                  </p>
                   <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{PLAN_YEARLY_BACK_LINE}</p>
                   <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">{PLAN_REFUND_LINE}</p>
                 </>
@@ -192,9 +272,15 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
         >
           <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
             {people}
-            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">of {plan.maxMembers}</span>
+            <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+              of {plan.maxMembers}
+            </span>
           </p>
-          <Progress value={peoplePercent} indicatorClassName="bg-primary/55" aria-label={`People: ${people} of ${plan.maxMembers}`} />
+          <Progress
+            value={peoplePercent}
+            indicatorClassName="bg-primary/55"
+            aria-label={`People: ${people} of ${plan.maxMembers}`}
+          />
           <ul className="divide-y rounded-lg border">
             {team.members.map((member) => (
               <li key={member.partyId} className="flex items-center justify-between gap-4 px-4 py-3">
@@ -206,7 +292,11 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
               </li>
             ))}
           </ul>
-          {waiting > 0 && <p className="text-sm leading-relaxed text-muted-foreground">Plus {waiting} waiting {waiting === 1 ? "invite" : "invites"}.</p>}
+          {waiting > 0 && (
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Plus {waiting} waiting {waiting === 1 ? "invite" : "invites"}.
+            </p>
+          )}
         </Column>
 
         <Column
@@ -223,7 +313,9 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
           }
         >
           {paired.length === 0 ? (
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">No computer is paired yet. A Runner is a computer that runs your scans, with its own Claude and git login.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              No computer is paired yet. A Runner is a computer that runs your scans, with its own Claude and git login.
+            </p>
           ) : (
             <>
               <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
@@ -233,7 +325,8 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
               {running === 0 && (
                 <Alert variant="warning">
                   <AlertDescription>
-                    <span className="font-medium">No Runner is running.</span> A new scan waits until one starts. Open the Elise Runner on one of your computers.
+                    <span className="font-medium">No Runner is running.</span> A new scan waits until one starts. Open
+                    the Elise Runner on one of your computers.
                   </AlertDescription>
                 </Alert>
               )}
@@ -244,7 +337,9 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
                     <li key={runner.id} className="flex items-center justify-between gap-4 px-4 py-3">
                       <span className="grid min-w-0 gap-0.5">
                         <span className="truncate text-sm font-medium">{runner.name}</span>
-                        <span className="text-xs text-muted-foreground">{runner.lastSeenAt === null ? "Not seen yet." : `Last seen ${runnerWhen(runner.lastSeenAt)}.`}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {runner.lastSeenAt === null ? "Not seen yet." : `Last seen ${runnerWhen(runner.lastSeenAt)}.`}
+                        </span>
                       </span>
                       <Badge variant={isRunning ? "success" : "neutral"}>{isRunning ? "Running" : "Not running"}</Badge>
                     </li>
@@ -262,7 +357,9 @@ export function PlanCard({ checkout }: { checkout?: PlanCheckoutReturn }) {
         from={plan}
         canManage={canManage}
         switching={switchWaiting && !switchGaveUp}
-        onSwitched={(target) => setSwitching({ ...target, baseline: queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0 })}
+        onSwitched={(target) =>
+          setSwitching({ ...target, baseline: queryClient.getQueryState(planKeys.details())?.dataUpdateCount ?? 0 })
+        }
       />
     </>
   );

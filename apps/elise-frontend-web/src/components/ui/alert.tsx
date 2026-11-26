@@ -1,7 +1,7 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "#/lib/utils"
+import { cn } from "#/lib/utils";
 
 const alertVariants = cva(
   "relative flex items-start gap-3 rounded-xl border p-4 text-sm [&>svg]:mt-0.5 [&>svg]:size-4 [&>svg]:shrink-0",
@@ -16,15 +16,22 @@ const alertVariants = cva(
       },
     },
     defaultVariants: { variant: "default" },
-  }
-)
+  },
+);
 
 function Alert({ className, variant, ...props }: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
-  return <div data-slot="alert" role={variant === "destructive" ? "alert" : undefined} className={cn(alertVariants({ variant }), className)} {...props} />
+  return (
+    <div
+      data-slot="alert"
+      role={variant === "destructive" ? "alert" : undefined}
+      className={cn(alertVariants({ variant }), className)}
+      {...props}
+    />
+  );
 }
 
 function AlertDescription({ className, ...props }: React.ComponentProps<"p">) {
-  return <p data-slot="alert-description" className={cn("leading-relaxed", className)} {...props} />
+  return <p data-slot="alert-description" className={cn("leading-relaxed", className)} {...props} />;
 }
 
-export { Alert, AlertDescription }
+export { Alert, AlertDescription };

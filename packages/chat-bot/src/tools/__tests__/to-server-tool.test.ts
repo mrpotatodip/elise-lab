@@ -29,9 +29,7 @@ function runtime(): ChatBotRuntime {
   return {
     userId: "u1",
     allowedPathPrefix: "/chat-bot-tools/",
-    fetch: vi.fn<ChatBotRuntime["fetch"]>(async () =>
-      Response.json({ data: { a: 2, b: 3, sum: 5 }, error: null }),
-    ),
+    fetch: vi.fn<ChatBotRuntime["fetch"]>(async () => Response.json({ data: { a: 2, b: 3, sum: 5 }, error: null })),
   };
 }
 

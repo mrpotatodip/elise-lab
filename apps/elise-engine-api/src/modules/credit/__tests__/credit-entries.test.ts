@@ -7,14 +7,16 @@ import { creditEntriesEffect } from "#/modules/credit";
 let test: TestDb;
 let tenantId: string;
 
-const entries = (query: { limit: number; cursor?: string }, tenant = tenantId) => Effect.runPromise(creditEntriesEffect(test.http, tenant, query));
+const entries = (query: { limit: number; cursor?: string }, tenant = tenantId) =>
+  Effect.runPromise(creditEntriesEffect(test.http, tenant, query));
 const at = (minute: number) => new Date(Date.UTC(2026, 10, 11, 10, minute));
 
 beforeAll(async () => {
   test = await openTestDb();
   tenantId = (await seedTenant(test, "acme")).tenantId;
   const repoId = await seedRepo(test, tenantId);
-  for (const id of ["scan-a", "scan-b"]) await test.raw.insert(scans).values(scanValues(tenantId, repoId, id, "2026-11-11T00:00:00Z"));
+  for (const id of ["scan-a", "scan-b"])
+    await test.raw.insert(scans).values(scanValues(tenantId, repoId, id, "2026-11-11T00:00:00Z"));
   await test.raw.insert(tenantCreditLedger).values([
     { tenantId, kind: "grant", amountUsd: "49.0000", createdAt: at(0) },
     { tenantId, kind: "scan_hold", amountUsd: "-1.5000", scanId: "scan-a", createdAt: at(1) },

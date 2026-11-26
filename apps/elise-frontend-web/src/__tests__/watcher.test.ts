@@ -7,7 +7,11 @@ describe("isWatcher", () => {
     { name: "a Workspace member", powers: ACCESS_ROLE_GRANTS.workspace_member, expected: false },
     { name: "a Workspace admin", powers: ACCESS_ROLE_GRANTS.workspace_admin, expected: false },
     { name: "the account owner", powers: ACCESS_ROLE_GRANTS.tenant_admin, expected: false },
-    { name: "an account whose engine grants neither Power yet", powers: ["company:team:members:read"], expected: false },
+    {
+      name: "an account whose engine grants neither Power yet",
+      powers: ["company:team:members:read"],
+      expected: false,
+    },
     { name: "no Powers at all", powers: [], expected: false },
   ] as const)("is $expected for $name", ({ powers, expected }) => {
     expect(isWatcher(powers)).toBe(expected);

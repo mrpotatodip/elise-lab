@@ -43,10 +43,17 @@ export const replaceUnverifiedLoginEffect = (db: PoolDbType, email: string): Eff
         const owned = await tx.select({ id: tenants.id }).from(tenants).where(eq(tenants.partyId, login.partyId));
         const ownedIds = owned.map((row) => row.id);
         if (ownedIds.length === 0) throw new ReplaceBlocked();
-        const roles = await tx.select({ tenantId: partyRoles.tenantId }).from(partyRoles).where(eq(partyRoles.partyId, login.partyId));
+        const roles = await tx
+          .select({ tenantId: partyRoles.tenantId })
+          .from(partyRoles)
+          .where(eq(partyRoles.partyId, login.partyId));
         if (roles.some((role) => !role.tenantId || !ownedIds.includes(role.tenantId))) throw new ReplaceBlocked();
 
-        const [plan] = await tx.select({ tenantId: tenantSubscriptions.tenantId }).from(tenantSubscriptions).where(inArray(tenantSubscriptions.tenantId, ownedIds)).limit(1);
+        const [plan] = await tx
+          .select({ tenantId: tenantSubscriptions.tenantId })
+          .from(tenantSubscriptions)
+          .where(inArray(tenantSubscriptions.tenantId, ownedIds))
+          .limit(1);
         const [scan] = await tx.select({ id: scans.id }).from(scans).where(inArray(scans.tenantId, ownedIds)).limit(1);
         const [member] = await tx
           .select({ id: partyRoles.id })
@@ -60,7 +67,9 @@ export const replaceUnverifiedLoginEffect = (db: PoolDbType, email: string): Eff
         await tx.delete(parties).where(eq(parties.id, login.partyId));
       }),
     catch: (cause) =>
-      cause instanceof ReplaceBlocked || pgErrorCode(cause) === PG_FOREIGN_KEY_VIOLATION ? new Conflict({ message: SIGN_UP_REFUSED }) : toDbError(cause),
+      cause instanceof ReplaceBlocked || pgErrorCode(cause) === PG_FOREIGN_KEY_VIOLATION
+        ? new Conflict({ message: SIGN_UP_REFUSED })
+        : toDbError(cause),
   });
 
 // -----
@@ -138,7 +147,12 @@ export const insertAccountEffect = (
     // is a bug, not something a caller can fix.
     // -----
     const tenant = yield* Effect.try(() =>
-      TenantSchema.parse({ ...created.tenant, role: created.role.key, roleLabel: created.role.label, powers: created.powers }),
+      TenantSchema.parse({
+        ...created.tenant,
+        role: created.role.key,
+        roleLabel: created.role.label,
+        powers: created.powers,
+      }),
     ).pipe(Effect.orDie);
     return { userId: created.userId, tenant };
   });

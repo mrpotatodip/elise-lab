@@ -22,12 +22,14 @@ beforeAll(async () => {
   test = await openTestDb();
   tenantId = (await seedTenant(test)).tenantId;
   repoId = await seedRepo(test, tenantId);
-  await test.raw.insert(scans).values([
-    row("in-1", "2026-11-03T10:00:00Z", "0.5000", 100),
-    row("in-2", "2026-11-20T10:00:00Z", "0.2500", 50),
-    row("in-no-usage", "2026-11-21T10:00:00Z", null, null),
-    row("last-month", "2026-10-31T23:59:59Z", "9.0000", 9000),
-  ]);
+  await test.raw
+    .insert(scans)
+    .values([
+      row("in-1", "2026-11-03T10:00:00Z", "0.5000", 100),
+      row("in-2", "2026-11-20T10:00:00Z", "0.2500", 50),
+      row("in-no-usage", "2026-11-21T10:00:00Z", null, null),
+      row("last-month", "2026-10-31T23:59:59Z", "9.0000", 9000),
+    ]);
 });
 
 afterAll(async () => {

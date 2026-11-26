@@ -47,7 +47,9 @@ try {
   made = true;
   console.log(`deploy-clean: ${app} from commit ${sha.slice(0, 7)} (${git("log", "-1", "--format=%s", sha)})`);
   if (dry) {
-    console.log(`deploy-clean: --dry, would run pnpm install --frozen-lockfile, then ${STEPS[app].map(([c, a]) => `${c} ${a.join(" ")}`).join(", then ")} in ${join(dir, app)}`);
+    console.log(
+      `deploy-clean: --dry, would run pnpm install --frozen-lockfile, then ${STEPS[app].map(([c, a]) => `${c} ${a.join(" ")}`).join(", then ")} in ${join(dir, app)}`,
+    );
   } else {
     run("pnpm", ["install", "--frozen-lockfile"], dir);
     for (const [command, commandArgs] of STEPS[app]) run(command, commandArgs, join(dir, app));

@@ -9,11 +9,19 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/", getFindingThreadDoc, zValidator("header", AccountHeaderSchema), zValidator("query", FindingCommentsQuerySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const query = c.req.valid("query");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(findingThreadSvc(db, accountId, query)));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/",
+  getFindingThreadDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("query", FindingCommentsQuerySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const query = c.req.valid("query");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(findingThreadSvc(db, accountId, query)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

@@ -7,10 +7,15 @@ describe("appendChatBotToolResult", () => {
     const entry = { display: "number" as const, displayOptions: { value: "price" } };
     let structure = appendChatBotToolResult({}, "getCardPrice", entry, { price: 1 });
     structure = appendChatBotToolResult(structure, "getCardPrice", entry, { error: "timed out" });
-    structure = appendChatBotToolResult(structure, "addTwoNumbers", {
-      display: null,
-      displayOptions: null,
-    }, { a: 2, b: 3, sum: 5 });
+    structure = appendChatBotToolResult(
+      structure,
+      "addTwoNumbers",
+      {
+        display: null,
+        displayOptions: null,
+      },
+      { a: 2, b: 3, sum: 5 },
+    );
 
     expect(structure).toEqual({
       getCardPrice: {

@@ -3,12 +3,23 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { Button } from "#/components/ui/button";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "#/components/ui/breadcrumb";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "#/components/ui/breadcrumb";
 import { Tooltip, TooltipContent, TooltipTrigger } from "#/components/ui/tooltip";
 import { hydratedTimeZone, useHydrated } from "#/lib/use-hydrated";
 import { cn } from "#/lib/utils";
 import { useRouteNames, type RouteNames } from "../hooks";
-type Crumb = { label: string; to?: "/scans" | "/repos" | "/summary"; branch?: { repoId: string; branchId: string }; plain?: boolean };
+type Crumb = {
+  label: string;
+  to?: "/scans" | "/repos" | "/summary";
+  branch?: { repoId: string; branchId: string };
+  plain?: boolean;
+};
 
 // -----
 // A scan belongs to the branch it read, so its breadcrumb follows the data:
@@ -24,25 +35,41 @@ const scanCrumbs = (names: RouteNames | null, when: FormatTime): Crumb[] => {
   const repo: Crumb = { label: names.name, plain: true };
   const scan = names.startedAt ? `Scan of ${when(names.startedAt)}` : names.commit ? `Scan ${names.commit}` : "Scan";
   if (names.branch && names.repoId && names.branchId) {
-    return [{ label: "Repositories", to: "/repos" }, repo, { label: names.branch, branch: { repoId: names.repoId, branchId: names.branchId } }, { label: scan }];
+    return [
+      { label: "Repositories", to: "/repos" },
+      repo,
+      { label: names.branch, branch: { repoId: names.repoId, branchId: names.branchId } },
+      { label: scan },
+    ];
   }
-  return [{ label: "Repositories", to: "/repos" }, repo, { label: names.commit ? `One-off scan ${names.commit}` : "Scan" }];
+  return [
+    { label: "Repositories", to: "/repos" },
+    repo,
+    { label: names.commit ? `One-off scan ${names.commit}` : "Scan" },
+  ];
 };
 
 const crumbs = (pathname: string, names: RouteNames | null, when: FormatTime): Crumb[] => {
   if (pathname.startsWith("/scans/")) return scanCrumbs(names, when);
   if (pathname.startsWith("/scans")) return [{ label: "Scans" }];
   if (pathname.startsWith("/repos/") && pathname.includes("/branches/")) {
-    return [{ label: "Repositories", to: "/repos" }, ...(names ? [{ label: names.name, plain: true }] : []), { label: names?.branch ?? "Branch" }];
+    return [
+      { label: "Repositories", to: "/repos" },
+      ...(names ? [{ label: names.name, plain: true }] : []),
+      { label: names?.branch ?? "Branch" },
+    ];
   }
-  if (pathname.startsWith("/repos/")) return [{ label: "Repositories", to: "/repos" }, { label: names?.name ?? "Repository" }];
+  if (pathname.startsWith("/repos/"))
+    return [{ label: "Repositories", to: "/repos" }, { label: names?.name ?? "Repository" }];
   if (pathname.startsWith("/repos")) return [{ label: "Repositories" }];
   if (pathname.startsWith("/files")) return [{ label: "Files" }];
   if (pathname.startsWith("/team")) return [{ label: "Team" }];
   if (pathname.startsWith("/groups")) return [{ label: "Groups" }];
   if (pathname.startsWith("/settings/plan")) return [{ label: "Plan and billing" }];
   if (pathname.startsWith("/settings/providers")) return [{ label: "Runners" }];
-  if (pathname.startsWith("/summary/")) return [{ label: "Security status", to: "/summary" }, { label: names?.name ?? "Repository" }];
+  if (pathname.startsWith("/settings/security")) return [{ label: "Security" }];
+  if (pathname.startsWith("/summary/"))
+    return [{ label: "Security status", to: "/summary" }, { label: names?.name ?? "Repository" }];
   if (pathname.startsWith("/summary")) return [{ label: "Security status" }];
   return [{ label: "Overview" }];
 };
@@ -57,7 +84,13 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
   const queryClient = useQueryClient();
   const fetching = useIsFetching() > 0;
   const hydrated = useHydrated();
-  const timeFormat = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: hydratedTimeZone(hydrated) });
+  const timeFormat = new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: hydratedTimeZone(hydrated),
+  });
   const trail = crumbs(pathname, names, (value) => timeFormat.format(new Date(value)));
 
   return (
@@ -70,7 +103,10 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
                 {index > 0 && <BreadcrumbSeparator />}
                 <BreadcrumbItem className="min-w-0">
                   {crumb.to ? (
-                    <Link to={crumb.to} className="inline-flex min-h-6 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Link
+                      to={crumb.to}
+                      className="inline-flex min-h-6 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
                       {crumb.label}
                     </Link>
                   ) : crumb.branch ? (
@@ -98,7 +134,16 @@ export function ShellTopbar({ actions }: ShellTopbarProps) {
         </Breadcrumb>
         <div className="flex items-center gap-2">
           <Tooltip>
-            <TooltipTrigger render={<Button variant="outline" size="sm" aria-label="Refresh" onClick={() => queryClient.invalidateQueries()} />}>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Refresh"
+                  onClick={() => queryClient.invalidateQueries()}
+                />
+              }
+            >
               <RefreshCw className={cn("size-3.5", hydrated && fetching && "animate-spin")} />
               <span className="hidden sm:inline">Refresh</span>
             </TooltipTrigger>

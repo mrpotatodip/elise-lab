@@ -118,7 +118,7 @@ Profiles change breadth and redundancy, never the evidence bar. Do not scale awa
 
 #### Agents at once, and running out of money
 
-Run at most 3 hunters or verifiers at the same time. Reconnaissance and the report use one agent and no sub-agents.
+Run at most as many hunters or verifiers at the same time as the run prompt gives, or 3 when it gives none. Reconnaissance and the report use one agent and no sub-agents.
 
 The run's limit is money, not a count of agents. A model call refused with a budget message, or a note that your money is limited, means the run can stop at any point. Do not retry a refused call or start new work. Finish the files instead:
 

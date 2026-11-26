@@ -2,7 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { deleteFindingComment, editFindingComment, postFindingComment } from "../api";
 import type { FindingThread } from "../schemas";
-import { findComment, pendingCommentId, withComment, withCommentDeleted, withCommentRestored, withoutEvent } from "../utils";
+import {
+  findComment,
+  pendingCommentId,
+  withComment,
+  withCommentDeleted,
+  withCommentRestored,
+  withoutEvent,
+} from "../utils";
 import { findingCommentKeys } from "./finding-comment-queries";
 
 type CommentTarget = {
@@ -22,7 +29,9 @@ export function useFindingCommentActions({ repo, fingerprint, viewer }: CommentT
   const threadKey = findingCommentKeys.thread(repo, fingerprint);
   const reload = () => queryClient.invalidateQueries({ queryKey: threadKey });
   const changeEvents = (change: (events: FindingThread["events"]) => FindingThread["events"]) =>
-    queryClient.setQueryData<FindingThread>(threadKey, (thread) => (thread ? { ...thread, events: change(thread.events) } : thread));
+    queryClient.setQueryData<FindingThread>(threadKey, (thread) =>
+      thread ? { ...thread, events: change(thread.events) } : thread,
+    );
 
   const create = useMutation({
     mutationFn: (body: string) => postFindingComment({ data: { repo, fingerprint, body } }),
@@ -30,7 +39,16 @@ export function useFindingCommentActions({ repo, fingerprint, viewer }: CommentT
       await queryClient.cancelQueries({ queryKey: threadKey });
       const pendingId = pendingCommentId();
       changeEvents((events) =>
-        withComment(events, { kind: "comment", id: pendingId, authorPartyId: viewer.partyId, authorName: viewer.name, body, createdAt: new Date().toISOString(), editedAt: null, deletedAt: null }),
+        withComment(events, {
+          kind: "comment",
+          id: pendingId,
+          authorPartyId: viewer.partyId,
+          authorName: viewer.name,
+          body,
+          createdAt: new Date().toISOString(),
+          editedAt: null,
+          deletedAt: null,
+        }),
       );
       return { pendingId };
     },
@@ -42,7 +60,8 @@ export function useFindingCommentActions({ repo, fingerprint, viewer }: CommentT
   });
 
   const edit = useMutation({
-    mutationFn: ({ commentId, body }: { commentId: string; body: string }) => editFindingComment({ data: { commentId, body } }),
+    mutationFn: ({ commentId, body }: { commentId: string; body: string }) =>
+      editFindingComment({ data: { commentId, body } }),
     onSuccess: reload,
     onError: (error) => toast.error(`We couldn't save that edit. ${error.message}`),
   });

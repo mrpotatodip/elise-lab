@@ -15,7 +15,8 @@ import { findingAnchor, findingPath, findingStateLabel, findingWhere, openFindin
 
 const STATE_VARIANT = { regressed: "destructive", needs_validation: "warning", confirmed: "outline" } as const;
 
-const stateVariant = (finding: Pick<RepoFinding, "state" | "status">) => (finding.state === "regressed" ? STATE_VARIANT.regressed : STATE_VARIANT[finding.status]);
+const stateVariant = (finding: Pick<RepoFinding, "state" | "status">) =>
+  finding.state === "regressed" ? STATE_VARIANT.regressed : STATE_VARIANT[finding.status];
 
 function Fact({ label, children, className }: { label: string; children: string; className?: string }) {
   return (
@@ -35,7 +36,14 @@ function CopyLink({ repoId, finding }: { repoId: string; finding: Pick<RepoFindi
   };
 
   return (
-    <Button type="button" variant="ghost" size="sm" onClick={copy} aria-label={`Copy link to: ${finding.title}`} className="text-muted-foreground">
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={copy}
+      aria-label={`Copy link to: ${finding.title}`}
+      className="text-muted-foreground"
+    >
       <Link2 aria-hidden="true" />
       Copy link
     </Button>
@@ -65,7 +73,11 @@ function SummaryFinding({ repoId, finding, first }: { repoId: string; finding: R
   const open = first || linked;
 
   return (
-    <li ref={scrollWhenLinked} id={findingAnchor(finding.id)} className="scroll-mt-20 target:bg-accent/40 target:shadow-[inset_3px_0_0_0_var(--primary)]">
+    <li
+      ref={scrollWhenLinked}
+      id={findingAnchor(finding.id)}
+      className="scroll-mt-20 target:bg-accent/40 target:shadow-[inset_3px_0_0_0_var(--primary)]"
+    >
       <Collapsible key={open ? "open" : "closed"} defaultOpen={open}>
         <div className="grid items-center gap-x-6 gap-y-2 px-6 py-4 lg:grid-cols-[12rem_minmax(0,1fr)_auto_auto]">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -83,9 +95,15 @@ function SummaryFinding({ repoId, finding, first }: { repoId: string; finding: R
           </div>
           <CopyLink repoId={repoId} finding={finding} />
           {hasDetail && (
-            <CollapsibleTrigger aria-label={`Read: ${finding.title}`} className="group inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <CollapsibleTrigger
+              aria-label={`Read: ${finding.title}`}
+              className="group inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               Read
-              <ChevronUp aria-hidden="true" className="size-4 rotate-180 transition-transform group-data-[panel-open]:rotate-0" />
+              <ChevronUp
+                aria-hidden="true"
+                className="size-4 rotate-180 transition-transform group-data-[panel-open]:rotate-0"
+              />
             </CollapsibleTrigger>
           )}
         </div>
@@ -118,14 +136,18 @@ function FindingsPending() {
 }
 
 export function SummaryFindings({ repo }: { repo: Repo }) {
-  const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(repoFindingsQuery(repo.id, { branch: repo.defaultBranch ?? undefined, triage: "open" }));
+  const { data, isPending, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(
+    repoFindingsQuery(repo.id, { branch: repo.defaultBranch ?? undefined, triage: "open" }),
+  );
   const findings = data ? openFindings(data.pages.flatMap((page) => page.findings)) : [];
 
   return (
     <Card>
       <CardHeader className="gap-1.5">
         <CardTitle>{SUMMARY_COPY.findingsTitle}</CardTitle>
-        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Each one says where it is in the code, what could happen, and how your developer fixes it.</p>
+        <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+          Each one says where it is in the code, what could happen, and how your developer fixes it.
+        </p>
       </CardHeader>
       {isPending ? (
         <FindingsPending />

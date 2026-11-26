@@ -10,8 +10,7 @@ export const noErrorHandlingInRoutesRule = defineRule({
     messages: {
       tryStatement:
         "Don't catch errors in a route. Let them bubble to `app.onError`, which turns them into the envelope.",
-      tryCatchCall:
-        "Don't wrap a route's work in `tryCatch`. Let errors bubble to `app.onError`.",
+      tryCatchCall: "Don't wrap a route's work in `tryCatch`. Let errors bubble to `app.onError`.",
     },
   },
   createOnce(context) {

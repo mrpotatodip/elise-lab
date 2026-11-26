@@ -24,10 +24,33 @@ beforeAll(async () => {
   otherTenantId = (await seedTenant(test, "other")).tenantId;
   const repoId = await seedRepo(test, tenantId);
   const otherRepoId = await seedRepo(test, otherTenantId);
-  await test.raw.insert(scans).values([scanValues(tenantId, repoId, "mine", "2026-11-01T00:00:00Z"), scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z")]);
+  await test.raw
+    .insert(scans)
+    .values([
+      scanValues(tenantId, repoId, "mine", "2026-11-01T00:00:00Z"),
+      scanValues(otherTenantId, otherRepoId, "theirs", "2026-11-01T00:00:00Z"),
+    ]);
   await test.raw.insert(scanFindings).values([
-    { tenantId, scanId: "mine", findingId: "F-MINE", fingerprint: fp("a"), status: "confirmed", severity: "high", title: "mine", class: "authz" },
-    { tenantId: otherTenantId, scanId: "theirs", findingId: "F-THEIRS", fingerprint: fp("b"), status: "confirmed", severity: "high", title: "theirs", class: "authz" },
+    {
+      tenantId,
+      scanId: "mine",
+      findingId: "F-MINE",
+      fingerprint: fp("a"),
+      status: "confirmed",
+      severity: "high",
+      title: "mine",
+      class: "authz",
+    },
+    {
+      tenantId: otherTenantId,
+      scanId: "theirs",
+      findingId: "F-THEIRS",
+      fingerprint: fp("b"),
+      status: "confirmed",
+      severity: "high",
+      title: "theirs",
+      class: "authz",
+    },
   ]);
 });
 

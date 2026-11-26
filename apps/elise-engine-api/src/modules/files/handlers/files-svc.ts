@@ -10,7 +10,14 @@ import { countFilesEffect, listFilesEffect } from "#/modules/files/queries";
 // -----
 export const listFilesSvc = (db: AppDbType, accountId: string, query: FilesQuery): Effect.Effect<FileList, DbError> =>
   Effect.gen(function* () {
-    const [rows, counts] = yield* Effect.all([listFilesEffect(db, accountId, query), countFilesEffect(db, accountId, query)], { concurrency: 2 });
+    const [rows, counts] = yield* Effect.all(
+      [listFilesEffect(db, accountId, query), countFilesEffect(db, accountId, query)],
+      { concurrency: 2 },
+    );
     const offset = query.cursor ? Number(query.cursor) : 0;
-    return { files: rows.slice(0, query.limit), nextCursor: rows.length > query.limit ? String(offset + query.limit) : null, counts };
+    return {
+      files: rows.slice(0, query.limit),
+      nextCursor: rows.length > query.limit ? String(offset + query.limit) : null,
+      counts,
+    };
   });

@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/dist-ssr/**",
+    "**/.output/**",
+    "**/.wrangler/**",
+    "**/.tanstack/**",
+    "**/.cloudflare/**",
+    ".claude/**",
+    ".review/**",
+    ".skills-store/**",
+    ".agents/**",
+    ".cursor/**",
+    "patches/**",
+    "pnpm-lock.yaml",
+    "packages/db-elise/migrations/**",
+    "**/worker-configuration.d.ts",
+    "**/*.gen.ts",
+    "apps/elise-runner-cli/**",
+    "**/*.astro"
+  ]
+}

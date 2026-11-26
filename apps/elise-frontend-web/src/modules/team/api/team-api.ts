@@ -20,25 +20,65 @@ import {
   TeamDeletedSchema,
   TeamInvitePreviewSchema,
   TeamListSchema,
+  ResetTwoFactorInputSchema,
   TeamRolesSchema,
+  TeamTwoFactorRequirementSchema,
+  TeamTwoFactorResetSchema,
+  UpdateTeamTwoFactorRequirementBodySchema,
 } from "../schemas";
 
 // -----
 // /team and /groups need a signed-in tenant_admin; the engine checks it.
 // -----
-export const fetchTeam = createServerFn({ method: "GET" }).handler(async () => engineJson(TeamListSchema, "/team", {}, await engineAuth()));
+export const fetchTeam = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(TeamListSchema, "/team", {}, await engineAuth()),
+);
 
-export const fetchTeamRoles = createServerFn({ method: "GET" }).handler(async () => engineJson(TeamRolesSchema, "/team/roles", {}, await engineAuth()));
+export const fetchTeamRoles = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(TeamRolesSchema, "/team/roles", {}, await engineAuth()),
+);
+
+export const fetchTwoFactorRequirement = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(TeamTwoFactorRequirementSchema, "/team/two-factor-requirement", {}, await engineAuth()),
+);
+
+export const setTwoFactorRequirement = createServerFn({ method: "POST" })
+  .validator(UpdateTeamTwoFactorRequirementBodySchema)
+  .handler(async ({ data }) =>
+    engineJson(
+      TeamTwoFactorRequirementSchema,
+      "/team/two-factor-requirement",
+      { ...jsonPost(JSON.stringify(data)), method: "PUT" },
+      await engineAuth(),
+    ),
+  );
+
+export const resetMemberTwoFactor = createServerFn({ method: "POST" })
+  .validator(ResetTwoFactorInputSchema)
+  .handler(async ({ data }) =>
+    engineJson(
+      TeamTwoFactorResetSchema,
+      `/team/members/${data.partyId}/two-factor/reset`,
+      { method: "POST" },
+      await engineAuth(),
+    ),
+  );
 
 export const createTeamInvite = createServerFn({ method: "POST" })
   .validator(CreateInviteInputSchema)
-  .handler(async ({ data }) => engineJson(CreatedTeamInviteSchema, "/team/invites", jsonPost(JSON.stringify(data)), await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(CreatedTeamInviteSchema, "/team/invites", jsonPost(JSON.stringify(data)), await engineAuth()),
+  );
 
 export const revokeTeamInvite = createServerFn({ method: "POST" })
   .validator(RevokeInviteInputSchema)
-  .handler(async ({ data }) => engineJson(TeamDeletedSchema, `/team/invites/${data.inviteId}`, { method: "DELETE" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(TeamDeletedSchema, `/team/invites/${data.inviteId}`, { method: "DELETE" }, await engineAuth()),
+  );
 
-export const fetchGroups = createServerFn({ method: "GET" }).handler(async () => engineJson(GroupListSchema, "/groups", {}, await engineAuth()));
+export const fetchGroups = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(GroupListSchema, "/groups", {}, await engineAuth()),
+);
 
 export const createGroup = createServerFn({ method: "POST" })
   .validator(CreateGroupInputSchema)
@@ -46,19 +86,42 @@ export const createGroup = createServerFn({ method: "POST" })
 
 export const renameGroup = createServerFn({ method: "POST" })
   .validator(RenameGroupInputSchema)
-  .handler(async ({ data }) => engineJson(GroupSchema, `/groups/${data.groupId}`, { ...jsonPost(JSON.stringify({ name: data.name })), method: "PATCH" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(
+      GroupSchema,
+      `/groups/${data.groupId}`,
+      { ...jsonPost(JSON.stringify({ name: data.name })), method: "PATCH" },
+      await engineAuth(),
+    ),
+  );
 
 export const deleteGroup = createServerFn({ method: "POST" })
   .validator(GroupInputSchema)
-  .handler(async ({ data }) => engineJson(GroupDeletedSchema, `/groups/${data.groupId}`, { method: "DELETE" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(GroupDeletedSchema, `/groups/${data.groupId}`, { method: "DELETE" }, await engineAuth()),
+  );
 
 export const addGroupMember = createServerFn({ method: "POST" })
   .validator(GroupMemberInputSchema)
-  .handler(async ({ data }) => engineJson(GroupMemberSchema, `/groups/${data.groupId}/members/${data.partyId}`, { method: "PUT" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(
+      GroupMemberSchema,
+      `/groups/${data.groupId}/members/${data.partyId}`,
+      { method: "PUT" },
+      await engineAuth(),
+    ),
+  );
 
 export const removeGroupMember = createServerFn({ method: "POST" })
   .validator(GroupMemberInputSchema)
-  .handler(async ({ data }) => engineJson(GroupMemberSchema, `/groups/${data.groupId}/members/${data.partyId}`, { method: "DELETE" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(
+      GroupMemberSchema,
+      `/groups/${data.groupId}/members/${data.partyId}`,
+      { method: "DELETE" },
+      await engineAuth(),
+    ),
+  );
 
 // -----
 // The invitee's two routes are open: no session needed to read an invite.
@@ -66,13 +129,18 @@ export const removeGroupMember = createServerFn({ method: "POST" })
 // already has a login joins as themselves.
 // -----
 // oxlint-disable-next-line anti-slop/require-server-fn-session -- an invite link opens before sign-in
-export const previewTeamInvite =createServerFn({ method: "GET" })
+export const previewTeamInvite = createServerFn({ method: "GET" })
   .validator(InviteTokenInputSchema)
   .handler(async ({ data }) => engineJson(TeamInvitePreviewSchema, `/team/invites/${encodeURIComponent(data.token)}`));
 
 // oxlint-disable-next-line anti-slop/require-server-fn-session -- passes the session cookie only when there is one
-export const acceptTeamInvite =createServerFn({ method: "POST" })
+export const acceptTeamInvite = createServerFn({ method: "POST" })
   .validator(AcceptInviteInputSchema)
   .handler(async ({ data: { token, ...body } }) =>
-    engineJson(AcceptedTeamInviteSchema, `/team/invites/${encodeURIComponent(token)}/accept`, jsonPost(JSON.stringify(body)), { token: getCookie("elise_session") }),
+    engineJson(
+      AcceptedTeamInviteSchema,
+      `/team/invites/${encodeURIComponent(token)}/accept`,
+      jsonPost(JSON.stringify(body)),
+      { token: getCookie("elise_session") },
+    ),
   );

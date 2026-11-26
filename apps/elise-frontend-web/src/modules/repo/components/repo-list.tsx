@@ -16,6 +16,7 @@ import type { Repo } from "../schemas";
 import { repoAttention, repoName } from "../utils";
 import { RepoAddDialog } from "./repo-add-dialog";
 import { RepoOpenFindings } from "./repo-open-findings";
+import { RepoRemovedSection } from "./repo-removed-section";
 import { RepoSummary } from "./repo-summary";
 
 const SEARCH_FROM = 6;
@@ -31,7 +32,11 @@ const columns = column.columns([
       return (
         <span className="grid gap-0.5">
           <span className="flex items-center gap-2">
-            <Link to="/repos/$repoId" params={{ repoId: repo.id }} className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Link
+              to="/repos/$repoId"
+              params={{ repoId: repo.id }}
+              className="inline-flex min-h-6 items-center rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               {repoName(repo.url)}
             </Link>
             <GithubPrivateBadge isPrivate={repo.isPrivate} />
@@ -68,7 +73,11 @@ const columns = column.columns([
       );
     },
   }),
-  column.display({ id: "open", header: "Open findings", cell: ({ row }) => <RepoOpenFindings open={row.original.open} /> }),
+  column.display({
+    id: "open",
+    header: "Open findings",
+    cell: ({ row }) => <RepoOpenFindings open={row.original.open} />,
+  }),
   column.display({
     id: "last",
     header: "Last scan",
@@ -86,34 +95,50 @@ const columns = column.columns([
 export function RepoList() {
   const { data } = useSuspenseQuery(reposQuery());
   const [search, setSearch] = useState("");
-  const sorted = data.repos.toSorted((a, b) => repoAttention(b) - repoAttention(a) || (b.lastScanAt ?? "").localeCompare(a.lastScanAt ?? ""));
+  const sorted = data.repos.toSorted(
+    (a, b) => repoAttention(b) - repoAttention(a) || (b.lastScanAt ?? "").localeCompare(a.lastScanAt ?? ""),
+  );
   const query = search.trim().toLowerCase();
-  const visible = sorted.filter((repo) => query === "" || repo.canonical.toLowerCase().includes(query) || repoName(repo.url).toLowerCase().includes(query) || repo.branchNames.some((name) => name.toLowerCase().includes(query)));
+  const visible = sorted.filter(
+    (repo) =>
+      query === "" ||
+      repo.canonical.toLowerCase().includes(query) ||
+      repoName(repo.url).toLowerCase().includes(query) ||
+      repo.branchNames.some((name) => name.toLowerCase().includes(query)),
+  );
   const table = useTable({ features: dataTableFeatures, columns, data: visible, getRowId: (repo) => repo.id });
 
   if (data.repos.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Repositories</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Every repository you scan, with what is still open in it.</p>
-        </CardHeader>
-        <CardContent className="overflow-hidden p-0">
-          <Empty className="py-14">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <FolderGit2 />
-              </EmptyMedia>
-              <EmptyTitle>No repositories yet</EmptyTitle>
-              <EmptyDescription>A repository appears here after its first scan, with every finding it has had and what happened to each.</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <RepoAddDialog label="Add a repository" size="default" variant="default" />
-              <ScanNewDialog label="Start your first audit" size="default" variant="outline" />
-            </EmptyContent>
-          </Empty>
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardHeader>
+            <CardTitle>Repositories</CardTitle>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Every repository you scan, with what is still open in it.
+            </p>
+          </CardHeader>
+          <CardContent className="overflow-hidden p-0">
+            <Empty className="py-14">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FolderGit2 />
+                </EmptyMedia>
+                <EmptyTitle>No repositories yet</EmptyTitle>
+                <EmptyDescription>
+                  A repository appears here after its first scan, with every finding it has had and what happened to
+                  each.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <RepoAddDialog label="Add a repository" size="default" variant="default" />
+                <ScanNewDialog label="Start your first audit" size="default" variant="outline" />
+              </EmptyContent>
+            </Empty>
+          </CardContent>
+        </Card>
+        <RepoRemovedSection />
+      </>
     );
   }
 
@@ -124,14 +149,23 @@ export function RepoList() {
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <div className="grid gap-1.5">
             <CardTitle>All repositories</CardTitle>
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Sorted by what needs attention first: findings that came back, then the most severe.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Sorted by what needs attention first: findings that came back, then the most severe.
+            </p>
           </div>
           <ShellListCount shown={visible.length} total={sorted.length} noun="repository" plural="repositories" />
         </CardHeader>
         <CardContent className="overflow-hidden p-0">
           {sorted.length >= SEARCH_FROM && (
             <ShellFilterBar className="justify-end">
-              <ShellSearchField id="repo-search" name="search" label="Search repositories and branches by name" placeholder="Search by repository or branch" value={search} onChange={(event) => setSearch(event.target.value)} />
+              <ShellSearchField
+                id="repo-search"
+                name="search"
+                label="Search repositories and branches by name"
+                placeholder="Search by repository or branch"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
             </ShellFilterBar>
           )}
           {visible.length === 0 ? (
@@ -154,6 +188,7 @@ export function RepoList() {
           )}
         </CardContent>
       </Card>
+      <RepoRemovedSection />
     </>
   );
 }

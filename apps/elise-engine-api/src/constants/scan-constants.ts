@@ -13,7 +13,10 @@ export { SCAN_EFFORTS, SCAN_MODELS, SCAN_PROFILES, SCAN_SKILLS } from "@repo/con
 // first real Scans (#142). MAX_BUDGET_FULL_USD guards the table: a
 // profile whose cap is above it refuses its Scans before any hold.
 // -----
-export const SCAN_PROFILE_CAPS_USD = { quick: 6, standard: 12, deep: 18 } as const satisfies Record<(typeof SCAN_PROFILES)[number], number>;
+export const SCAN_PROFILE_CAPS_USD = { quick: 12, standard: 24, deep: 50 } as const satisfies Record<
+  (typeof SCAN_PROFILES)[number],
+  number
+>;
 
 // -----
 // Saved files

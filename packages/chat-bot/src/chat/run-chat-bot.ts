@@ -107,48 +107,38 @@ function streamSubagent(
         chunk.type !== EventType.MESSAGES_SNAPSHOT,
     ),
     Stream.mapEffect((chunk) =>
-      chunk.type === EventType.RUN_ERROR
-        ? Effect.fail(toModelError(chunk.message))
-        : Effect.succeed(chunk),
+      chunk.type === EventType.RUN_ERROR ? Effect.fail(toModelError(chunk.message)) : Effect.succeed(chunk),
     ),
     Stream.tap((chunk) =>
-      chunk.type === EventType.TEXT_MESSAGE_CONTENT
-        ? Ref.update(reply, (text) => text + chunk.delta)
-        : Effect.void,
+      chunk.type === EventType.TEXT_MESSAGE_CONTENT ? Ref.update(reply, (text) => text + chunk.delta) : Effect.void,
     ),
     Stream.map((chunk): StreamChunk => ({ ...chunk, subagentRunId })),
   );
 
-  return Stream.sync(
-    (): StreamChunk => ({
-      type: EventType.SUBAGENT_STARTED,
-      subagentRunId,
-      name: subagent.name,
-      description: subagent.description,
-      timestamp: new Date().getTime(),
-    }),
-  ).pipe(
+  return Stream.sync((): StreamChunk => ({
+    type: EventType.SUBAGENT_STARTED,
+    subagentRunId,
+    name: subagent.name,
+    description: subagent.description,
+    timestamp: new Date().getTime(),
+  })).pipe(
     Stream.concat(body),
     Stream.concat(
-      Stream.sync(
-        (): StreamChunk => ({
-          type: EventType.SUBAGENT_FINISHED,
-          subagentRunId,
-          timestamp: new Date().getTime(),
-        }),
-      ),
+      Stream.sync((): StreamChunk => ({
+        type: EventType.SUBAGENT_FINISHED,
+        subagentRunId,
+        timestamp: new Date().getTime(),
+      })),
     ),
     Stream.catchTag("ChatBotModelError", (error) =>
       Stream.fromEffect(
         Ref.set(reply, "").pipe(
-          Effect.map(
-            (): StreamChunk => ({
-              type: EventType.SUBAGENT_ERROR,
-              subagentRunId,
-              message: error.message,
-              timestamp: new Date().getTime(),
-            }),
-          ),
+          Effect.map((): StreamChunk => ({
+            type: EventType.SUBAGENT_ERROR,
+            subagentRunId,
+            message: error.message,
+            timestamp: new Date().getTime(),
+          })),
         ),
       ),
     ),
@@ -215,9 +205,7 @@ export function runChatBot(
           }),
         ),
       );
-      return streamSubagent(run, subagent, input.messages, input.runtime, budget, reply).pipe(
-        Stream.concat(main),
-      );
+      return streamSubagent(run, subagent, input.messages, input.runtime, budget, reply).pipe(Stream.concat(main));
     }),
   );
 }

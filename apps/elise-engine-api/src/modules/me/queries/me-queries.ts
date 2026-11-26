@@ -15,6 +15,7 @@ import {
 import type { AccessPower, Me, MeAccount } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { twoFactorStatusEffect } from "#/modules/two-factor";
 
 // -----
 // The login, the type of its Party, the Accounts
@@ -89,7 +90,11 @@ export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me
       catch: toDbError,
     });
 
+    const twoFactor = yield* twoFactorStatusEffect(db, userId);
+
     return {
+      twoFactorEnabled: twoFactor.enabled,
+      twoFactorSetupRequired: twoFactor.setupRequired,
       user: { id: login.id, name: login.name, email: login.email, partyId: login.partyId },
       partyType: login.partyType,
       isSuperuser: staff.length > 0,
@@ -101,7 +106,11 @@ export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me
 // Does this login hold a Role in this Account?
 // The guard for a signed-in caller of /scans.
 // -----
-export const userHasAccountEffect = (db: DbConnectType, userId: string, accountId: string): Effect.Effect<boolean, DbError> =>
+export const userHasAccountEffect = (
+  db: DbConnectType,
+  userId: string,
+  accountId: string,
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
@@ -138,7 +147,12 @@ export const listLoginsWithPowerEffect = (
 // the Powers granted to its Master Role. The guard for its team,
 // groups, GitHub connection and accepted risks.
 // -----
-export const userHasPowerEffect = (db: DbConnectType, userId: string, accountId: string, power: AccessPower): Effect.Effect<boolean, DbError> =>
+export const userHasPowerEffect = (
+  db: DbConnectType,
+  userId: string,
+  accountId: string,
+  power: AccessPower,
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: () =>
       db

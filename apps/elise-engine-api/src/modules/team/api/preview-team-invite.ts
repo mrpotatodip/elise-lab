@@ -15,10 +15,16 @@ const app = new Hono<AppEnv>();
 // before any Account is known, so there is no app.tenant_id
 // to set and the invite tables' policy would hide every row.
 // -----
-app.get("/invites/:token", previewTeamInviteDoc, requireInviteLimit, zValidator("param", TeamInviteTokenParamSchema), async (c) => {
-  const { token } = c.req.valid("param");
-  const data = await runEffect(previewInviteSvc(dbConnect(c.env.DATABASE_URL), token));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/invites/:token",
+  previewTeamInviteDoc,
+  requireInviteLimit,
+  zValidator("param", TeamInviteTokenParamSchema),
+  async (c) => {
+    const { token } = c.req.valid("param");
+    const data = await runEffect(previewInviteSvc(dbConnect(c.env.DATABASE_URL), token));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

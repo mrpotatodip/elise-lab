@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { RUNNER_PAIRING_ALPHABET, RUNNER_PAIRING_CODE_LENGTH } from "#/modules/runners/constants";
-import { bearerTokenOf, generatePairingCode, generateRunnerToken, hashPairingCode, normalizePairingCode } from "#/modules/runners/utils";
+import {
+  bearerTokenOf,
+  generatePairingCode,
+  generateRunnerToken,
+  hashPairingCode,
+  normalizePairingCode,
+} from "#/modules/runners/utils";
 
 describe("pairing codes", () => {
   it("are three groups of four from the safe alphabet", () => {
@@ -11,10 +17,13 @@ describe("pairing codes", () => {
     expect(RUNNER_PAIRING_CODE_LENGTH * Math.log2(RUNNER_PAIRING_ALPHABET.length)).toBeGreaterThanOrEqual(60);
   });
 
-  it.each(["k7qm-4txd-9wpa", "K7QM4TXD9WPA", " k7qm 4txd 9wpa ", "K7QM-4TXD-9WPA"])("find one hash however %j is typed", async (typed) => {
-    expect(normalizePairingCode(typed)).toBe("K7QM4TXD9WPA");
-    expect(await hashPairingCode(typed)).toBe(await hashPairingCode("K7QM-4TXD-9WPA"));
-  });
+  it.each(["k7qm-4txd-9wpa", "K7QM4TXD9WPA", " k7qm 4txd 9wpa ", "K7QM-4TXD-9WPA"])(
+    "find one hash however %j is typed",
+    async (typed) => {
+      expect(normalizePairingCode(typed)).toBe("K7QM4TXD9WPA");
+      expect(await hashPairingCode(typed)).toBe(await hashPairingCode("K7QM-4TXD-9WPA"));
+    },
+  );
 });
 
 describe("runner tokens", () => {

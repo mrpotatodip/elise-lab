@@ -1,10 +1,6 @@
 import { Data, Effect } from "effect";
 import type { z } from "zod";
-import {
-  ChatBotJsonSchema,
-  type ChatBotJson,
-  type ChatBotToolError,
-} from "../contracts";
+import { ChatBotJsonSchema, type ChatBotJson, type ChatBotToolError } from "../contracts";
 import {
   CHAT_BOT_TOOL_DEFAULT_TIMEOUT_MS,
   CHAT_BOT_TOOL_ERROR_FAILED,
@@ -12,12 +8,7 @@ import {
   CHAT_BOT_TOOL_ERROR_TIMED_OUT,
   CHAT_BOT_TOOL_ERROR_UNEXPECTED_RESPONSE,
 } from "../constants";
-import type {
-  ChatBotRuntime,
-  ChatBotServices,
-  ChatBotToolConfig,
-  ChatBotToolSpec,
-} from "../types";
+import type { ChatBotRuntime, ChatBotServices, ChatBotToolConfig, ChatBotToolSpec } from "../types";
 
 class ChatBotToolFailure extends Data.TaggedError("ChatBotToolFailure")<{
   reason: string;
@@ -49,11 +40,7 @@ function toToolFailure(
 // One call: check input, run the function
 // under a timeout, check the result.
 // -----
-function callChatBotTool<
-  TInput extends z.ZodType,
-  TOutput extends z.ZodType,
-  S extends ChatBotServices,
->(
+function callChatBotTool<TInput extends z.ZodType, TOutput extends z.ZodType, S extends ChatBotServices>(
   config: ChatBotToolConfig<TInput, TOutput, S>,
   input: ChatBotJson,
   runtime: ChatBotRuntime<S>,
@@ -91,11 +78,7 @@ function callChatBotTool<
 // server did not log yet. Paths and codes only:
 // the values are the customer's.
 // -----
-function logToolRejection(
-  name: string,
-  runtime: { threadId?: string },
-  failure: ChatBotToolFailure,
-) {
+function logToolRejection(name: string, runtime: { threadId?: string }, failure: ChatBotToolFailure) {
   if (failure.reason === CHAT_BOT_TOOL_ERROR_FAILED) return;
   console.error("chat-bot: tool call rejected", {
     tool: name,

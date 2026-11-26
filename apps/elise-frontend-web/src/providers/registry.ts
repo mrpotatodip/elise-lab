@@ -32,11 +32,13 @@ export const SOURCE_PROVIDER_LIST: readonly SourceProvider[] = SOURCE_PROVIDER_V
 
 export const sourceProviderOf = (id: SourceProviderId): SourceProvider => SOURCE_PROVIDERS[id];
 
-export const isGitSourceProvider = (provider: SourceProvider): provider is GitSourceProvider => provider.address !== null;
+export const isGitSourceProvider = (provider: SourceProvider): provider is GitSourceProvider =>
+  provider.address !== null;
 
 // -----
 // The git provider whose strict pattern an address meets, or
 // null. The patterns do not overlap: gitlab-sh refuses
 // github.com and gitlab.com.
 // -----
-export const sourceProviderOfAddress = (address: string): GitSourceProvider | null => SOURCE_PROVIDER_LIST.filter(isGitSourceProvider).find((provider) => provider.address.pattern.test(address)) ?? null;
+export const sourceProviderOfAddress = (address: string): GitSourceProvider | null =>
+  SOURCE_PROVIDER_LIST.filter(isGitSourceProvider).find((provider) => provider.address.pattern.test(address)) ?? null;

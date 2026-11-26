@@ -1,6 +1,15 @@
 import { describeRoute } from "hono-openapi";
 import { FindingCommentSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const deleteFindingCommentDoc = describeRoute({
   tags: ["findings"],
@@ -18,8 +27,15 @@ export const deleteFindingCommentDoc = describeRoute({
     ],
     example: [
       "Delete a comment:",
-      bash(`curl -X DELETE ${EXAMPLE_BASE_URL}/findings/comments/$COMMENT_ID \\`, '  -H "authorization: Bearer $SESSION_TOKEN" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`),
+      bash(
+        `curl -X DELETE ${EXAMPLE_BASE_URL}/findings/comments/$COMMENT_ID \\`,
+        '  -H "authorization: Bearer $SESSION_TOKEN" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
     ],
   }),
-  responses: { 200: jsonResponse("The comment as a deleted marker, with no body.", envelope(FindingCommentSchema)), ...errorResponses(400, 401, 403, 404, 409) },
+  responses: {
+    200: jsonResponse("The comment as a deleted marker, with no body.", envelope(FindingCommentSchema)),
+    ...errorResponses(400, 401, 403, 404, 409),
+  },
 });

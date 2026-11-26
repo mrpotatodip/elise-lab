@@ -88,30 +88,20 @@ function broadTypeKind(type: ESTree.TSType): BroadTypeKind | null {
   return isBroadRecordType(unwrapped) ? "record" : null;
 }
 
-function assertedExpression(
-  node: ESTree.TSAsExpression | ESTree.TSTypeAssertion,
-): ESTree.Expression {
+function assertedExpression(node: ESTree.TSAsExpression | ESTree.TSTypeAssertion): ESTree.Expression {
   return unwrapExpressionParentheses(node.expression);
 }
 
-function assertionFromExpression(
-  expression: ESTree.Expression,
-): ESTree.TSAsExpression | ESTree.TSTypeAssertion | null {
+function assertionFromExpression(expression: ESTree.Expression): ESTree.TSAsExpression | ESTree.TSTypeAssertion | null {
   const unwrapped = unwrapExpressionParentheses(expression);
-  return unwrapped.type === "TSAsExpression" || unwrapped.type === "TSTypeAssertion"
-    ? unwrapped
-    : null;
+  return unwrapped.type === "TSAsExpression" || unwrapped.type === "TSTypeAssertion" ? unwrapped : null;
 }
 
 function normalizedTypeText(sourceText: string, type: ESTree.TSType): string {
   return sourceText.slice(type.start, type.end).replaceAll(/\s+/gu, "");
 }
 
-function typesHaveSameSyntax(
-  sourceText: string,
-  left: ESTree.TSType | null,
-  right: ESTree.TSType,
-): boolean {
+function typesHaveSameSyntax(sourceText: string, left: ESTree.TSType | null, right: ESTree.TSType): boolean {
   return (
     left !== null &&
     normalizedTypeText(sourceText, unwrapTypeParentheses(left)) ===
@@ -154,9 +144,7 @@ function isDefinitelyNarrowerRecordType(type: ESTree.TSType): boolean {
   if (typeReferenceName(unwrapped) !== "Record") return false;
 
   const parameters = unwrapped.typeArguments?.params ?? [];
-  return (
-    parameters.length === 2 && parameters[1] !== undefined && !isUnknownOrAnyType(parameters[1])
-  );
+  return parameters.length === 2 && parameters[1] !== undefined && !isUnknownOrAnyType(parameters[1]);
 }
 
 function functionBoundary(node: ESTree.Node): ESTree.Node | null {
@@ -179,9 +167,7 @@ function resolvedVariableForIdentifier(
 ): Variable | null {
   for (const scope of scopes) {
     const reference = scope.references.find(
-      (candidate) =>
-        candidate.identifier.start === identifier.start &&
-        candidate.identifier.end === identifier.end,
+      (candidate) => candidate.identifier.start === identifier.start && candidate.identifier.end === identifier.end,
     );
     if (reference !== undefined) return reference.resolved;
   }
@@ -252,12 +238,7 @@ function knownValueEvidence(
     return null;
   }
 
-  return knownValueEvidence(
-    declarator.init,
-    scopes,
-    boundary,
-    new Set([...visitedVariables, variable]),
-  );
+  return knownValueEvidence(declarator.init, scopes, boundary, new Set([...visitedVariables, variable]));
 }
 
 function widenedBinding(
@@ -338,12 +319,7 @@ export const noWidenThenAssertRule = defineRule({
         widened === null ||
         node.start <= widened.declaredAt ||
         functionBoundary(node) !== widened.boundary ||
-        !assertionIsNarrower(
-          context.sourceCode.text,
-          widened.broadKind,
-          widened.evidence,
-          node.typeAnnotation,
-        )
+        !assertionIsNarrower(context.sourceCode.text, widened.broadKind, widened.evidence, node.typeAnnotation)
       ) {
         return;
       }

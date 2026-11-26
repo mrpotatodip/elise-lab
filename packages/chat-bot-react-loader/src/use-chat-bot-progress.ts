@@ -29,9 +29,7 @@ function reduce(state: AGUILoadingStackedState, action: Action): AGUILoadingStac
   // ignores stragglers.
   // -----
   const startsTurn = state.status === "idle" || event.type === EventType.RUN_STARTED;
-  const base = startsTurn
-    ? aguiLoadingStackedReducer(initialAGUILoadingStackedState, TURN_STARTED)
-    : state;
+  const base = startsTurn ? aguiLoadingStackedReducer(initialAGUILoadingStackedState, TURN_STARTED) : state;
   return aguiLoadingStackedReducer(base, event);
 }
 

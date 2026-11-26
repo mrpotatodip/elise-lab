@@ -15,7 +15,12 @@ export type ScanCheckout = { commitSha: string | null; branch: string | null };
 // -----
 // What the Outbound proxy counts for one scan
 // -----
-export type MeteredTokens = { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
+export type MeteredTokens = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+};
 // -----
 // reservedUsd is what calls still in flight may yet cost; a meter
 // stored before it existed has none.

@@ -18,7 +18,14 @@ function Code({ code }: { code: string }) {
   const block = isBlock(code);
 
   return (
-    <code className={cn("font-mono text-[0.9em] leading-relaxed", block ? "my-2 block whitespace-pre-wrap rounded-md border bg-background px-3 py-2.5 [overflow-wrap:anywhere]" : "rounded bg-background px-1 py-0.5 [overflow-wrap:anywhere]")}>
+    <code
+      className={cn(
+        "font-mono text-[0.9em] leading-relaxed",
+        block
+          ? "my-2 block whitespace-pre-wrap rounded-md border bg-background px-3 py-2.5 [overflow-wrap:anywhere]"
+          : "rounded bg-background px-1 py-0.5 [overflow-wrap:anywhere]",
+      )}
+    >
       {highlightCode(code).map((token, index) => (
         <span key={`${index}-${token.value}`} className={token.className ? `th-${token.className}` : undefined}>
           {token.value}
@@ -31,7 +38,10 @@ function Code({ code }: { code: string }) {
 function Prose({ text }: { text: string }) {
   return text.split(FILE_REFERENCE).map((part, index) =>
     index % 2 === 1 ? (
-      <code key={`${index}-${part}`} className="rounded bg-background px-1 py-0.5 font-mono text-[0.9em] font-medium [overflow-wrap:anywhere]">
+      <code
+        key={`${index}-${part}`}
+        className="rounded bg-background px-1 py-0.5 font-mono text-[0.9em] font-medium [overflow-wrap:anywhere]"
+      >
         {part}
       </code>
     ) : (
@@ -51,7 +61,13 @@ export function ScanEvidence({ text }: { text: string }) {
       <style href="tanstack-highlight" precedence="default">
         {highlightThemeCss}
       </style>
-      {parseEvidence(text).map((piece, index) => (piece.kind === "code" ? <Code key={`${index}-${piece.value}`} code={piece.value} /> : <Prose key={`${index}-${piece.value}`} text={piece.value} />))}
+      {parseEvidence(text).map((piece, index) =>
+        piece.kind === "code" ? (
+          <Code key={`${index}-${piece.value}`} code={piece.value} />
+        ) : (
+          <Prose key={`${index}-${piece.value}`} text={piece.value} />
+        ),
+      )}
     </div>
   );
 }

@@ -1,14 +1,31 @@
 import { Effect } from "effect";
-import { RUNNER_JOB_SOURCE_VALUES, type RunnerJob, type RunnerJobResultBody, type RunnerJobState } from "@repo/contracts/elise";
-import { SCAN_PROFILE_CAPS_USD, SCAN_REPORT_FILES } from "#/constants";
+import {
+  RUNNER_JOB_SOURCE_VALUES,
+  type RunnerJob,
+  type RunnerJobResultBody,
+  type RunnerJobState,
+} from "@repo/contracts/elise";
+import { SCAN_REPORT_FILES } from "#/constants";
 import type { DbConnectType } from "#/lib/db-connection";
 import { NotFound, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import type { ScanFiles } from "#/lib/scan-file-types";
 import { ScanOptionsSchema } from "#/schemas";
 import { normalizeBranchName } from "#/modules/branches";
 import { SCAN_SANDBOX_FULL_PHASES, buildPhasePrompt, parseAgentUsage } from "#/modules/scan-sandbox";
-import { RUNNER_JOB_ARCHIVE_REMOVED, RUNNER_JOB_BAD_OPTIONS, RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_FOUND, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
-import { claimRunnerJobEffect, readRunnerJobEffect, recordRunnerSourcesEffect, reportRunnerJobEffect } from "#/modules/runners/queries";
+import {
+  RUNNER_JOB_ARCHIVE_REMOVED,
+  RUNNER_JOB_BAD_OPTIONS,
+  RUNNER_JOB_NO_REPORT,
+  RUNNER_JOB_NOT_FOUND,
+  RUNNER_PROMPT_PLACE,
+} from "#/modules/runners/constants";
+import {
+  claimRunnerJobEffect,
+  earlierScanIdsEffect,
+  readRunnerJobEffect,
+  recordRunnerSourcesEffect,
+  reportRunnerJobEffect,
+} from "#/modules/runners/queries";
 import { archiveKeyEffect, scanArchiveOfEffect } from "#/modules/archives/queries";
 import { sourceProviderOf } from "#/providers/registry";
 
@@ -30,17 +47,41 @@ const UPLOAD_BRANCH = sourceProviderOf("upload").fixedBranch;
 // upload Scan can be refused before it is queued, and an archive
 // job goes only to a Runner that reads archives.
 // -----
-export const claimJobSvc = (db: DbConnectType, runnerId: string, reported?: readonly string[]): Effect.Effect<RunnerJob | null, DbError> =>
+export const claimJobSvc = (
+  db: DbConnectType,
+  runnerId: string,
+  reported?: readonly string[],
+): Effect.Effect<RunnerJob | null, DbError> =>
   Effect.gen(function* () {
     const sources = RUNNER_JOB_SOURCE_VALUES.filter((source) => source === "git" || reported?.includes(source));
     yield* recordRunnerSourcesEffect(db, runnerId, sources);
     return yield* claimNextJob(db, runnerId, sources.includes("archive"));
   });
 
-const failClaimed = (db: DbConnectType, runnerId: string, scanId: string, error: string, now: Date): Effect.Effect<boolean, DbError> =>
-  reportRunnerJobEffect(db, { scanId, runnerId, state: "failed", error, commitSha: null, branch: null, usageJson: null, filesJson: "{}", now });
+const failClaimed = (
+  db: DbConnectType,
+  runnerId: string,
+  scanId: string,
+  error: string,
+  now: Date,
+): Effect.Effect<boolean, DbError> =>
+  reportRunnerJobEffect(db, {
+    scanId,
+    runnerId,
+    state: "failed",
+    error,
+    commitSha: null,
+    branch: null,
+    usageJson: null,
+    filesJson: "{}",
+    now,
+  });
 
-const claimNextJob = (db: DbConnectType, runnerId: string, readsArchive: boolean): Effect.Effect<RunnerJob | null, DbError> =>
+const claimNextJob = (
+  db: DbConnectType,
+  runnerId: string,
+  readsArchive: boolean,
+): Effect.Effect<RunnerJob | null, DbError> =>
   Effect.gen(function* () {
     const now = new Date();
     const row = yield* claimRunnerJobEffect(db, runnerId, now, readsArchive);
@@ -55,7 +96,7 @@ const claimNextJob = (db: DbConnectType, runnerId: string, readsArchive: boolean
       yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_ARCHIVE_REMOVED, now);
       return yield* claimNextJob(db, runnerId, readsArchive);
     }
-    return {
+    const job: RunnerJob = {
       scanId: row.scanId,
       repo: row.repoUrl,
       source: archive?.id ? { kind: "archive" as const, archiveId: archive.id } : { kind: "git" as const },
@@ -64,12 +105,22 @@ const claimNextJob = (db: DbConnectType, runnerId: string, readsArchive: boolean
       model: options.value.model,
       effort: options.value.effort,
       profile: options.value.profile,
-      profileCapUsd: SCAN_PROFILE_CAPS_USD[options.value.profile],
+      profileCapUsd: options.value.maxBudgetUsd,
       maxBudgetUsd: options.value.maxBudgetUsd,
+      scopePaths: options.value.scopePaths,
       prompt: row.prompt,
-      phasePrompts: SCAN_SANDBOX_FULL_PHASES.map((phase) => ({ phase, prompt: buildPhasePrompt(options.value, phase, RUNNER_PROMPT_PLACE) })),
+      phasePrompts: SCAN_SANDBOX_FULL_PHASES.map((phase) => ({
+        phase,
+        prompt: buildPhasePrompt(options.value, phase, RUNNER_PROMPT_PLACE),
+      })),
       priorsJson: row.priorsJson,
     };
+    if (row.resumesScanId !== null) {
+      job.resume = true;
+      job.resumesScanId = row.resumesScanId;
+      job.earlierScanIds = yield* earlierScanIdsEffect(db, row.tenantId, row.resumesScanId);
+    }
+    return job;
   });
 
 // -----
@@ -80,19 +131,30 @@ const claimNextJob = (db: DbConnectType, runnerId: string, readsArchive: boolean
 // since (its link's archive id is null, or the bytes are gone)
 // says so.
 // -----
-export const jobArchiveSvc = (db: DbConnectType, reports: R2Bucket, runnerId: string, scanId: string): Effect.Effect<{ body: R2ObjectBody["body"] }, NotFound | DbError | ExternalError> =>
+export const jobArchiveSvc = (
+  db: DbConnectType,
+  reports: R2Bucket,
+  runnerId: string,
+  scanId: string,
+): Effect.Effect<{ body: R2ObjectBody["body"] }, NotFound | DbError | ExternalError> =>
   Effect.gen(function* () {
     const job = yield* readRunnerJobEffect(db, scanId);
-    if (job === null || job.runnerId !== runnerId || job.state !== "claimed") return yield* new NotFound({ message: RUNNER_JOB_NOT_FOUND });
+    if (job === null || job.runnerId !== runnerId || job.state !== "claimed")
+      return yield* new NotFound({ message: RUNNER_JOB_NOT_FOUND });
     const archive = yield* scanArchiveOfEffect(db, scanId);
     if (archive === null) return yield* new NotFound({ message: RUNNER_JOB_NOT_FOUND });
     const key = archive.id === null ? null : yield* archiveKeyEffect(db, archive.id);
-    const object = key === null ? null : yield* Effect.tryPromise({ try: () => reports.get(key), catch: toExternalError });
+    const object =
+      key === null ? null : yield* Effect.tryPromise({ try: () => reports.get(key), catch: toExternalError });
     if (object === null) return yield* new NotFound({ message: RUNNER_JOB_ARCHIVE_REMOVED });
     return { body: object.body };
   });
 
-export const jobStateSvc = (db: DbConnectType, runnerId: string, scanId: string): Effect.Effect<RunnerJobState, NotFound | DbError> =>
+export const jobStateSvc = (
+  db: DbConnectType,
+  runnerId: string,
+  scanId: string,
+): Effect.Effect<RunnerJobState, NotFound | DbError> =>
   Effect.gen(function* () {
     const job = yield* readRunnerJobEffect(db, scanId);
     if (job === null || job.runnerId !== runnerId) return yield* new NotFound({ message: RUNNER_JOB_NOT_FOUND });
@@ -129,10 +191,16 @@ const branchOf = (ref: string | null, checkout: RunnerJobResultBody["checkout"])
 // on the person's own Claude, takes no credit hold, settles
 // nothing, and the month's spend leaves it out.
 // -----
-export const reportJobSvc = (db: DbConnectType, runnerId: string, scanId: string, body: RunnerJobResultBody): Effect.Effect<{ accepted: true }, NotFound | DbError> =>
+export const reportJobSvc = (
+  db: DbConnectType,
+  runnerId: string,
+  scanId: string,
+  body: RunnerJobResultBody,
+): Effect.Effect<{ accepted: true }, NotFound | DbError> =>
   Effect.gen(function* () {
     const job = yield* readRunnerJobEffect(db, scanId);
-    if (job === null || job.runnerId !== runnerId) return yield* Effect.fail(new NotFound({ message: RUNNER_JOB_NOT_FOUND }));
+    if (job === null || job.runnerId !== runnerId)
+      return yield* Effect.fail(new NotFound({ message: RUNNER_JOB_NOT_FOUND }));
 
     const files = keptFiles(body.files);
     const succeeded = body.state === "succeeded" && files["REPORT.md"] !== undefined;

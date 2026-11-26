@@ -10,12 +10,21 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.delete("/invites/:inviteId", revokeTeamInviteDoc, requirePower("company:team:invites:delete"), zValidator("header", AccountHeaderSchema), zValidator("param", TeamInviteParamSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { inviteId } = c.req.valid("param");
-  const userId = userIdOf(c);
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(revokeInviteSvc(db, accountId, userId, inviteId)));
-  return c.json({ data, error: null });
-});
+app.delete(
+  "/invites/:inviteId",
+  revokeTeamInviteDoc,
+  requirePower("company:team:invites:delete"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", TeamInviteParamSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { inviteId } = c.req.valid("param");
+    const userId = userIdOf(c);
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(revokeInviteSvc(db, accountId, userId, inviteId)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

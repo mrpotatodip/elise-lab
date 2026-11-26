@@ -1,4 +1,5 @@
 mod engine;
+pub mod find;
 pub mod git_access;
 mod git_token;
 mod live;

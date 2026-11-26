@@ -19,9 +19,7 @@ describe("ChatBotOutputSchema", () => {
   });
 
   it("drops fields the model should no longer send", () => {
-    expect(
-      ChatBotOutputSchema.parse({ answer: "Hi.", kind: "none", structure: {} }),
-    ).toEqual({ answer: "Hi." });
+    expect(ChatBotOutputSchema.parse({ answer: "Hi.", kind: "none", structure: {} })).toEqual({ answer: "Hi." });
   });
 
   it("sends the model only an answer field", () => {

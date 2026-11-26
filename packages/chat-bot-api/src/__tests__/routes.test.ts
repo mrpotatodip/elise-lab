@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import { Effect } from "effect";
 import { EventType, type StreamChunk } from "@tanstack/ai";
-import {
-  createChatBotDurableStream,
-  memoryChatBotDurableStreamStore,
-} from "@repo/chat-bot-durable-stream";
+import { createChatBotDurableStream, memoryChatBotDurableStreamStore } from "@repo/chat-bot-durable-stream";
 import { createChatBot, type ChatBotAgent, type ChatBotOwner, type ChatBotRunner } from "../index";
 import { createChatBotRoutes } from "../hono";
 import { createMemoryChatBotStore } from "../memory";
@@ -139,12 +136,7 @@ describe("createChatBotRoutes", () => {
 
     const read = await (await app.request(`/chat/threads/${threadId}`)).json();
     expect(second.headers.get("x-thread-id")).toBe(threadId);
-    expect(read.data.messages.map((m: { content: string }) => m.content)).toEqual([
-      "Hello",
-      "Hello",
-      "Again",
-      "Hello",
-    ]);
+    expect(read.data.messages.map((m: { content: string }) => m.content)).toEqual(["Hello", "Hello", "Again", "Hello"]);
   });
 
   it("refuses a message list with no user text", async () => {

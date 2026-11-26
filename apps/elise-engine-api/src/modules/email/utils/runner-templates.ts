@@ -1,9 +1,14 @@
 import type { RunnerNames, RunnerNoticeEmail } from "#/modules/email/types";
 import { renderEmailLayout } from "./layout";
 
-const utcOf = (at: string) => `${new Date(at).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" })} UTC`;
+const utcOf = (at: string) =>
+  `${new Date(at).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" })} UTC`;
 
-const runnerNotice = (mail: RunnerNoticeEmail, names: RunnerNames, wording: { verb: string; heading: string; consequence: string; actorLabel: string }) =>
+const runnerNotice = (
+  mail: RunnerNoticeEmail,
+  names: RunnerNames,
+  wording: { verb: string; heading: string; consequence: string; actorLabel: string },
+) =>
   renderEmailLayout({
     subject: `${wording.heading}: ${names.runnerName}`,
     preheader: `${names.actorName} ${wording.verb} the Runner ${names.runnerName} in ${names.accountName}.`,
@@ -21,7 +26,8 @@ const runnerNotice = (mail: RunnerNoticeEmail, names: RunnerNames, wording: { ve
       { label: "When", value: utcOf(mail.at) },
     ],
     button: { label: "Open Runners", url: mail.link },
-    footer: "If this was not you or someone you expect, open Runners and check the list, then change your password. This is a security notice: you get it whatever your email settings.",
+    footer:
+      "If this was not you or someone you expect, open Runners and check the list, then change your password. This is a security notice: you get it whatever your email settings.",
   });
 
 export const renderRunnerAdded = (mail: RunnerNoticeEmail, names: RunnerNames) =>

@@ -1,9 +1,5 @@
 import type { StreamChunk } from "@tanstack/ai";
-import type {
-  ChatBotDurableStreamKey,
-  ChatBotDurableStreamRow,
-  ChatBotDurableStreamStore,
-} from "./types";
+import type { ChatBotDurableStreamKey, ChatBotDurableStreamRow, ChatBotDurableStreamStore } from "./types";
 
 const toId = (key: ChatBotDurableStreamKey) => `${key.streamPrefix}\u0000${key.runId}`;
 

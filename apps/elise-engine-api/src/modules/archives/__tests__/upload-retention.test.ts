@@ -13,7 +13,10 @@ let appId = "";
 beforeAll(async () => {
   test = await openTestDb();
   tenantId = (await seedTenant(test, "acme")).tenantId;
-  const [created] = await test.raw.insert(scanRepos).values({ tenantId, provider: "upload", host: null, canonical: "billing", url: "Billing", defaultBranch: "upload" }).returning();
+  const [created] = await test.raw
+    .insert(scanRepos)
+    .values({ tenantId, provider: "upload", host: null, canonical: "billing", url: "Billing", defaultBranch: "upload" })
+    .returning();
   appId = created.id;
 });
 
@@ -31,18 +34,39 @@ describe("the upload retention sweep", () => {
     const zips = { unscannedOld: daysAgo(31), scannedOld: daysAgo(31), unscannedYoung: daysAgo(29) };
     const keyOf = (label: string) => `accounts/${tenantId}/uploads/${appId}/${label}.zip`;
     for (const [label, at] of Object.entries(zips)) {
-      await test.raw.insert(scanUploadArchives).values({ tenantId, repoId: appId, label, r2Key: keyOf(label), sizeBytes: 10, contentSha256: "c".repeat(64), uploadedAt: at });
+      await test.raw.insert(scanUploadArchives).values({
+        tenantId,
+        repoId: appId,
+        label,
+        r2Key: keyOf(label),
+        sizeBytes: 10,
+        contentSha256: "c".repeat(64),
+        uploadedAt: at,
+      });
       store.set(keyOf(label), "zip");
       uploadedAt.set(keyOf(label), at);
     }
-    const [scanned] = await test.raw.select({ id: scanUploadArchives.id }).from(scanUploadArchives).where(eq(scanUploadArchives.label, "scannedOld"));
+    const [scanned] = await test.raw
+      .select({ id: scanUploadArchives.id })
+      .from(scanUploadArchives)
+      .where(eq(scanUploadArchives.label, "scannedOld"));
     await test.raw.insert(scans).values(scanValues(tenantId, appId, "scan-read-it", daysAgo(30).toISOString()));
-    await test.raw.insert(scanArchiveLinks).values({ scanId: "scan-read-it", tenantId, archiveId: scanned.id, label: "scannedOld", contentSha256: "c".repeat(64) });
+    await test.raw.insert(scanArchiveLinks).values({
+      scanId: "scan-read-it",
+      tenantId,
+      archiveId: scanned.id,
+      label: "scannedOld",
+      contentSha256: "c".repeat(64),
+    });
 
     const swept = await Effect.runPromise(sweepUploadsSvc(test.pool, env.REPORTS, NOW));
     const rows = await test.raw.select({ label: scanUploadArchives.label }).from(scanUploadArchives);
 
-    expect({ swept: swept.expired, rows: rows.map((row) => row.label).toSorted(), files: [...store.keys()].toSorted() }).toEqual({
+    expect({
+      swept: swept.expired,
+      rows: rows.map((row) => row.label).toSorted(),
+      files: [...store.keys()].toSorted(),
+    }).toEqual({
       swept: 1,
       rows: ["scannedOld", "unscannedYoung"],
       files: [keyOf("scannedOld"), keyOf("unscannedYoung")],

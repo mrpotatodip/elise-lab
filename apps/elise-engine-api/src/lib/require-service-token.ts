@@ -3,7 +3,8 @@ import type { Context } from "hono";
 import { InternalServiceError, UnauthorizedError } from "#/lib/errors";
 import type { AppEnv } from "#/types/variables";
 
-const digest = async (text: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
+const digest = async (text: string) =>
+  new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
 
 const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => {
   let difference = a.length ^ b.length;
@@ -19,7 +20,10 @@ const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => {
 export const hasServiceToken = async (c: Context<AppEnv>): Promise<boolean> => {
   const expected = c.env.SCAN_API_TOKEN;
   if (!expected) throw new InternalServiceError("SCAN_API_TOKEN is not set");
-  const [given, wanted] = await Promise.all([digest(c.req.header("authorization") ?? ""), digest(`Bearer ${expected}`)]);
+  const [given, wanted] = await Promise.all([
+    digest(c.req.header("authorization") ?? ""),
+    digest(`Bearer ${expected}`),
+  ]);
   return sameBytes(given, wanted);
 };
 

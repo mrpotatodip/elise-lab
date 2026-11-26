@@ -1,7 +1,7 @@
 /* Camera */
 
 @property --ss-feather {
-  syntax: '<length>';
+  syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }

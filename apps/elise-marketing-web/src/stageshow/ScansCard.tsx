@@ -1,4 +1,21 @@
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, FileText, FolderGit2, LayoutDashboard, Lock, Plug, RefreshCw, ScanSearch, Search, Settings, Users, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  FileText,
+  FolderGit2,
+  LayoutDashboard,
+  Lock,
+  Plug,
+  RefreshCw,
+  ScanSearch,
+  Search,
+  Settings,
+  Users,
+  X,
+} from "lucide-react";
 import { Collapse, Stage, Swap, Window, type Act } from "./kit";
 import { DASHBOARD_LOOK } from "./look";
 import { Pill, STATUS } from "./Pill";
@@ -37,16 +54,90 @@ const CRUMBS: Record<Page, string[]> = {
 
 type Severity = "high" | "medium" | "low";
 export type Found = { total: number; severity: Partial<Record<Severity, number>>; byHand?: number };
-export type Scan = { owner: string; name: string; priv?: boolean; branch: string; sha: string; status: keyof typeof STATUS; found: Found | null; review: string; cost: string; started: string };
+export type Scan = {
+  owner: string;
+  name: string;
+  priv?: boolean;
+  branch: string;
+  sha: string;
+  status: keyof typeof STATUS;
+  found: Found | null;
+  review: string;
+  cost: string;
+  started: string;
+};
 
-export const FRESH: Scan = { owner: "acme/", name: "example-app", priv: true, branch: "main", sha: "4f2a9c1", status: "succeeded", found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 }, review: "Focused", cost: "$0.42", started: "Nov 12, 10:12 AM" };
+export const FRESH: Scan = {
+  owner: "acme/",
+  name: "example-app",
+  priv: true,
+  branch: "main",
+  sha: "4f2a9c1",
+  status: "succeeded",
+  found: { total: 4, severity: { high: 1, medium: 2, low: 1 }, byHand: 1 },
+  review: "Focused",
+  cost: "$0.42",
+  started: "Nov 12, 10:12 AM",
+};
 
 export const OLDER: Scan[] = [
-  { owner: "acme/", name: "web-app", branch: "main", sha: "b81d03e", status: "succeeded", found: { total: 1, severity: { low: 1 } }, review: "Focused", cost: "$0.31", started: "Nov 11, 4:40 PM" },
-  { owner: "acme/", name: "docs-site", branch: "main", sha: "9c0e5a2", status: "succeeded", found: { total: 0, severity: {} }, review: "Focused", cost: "$0.12", started: "Nov 11, 11:05 AM" },
-  { owner: "acme/", name: "mobile-api", priv: true, branch: "auth", sha: "e47b1f8", status: "failed", found: null, review: "Balanced", cost: "-", started: "Nov 10, 6:48 PM" },
-  { owner: "acme/", name: "example-app", priv: true, branch: "rounding", sha: "21ad7c4", status: "succeeded", found: { total: 1, severity: { medium: 1 } }, review: "Focused", cost: "$0.28", started: "Nov 10, 9:03 AM" },
-  { owner: "acme/", name: "web-app", branch: "main", sha: "03fe8b6", status: "succeeded", found: { total: 2, severity: { low: 2 } }, review: "Balanced", cost: "$1.84", started: "Nov 9, 6:21 PM" },
+  {
+    owner: "acme/",
+    name: "web-app",
+    branch: "main",
+    sha: "b81d03e",
+    status: "succeeded",
+    found: { total: 1, severity: { low: 1 } },
+    review: "Focused",
+    cost: "$0.31",
+    started: "Nov 11, 4:40 PM",
+  },
+  {
+    owner: "acme/",
+    name: "docs-site",
+    branch: "main",
+    sha: "9c0e5a2",
+    status: "succeeded",
+    found: { total: 0, severity: {} },
+    review: "Focused",
+    cost: "$0.12",
+    started: "Nov 11, 11:05 AM",
+  },
+  {
+    owner: "acme/",
+    name: "mobile-api",
+    priv: true,
+    branch: "auth",
+    sha: "e47b1f8",
+    status: "failed",
+    found: null,
+    review: "Balanced",
+    cost: "-",
+    started: "Nov 10, 6:48 PM",
+  },
+  {
+    owner: "acme/",
+    name: "example-app",
+    priv: true,
+    branch: "rounding",
+    sha: "21ad7c4",
+    status: "succeeded",
+    found: { total: 1, severity: { medium: 1 } },
+    review: "Focused",
+    cost: "$0.28",
+    started: "Nov 10, 9:03 AM",
+  },
+  {
+    owner: "acme/",
+    name: "web-app",
+    branch: "main",
+    sha: "03fe8b6",
+    status: "succeeded",
+    found: { total: 2, severity: { low: 2 } },
+    review: "Balanced",
+    cost: "$1.84",
+    started: "Nov 9, 6:21 PM",
+  },
 ];
 
 export const MODEL = "Claude Opus 5.5";
@@ -131,13 +222,17 @@ export function Findings({ found }: { found: Found | null }) {
   return (
     <span className="dt-found">
       <span className="dt-found__row">
-        <span className="dt-strong">{found.total} {found.total === 1 ? "finding" : "findings"}</span>
-        {(["high", "medium", "low"] as const).filter((s) => found.severity[s]).map((s) => (
-          <span key={s} className="dt-sev">
-            <i data-tone={s} />
-            <span className="dt-num">{found.severity[s]}</span> {s}
-          </span>
-        ))}
+        <span className="dt-strong">
+          {found.total} {found.total === 1 ? "finding" : "findings"}
+        </span>
+        {(["high", "medium", "low"] as const)
+          .filter((s) => found.severity[s])
+          .map((s) => (
+            <span key={s} className="dt-sev">
+              <i data-tone={s} />
+              <span className="dt-num">{found.severity[s]}</span> {s}
+            </span>
+          ))}
       </span>
       {found.byHand ? <span className="dt-byhand">{found.byHand} to check by hand</span> : null}
     </span>
@@ -147,16 +242,26 @@ export function Findings({ found }: { found: Found | null }) {
 export function Cells({ scan }: { scan: Scan }) {
   return (
     <>
-      <div className="dt-cell dt-cell--repo"><Repo scan={scan} /></div>
-      <div className="dt-cell dt-cell--status"><Pill tone={STATUS[scan.status].tone} dot>{STATUS[scan.status].label}</Pill></div>
-      <div className="dt-cell dt-cell--found"><Findings found={scan.found} /></div>
+      <div className="dt-cell dt-cell--repo">
+        <Repo scan={scan} />
+      </div>
+      <div className="dt-cell dt-cell--status">
+        <Pill tone={STATUS[scan.status].tone} dot>
+          {STATUS[scan.status].label}
+        </Pill>
+      </div>
+      <div className="dt-cell dt-cell--found">
+        <Findings found={scan.found} />
+      </div>
       <div className="dt-cell dt-cell--review">
         <span className="dt-review">{scan.review}</span>
         <span className="dt-origin">{MODEL}</span>
       </div>
       <div className="dt-cell dt-cell--cost">{scan.cost}</div>
       <div className="dt-cell dt-cell--time">{scan.started}</div>
-      <div className="dt-cell dt-cell--open"><ChevronRight size={16} strokeWidth={1.5} aria-hidden /></div>
+      <div className="dt-cell dt-cell--open">
+        <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+      </div>
     </>
   );
 }
@@ -194,13 +299,21 @@ export default function ScansCard({ still }: { still?: Page }) {
                 </div>
                 <nav className="dash-nav">
                   {NAV.map(({ label, icon: Icon, page, target }) => (
-                    <div key={label} className="dash-row" data-on={(label === "Security status" ? false : page === s.page) || undefined} data-target={target || undefined} data-cursor={target ? "pointer" : undefined}>
+                    <div
+                      key={label}
+                      className="dash-row"
+                      data-on={(label === "Security status" ? false : page === s.page) || undefined}
+                      data-target={target || undefined}
+                      data-cursor={target ? "pointer" : undefined}
+                    >
                       <Icon size={18} strokeWidth={1.5} />
                       <span className="dash-row__label">{label}</span>
                       {label === "Scans" && (
                         <>
                           <span className="dash-live" data-on={running || undefined} />
-                          <span className="dash-count"><Swap id={all}>{all}</Swap></span>
+                          <span className="dash-count">
+                            <Swap id={all}>{all}</Swap>
+                          </span>
                         </>
                       )}
                     </div>
@@ -208,7 +321,13 @@ export default function ScansCard({ still }: { still?: Page }) {
                 </nav>
                 <nav className="dash-nav dash-nav--account">
                   {ACCOUNT.map(({ label, icon: Icon, page, target }) => (
-                    <div key={label} className="dash-row" data-on={(page !== undefined && page === s.page) || undefined} data-target={target} data-cursor={target ? "pointer" : undefined}>
+                    <div
+                      key={label}
+                      className="dash-row"
+                      data-on={(page !== undefined && page === s.page) || undefined}
+                      data-target={target}
+                      data-cursor={target ? "pointer" : undefined}
+                    >
                       <Icon size={18} strokeWidth={1.5} />
                       <span className="dash-row__label">{label}</span>
                     </div>
@@ -231,18 +350,27 @@ export default function ScansCard({ still }: { still?: Page }) {
                     </Swap>
                   </span>
                   <span className="dash-actions">
-                    <span className="dash-iconbtn" aria-hidden><RefreshCw size={16} strokeWidth={1.5} /></span>
-                    <span className="dash-btn" data-target="new" data-cursor="pointer">New scan</span>
+                    <span className="dash-iconbtn" aria-hidden>
+                      <RefreshCw size={16} strokeWidth={1.5} />
+                    </span>
+                    <span className="dash-btn" data-target="new" data-cursor="pointer">
+                      New scan
+                    </span>
                   </span>
                 </header>
 
                 <div className="dash-pages">
                   <section className="dash-page" data-active={s.page === "scans" || undefined}>
-                    <PageHead title="Scans" desc="Every audit you have run, newest first. Open one to read its report." />
+                    <PageHead
+                      title="Scans"
+                      desc="Every audit you have run, newest first. Open one to read its report."
+                    />
                     <div className="dl-card">
                       <div className="dl-card__head">
                         <span className="dl-card__title">All scans</span>
-                        <span className="dl-card__count"><Swap id={all}>{all} scans</Swap></span>
+                        <span className="dl-card__count">
+                          <Swap id={all}>{all} scans</Swap>
+                        </span>
                       </div>
                       <div className="dl-card__body">
                         <div className="dash-filter">
@@ -255,7 +383,9 @@ export default function ScansCard({ still }: { still?: Page }) {
                             ].map(([label, count, on]) => (
                               <span key={String(label)} className="dash-tab" data-on={on || undefined}>
                                 {label}
-                                <span className="dash-tab__n"><Swap id={String(count)}>{String(count)}</Swap></span>
+                                <span className="dash-tab__n">
+                                  <Swap id={String(count)}>{String(count)}</Swap>
+                                </span>
                               </span>
                             ))}
                           </div>
@@ -278,24 +408,42 @@ export default function ScansCard({ still }: { still?: Page }) {
 
                           <Collapse open={s.added}>
                             <div className="dt-row" data-target="fresh" data-cursor="pointer">
-                              <div className="dt-cell dt-cell--repo"><Repo scan={FRESH} /></div>
+                              <div className="dt-cell dt-cell--repo">
+                                <Repo scan={FRESH} />
+                              </div>
                               <div className="dt-cell dt-cell--status">
                                 <Swap id={s.done ? "done" : "run"}>
-                                  {s.done ? <Pill tone="success" dot>Succeeded</Pill> : <Pill tone="info" dot pulse>Running</Pill>}
+                                  {s.done ? (
+                                    <Pill tone="success" dot>
+                                      Succeeded
+                                    </Pill>
+                                  ) : (
+                                    <Pill tone="info" dot pulse>
+                                      Running
+                                    </Pill>
+                                  )}
                                 </Swap>
                               </div>
                               <div className="dt-cell dt-cell--found">
                                 <Swap id={s.done ? "done" : "run"}>
-                                  {s.done ? <Findings found={FRESH.found} /> : <span className="dt-muted">In progress</span>}
+                                  {s.done ? (
+                                    <Findings found={FRESH.found} />
+                                  ) : (
+                                    <span className="dt-muted">In progress</span>
+                                  )}
                                 </Swap>
                               </div>
                               <div className="dt-cell dt-cell--review">
                                 <span className="dt-review">{FRESH.review}</span>
                                 <span className="dt-origin">{MODEL}</span>
                               </div>
-                              <div className="dt-cell dt-cell--cost"><Swap id={s.done ? "done" : "run"}>{s.done ? FRESH.cost : "-"}</Swap></div>
+                              <div className="dt-cell dt-cell--cost">
+                                <Swap id={s.done ? "done" : "run"}>{s.done ? FRESH.cost : "-"}</Swap>
+                              </div>
                               <div className="dt-cell dt-cell--time">{FRESH.started}</div>
-                              <div className="dt-cell dt-cell--open"><ChevronRight size={16} strokeWidth={1.5} aria-hidden /></div>
+                              <div className="dt-cell dt-cell--open">
+                                <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+                              </div>
                             </div>
                           </Collapse>
 
@@ -311,10 +459,18 @@ export default function ScansCard({ still }: { still?: Page }) {
 
                   {!compact && (
                     <>
-                      <section className="dash-page dash-page--flush" data-active={s.page === "ship" || undefined}><ShipScene s={s} /></section>
-                      <section className="dash-page dash-page--flush" data-active={s.page === "overview" || undefined}><OverviewScene s={s} /></section>
-                      <section className="dash-page" data-active={s.page === "files" || undefined}><FilesScene s={s} /></section>
-                      <section className="dash-page" data-active={s.page === "runners" || undefined}><RunnersScene s={s} /></section>
+                      <section className="dash-page dash-page--flush" data-active={s.page === "ship" || undefined}>
+                        <ShipScene s={s} />
+                      </section>
+                      <section className="dash-page dash-page--flush" data-active={s.page === "overview" || undefined}>
+                        <OverviewScene s={s} />
+                      </section>
+                      <section className="dash-page" data-active={s.page === "files" || undefined}>
+                        <FilesScene s={s} />
+                      </section>
+                      <section className="dash-page" data-active={s.page === "runners" || undefined}>
+                        <RunnersScene s={s} />
+                      </section>
                     </>
                   )}
                 </div>
@@ -322,10 +478,20 @@ export default function ScansCard({ still }: { still?: Page }) {
 
               <div className="dash-scrim" data-open={s.open || undefined} aria-hidden />
               <aside className="dash-sheet" data-open={s.open || undefined} aria-hidden>
-                <button className="dash-sheet__close" tabIndex={-1} aria-hidden data-target="close" data-cursor="pointer"><X size={16} strokeWidth={1.5} /></button>
+                <button
+                  className="dash-sheet__close"
+                  tabIndex={-1}
+                  aria-hidden
+                  data-target="close"
+                  data-cursor="pointer"
+                >
+                  <X size={16} strokeWidth={1.5} />
+                </button>
                 <header className="dash-sheet__head">
                   <div className="dash-sheet__badges">
-                    <Pill tone="high" dot>High</Pill>
+                    <Pill tone="high" dot>
+                      High
+                    </Pill>
                     <Pill tone="success">Confirmed</Pill>
                     <span className="dash-sheet__n">1 of 4</span>
                   </div>
@@ -334,29 +500,49 @@ export default function ScansCard({ still }: { still?: Page }) {
                 </header>
                 <div className="dash-sheet__body">
                   <section>
-                    <h5 className="dash-sec" data-tone="danger">What could happen</h5>
-                    <p className="dash-sheet__p">A crafted link can send people from your login page to another site, where a lookalike page can ask for their password.</p>
+                    <h5 className="dash-sec" data-tone="danger">
+                      What could happen
+                    </h5>
+                    <p className="dash-sheet__p">
+                      A crafted link can send people from your login page to another site, where a lookalike page can
+                      ask for their password.
+                    </p>
                   </section>
                   <section>
                     <h5 className="dash-sec">Evidence in the code</h5>
                     <div className="dash-evidence">
-                      <p className="dash-sheet__p">The login route sends people to whatever address the next parameter holds.</p>
+                      <p className="dash-sheet__p">
+                        The login route sends people to whatever address the next parameter holds.
+                      </p>
                       <code className="dash-code">res.redirect(req.query.next)</code>
                     </div>
                   </section>
                   <section>
-                    <h5 className="dash-sec" data-tone="success">Suggested fix</h5>
-                    <p className="dash-sheet__p">Check the address against a list of allowed pages before redirecting.</p>
+                    <h5 className="dash-sec" data-tone="success">
+                      Suggested fix
+                    </h5>
+                    <p className="dash-sheet__p">
+                      Check the address against a list of allowed pages before redirecting.
+                    </p>
                   </section>
                 </div>
                 <footer className="dash-sheet__foot">
                   <span className="dash-decide">
                     <span className="dash-decide__label">Your decision</span>
-                    <span className="dash-select">Open<ChevronDown size={16} strokeWidth={1.5} /></span>
+                    <span className="dash-select">
+                      Open
+                      <ChevronDown size={16} strokeWidth={1.5} />
+                    </span>
                   </span>
                   <span className="dash-nav-btns">
-                    <span className="dash-obtn" data-off><ArrowLeft size={16} strokeWidth={1.5} />Previous</span>
-                    <span className="dash-obtn">Next<ArrowRight size={16} strokeWidth={1.5} /></span>
+                    <span className="dash-obtn" data-off>
+                      <ArrowLeft size={16} strokeWidth={1.5} />
+                      Previous
+                    </span>
+                    <span className="dash-obtn">
+                      Next
+                      <ArrowRight size={16} strokeWidth={1.5} />
+                    </span>
                   </span>
                 </footer>
               </aside>

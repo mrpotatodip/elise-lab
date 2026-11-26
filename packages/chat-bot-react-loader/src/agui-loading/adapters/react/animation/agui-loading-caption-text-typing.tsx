@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 
-import {
-  CARET_BLINK_ANIMATION,
-  CARET_KEYFRAMES,
-  TYPE_CHAR_MS,
-} from "../../..";
+import { CARET_BLINK_ANIMATION, CARET_KEYFRAMES, TYPE_CHAR_MS } from "../../..";
 
 function TypingText({ text }: { text: string }) {
   const [displayText, setDisplayText] = useState("");
@@ -36,11 +32,7 @@ function TypingText({ text }: { text: string }) {
       <style>{CARET_KEYFRAMES}</style>
       <span>{displayText}</span>
       {/* Solid while actively typing; only blinks once idle, like a real terminal caret. */}
-      <span
-        aria-hidden
-        className="cbl-caret"
-        style={typing ? undefined : { animation: CARET_BLINK_ANIMATION }}
-      />
+      <span aria-hidden className="cbl-caret" style={typing ? undefined : { animation: CARET_BLINK_ANIMATION }} />
     </>
   );
 }

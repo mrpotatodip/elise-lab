@@ -9,7 +9,13 @@ export function FindingCommentBody({ text }: { text: string }) {
     <p className="whitespace-pre-wrap text-sm leading-relaxed wrap-anywhere">
       {commentSegments(text).map((segment, index) =>
         segment.kind === "link" ? (
-          <a key={`${index}-${segment.href}`} href={segment.href} target="_blank" rel="noopener noreferrer nofollow" className="text-primary underline underline-offset-2">
+          <a
+            key={`${index}-${segment.href}`}
+            href={segment.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="text-primary underline underline-offset-2"
+          >
             {segment.text}
           </a>
         ) : (

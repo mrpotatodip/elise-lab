@@ -19,6 +19,8 @@ A second `lite` scan of a Repo started from what the first one left open. No Sca
 
 The lite Skill and its output checker (#141), and the planning, writing and reading of the History and Prior findings (#178), were removed; old lite rows keep the History they wrote.
 
+A removed Repo keeps its History: removing sets `removed_at` and never deletes the Repo row, so its Scans, findings and Prior findings stay, and adding the Repo again continues the same History (ADR 0008).
+
 ## Managing a team
 
 `/team` and `/groups` need a signed-in login whose Role holds the route's Power (`company:team:*`). `tenant_admin` and `workspace_admin` hold them; a `workspace_member` holds none. A `workspace_admin` can invite, revoke and run groups, but changing or removing a member stays with the `tenant_admin`. The service token is not accepted.

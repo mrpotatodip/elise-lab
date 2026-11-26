@@ -27,17 +27,38 @@ export const recordScanSvc = (
       return;
     }
     const db = dbConnect(env.DATABASE_URL);
-    const { repoId, status: current, branch: branchName, ref } = yield* scanRowOfEffect(db, params.accountId, params.scanId);
+    const {
+      repoId,
+      status: current,
+      branch: branchName,
+      ref,
+    } = yield* scanRowOfEffect(db, params.accountId, params.scanId);
     if (current === "stopped") {
-      yield* Effect.sync(() => console.warn(`scan records: ${params.scanId} was stopped by a person, so its results are not recorded`));
+      yield* Effect.sync(() =>
+        console.warn(`scan records: ${params.scanId} was stopped by a person, so its results are not recorded`),
+      );
       return;
     }
     if (current === "failed" && status === "succeeded") {
-      yield* Effect.sync(() => console.warn(`scan records: ${params.scanId} was closed as failed before it finished, so its results are not recorded`));
+      yield* Effect.sync(() =>
+        console.warn(
+          `scan records: ${params.scanId} was closed as failed before it finished, so its results are not recorded`,
+        ),
+      );
       return;
     }
     const succeeded = status === "succeeded";
-    const outcome: ScanBranchOutcome = succeeded ? yield* resolveScanBranchEffect(db, params.accountId, repoId, { name: branchName, ref }) : { id: null, reason: null };
-    const record = yield* buildScanRecordSvc(env.REPORTS, params, repoId, { ...outcome, name: outcome.name ?? branchName }, status, error, usage);
+    const outcome: ScanBranchOutcome = succeeded
+      ? yield* resolveScanBranchEffect(db, params.accountId, repoId, { name: branchName, ref })
+      : { id: null, reason: null };
+    const record = yield* buildScanRecordSvc(
+      env.REPORTS,
+      params,
+      repoId,
+      { ...outcome, name: outcome.name ?? branchName },
+      status,
+      error,
+      usage,
+    );
     yield* writeScanRecordEffect(db, record);
   });

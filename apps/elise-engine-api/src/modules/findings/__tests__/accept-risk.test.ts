@@ -27,7 +27,9 @@ const body = (letter: string, overrides: Partial<FindingTriageBody> = {}): Findi
 });
 
 const set = (input: FindingTriageBody, serviceTokenOrLogin: string | null = "admin") =>
-  asTenantEffect(test, tenantId, (db) => setTriageEffect(db, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW));
+  asTenantEffect(test, tenantId, (db) =>
+    setTriageEffect(db, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW),
+  );
 
 // -----
 // The audit rows about one problem, oldest first.
@@ -45,9 +47,20 @@ beforeAll(async () => {
   partyId = seeded.partyId;
   repoId = await seedRepo(test, tenantId, REPO);
   await test.raw.insert(authUser).values({ id: "admin", name: "Ada Rossi", email: "ada@example.com", partyId });
-  await test.raw.insert(scans).values(scanValues(tenantId, repoId, "s1", "2026-11-01T00:00:00Z", { status: "succeeded" }));
+  await test.raw
+    .insert(scans)
+    .values(scanValues(tenantId, repoId, "s1", "2026-11-01T00:00:00Z", { status: "succeeded" }));
   await test.raw.insert(scanFindings).values(
-    ["a", "b"].map((letter) => ({ tenantId, scanId: "s1", findingId: `F-${letter}`, fingerprint: fp(letter), status: "confirmed" as const, severity: "high" as const, title: letter, class: "authz" })),
+    ["a", "b"].map((letter) => ({
+      tenantId,
+      scanId: "s1",
+      findingId: `F-${letter}`,
+      fingerprint: fp(letter),
+      status: "confirmed" as const,
+      severity: "high" as const,
+      title: letter,
+      class: "authz",
+    })),
   );
 });
 
@@ -60,7 +73,11 @@ describe("an accepted risk", () => {
     const saved = await Effect.runPromise(set(body("a")));
     const [finding] = await Effect.runPromise(listFindingsEffect(test.http, tenantId, { limit: 50, severity: "high" }));
 
-    expect(saved).toMatchObject({ status: "accepted_risk", note: "Behind the VPN until the rewrite", acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString() });
+    expect(saved).toMatchObject({
+      status: "accepted_risk",
+      note: "Behind the VPN until the rewrite",
+      acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString(),
+    });
     expect(finding.triage?.acceptedUntil).toBe(saved.acceptedUntil);
   });
 
@@ -69,7 +86,14 @@ describe("an accepted risk", () => {
       expect.objectContaining({
         action: "finding.risk.accepted",
         actorPartyId: partyId,
-        after: { tenantId, fingerprint: fp("a"), status: "accepted_risk", note: "Behind the VPN until the rewrite", acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString(), duplicateOf: null },
+        after: {
+          tenantId,
+          fingerprint: fp("a"),
+          status: "accepted_risk",
+          note: "Behind the VPN until the rewrite",
+          acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString(),
+          duplicateOf: null,
+        },
       }),
     ]);
   });
@@ -88,14 +112,23 @@ describe("an accepted risk", () => {
 
 describe("every other decision", () => {
   it("writes an audit row, with no person when the service token set it", async () => {
-    await Effect.runPromise(set(body("b", { status: "false_positive", note: "test fixture", acceptDays: undefined }), null));
+    await Effect.runPromise(
+      set(body("b", { status: "false_positive", note: "test fixture", acceptDays: undefined }), null),
+    );
 
     expect(await auditOf("b")).toEqual([
       expect.objectContaining({
         action: "finding.triage.set",
         actorPartyId: null,
         before: null,
-        after: { tenantId, fingerprint: fp("b"), status: "false_positive", note: "test fixture", acceptedUntil: null, duplicateOf: null },
+        after: {
+          tenantId,
+          fingerprint: fp("b"),
+          status: "false_positive",
+          note: "test fixture",
+          acceptedUntil: null,
+          duplicateOf: null,
+        },
       }),
     ]);
   });
@@ -105,7 +138,11 @@ describe("every other decision", () => {
     const rows = await auditOf("b");
 
     expect(rows).toHaveLength(2);
-    expect(rows[1]).toMatchObject({ action: "finding.triage.set", actorPartyId: partyId, before: { status: "false_positive", note: "test fixture", acceptedUntil: null } });
+    expect(rows[1]).toMatchObject({
+      action: "finding.triage.set",
+      actorPartyId: partyId,
+      before: { status: "false_positive", note: "test fixture", acceptedUntil: null },
+    });
   });
 
   it("clears the end date, and records the accepted risk it ended", async () => {
@@ -114,17 +151,31 @@ describe("every other decision", () => {
 
     expect(saved).toMatchObject({ status: "fixed", acceptedUntil: null });
     expect(rows).toHaveLength(2);
-    expect(rows[1]).toMatchObject({ action: "finding.triage.set", before: { status: "accepted_risk", acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString() } });
+    expect(rows[1]).toMatchObject({
+      action: "finding.triage.set",
+      before: { status: "accepted_risk", acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString() },
+    });
   });
 });
 
 describe("a decision whose audit row cannot be written", () => {
   it("leaves no decision either", async () => {
-    await test.raw.execute(sql`create function refuse_audit() returns trigger as $$ begin raise exception 'audit refused'; end $$ language plpgsql`);
-    await test.raw.execute(sql.raw(`create trigger refuse_audit before insert on access_audit_log for each row when (new.after->>'fingerprint' = '${fp("f")}') execute function refuse_audit()`));
+    await test.raw.execute(
+      sql`create function refuse_audit() returns trigger as $$ begin raise exception 'audit refused'; end $$ language plpgsql`,
+    );
+    await test.raw.execute(
+      sql.raw(
+        `create trigger refuse_audit before insert on access_audit_log for each row when (new.after->>'fingerprint' = '${fp("f")}') execute function refuse_audit()`,
+      ),
+    );
 
-    const failure = await Effect.runPromise(Effect.flip(set(body("f", { status: "fixed", note: null, acceptDays: undefined }))));
-    const rows = await test.raw.select().from(scanFindingTriage).where(eq(scanFindingTriage.fingerprint, fp("f")));
+    const failure = await Effect.runPromise(
+      Effect.flip(set(body("f", { status: "fixed", note: null, acceptDays: undefined }))),
+    );
+    const rows = await test.raw
+      .select()
+      .from(scanFindingTriage)
+      .where(eq(scanFindingTriage.fingerprint, fp("f")));
 
     expect([failure._tag, rows]).toEqual(["DbError", []]);
   });
@@ -147,7 +198,10 @@ describe("FindingTriageBodySchema", () => {
 
 describe("who decided", () => {
   it("is named on the saved decision and in the list", async () => {
-    await test.raw.insert(partyPersons).values({ partyId, firstName: "Ada", lastName: "Rossi" }).onConflictDoUpdate({ target: partyPersons.partyId, set: { firstName: "Ada", lastName: "Rossi" } });
+    await test.raw
+      .insert(partyPersons)
+      .values({ partyId, firstName: "Ada", lastName: "Rossi" })
+      .onConflictDoUpdate({ target: partyPersons.partyId, set: { firstName: "Ada", lastName: "Rossi" } });
 
     const saved = await Effect.runPromise(set(body("b", { status: "fixed", note: null, acceptDays: undefined })));
     const listed = await Effect.runPromise(listFindingsEffect(test.http, tenantId, { limit: 50 }));
@@ -157,7 +211,9 @@ describe("who decided", () => {
   });
 
   it("is no one when the service token decided", async () => {
-    const saved = await Effect.runPromise(set(body("b", { status: "false_positive", note: null, acceptDays: undefined }), null));
+    const saved = await Effect.runPromise(
+      set(body("b", { status: "false_positive", note: null, acceptDays: undefined }), null),
+    );
 
     expect(saved.decidedBy).toBeNull();
   });

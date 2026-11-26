@@ -7,4 +7,6 @@ import type { Bindings } from "#/types/variables";
 export const recordInviteStatusOf =
   (env: Pick<Bindings, "DATABASE_URL">, waitUntil: (promise: Promise<unknown>) => void): RecordInviteStatus =>
   (inviteId, status) =>
-    withPool(env.DATABASE_URL, waitUntil, (db) => runEffect(markInviteEmailStatusEffect(db, inviteId, status, new Date())));
+    withPool(env.DATABASE_URL, waitUntil, (db) =>
+      runEffect(markInviteEmailStatusEffect(db, inviteId, status, new Date())),
+    );

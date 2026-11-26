@@ -11,9 +11,7 @@ describe("resolveChatBotToolDisplay", () => {
   });
 
   it("accepts valid options for a layout", () => {
-    expect(
-      resolveChatBotToolDisplay("number", { value: "price", unit: "currency" }),
-    ).toEqual({
+    expect(resolveChatBotToolDisplay("number", { value: "price", unit: "currency" })).toEqual({
       display: "number",
       displayOptions: { value: "price", unit: "currency" },
       valid: true,

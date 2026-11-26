@@ -10,12 +10,21 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/login/deny", denyRunnerLoginDoc, requirePower("company:runners:create"), zValidator("header", AccountHeaderSchema), zValidator("json", DenyRunnerLoginBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const body = c.req.valid("json");
-  const ip = c.req.header("cf-connecting-ip") ?? "local";
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(denyRunnerLoginSvc(db, accountId, userIdOf(c), ip, body)));
-  return c.json({ data, error: null });
-});
+app.post(
+  "/login/deny",
+  denyRunnerLoginDoc,
+  requirePower("company:runners:create"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", DenyRunnerLoginBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const body = c.req.valid("json");
+    const ip = c.req.header("cf-connecting-ip") ?? "local";
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(denyRunnerLoginSvc(db, accountId, userIdOf(c), ip, body)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

@@ -1,7 +1,14 @@
 import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { PlanDetails, PlanOffer } from "@repo/contracts/elise";
-import { authUser, partyRoles, platformMasterPlans, tenants, tenantSubscriptions, tenantTeamInvites } from "@repo/db-elise/schema";
+import {
+  authUser,
+  partyRoles,
+  platformMasterPlans,
+  tenants,
+  tenantSubscriptions,
+  tenantTeamInvites,
+} from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { BillingContext, PlanByKey } from "#/modules/plan/types";
@@ -60,7 +67,11 @@ export const planByKeyEffect = (db: AppDbType, key: string): Effect.Effect<PlanB
     catch: toDbError,
   });
 
-export const seatsEffect = (db: AppDbType, tenantId: string, now: Date): Effect.Effect<{ members: number; pendingInvites: number }, DbError> =>
+export const seatsEffect = (
+  db: AppDbType,
+  tenantId: string,
+  now: Date,
+): Effect.Effect<{ members: number; pendingInvites: number }, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [{ members }] = await db
@@ -70,13 +81,24 @@ export const seatsEffect = (db: AppDbType, tenantId: string, now: Date): Effect.
       const [{ pendingInvites }] = await db
         .select({ pendingInvites: sql<number>`count(*)::int` })
         .from(tenantTeamInvites)
-        .where(and(eq(tenantTeamInvites.tenantId, tenantId), isNull(tenantTeamInvites.revokedAt), isNull(tenantTeamInvites.acceptedAt), gt(tenantTeamInvites.expiresAt, now)));
+        .where(
+          and(
+            eq(tenantTeamInvites.tenantId, tenantId),
+            isNull(tenantTeamInvites.revokedAt),
+            isNull(tenantTeamInvites.acceptedAt),
+            gt(tenantTeamInvites.expiresAt, now),
+          ),
+        );
       return { members, pendingInvites };
     },
     catch: toDbError,
   });
 
-export const billingContextEffect = (db: AppDbType, tenantId: string, userId: string): Effect.Effect<BillingContext, DbError> =>
+export const billingContextEffect = (
+  db: AppDbType,
+  tenantId: string,
+  userId: string,
+): Effect.Effect<BillingContext, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [account] = await db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId));

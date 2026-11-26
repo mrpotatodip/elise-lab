@@ -91,7 +91,10 @@ class RolledBack extends Data.TaggedError("RolledBack") {}
 // rolls back, and comes out as the same typed failure; an error of
 // the library itself is a DbError.
 // -----
-export const effectInCallback = <D, A, E>(open: (callback: (db: D) => Promise<Exit.Exit<A, E>>) => Promise<Exit.Exit<A, E>>, run: (db: D) => Effect.Effect<A, E>): Effect.Effect<A, E | DbError> =>
+export const effectInCallback = <D, A, E>(
+  open: (callback: (db: D) => Promise<Exit.Exit<A, E>>) => Promise<Exit.Exit<A, E>>,
+  run: (db: D) => Effect.Effect<A, E>,
+): Effect.Effect<A, E | DbError> =>
   Effect.suspend(() => {
     let failed: Exit.Exit<A, E> | undefined;
     return Effect.tryPromise({

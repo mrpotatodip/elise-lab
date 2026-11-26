@@ -1,10 +1,23 @@
-const USD = new Intl.NumberFormat("en", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const USD = new Intl.NumberFormat("en", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 const COMPACT = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const MONTH = new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" });
 
 export const usageUsd = (value: number) => USD.format(value);
 
-const CHANGED_AT = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
+const CHANGED_AT = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
+});
 
 export const usageChangedAt = (iso: string) => {
   const date = new Date(iso);
@@ -31,7 +44,8 @@ export const usageCommittedPercent = (budgetUsd: number, spentUsd: number, reser
 // The least an admin may set: what the month has already spent
 // or holds for running scans, rounded up to the cent.
 // -----
-export const usageBudgetFloorUsd = (spentUsd: number, reservedUsd: number) => Math.ceil((spentUsd + reservedUsd) * 100) / 100;
+export const usageBudgetFloorUsd = (spentUsd: number, reservedUsd: number) =>
+  Math.ceil((spentUsd + reservedUsd) * 100) / 100;
 
 // -----
 // Why a new scan is refused. A running scan holds its whole spend cap, so a
@@ -51,11 +65,16 @@ const DOLLARS = /^\d{1,7}(\.\d{1,2})?$/;
 // before it sends. allowanceUsd is missing until the engine that
 // reports it is live; the engine still refuses a value above it.
 // -----
-export const usageBudgetError = (input: string, floorUsd: number, allowanceUsd: number | undefined): string | undefined => {
+export const usageBudgetError = (
+  input: string,
+  floorUsd: number,
+  allowanceUsd: number | undefined,
+): string | undefined => {
   const text = input.trim();
   if (!DOLLARS.test(text)) return "Enter a dollar amount, like 25 or 25.50.";
   const value = Number(text);
   if (value < floorUsd) return `At least ${usageUsd(floorUsd)}: this month has already spent or holds that much.`;
-  if (allowanceUsd !== undefined && value > allowanceUsd) return `At most ${usageUsd(allowanceUsd)}, the most this account may set.`;
+  if (allowanceUsd !== undefined && value > allowanceUsd)
+    return `At most ${usageUsd(allowanceUsd)}, the most this account may set.`;
   return undefined;
 };

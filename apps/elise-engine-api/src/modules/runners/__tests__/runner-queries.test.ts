@@ -3,7 +3,14 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authUser, tenantRunners } from "@repo/db-elise";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
-import { claimPairingEffect, createRunnerEffect, findRunnerByTokenEffect, listRunnersEffect, removeRunnerEffect, revokeRunnerByTokenEffect } from "#/modules/runners/queries";
+import {
+  claimPairingEffect,
+  createRunnerEffect,
+  findRunnerByTokenEffect,
+  listRunnersEffect,
+  removeRunnerEffect,
+  revokeRunnerByTokenEffect,
+} from "#/modules/runners/queries";
 import { hashPairingCode } from "#/modules/runners/utils";
 
 let test: TestDb;
@@ -16,16 +23,20 @@ const LATER = new Date("2026-11-11T09:11:00Z");
 
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 
-const addRunner = (codeHash: string, expiresAt = SOON) => run(createRunnerEffect(test.http, { tenantId, actorUserId: userId, name: "Jayson MacBook", codeHash, expiresAt }));
+const addRunner = (codeHash: string, expiresAt = SOON) =>
+  run(createRunnerEffect(test.http, { tenantId, actorUserId: userId, name: "Jayson MacBook", codeHash, expiresAt }));
 
-const claim = (codeHash: string, tokenHash: string, now = NOW) => run(claimPairingEffect(test.http, { codeHash, tokenHash, now }));
+const claim = (codeHash: string, tokenHash: string, now = NOW) =>
+  run(claimPairingEffect(test.http, { codeHash, tokenHash, now }));
 
 beforeAll(async () => {
   test = await openTestDb();
   const seeded = await seedTenant(test, "acme");
   tenantId = seeded.tenantId;
   userId = crypto.randomUUID();
-  await test.raw.insert(authUser).values({ id: userId, name: "Ada", email: "ada@example.com", emailVerified: true, partyId: seeded.partyId });
+  await test.raw
+    .insert(authUser)
+    .values({ id: userId, name: "Ada", email: "ada@example.com", emailVerified: true, partyId: seeded.partyId });
 });
 
 afterAll(async () => {
@@ -57,7 +68,10 @@ describe("pairing a Runner", () => {
 
   it("refuses a code whose Runner was revoked", async () => {
     await addRunner("code-revoked");
-    await test.raw.update(tenantRunners).set({ revokedAt: NOW }).where(eq(tenantRunners.pairingCodeHash, "code-revoked"));
+    await test.raw
+      .update(tenantRunners)
+      .set({ revokedAt: NOW })
+      .where(eq(tenantRunners.pairingCodeHash, "code-revoked"));
     expect(await claim("code-revoked", "token-revoked")).toBeNull();
   });
 
@@ -79,9 +93,14 @@ describe("listing Runners", () => {
     await addRunner("list-connected");
     await claim("list-connected", "token-list");
     await addRunner("list-removed");
-    await test.raw.update(tenantRunners).set({ revokedAt: NOW }).where(eq(tenantRunners.pairingCodeHash, "list-removed"));
+    await test.raw
+      .update(tenantRunners)
+      .set({ revokedAt: NOW })
+      .where(eq(tenantRunners.pairingCodeHash, "list-removed"));
 
-    const states = (await list(tenantId, NOW)).filter((runner) => runner.name === "Jayson MacBook").map((runner) => runner.state);
+    const states = (await list(tenantId, NOW))
+      .filter((runner) => runner.name === "Jayson MacBook")
+      .map((runner) => runner.state);
     expect(states).toEqual(expect.arrayContaining(["waiting", "expired", "connected"]));
     expect(states).not.toContain("removed");
     expect(await list(other.tenantId, NOW)).toEqual([]);
@@ -92,9 +111,21 @@ describe("who added a Runner", () => {
   it("names the person for a pairing code and for an approved login", async () => {
     const owner = await seedTenant(test, "who-added");
     const person = crypto.randomUUID();
-    await test.raw.insert(authUser).values({ id: person, name: "Ada", email: "who@example.com", emailVerified: true, partyId: owner.partyId });
-    await run(createRunnerEffect(test.http, { tenantId: owner.tenantId, actorUserId: person, name: "By code", codeHash: "who-code", expiresAt: SOON }));
-    await test.raw.insert(tenantRunners).values({ tenantId: owner.tenantId, name: "By login", pairingExpiresAt: SOON, createdBy: owner.partyId });
+    await test.raw
+      .insert(authUser)
+      .values({ id: person, name: "Ada", email: "who@example.com", emailVerified: true, partyId: owner.partyId });
+    await run(
+      createRunnerEffect(test.http, {
+        tenantId: owner.tenantId,
+        actorUserId: person,
+        name: "By code",
+        codeHash: "who-code",
+        expiresAt: SOON,
+      }),
+    );
+    await test.raw
+      .insert(tenantRunners)
+      .values({ tenantId: owner.tenantId, name: "By login", pairingExpiresAt: SOON, createdBy: owner.partyId });
 
     const listed = await run(listRunnersEffect(test.http, owner.tenantId, NOW));
     expect(listed.map((runner) => [runner.name, runner.createdByName]).toSorted()).toEqual([

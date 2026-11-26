@@ -8,7 +8,12 @@ const result = {
   duration_ms: 91000,
   num_turns: 14,
   total_cost_usd: 0.4132,
-  usage: { input_tokens: 1200, output_tokens: 5400, cache_read_input_tokens: 250000, cache_creation_input_tokens: 31000 },
+  usage: {
+    input_tokens: 1200,
+    output_tokens: 5400,
+    cache_read_input_tokens: 250000,
+    cache_creation_input_tokens: 31000,
+  },
 };
 
 describe("parseAgentUsage", () => {
@@ -25,7 +30,11 @@ describe("parseAgentUsage", () => {
   });
 
   it("takes the last line of a streamed log, after the lines of the run", () => {
-    const stream = [JSON.stringify({ type: "system", subtype: "init" }), JSON.stringify({ type: "assistant", message: { content: [] } }), JSON.stringify(result)].join("\n");
+    const stream = [
+      JSON.stringify({ type: "system", subtype: "init" }),
+      JSON.stringify({ type: "assistant", message: { content: [] } }),
+      JSON.stringify(result),
+    ].join("\n");
 
     expect(parseAgentUsage(`${stream}\n`)).toMatchObject({ costUsd: 0.4132, turns: 14 });
   });

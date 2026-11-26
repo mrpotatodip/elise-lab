@@ -9,7 +9,9 @@ import type { AppEnv } from "#/types/variables";
 // open more than one, or work outside one, takes this in place of
 // a database. A failed effect rolls its transaction back.
 // -----
-export type TenantEffect<D = TenantDbType> = <A, E>(run: (db: D) => Effect.Effect<A, E>) => Effect.Effect<A, E | DbError>;
+export type TenantEffect<D = TenantDbType> = <A, E>(
+  run: (db: D) => Effect.Effect<A, E>,
+) => Effect.Effect<A, E | DbError>;
 
 export const tenantEffectOf =
   (c: Context<AppEnv>, accountId: string): TenantEffect =>

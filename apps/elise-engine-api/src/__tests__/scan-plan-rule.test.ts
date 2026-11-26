@@ -13,7 +13,17 @@ const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const REPO = "https://github.com/octocat/Hello-World";
 const headers = { authorization: `Bearer ${TEST_TOKEN}`, "x-account-id": ACCOUNT, "content-type": "application/json" };
 
-const NO_SPEND: MonthSpend = { spentUsd: 0, scans: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, budgetOverrideUsd: null, budgetAllowanceUsd: null, platformSpentUsd: 0, platformReservedUsd: 0, ownKey: false, plan: null };
+const NO_SPEND: MonthSpend = {
+  spentUsd: 0,
+  scans: 0,
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  budgetOverrideUsd: null,
+  budgetAllowanceUsd: null,
+  platformSpentUsd: 0,
+  platformReservedUsd: 0,
+  ownKey: false,
+  plan: null,
+};
 const PRO: PlanState = {
   planKey: "pro",
   includedCreditUsd: 49,
@@ -41,12 +51,17 @@ beforeEach(() => {
   spend = NO_SPEND;
 });
 
-const post = (env: Bindings, body: { repo: string; profile: string }) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
+const post = (env: Bindings, body: { repo: string; profile: string }) =>
+  app.fetch(
+    new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }),
+    env,
+    testExecutionContext,
+  );
 const ErrorBodySchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
 
 describe("POST /scans: a Monthly budget refusal names the profile that fits", () => {
-  it("refuses deep under a $20 Monthly budget, names standard and takes no hold", async () => {
-    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 20 };
+  it("refuses deep under a $40 Monthly budget, names standard and takes no hold", async () => {
+    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 40 };
     const { env, createdFull } = fakeBindings();
     const res = await post(env, { repo: REPO, profile: "deep" });
     const error = ErrorBodySchema.parse(await res.json()).error;
@@ -59,7 +74,7 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
   });
 
   it("names the biggest profile that fits after what the month already spent", async () => {
-    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 20, spentUsd: 6 };
+    spend = { ...NO_SPEND, plan: PRO, budgetOverrideUsd: 40, spentUsd: 8 };
     const { env } = fakeBindings();
     const res = await post(env, { repo: REPO, profile: "deep" });
 
@@ -78,18 +93,44 @@ describe("POST /scans: a Monthly budget refusal names the profile that fits", ()
   });
 });
 
-const RUNNER: PlanState = { ...PRO, planKey: "runner", keySource: "account", includedCreditUsd: 0, creditBalanceUsd: 0, hostedScansAllowed: false };
+const RUNNER: PlanState = {
+  ...PRO,
+  planKey: "runner",
+  keySource: "account",
+  includedCreditUsd: 0,
+  creditBalanceUsd: 0,
+  hostedScansAllowed: false,
+};
 const RUNNER_ONLY_OTHER_KEY: PlanState = { ...RUNNER, planKey: "runner-team" };
 const RUNNER_KEY_HOSTED_OK: PlanState = { ...RUNNER, hostedScansAllowed: true };
 const RUNNER_ID = "5d1f0c52-8a37-4f0e-9b6a-2c4d7e8f9a01";
-const postWith = (env: Bindings, body: { repo: string; profile: string; runner_id?: string }) => app.fetch(new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }), env, testExecutionContext);
+const postWith = (env: Bindings, body: { repo: string; profile: string; runner_id?: string }) =>
+  app.fetch(
+    new Request("http://localhost/scans", { method: "POST", headers, body: JSON.stringify(body) }),
+    env,
+    testExecutionContext,
+  );
 
 describe("POST /scans: the Runner plan runs Scans on a Runner only", () => {
   it.each([
     ["a Runner Scan on the Runner plan", { ...NO_SPEND, plan: RUNNER }, { runner_id: RUNNER_ID }, 201, null, 1],
     ["a hosted Scan on the Runner plan", { ...NO_SPEND, plan: RUNNER, ownKey: true }, {}, 429, "RUNNER_PLAN_HOSTED", 0],
-    ["a hosted Scan on a plan the catalogue marks Runner-only, whatever its key", { ...NO_SPEND, plan: RUNNER_ONLY_OTHER_KEY, ownKey: true }, {}, 429, "RUNNER_PLAN_HOSTED", 0],
-    ["a hosted Scan on a plan keyed runner that the catalogue allows", { ...NO_SPEND, plan: RUNNER_KEY_HOSTED_OK, ownKey: true }, {}, 201, null, 1],
+    [
+      "a hosted Scan on a plan the catalogue marks Runner-only, whatever its key",
+      { ...NO_SPEND, plan: RUNNER_ONLY_OTHER_KEY, ownKey: true },
+      {},
+      429,
+      "RUNNER_PLAN_HOSTED",
+      0,
+    ],
+    [
+      "a hosted Scan on a plan keyed runner that the catalogue allows",
+      { ...NO_SPEND, plan: RUNNER_KEY_HOSTED_OK, ownKey: true },
+      {},
+      201,
+      null,
+      1,
+    ],
     ["a Runner Scan with no plan", NO_SPEND, { runner_id: RUNNER_ID }, 429, "NO_ACTIVE_PLAN", 0],
     ["a hosted Scan with no plan", NO_SPEND, {}, 429, "NO_ACTIVE_PLAN", 0],
   ])("%s", async (_name, account, extra, status, code, started) => {
@@ -98,7 +139,9 @@ describe("POST /scans: the Runner plan runs Scans on a Runner only", () => {
     const res = await postWith(env, { repo: REPO, profile: "quick", ...extra });
 
     expect(res.status).toBe(status);
-    expect(z.object({ error: z.object({ code: z.string() }).nullable() }).parse(await res.json()).error?.code ?? null).toBe(code);
+    expect(
+      z.object({ error: z.object({ code: z.string() }).nullable() }).parse(await res.json()).error?.code ?? null,
+    ).toBe(code);
     expect(createdFull).toHaveLength(started);
   });
 
@@ -117,7 +160,10 @@ describe("POST /scans: a full Scan on the platform's key needs a Plan", () => {
     const res = await post(env, { repo: REPO, profile: "quick" });
 
     expect(res.status).toBe(429);
-    expect(ErrorBodySchema.parse(await res.json()).error).toEqual({ code: "NO_ACTIVE_PLAN", message: BILLING_NO_PLAN_MESSAGE });
+    expect(ErrorBodySchema.parse(await res.json()).error).toEqual({
+      code: "NO_ACTIVE_PLAN",
+      message: BILLING_NO_PLAN_MESSAGE,
+    });
     expect(createdFull).toHaveLength(0);
   });
 

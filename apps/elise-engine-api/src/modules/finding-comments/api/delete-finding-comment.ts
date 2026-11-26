@@ -10,17 +10,25 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.delete("/:commentId", deleteFindingCommentDoc, zValidator("header", AccountHeaderSchema), zValidator("param", FindingCommentParamSchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { commentId } = c.req.valid("param");
-  const deps = c.get("deps");
-  const userId = await signedInUserId(c);
-  const [holdsDeletePower, holdsCreatePower] = await Promise.all([
-    deps.userHasPower(c, userId, accountId, "company:findings:comments:delete"),
-    deps.userHasPower(c, userId, accountId, "company:findings:comments:create"),
-  ]);
-  const data = await deps.withTenant(c, accountId, (db) => runEffect(deleteFindingCommentSvc(db, accountId, commentId, { userId, holdsDeletePower, holdsCreatePower })));
-  return c.json({ data, error: null });
-});
+app.delete(
+  "/:commentId",
+  deleteFindingCommentDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", FindingCommentParamSchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { commentId } = c.req.valid("param");
+    const deps = c.get("deps");
+    const userId = await signedInUserId(c);
+    const [holdsDeletePower, holdsCreatePower] = await Promise.all([
+      deps.userHasPower(c, userId, accountId, "company:findings:comments:delete"),
+      deps.userHasPower(c, userId, accountId, "company:findings:comments:create"),
+    ]);
+    const data = await deps.withTenant(c, accountId, (db) =>
+      runEffect(deleteFindingCommentSvc(db, accountId, commentId, { userId, holdsDeletePower, holdsCreatePower })),
+    );
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

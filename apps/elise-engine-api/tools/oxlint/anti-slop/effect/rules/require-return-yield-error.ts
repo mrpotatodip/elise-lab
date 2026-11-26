@@ -8,7 +8,8 @@ export const requireReturnYieldErrorRule = defineRule({
       description: "Require `return` before `yield* new X(...)` used as a statement.",
     },
     messages: {
-      missingReturn: "Write `return yield* new {{name}}(...)`. Without `return`, TypeScript still thinks the code below can run.",
+      missingReturn:
+        "Write `return yield* new {{name}}(...)`. Without `return`, TypeScript still thinks the code below can run.",
     },
   },
   createOnce(context) {

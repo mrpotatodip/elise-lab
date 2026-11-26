@@ -26,7 +26,7 @@ describe("renderEmail", () => {
     expect(html).toContain("Ada &quot;the admin&quot; &amp; co");
     expect(html).toContain('href="https://eliselab.com/invite/abc_123?x=1&amp;y=2"');
     expect(html).not.toContain("<script>");
-    expect(text).toContain("Ada \"the admin\" & co invited you to join Acme <script>");
+    expect(text).toContain('Ada "the admin" & co invited you to join Acme <script>');
     expect(text).toContain(invite.link);
   });
 
