@@ -59,7 +59,7 @@ export const listSignalsEffect = (db: AppDbType, tenantId: string, repo: string)
       const repoIds = db
         .select({ id: scanRepos.id })
         .from(scanRepos)
-        .where(sameRepoIdentity(tenantId, repoIdentityOf(repo)));
+        .where(and(sameRepoIdentity(tenantId, repoIdentityOf(repo)), isNull(scanRepos.removedAt)));
       const rows = await db
         .select()
         .from(scanSignals)
@@ -122,6 +122,7 @@ export const findReasonCheckInputEffect = (
           and(
             eq(scanFindings.tenantId, tenantId),
             sameRepoIdentity(tenantId, repoIdentityOf(body.repo)),
+            isNull(scanRepos.removedAt),
             eq(scanFindings.fingerprint, body.fingerprint),
           ),
         )

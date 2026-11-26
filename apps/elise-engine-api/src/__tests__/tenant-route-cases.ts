@@ -155,6 +155,12 @@ export const CROSS_ACCOUNT_CASES = {
     expect: "not-found",
   },
   "GET /repos/:repoId/archives": { kind: "run", path: `/repos/${OTHER_REPO_ID}/archives`, expect: "not-found" },
+  "POST /repos/:repoId/restore": {
+    kind: "run",
+    path: `/repos/${OTHER_REPO_ID}/restore`,
+    method: "POST",
+    expect: "not-found",
+  },
   "POST /repos/:repoId/archives": {
     kind: "run",
     path: `/repos/${OTHER_REPO_ID}/archives?label=app.zip`,

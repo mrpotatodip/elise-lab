@@ -33,10 +33,32 @@ export const listReposDoc = describeRoute({
       "The Worker reads the account's repos.",
       "For each it lists the names of the tracked branches (`branchNames`), counts the scans, finds the latest one, and counts the open problems by severity. Open means the history has not closed it and no person marked it fixed, a false positive or an accepted risk.",
       "`regressed` counts open problems that came back after being fixed. `unchecked` counts those the latest scan could not re-check.",
+      "A Removed Repo is not listed. `?removed=true` lists the Removed Repos only, each with `removedAt`, and needs the Power `company:repos:delete` (403 without it).",
     ],
     example: ["List the repos:", bash(`curl ${EXAMPLE_BASE_URL}/repos \\`, AUTH, ACCOUNT)],
   }),
   responses: { 200: jsonResponse("The repos.", envelope(RepoListSchema)), ...errorResponses(400, 401, 403) },
+});
+
+export const restoreRepoDoc = describeRoute({
+  tags: ["repos"],
+  security: SERVICE_SECURITY,
+  summary: "Restore a removed repo",
+  description: routeText({
+    context:
+      "Brings a Removed Repo back to the list with its Scans, findings, Branches and decisions. Adding the repo again, or scanning it, does the same.",
+    steps: [
+      "The login must hold the Power `company:repos:delete`, else 403.",
+      "The Worker finds the repo among the account's removed ones, 404 if there is none.",
+      "It refuses with 409 when the account already has the most repos, as adding one does.",
+      "It clears the removal and writes `repo.restored` to the Audit trail.",
+    ],
+    example: ["Restore a repo:", bash(`curl -X POST ${EXAMPLE_BASE_URL}/repos/${REPO_ID}/restore \\`, AUTH, ACCOUNT)],
+  }),
+  responses: {
+    200: jsonResponse("The restored repo and its scans.", envelope(RepoDetailSchema)),
+    ...errorResponses(400, 401, 403, 404, 409),
+  },
 });
 
 export const getRepoDoc = describeRoute({

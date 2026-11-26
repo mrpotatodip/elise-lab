@@ -120,6 +120,10 @@ _Avoid_: Output, result
 One source of code an Account scans, kept once per Account (`scan_repos`) however its address was typed. It is known by Provider, host and path, so a GitLab `acme/app` is never the GitHub `acme/app`: the path is lowercase, without `.git` or a trailing slash, and the host is lowercase (`github.com` for GitHub, none for an Upload app). It can be added without a Scan. Its Scans, Branches and decisions hang off it. An Account has one active Scan per Repo and at most 200 Repos, an Upload app included.
 _Avoid_: Project, target
 
+**Removed Repo**:
+A Repo a person took off the list. Its History stays, but it is not in the Repo list, the findings across Repos, the overview's Repo count and findings tiles, the Verdict or the Signals, and it does not take one of the 200 places. Its Scans still show on the Scans page and in the overview's Scan counts. Only an admin removes one, and not while a Scan of it is queued or running. Adding it again, or a Scan of it, brings it back with its History, if the Account has a free place.
+_Avoid_: Deleted Repo, soft delete, archived Repo
+
 **Provider**:
 Where the code of a Scan comes from: `github`, `gitlab`, `gitlab-sh` or `upload`. The user picks it first, and each Provider is its own flow with its own address or file rules, contract schemas and dashboard screens. Core knows only the `SourceProvider` port and one registry, and lint fails when core reads a Provider's folder or one Provider reads another. A request with no `provider` means `github`. On a Runner the clone happens on the user's computer with their own git login, so EliseLAB stores no token for any Provider. `gitlab-sh` takes only hosts the user listed in their own Runner settings: a host that only the job names is refused. ADR 0008 (git providers) holds the rules.
 _Avoid_: Source (too loose), host (that is the server inside an address)

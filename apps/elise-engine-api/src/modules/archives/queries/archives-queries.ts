@@ -3,9 +3,13 @@ import { Effect } from "effect";
 import type { ScanArchiveRef, UploadArchive } from "@repo/contracts/elise";
 import { scanArchiveLinks, scanRepos, scans, scanUploadArchives, type TScanUploadArchive } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
-import { Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
+import { liveScansSql } from "#/modules/scan-ledger/utils";
 
+export const REPO_HAS_ACTIVE_SCAN = "A Scan of this Repo is queued or running; stop it or wait for it first";
 export const UPLOAD_APP_NOT_FOUND = "Upload app not found";
+export const REPO_NOT_FOUND = "Repo not found";
 export const UPLOAD_ARCHIVE_NOT_FOUND = "Upload not found";
 
 export const archiveViewOf = (row: TScanUploadArchive): UploadArchive => ({
@@ -47,33 +51,59 @@ export const findUploadAppEffect = (
   );
 
 // -----
-// Removes an upload app: deletes its zips' rows, marks the app
-// removed and gives back where the zips' bytes are. The Repo row
-// stays, so its Scans and findings keep their History; the
+// Soft-deletes a repo of any provider: marks it removed, and
+// deletes the rows of its zips (an upload app has them, a git
+// Repo has none) and gives back where their bytes are. The Repo
+// row stays, so its Scans and findings keep their History; the
 // links of those Scans keep each zip's label and hash.
+//
+// The Repo row is locked first, and a new Scan locks it too
+// (ensureRepo), so a Scan made while this runs is either seen
+// by the live check or waits for the remove. A stalled Scan
+// does not block it. A Repo that is not there, or already
+// removed, is not found.
 // -----
 export const removeUploadAppEffect = (
   db: AppDbType,
   tenantId: string,
   repoId: string,
-): Effect.Effect<string[], NotFound | DbError> =>
-  Effect.gen(function* () {
-    yield* findUploadAppEffect(db, tenantId, repoId);
-    return yield* Effect.tryPromise({
-      try: async () => {
-        const deleted = await db
-          .delete(scanUploadArchives)
-          .where(and(eq(scanUploadArchives.tenantId, tenantId), eq(scanUploadArchives.repoId, repoId)))
-          .returning({ r2Key: scanUploadArchives.r2Key });
-        await db
-          .update(scanRepos)
-          .set({ removedAt: new Date() })
-          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
-        return deleted.map((row) => row.r2Key);
-      },
-      catch: toDbError,
-    });
-  });
+  userId: string,
+): Effect.Effect<string[], NotFound | Conflict | DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const [locked] = await db
+        .select({ id: scanRepos.id })
+        .from(scanRepos)
+        .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId), isNull(scanRepos.removedAt)))
+        .for("update");
+      if (!locked) return "missing" as const;
+      const [live] = await db
+        .select({ id: scans.id })
+        .from(scans)
+        .where(and(eq(scans.tenantId, tenantId), eq(scans.repoId, repoId), liveScansSql(Date.now())))
+        .limit(1);
+      if (live) return "live" as const;
+      const actorPartyId = await actorPartyOf(db, userId);
+      const deleted = await db
+        .delete(scanUploadArchives)
+        .where(and(eq(scanUploadArchives.tenantId, tenantId), eq(scanUploadArchives.repoId, repoId)))
+        .returning({ r2Key: scanUploadArchives.r2Key });
+      await db
+        .update(scanRepos)
+        .set({ removedAt: new Date() })
+        .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
+      // SAFETY: the tenant transaction's insert answers like the pool's one AuditDb names, and access_audit_log has no row-level security.
+      await insertAuditEntry(db as never, { actorPartyId, action: "repo.removed", subjectId: repoId, tenantId });
+      return deleted.map((row) => row.r2Key);
+    },
+    catch: toDbError,
+  }).pipe(
+    Effect.flatMap((result): Effect.Effect<string[], NotFound | Conflict> => {
+      if (result === "missing") return Effect.fail(new NotFound({ message: REPO_NOT_FOUND }));
+      if (result === "live") return Effect.fail(new Conflict({ message: REPO_HAS_ACTIVE_SCAN }));
+      return Effect.succeed(result);
+    }),
+  );
 
 export const listArchivesEffect = (
   db: AppDbType,

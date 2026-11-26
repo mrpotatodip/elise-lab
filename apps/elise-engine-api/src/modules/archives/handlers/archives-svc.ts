@@ -134,9 +134,10 @@ export const removeUploadAppSvc = (
   reports: R2Bucket,
   accountId: string,
   repoId: string,
-): Effect.Effect<UploadArchiveRemoved, NotFound | DbError | ExternalError> =>
+  userId: string,
+): Effect.Effect<UploadArchiveRemoved, NotFound | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
-    const rowKeys = yield* removeUploadAppEffect(db, accountId, repoId);
+    const rowKeys = yield* removeUploadAppEffect(db, accountId, repoId, userId);
     const stored = yield* listObjectsEffect(reports, archivePrefixOf(accountId, repoId));
     yield* deleteObjectsEffect(reports, [...new Set([...rowKeys, ...stored.map((object) => object.key)])]);
     return { removed: true as const };

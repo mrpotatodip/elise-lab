@@ -8,8 +8,9 @@ import {
 } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
 import { PayloadTooLargeError } from "#/lib/errors";
-import { ARCHIVE_TOO_LARGE, MB } from "#/modules/archives/constants";
+import { requirePower, userIdOf } from "#/lib/require-power";
 import { zValidator } from "#/lib/zod-validator";
+import { ARCHIVE_TOO_LARGE, MB } from "#/modules/archives/constants";
 import { listArchivesSvc, removeArchiveSvc, removeUploadAppSvc, uploadArchiveSvc } from "#/modules/archives/handlers";
 import { listArchivesDoc, removeArchiveDoc, removeUploadAppDoc, uploadArchiveDoc } from "#/modules/archives/openapi";
 import { AccountHeaderSchema } from "#/modules/scans/schemas";
@@ -76,6 +77,7 @@ app.delete(
 app.delete(
   "/:repoId",
   removeUploadAppDoc,
+  requirePower("company:repos:delete"),
   zValidator("header", AccountHeaderSchema),
   zValidator("param", RepoParamSchema),
   async (c) => {
@@ -83,7 +85,9 @@ app.delete(
     const { repoId } = c.req.valid("param");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(removeUploadAppSvc(db, c.env.REPORTS, accountId, repoId)));
+      .withTenant(c, accountId, (db) =>
+        runEffect(removeUploadAppSvc(db, c.env.REPORTS, accountId, repoId, userIdOf(c))),
+      );
     return c.json({ data, error: null });
   },
 );

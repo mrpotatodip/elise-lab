@@ -1,15 +1,19 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
-import { fetchRepo, fetchRepoFindings, fetchRepos } from "../api";
+import { fetchRemovedRepos, fetchRepo, fetchRepoFindings, fetchRepos } from "../api";
 import type { RepoFindingsFilter } from "../schemas";
 
 export const repoKeys = {
   all: ["repos"] as const,
   list: () => [...repoKeys.all, "list"] as const,
+  removed: () => [...repoKeys.all, "removed"] as const,
   detail: (repoId: string) => [...repoKeys.all, "detail", repoId] as const,
   findings: (repoId: string, filter: RepoFindingsFilter) => [...repoKeys.detail(repoId), "findings", filter] as const,
 };
 
 export const reposQuery = () => queryOptions({ queryKey: repoKeys.list(), queryFn: () => fetchRepos() });
+
+export const removedReposQuery = () =>
+  queryOptions({ queryKey: repoKeys.removed(), queryFn: () => fetchRemovedRepos() });
 
 export const repoQuery = (repoId: string) =>
   queryOptions({

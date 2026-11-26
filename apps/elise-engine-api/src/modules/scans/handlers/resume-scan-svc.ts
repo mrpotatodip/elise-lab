@@ -16,6 +16,7 @@ export const submitResumeSvc = (
   deps: SubmitScanDeps,
   accountId: string,
   scanId: string,
+  actorUserId?: string,
 ): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | NotFound | DbError | ExternalError> =>
   tenant((db) =>
     Effect.gen(function* () {
@@ -51,6 +52,7 @@ export const submitResumeSvc = (
         (newScanId, holdUsd) => deps.holdCredit(db, accountId, newScanId, holdUsd),
         (id) => deps.connectedRunnerSources(db, accountId, id),
         undefined,
+        actorUserId,
         scanId,
       );
     }),

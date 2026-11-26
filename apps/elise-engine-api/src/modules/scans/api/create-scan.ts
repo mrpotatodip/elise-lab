@@ -17,7 +17,9 @@ app.post(
   async (c) => {
     const { "x-account-id": accountId } = c.req.valid("header");
     const body = c.req.valid("json");
-    const data = await runEffect(submitScanSvc(c.env, tenantEffectOf(c, accountId), c.get("deps"), accountId, body));
+    const data = await runEffect(
+      submitScanSvc(c.env, tenantEffectOf(c, accountId), c.get("deps"), accountId, body, c.get("userId")),
+    );
     return c.json({ data, error: null }, 201);
   },
 );

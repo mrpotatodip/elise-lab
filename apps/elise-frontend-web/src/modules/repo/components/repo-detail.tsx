@@ -1,5 +1,5 @@
 import { Suspense, useState, type ComponentProps } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import {
   useMutation,
   useQuery,
@@ -57,6 +57,7 @@ import { repoFindingsQuery, repoKeys, repoQuery } from "../hooks";
 import type { RepoFinding } from "../schemas";
 import { repoEmptyCopy, repoName, repoNotFullScanIds, repoUntrackedCopy, type FindingFilter } from "../utils";
 import { RepoBranchSwitch } from "./repo-branch-switch";
+import { RepoRemoveButton } from "./repo-remove-button";
 import { RepoFindingsSkeleton } from "./repo-detail-skeleton";
 import { RepoBranchSummary } from "./repo-branch-summary";
 
@@ -687,7 +688,6 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
   const source = sourceProviderOf(repo.provider ?? DEFAULT_SOURCE_PROVIDER_ID);
   const isApp = source.capabilities.isArchive;
   const latestZip = isApp ? scanArchiveNote((fullScan ?? newestScan)?.archive) : null;
-  const navigate = useNavigate();
   const recentTable = useTable({
     features: dataTableFeatures,
     columns: isApp ? RECENT_ZIP_SCAN_COLUMNS : RECENT_SCAN_COLUMNS,
@@ -821,9 +821,7 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
         )}
       </ShellPageHeader>
 
-      {source.RepoPanel !== null && (
-        <source.RepoPanel repoId={repoId} name={repoName(repo.url)} onRemoved={() => void navigate({ to: "/repos" })} />
-      )}
+      {source.RepoPanel !== null && <source.RepoPanel repoId={repoId} />}
 
       {current && (
         <RepoBranchSummary
@@ -907,6 +905,8 @@ export function RepoDetail({ repoId, branchId }: { repoId: string; branchId?: st
           )}
         </CardContent>
       </Card>
+
+      <RepoRemoveButton repoId={repoId} name={repoName(repo.url)} isArchive={isApp} removedAt={repo.removedAt} />
     </>
   );
 }

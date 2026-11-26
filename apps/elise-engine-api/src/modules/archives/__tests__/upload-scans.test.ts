@@ -15,7 +15,7 @@ import { tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { zipOf } from "#/__tests__/zip-fixture";
 
 let test: TestDb;
-const app = tenantRouteApp(() => test);
+const app = tenantRouteApp(() => test, { sessionUserId: async () => "ada", userHasPower: async () => true });
 const oldRunnerApp = tenantRouteApp(() => test, { connectedRunnerSources: () => Effect.succeed(["git"]) });
 const accountOf = new Map<string, string>();
 const { env, store } = fakeBindings();
@@ -207,6 +207,7 @@ describe("DELETE /repos/:repoId for an upload app", () => {
     );
     const prefix = `accounts/${accountOf.get("acme")}/uploads/${appId}/`;
     store.set(`${prefix}left-behind.zip`, "an object whose upload never committed");
+    await test.raw.update(scans).set({ status: "succeeded" }).where(eq(scans.id, scanId));
 
     const removed = await send("acme", `/repos/${appId}`, { method: "DELETE" });
     const rows = await test.raw
@@ -255,17 +256,5 @@ describe("DELETE /repos/:repoId for an upload app", () => {
       listed: true,
       archives: [],
     });
-  });
-
-  it("removes no git Repo", async () => {
-    const repoId = IdSchema.parse(
-      await dataOf(
-        await send("acme", "/repos", { method: "POST", json: { repo: "https://github.com/octocat/Spoon-Knife" } }),
-      ),
-    ).id;
-
-    const res = await send("acme", `/repos/${repoId}`, { method: "DELETE" });
-
-    expect(res.status).toBe(404);
   });
 });

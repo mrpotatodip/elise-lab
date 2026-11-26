@@ -18,7 +18,7 @@ app.post(
     const { "x-account-id": accountId } = c.req.valid("header");
     const { scanId } = c.req.valid("param");
     const data = await runEffect(
-      submitResumeSvc(c.env, tenantEffectOf(c, accountId), c.get("deps"), accountId, scanId),
+      submitResumeSvc(c.env, tenantEffectOf(c, accountId), c.get("deps"), accountId, scanId, c.get("userId")),
     );
     return c.json({ data, error: null }, 201);
   },

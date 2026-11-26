@@ -14,6 +14,7 @@ export {
   RepoFindingListSchema,
   RepoListSchema,
   RepoParamSchema,
+  UploadArchiveRemovedSchema,
 } from "@repo/contracts/elise";
 export type { Repo, RepoBranch, RepoFinding } from "@repo/contracts/elise";
 

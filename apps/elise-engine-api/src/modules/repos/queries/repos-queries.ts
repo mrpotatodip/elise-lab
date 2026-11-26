@@ -21,7 +21,14 @@ import type { AppDbType, AppTxDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { addBranchesTx, classifyBranchFailure } from "#/modules/branches";
 import { triageView } from "#/modules/findings/queries";
-import { displayRepoUrlOf, repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
+import {
+  displayRepoUrlOf,
+  REPO_LIMIT_MESSAGE,
+  repoIdentityOf,
+  restoreRemovedRepo,
+  sameRepoIdentity,
+} from "#/modules/scan-ledger";
 import { sourceProviderOf, type SourceProviderId } from "#/providers/registry";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
 import { branchStateOf, openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
@@ -255,14 +262,28 @@ const effectiveDefaultBranch = (pointer: string | null, trackedNames: readonly s
 // A removed upload app is not listed, but asked for by id it is
 // still found, so its Scans keep their History.
 // -----
-export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string): Effect.Effect<Repo[], DbError> =>
+export const listReposEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId?: string,
+  removedOnly = false,
+): Effect.Effect<Repo[], DbError> =>
   Effect.gen(function* () {
     const repos = yield* Effect.tryPromise({
       try: () =>
         db
           .select()
           .from(scanRepos)
-          .where(and(eq(scanRepos.tenantId, tenantId), repoId ? eq(scanRepos.id, repoId) : isNull(scanRepos.removedAt)))
+          .where(
+            and(
+              eq(scanRepos.tenantId, tenantId),
+              repoId
+                ? eq(scanRepos.id, repoId)
+                : removedOnly
+                  ? isNotNull(scanRepos.removedAt)
+                  : isNull(scanRepos.removedAt),
+            ),
+          )
           .orderBy(asc(scanRepos.canonical)),
       catch: toDbError,
     });
@@ -325,7 +346,38 @@ export const listReposEffect = (db: AppDbType, tenantId: string, repoId?: string
         lastScanStatus: last?.status ?? null,
         lastScanAt: last?.createdAt.toISOString() ?? null,
         open: openCountsOf((defaultBranchId ? findings.get(defaultBranchId) : undefined) ?? []),
+        removedAt: repo.removedAt?.toISOString() ?? null,
       };
+    });
+  });
+
+export const restoreRepoEffect = (
+  db: AppDbType,
+  tenantId: string,
+  repoId: string,
+  userId: string,
+): Effect.Effect<void, NotFound | Conflict | DbError> =>
+  Effect.gen(function* () {
+    const [row] = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ removedAt: scanRepos.removedAt })
+          .from(scanRepos)
+          .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId))),
+      catch: toDbError,
+    });
+    if (!row?.removedAt) return yield* new NotFound({ message: "Removed repo not found" });
+    const restored = yield* Effect.tryPromise({
+      try: () => restoreRemovedRepo(db, tenantId, eq(scanRepos.id, repoId)),
+      catch: toDbError,
+    });
+    if (!restored) return yield* new Conflict({ message: REPO_LIMIT_MESSAGE });
+    yield* Effect.tryPromise({
+      try: async () => {
+        const actorPartyId = await actorPartyOf(db, userId);
+        await insertAuditEntry(db, { actorPartyId, action: "repo.restored", subjectId: repoId, tenantId });
+      },
+      catch: toDbError,
     });
   });
 
@@ -537,8 +589,6 @@ export const scanDiffEffect = (
     return diff;
   });
 
-export const REPO_LIMIT_MESSAGE = `An account can have at most ${REPO_LIMIT_PER_TENANT} repos`;
-
 // -----
 // Add a repo without scanning it, with the branches to track.
 // The same repo in any spelling is the repo already there, so
@@ -564,17 +614,8 @@ export const addRepoEffect = (
           .from(scanRepos)
           .where(sameRepoIdentity(tenantId, identity));
         let repoId = existing?.id;
-        if (existing?.removedAt) {
-          const [{ total }] = await tx
-            .select({ total: count() })
-            .from(scanRepos)
-            .where(and(eq(scanRepos.tenantId, tenantId), isNull(scanRepos.removedAt)));
-          if (total >= REPO_LIMIT_PER_TENANT) throw new Conflict({ message: REPO_LIMIT_MESSAGE });
-          await tx
-            .update(scanRepos)
-            .set({ removedAt: null })
-            .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, existing.id)));
-        }
+        if (existing?.removedAt && !(await restoreRemovedRepo(tx, tenantId, eq(scanRepos.id, existing.id))))
+          throw new Conflict({ message: REPO_LIMIT_MESSAGE });
         if (!repoId) {
           const [{ total }] = await tx
             .select({ total: count() })
