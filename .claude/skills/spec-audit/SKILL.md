@@ -19,7 +19,7 @@ An issue number or URL for the spec. With none, ask for it. If the argument is a
 ## 1. Gather
 
 - `gh issue view <n> --comments` for the spec, including its discussion.
-- Its sub-issues: `gh api repos/mrpotatodip/ts-mrpotato-lab/issues/<n>/sub_issues --jq '.[] | {number, title, state}'`, then `gh issue view` each one.
+- Its sub-issues: `gh api repos/mrpotatodip/elise-lab/issues/<n>/sub_issues --jq '.[] | {number, title, state}'`, then `gh issue view` each one.
 - The context the spec touches: `GLOSSARY-MAP.md` and the `GLOSSARY.md` it points to, `docs/adr/`, `CODING_STANDARDS.md` and the file under `docs/standards/` for each scope the spec touches (`contracts.md` for any shared shape).
 - The code the spec says it will change, read to check what is there now. Do not run builds, tests or scans.
 

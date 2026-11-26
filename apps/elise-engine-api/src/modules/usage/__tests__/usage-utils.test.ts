@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { ScanStatus } from "#/schemas";
 import type { PlanState } from "#/modules/billing";
 import type { MonthSpend, UsageEnv } from "#/modules/usage";
-import { allowanceUsdOf, budgetUsdOf, defaultBudgetUsdOf, monthLabelOf, monthStartOf, reservedUsdOf, summarizeUsage } from "#/modules/usage";
+import {
+  allowanceUsdOf,
+  budgetUsdOf,
+  defaultBudgetUsdOf,
+  monthLabelOf,
+  monthStartOf,
+  reservedUsdOf,
+  summarizeUsage,
+} from "#/modules/usage";
 
 const ENV: UsageEnv = { MONTHLY_BUDGET_USD: "20", BUDGET_ALLOWANCE_USD: "1000" };
 const TEAM: PlanState = {
@@ -104,7 +112,9 @@ describe("summarizeUsage", () => {
     ["no plan and an own key", { plan: null, ownKey: true, budgetOverrideUsd: null }, false],
     ["no plan, an own key and a budget an admin set", { plan: null, ownKey: true, budgetOverrideUsd: 10 }, true],
   ])("says whether the monthly budget applies with %s: %s", (_name, over, expected) => {
-    expect(summarizeUsage(new Date("2026-11-07T00:00:00Z"), { ...spend, ...over }, ENV, 0).budgetApplies).toBe(expected);
+    expect(summarizeUsage(new Date("2026-11-07T00:00:00Z"), { ...spend, ...over }, ENV, 0).budgetApplies).toBe(
+      expected,
+    );
   });
 
   it("goes negative when the month passed the budget", () => {

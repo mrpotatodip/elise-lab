@@ -44,6 +44,7 @@ pub fn main(args: &[String]) -> Exit {
             Command::Doctor { hosts } => commands::doctor(&store, &hosts).await,
             Command::Unpair => commands::unpair(&store).await,
             Command::Run { once, parallel } => commands::run(&store, once, parallel).await,
+            Command::Resume { scan_id } => commands::resume(&scan_id),
         }
     })
 }

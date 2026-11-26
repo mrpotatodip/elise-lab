@@ -1,8 +1,4 @@
-import {
-  ChatBotToolErrorSchema,
-  type ChatBotJson,
-  type ChatBotToolError,
-} from "@repo/contracts/chat-bots";
+import { ChatBotToolErrorSchema, type ChatBotJson, type ChatBotToolError } from "@repo/contracts/chat-bots";
 
 // -----
 // A failed call's result in structure: the

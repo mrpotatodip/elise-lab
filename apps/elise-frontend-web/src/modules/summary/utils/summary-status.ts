@@ -25,7 +25,8 @@ export const findingStateLabel = (finding: Pick<RepoFinding, "state" | "status">
   return finding.status === "needs_validation" ? "Needs a person to check" : "Confirmed";
 };
 
-export const openFindings = <F extends Pick<RepoFinding, "state">>(findings: readonly F[]): F[] => findings.filter((finding) => finding.state !== "fixed_by_code");
+export const openFindings = <F extends Pick<RepoFinding, "state">>(findings: readonly F[]): F[] =>
+  findings.filter((finding) => finding.state !== "fixed_by_code");
 
 // -----
 // Findings the agent could not confirm have no severity, so the dots
@@ -35,7 +36,8 @@ export const needsPersonLabel = (count: number): string => `${count} ${count ===
 
 export const findingAnchor = (findingId: string): string => `finding-${findingId}`;
 
-export const findingPath = (repoId: string, findingId: string): string => `/summary/${repoId}#${findingAnchor(findingId)}`;
+export const findingPath = (repoId: string, findingId: string): string =>
+  `/summary/${repoId}#${findingAnchor(findingId)}`;
 
 const SCAN_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
@@ -54,7 +56,8 @@ export const scanDayLabel = (iso: string): string => {
 // -----
 export const repoSubtitle = (repo: Pick<Repo, "defaultBranch" | "scans" | "lastScanAt">): string => {
   const when = repo.lastScanAt ? `Latest scan ${scanDayLabel(repo.lastScanAt)}.` : "";
-  if (repo.defaultBranch === null) return repo.scans > 0 ? `${when} ${SUMMARY_COPY.noBranch}`.trim() : SUMMARY_COPY.notScanned;
+  if (repo.defaultBranch === null)
+    return repo.scans > 0 ? `${when} ${SUMMARY_COPY.noBranch}`.trim() : SUMMARY_COPY.notScanned;
   return `Branch ${repo.defaultBranch}${repo.lastScanAt ? `. ${when}` : ""}`;
 };
 

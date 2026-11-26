@@ -31,7 +31,15 @@ export function scanKnownRepos(scans: readonly ScanStatus[]): KnownRepo[] {
     // A scan names no provider, so its address tells.
     // -----
     const provider = sourceProviderOfAddress(scan.repo)?.id ?? DEFAULT_SOURCE_PROVIDER_ID;
-    known.set(scan.repoId, { provider, repoId: scan.repoId, url: scan.repo, label: owner ? `${owner}/${name}` : name, last: scan.status, running: active, isPrivate: false });
+    known.set(scan.repoId, {
+      provider,
+      repoId: scan.repoId,
+      url: scan.repo,
+      label: owner ? `${owner}/${name}` : name,
+      last: scan.status,
+      running: active,
+      isPrivate: false,
+    });
   }
   return [...known.values()];
 }
@@ -42,8 +50,20 @@ export function scanKnownRepos(scans: readonly ScanStatus[]): KnownRepo[] {
 // still comes from the scans, which the list of repositories does not carry.
 // -----
 export function scanRepoChoices(repos: readonly Repo[], scans: readonly ScanStatus[]): KnownRepo[] {
-  const running = new Set(scans.filter((scan) => scan.status === "queued" || scan.status === "running").map((scan) => scan.repoId));
+  const running = new Set(
+    scans.filter((scan) => scan.status === "queued" || scan.status === "running").map((scan) => scan.repoId),
+  );
   return repos
-    .toSorted((a, b) => (b.lastScanAt ?? "").localeCompare(a.lastScanAt ?? "") || a.canonical.localeCompare(b.canonical))
-    .map((repo) => ({ provider: repo.provider ?? DEFAULT_SOURCE_PROVIDER_ID, repoId: repo.id, url: repo.url, label: repo.canonical, last: repo.lastScanStatus, running: running.has(repo.id), isPrivate: repo.isPrivate === true }));
+    .toSorted(
+      (a, b) => (b.lastScanAt ?? "").localeCompare(a.lastScanAt ?? "") || a.canonical.localeCompare(b.canonical),
+    )
+    .map((repo) => ({
+      provider: repo.provider ?? DEFAULT_SOURCE_PROVIDER_ID,
+      repoId: repo.id,
+      url: repo.url,
+      label: repo.canonical,
+      last: repo.lastScanStatus,
+      running: running.has(repo.id),
+      isPrivate: repo.isPrivate === true,
+    }));
 }

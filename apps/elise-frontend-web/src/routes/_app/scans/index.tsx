@@ -12,7 +12,10 @@ export const Route = createFileRoute("/_app/scans/")({
 function ScansPage() {
   return (
     <>
-      <ShellPageHeader title="Scans" description="Every audit you have run, newest first. Open one to read its report." />
+      <ShellPageHeader
+        title="Scans"
+        description="Every audit you have run, newest first. Open one to read its report."
+      />
       <Suspense fallback={<ScanListSkeleton />}>
         <ScanList />
       </Suspense>

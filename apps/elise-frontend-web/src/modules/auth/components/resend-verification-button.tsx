@@ -12,10 +12,19 @@ export function ResendVerificationButton({ email }: { email: string }) {
 
   return (
     <div className="grid gap-3">
-      <Button type="button" variant="outline" size="lg" className="w-full" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className="w-full"
+        disabled={mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
         {mutation.isPending ? "Please wait…" : AUTH_COPY.verify.resend}
       </Button>
-      {mutation.isSuccess ? <output className="block text-sm leading-relaxed text-muted-foreground">{AUTH_COPY.verify.sent}</output> : null}
+      {mutation.isSuccess ? (
+        <output className="block text-sm leading-relaxed text-muted-foreground">{AUTH_COPY.verify.sent}</output>
+      ) : null}
     </div>
   );
 }

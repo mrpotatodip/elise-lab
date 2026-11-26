@@ -18,12 +18,22 @@ type UsageBudgetFormProps = {
 const INPUT_ID = "usage-budget";
 const HELP_ID = "usage-budget-help";
 
-export function UsageBudgetForm({ budgetUsd, floorUsd, allowanceUsd, pending, onSave, onCancel }: UsageBudgetFormProps) {
+export function UsageBudgetForm({
+  budgetUsd,
+  floorUsd,
+  allowanceUsd,
+  pending,
+  onSave,
+  onCancel,
+}: UsageBudgetFormProps) {
   const form = useForm({
     defaultValues: { budget: String(budgetUsd) },
     onSubmit: ({ value }) => onSave(Number(value.budget.trim())),
   });
-  const range = allowanceUsd === undefined ? `At least ${usageUsd(floorUsd)}.` : `Between ${usageUsd(floorUsd)} and ${usageUsd(allowanceUsd)}.`;
+  const range =
+    allowanceUsd === undefined
+      ? `At least ${usageUsd(floorUsd)}.`
+      : `Between ${usageUsd(floorUsd)} and ${usageUsd(allowanceUsd)}.`;
 
   return (
     <form
@@ -35,12 +45,25 @@ export function UsageBudgetForm({ budgetUsd, floorUsd, allowanceUsd, pending, on
       }}
       className="grid gap-2"
     >
-      <form.Field name="budget" validators={{ onSubmit: ({ value }) => usageBudgetError(value, floorUsd, allowanceUsd) }}>
+      <form.Field
+        name="budget"
+        validators={{ onSubmit: ({ value }) => usageBudgetError(value, floorUsd, allowanceUsd) }}
+      >
         {(field) => (
           <>
             <Label htmlFor={INPUT_ID}>Monthly budget (USD)</Label>
             <div className="flex items-center gap-2">
-              <Input id={INPUT_ID} name={field.name} inputMode="decimal" autoComplete="off" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} className="h-8 w-32 tabular-nums" {...fieldAria(field, INPUT_ID, HELP_ID)} />
+              <Input
+                id={INPUT_ID}
+                name={field.name}
+                inputMode="decimal"
+                autoComplete="off"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+                className="h-8 w-32 tabular-nums"
+                {...fieldAria(field, INPUT_ID, HELP_ID)}
+              />
               <Button type="submit" size="sm" disabled={pending}>
                 {pending ? "Saving" : "Save"}
               </Button>

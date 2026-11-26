@@ -10,7 +10,11 @@ import { cn } from "#/lib/utils";
 // as one pattern.
 // -----
 export function ShellFilterBar({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3", className)}>{children}</div>;
+  return (
+    <div className={cn("flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3", className)}>
+      {children}
+    </div>
+  );
 }
 
 type ShellSearchFieldProps = Omit<ComponentProps<typeof Input>, "id" | "type"> & {
@@ -24,7 +28,10 @@ export function ShellSearchField({ id, label, className, ...input }: ShellSearch
       <Label htmlFor={id} className="sr-only">
         {label}
       </Label>
-      <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Search
+        aria-hidden="true"
+        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+      />
       <Input id={id} type="search" autoComplete="off" className="pl-9" {...input} />
     </div>
   );

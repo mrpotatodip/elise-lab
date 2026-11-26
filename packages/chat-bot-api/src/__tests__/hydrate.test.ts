@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
-import {
-  createChatBotDurableStream,
-  memoryChatBotDurableStreamStore,
-} from "@repo/chat-bot-durable-stream";
+import { createChatBotDurableStream, memoryChatBotDurableStreamStore } from "@repo/chat-bot-durable-stream";
 import type { ChatBotThreadDetail } from "../contracts";
 import {
   ChatBotInvalid,
@@ -143,12 +140,7 @@ describe("hydrateOrJoinChatBotSvc", () => {
     await streams({ runId: "run-1" }).close();
     const store = storeWith({ lookupRun: () => Effect.succeed({ id: "run-1", threadId }) });
 
-    const response = await run(
-      store,
-      streams,
-      undefined,
-      new Request("https://chat.local/?runId=run-1&offset=-1"),
-    );
+    const response = await run(store, streams, undefined, new Request("https://chat.local/?runId=run-1&offset=-1"));
 
     expect(response.headers.get("X-Thread-Id")).toBe(threadId);
   });

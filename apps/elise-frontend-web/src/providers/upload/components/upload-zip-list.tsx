@@ -23,9 +23,11 @@ import { UploadRemoveDialog } from "./upload-remove-dialog";
 
 const MB = 1024 * 1024;
 
-const sizeOf = (bytes: number) => (bytes < MB ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / MB).toFixed(1)} MB`);
+const sizeOf = (bytes: number) =>
+  bytes < MB ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / MB).toFixed(1)} MB`;
 
-const dayOf = (iso: string) => new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+const dayOf = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
 export const UPLOAD_LIMITS_NOTE = `A zip can be up to ${UPLOAD_ARCHIVE_MAX_MB} MB, and unpack to at most ${UPLOAD_UNPACKED_MAX_MB} MB, ${UPLOAD_FILES_MAX.toLocaleString("en-US")} files and ${UPLOAD_PATH_DEPTH_MAX} folder levels. An app holds up to ${UPLOAD_ARCHIVES_PER_APP_MAX} zips, and your account up to ${UPLOAD_STORAGE_PER_TENANT_MAX_MB} MB of them.`;
 
@@ -94,7 +96,10 @@ export function UploadZipList({ repoId, selectedId, onSelect }: UploadZipListPro
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium">
-          Zips <span className="font-normal text-muted-foreground">({archives.length} of {UPLOAD_ARCHIVES_PER_APP_MAX})</span>
+          Zips{" "}
+          <span className="font-normal text-muted-foreground">
+            ({archives.length} of {UPLOAD_ARCHIVES_PER_APP_MAX})
+          </span>
         </span>
         <input
           ref={input}
@@ -109,7 +114,13 @@ export function UploadZipList({ repoId, selectedId, onSelect }: UploadZipListPro
             if (file) void send(file);
           }}
         />
-        <Button type="button" variant="outline" size="sm" disabled={busy || isPending} onClick={() => input.current?.click()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy || isPending}
+          onClick={() => input.current?.click()}
+        >
           <Upload aria-hidden="true" className="size-4" />
           {checking ? "Checking…" : upload.isPending ? "Uploading…" : "Upload a zip"}
         </Button>
@@ -128,14 +139,22 @@ export function UploadZipList({ repoId, selectedId, onSelect }: UploadZipListPro
           <AlertDescription>We couldn&apos;t load the zips of this app.</AlertDescription>
         </Alert>
       ) : archives.length === 0 ? (
-        <p className="rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">No zips yet. Upload a zip of your source code to scan it.</p>
+        <p className="rounded-md border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+          No zips yet. Upload a zip of your source code to scan it.
+        </p>
       ) : (
         <ul className="grid gap-1.5">
           {archives.map((archive) => {
             const selected = archive.id === selectedId;
             const details = `${sizeOf(archive.sizeBytes)} · uploaded ${dayOf(archive.uploadedAt)} · ${archive.contentSha256.slice(0, 7)}`;
             return (
-              <li key={archive.id} className={cn("flex items-center gap-2 rounded-md border bg-card px-2 py-1.5", selected && "border-primary ring-1 ring-primary")}>
+              <li
+                key={archive.id}
+                className={cn(
+                  "flex items-center gap-2 rounded-md border bg-card px-2 py-1.5",
+                  selected && "border-primary ring-1 ring-primary",
+                )}
+              >
                 {onSelect ? (
                   <button
                     type="button"

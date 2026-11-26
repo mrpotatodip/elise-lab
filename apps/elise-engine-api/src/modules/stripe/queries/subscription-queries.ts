@@ -15,23 +15,36 @@ export const tenantExistsEffect = (db: AppDbType, tenantId: string): Effect.Effe
     catch: toDbError,
   });
 
-export const tenantOfStripeCustomerEffect = (db: AppDbType, customerId: string): Effect.Effect<string | null, DbError> =>
+export const tenantOfStripeCustomerEffect = (
+  db: AppDbType,
+  customerId: string,
+): Effect.Effect<string | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
-      const [found] = await db.select({ tenantId: tenantSubscriptions.tenantId }).from(tenantSubscriptions).where(eq(tenantSubscriptions.stripeCustomerId, customerId));
+      const [found] = await db
+        .select({ tenantId: tenantSubscriptions.tenantId })
+        .from(tenantSubscriptions)
+        .where(eq(tenantSubscriptions.stripeCustomerId, customerId));
       return found?.tenantId ?? null;
     },
     catch: toDbError,
   });
 
-export const planOfPriceEffect = (db: AppDbType, priceId: string): Effect.Effect<{ id: string; interval: BillingIntervalValue } | null, DbError> =>
+export const planOfPriceEffect = (
+  db: AppDbType,
+  priceId: string,
+): Effect.Effect<{ id: string; interval: BillingIntervalValue } | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [found] = await db
         .select({ id: platformMasterPlans.id, monthly: platformMasterPlans.stripePriceId })
         .from(platformMasterPlans)
-        .where(or(eq(platformMasterPlans.stripePriceId, priceId), eq(platformMasterPlans.stripeYearlyPriceId, priceId)));
-      return found ? { id: found.id, interval: found.monthly === priceId ? ("month" as const) : ("year" as const) } : null;
+        .where(
+          or(eq(platformMasterPlans.stripePriceId, priceId), eq(platformMasterPlans.stripeYearlyPriceId, priceId)),
+        );
+      return found
+        ? { id: found.id, interval: found.monthly === priceId ? ("month" as const) : ("year" as const) }
+        : null;
     },
     catch: toDbError,
   });
@@ -47,7 +60,11 @@ export type StripeSubscriptionRow = {
   cancelAtPeriodEnd: boolean;
 };
 
-export const upsertStripeSubscriptionEffect = (db: AppDbType, row: StripeSubscriptionRow, now: Date): Effect.Effect<boolean, DbError> =>
+export const upsertStripeSubscriptionEffect = (
+  db: AppDbType,
+  row: StripeSubscriptionRow,
+  now: Date,
+): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const pastDue = row.status === "past_due";
@@ -57,7 +74,13 @@ export const upsertStripeSubscriptionEffect = (db: AppDbType, row: StripeSubscri
         .values({ ...row, source: "stripe", pastDueSince: pastDue ? now : null })
         .onConflictDoUpdate({
           target: tenantSubscriptions.tenantId,
-          setWhere: or(isNull(stored), eq(stored, row.stripeSubscriptionId), row.status === "canceled" ? undefined : notInArray(tenantSubscriptions.status, [...STRIPE_SUBSCRIPTION_LIVE_STATUSES])),
+          setWhere: or(
+            isNull(stored),
+            eq(stored, row.stripeSubscriptionId),
+            row.status === "canceled"
+              ? undefined
+              : notInArray(tenantSubscriptions.status, [...STRIPE_SUBSCRIPTION_LIVE_STATUSES]),
+          ),
           set: {
             planId: row.planId,
             billingInterval: row.billingInterval,
@@ -67,7 +90,9 @@ export const upsertStripeSubscriptionEffect = (db: AppDbType, row: StripeSubscri
             stripeSubscriptionId: row.stripeSubscriptionId,
             currentPeriodEnd: row.currentPeriodEnd,
             cancelAtPeriodEnd: row.cancelAtPeriodEnd,
-            pastDueSince: pastDue ? sql`coalesce(${tenantSubscriptions.pastDueSince}, ${now.toISOString()}::timestamptz)` : null,
+            pastDueSince: pastDue
+              ? sql`coalesce(${tenantSubscriptions.pastDueSince}, ${now.toISOString()}::timestamptz)`
+              : null,
             updatedAt: now,
           },
         })

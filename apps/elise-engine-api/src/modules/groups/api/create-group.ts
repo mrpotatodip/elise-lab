@@ -10,11 +10,20 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.post("/", createGroupDoc, requirePower("company:team:groups:create"), zValidator("header", AccountHeaderSchema), zValidator("json", CreateGroupBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { name } = c.req.valid("json");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(createGroupSvc(db, accountId, userIdOf(c), name)));
-  return c.json({ data, error: null }, 201);
-});
+app.post(
+  "/",
+  createGroupDoc,
+  requirePower("company:team:groups:create"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", CreateGroupBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { name } = c.req.valid("json");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(createGroupSvc(db, accountId, userIdOf(c), name)));
+    return c.json({ data, error: null }, 201);
+  },
+);
 
 export default app;

@@ -24,7 +24,14 @@ export function FindingCommentItem({ comment, markers, actions, editor }: Findin
   if (comment.body === null) {
     return (
       <li className="pl-11 text-xs text-muted-foreground">
-        A comment from <FindingCommentTime value={comment.createdAt} /> was deleted{comment.deletedAt && <> on <FindingCommentTime value={comment.deletedAt} /></>}.
+        A comment from <FindingCommentTime value={comment.createdAt} /> was deleted
+        {comment.deletedAt && (
+          <>
+            {" "}
+            on <FindingCommentTime value={comment.deletedAt} />
+          </>
+        )}
+        .
       </li>
     );
   }
@@ -32,7 +39,9 @@ export function FindingCommentItem({ comment, markers, actions, editor }: Findin
   return (
     <li className="flex gap-3">
       <Avatar aria-hidden="true" className="size-8">
-        <AvatarFallback className="bg-foreground/15 text-foreground ring-1 ring-inset ring-foreground/25">{commentInitials(comment.authorName) || "?"}</AvatarFallback>
+        <AvatarFallback className="bg-foreground/15 text-foreground ring-1 ring-inset ring-foreground/25">
+          {commentInitials(comment.authorName) || "?"}
+        </AvatarFallback>
       </Avatar>
       <div className="grid min-w-0 flex-1 content-start gap-1">
         <div className="flex flex-wrap items-center gap-x-2 text-xs">

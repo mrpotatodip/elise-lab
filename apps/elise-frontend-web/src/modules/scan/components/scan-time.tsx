@@ -1,6 +1,7 @@
 import { hydratedTimeZone, useHydrated } from "#/lib/use-hydrated";
 
-const format = (timeZone: string | undefined) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone });
+const format = (timeZone: string | undefined) =>
+  new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone });
 
 export function ScanTime({ value, utc = false }: { value: string | null | undefined; utc?: boolean }) {
   const hydrated = useHydrated();

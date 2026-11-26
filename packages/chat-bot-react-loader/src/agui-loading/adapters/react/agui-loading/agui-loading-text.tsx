@@ -13,10 +13,7 @@ import { AGUI_LOADING_CAPTION_TEXT_COMPONENTS } from "../animation/agui-loading-
 import { useAGUILoadingCaption } from "../use-agui-loading-caption";
 import { useAGUILoadingContext } from "./agui-loading";
 
-export type AGUILoadingTextProps<TEvent extends string = EventType> = Omit<
-  ComponentProps<"span">,
-  "children"
-> & {
+export type AGUILoadingTextProps<TEvent extends string = EventType> = Omit<ComponentProps<"span">, "children"> & {
   // Phrases to show per event, plus "waiting" and "stopped".
   // Unlisted keys use the built-in text.
   byEvent?: AGUILoadingTextsByEvent<TEvent>;

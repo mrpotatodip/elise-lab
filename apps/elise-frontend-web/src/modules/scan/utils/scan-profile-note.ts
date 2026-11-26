@@ -5,9 +5,13 @@ import type { ScanProfileNote } from "../types";
 
 const RANK = { quick: 1, standard: 2, deep: 3 } as const;
 
-const nameOf = (profile: ScanStatus["profile"]) => SCAN_PROFILE_OPTIONS.find((option) => option.value === profile)?.label ?? profile;
+const nameOf = (profile: ScanStatus["profile"]) =>
+  SCAN_PROFILE_OPTIONS.find((option) => option.value === profile)?.label ?? profile;
 
-export function scanProfileNote(asked: ScanStatus["profile"], met: ProfileMetValue | null | undefined): ScanProfileNote | null {
+export function scanProfileNote(
+  asked: ScanStatus["profile"],
+  met: ProfileMetValue | null | undefined,
+): ScanProfileNote | null {
   if (met === null || met === undefined) return null;
   const askedName = nameOf(asked);
 
@@ -16,7 +20,8 @@ export function scanProfileNote(asked: ScanStatus["profile"], met: ProfileMetVal
       kind: "unmet",
       badge: "Did not run as asked",
       title: `Asked for ${askedName}. Its work did not run.`,
-      detail: "This Scan did not do the work of Focused, Balanced or Exhaustive. The findings are kept, but they do not come from a full review. Run the Scan again on a Runner or in the cloud.",
+      detail:
+        "This Scan did not do the work of Focused, Balanced or Exhaustive. The findings are kept, but they do not come from a full review. Run the Scan again on a Runner or in the cloud.",
     };
   }
 

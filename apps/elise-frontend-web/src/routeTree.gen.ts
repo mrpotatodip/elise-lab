@@ -17,6 +17,8 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as TwoFactorRouteImport } from './routes/two-factor'
+import { Route as TwoFactorSetupRouteImport } from './routes/two-factor-setup'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AppFilesRouteImport } from './routes/_app/files'
 import { Route as AppGroupsRouteImport } from './routes/_app/groups'
@@ -33,6 +35,7 @@ import { Route as AppSettingsBudgetRouteImport } from './routes/_app/settings.bu
 import { Route as AppSettingsHistoryRouteImport } from './routes/_app/settings.history'
 import { Route as AppSettingsPlanRouteImport } from './routes/_app/settings.plan'
 import { Route as AppSettingsProvidersRouteImport } from './routes/_app/settings.providers'
+import { Route as AppSettingsSecurityRouteImport } from './routes/_app/settings.security'
 import { Route as AppSettingsSignalsRouteImport } from './routes/_app/settings.signals'
 import { Route as AppSummaryIndexRouteImport } from './routes/_app/summary.index'
 import { Route as AppSummaryRepoIdRouteImport } from './routes/_app/summary.$repoId'
@@ -75,6 +78,16 @@ const SigninRoute = SigninRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TwoFactorRoute = TwoFactorRouteImport.update({
+  id: '/two-factor',
+  path: '/two-factor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TwoFactorSetupRoute = TwoFactorSetupRouteImport.update({
+  id: '/two-factor-setup',
+  path: '/two-factor-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -157,6 +170,11 @@ const AppSettingsProvidersRoute = AppSettingsProvidersRouteImport.update({
   path: '/providers',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppSettingsSecurityRoute = AppSettingsSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const AppSettingsSignalsRoute = AppSettingsSignalsRouteImport.update({
   id: '/signals',
   path: '/signals',
@@ -187,6 +205,8 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/two-factor-setup': typeof TwoFactorSetupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/files': typeof AppFilesRoute
   '/groups': typeof AppGroupsRoute
@@ -200,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/settings/history': typeof AppSettingsHistoryRoute
   '/settings/plan': typeof AppSettingsPlanRoute
   '/settings/providers': typeof AppSettingsProvidersRoute
+  '/settings/security': typeof AppSettingsSecurityRoute
   '/settings/signals': typeof AppSettingsSignalsRoute
   '/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/repos/': typeof AppReposIndexRoute
@@ -216,6 +237,8 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/two-factor-setup': typeof TwoFactorSetupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/files': typeof AppFilesRoute
   '/groups': typeof AppGroupsRoute
@@ -228,6 +251,7 @@ export interface FileRoutesByTo {
   '/settings/history': typeof AppSettingsHistoryRoute
   '/settings/plan': typeof AppSettingsPlanRoute
   '/settings/providers': typeof AppSettingsProvidersRoute
+  '/settings/security': typeof AppSettingsSecurityRoute
   '/settings/signals': typeof AppSettingsSignalsRoute
   '/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/repos': typeof AppReposIndexRoute
@@ -246,6 +270,8 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/two-factor': typeof TwoFactorRoute
+  '/two-factor-setup': typeof TwoFactorSetupRoute
   '/verify-email': typeof VerifyEmailRoute
   '/_app/files': typeof AppFilesRoute
   '/_app/groups': typeof AppGroupsRoute
@@ -259,6 +285,7 @@ export interface FileRoutesById {
   '/_app/settings/history': typeof AppSettingsHistoryRoute
   '/_app/settings/plan': typeof AppSettingsPlanRoute
   '/_app/settings/providers': typeof AppSettingsProvidersRoute
+  '/_app/settings/security': typeof AppSettingsSecurityRoute
   '/_app/settings/signals': typeof AppSettingsSignalsRoute
   '/_app/summary/$repoId': typeof AppSummaryRepoIdRoute
   '/_app/repos/': typeof AppReposIndexRoute
@@ -277,6 +304,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signin'
     | '/signup'
+    | '/two-factor'
+    | '/two-factor-setup'
     | '/verify-email'
     | '/files'
     | '/groups'
@@ -290,6 +319,7 @@ export interface FileRouteTypes {
     | '/settings/history'
     | '/settings/plan'
     | '/settings/providers'
+    | '/settings/security'
     | '/settings/signals'
     | '/summary/$repoId'
     | '/repos/'
@@ -306,6 +336,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signin'
     | '/signup'
+    | '/two-factor'
+    | '/two-factor-setup'
     | '/verify-email'
     | '/files'
     | '/groups'
@@ -318,6 +350,7 @@ export interface FileRouteTypes {
     | '/settings/history'
     | '/settings/plan'
     | '/settings/providers'
+    | '/settings/security'
     | '/settings/signals'
     | '/summary/$repoId'
     | '/repos'
@@ -335,6 +368,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signin'
     | '/signup'
+    | '/two-factor'
+    | '/two-factor-setup'
     | '/verify-email'
     | '/_app/files'
     | '/_app/groups'
@@ -348,6 +383,7 @@ export interface FileRouteTypes {
     | '/_app/settings/history'
     | '/_app/settings/plan'
     | '/_app/settings/providers'
+    | '/_app/settings/security'
     | '/_app/settings/signals'
     | '/_app/summary/$repoId'
     | '/_app/repos/'
@@ -366,6 +402,8 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
+  TwoFactorRoute: typeof TwoFactorRoute
+  TwoFactorSetupRoute: typeof TwoFactorSetupRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   InviteTokenRoute: typeof InviteTokenRoute
 }
@@ -426,6 +464,20 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/two-factor': {
+      id: '/two-factor'
+      path: '/two-factor'
+      fullPath: '/two-factor'
+      preLoaderRoute: typeof TwoFactorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/two-factor-setup': {
+      id: '/two-factor-setup'
+      path: '/two-factor-setup'
+      fullPath: '/two-factor-setup'
+      preLoaderRoute: typeof TwoFactorSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/verify-email': {
@@ -540,6 +592,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsProvidersRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/security': {
+      id: '/_app/settings/security'
+      path: '/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof AppSettingsSecurityRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/signals': {
       id: '/_app/settings/signals'
       path: '/signals'
@@ -576,6 +635,7 @@ interface AppSettingsRouteChildren {
   AppSettingsHistoryRoute: typeof AppSettingsHistoryRoute
   AppSettingsPlanRoute: typeof AppSettingsPlanRoute
   AppSettingsProvidersRoute: typeof AppSettingsProvidersRoute
+  AppSettingsSecurityRoute: typeof AppSettingsSecurityRoute
   AppSettingsSignalsRoute: typeof AppSettingsSignalsRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
@@ -585,6 +645,7 @@ const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsHistoryRoute: AppSettingsHistoryRoute,
   AppSettingsPlanRoute: AppSettingsPlanRoute,
   AppSettingsProvidersRoute: AppSettingsProvidersRoute,
+  AppSettingsSecurityRoute: AppSettingsSecurityRoute,
   AppSettingsSignalsRoute: AppSettingsSignalsRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
@@ -636,6 +697,8 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
+  TwoFactorRoute: TwoFactorRoute,
+  TwoFactorSetupRoute: TwoFactorSetupRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   InviteTokenRoute: InviteTokenRoute,
 }

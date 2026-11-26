@@ -14,11 +14,20 @@ const app = new Hono<AppEnv>();
 // Owner role: a Runner has no session and no Account yet.
 // The login row has no Account until a member approves it.
 // -----
-app.post("/login/start", startRunnerLoginDoc, requireLoginStartLimit, requireLoginStartTotalLimit, zValidator("json", StartRunnerLoginBodySchema), async (c) => {
-  const body = c.req.valid("json");
-  const ip = c.req.header("cf-connecting-ip") ?? "local";
-  const data = await runEffect(startRunnerLoginSvc(dbConnect(c.env.DATABASE_URL), body, { ip, dashboardUrl: c.env.DASHBOARD_URL }));
-  return c.json({ data, error: null });
-});
+app.post(
+  "/login/start",
+  startRunnerLoginDoc,
+  requireLoginStartLimit,
+  requireLoginStartTotalLimit,
+  zValidator("json", StartRunnerLoginBodySchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const ip = c.req.header("cf-connecting-ip") ?? "local";
+    const data = await runEffect(
+      startRunnerLoginSvc(dbConnect(c.env.DATABASE_URL), body, { ip, dashboardUrl: c.env.DASHBOARD_URL }),
+    );
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

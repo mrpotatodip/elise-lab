@@ -47,7 +47,9 @@ export function ScanSummary({ scan }: { scan: ScanStatus }) {
           <Column label="What it found">
             <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
               {summary.total}
-              <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">{summary.total === 1 ? "finding" : "findings"}</span>
+              <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">
+                {summary.total === 1 ? "finding" : "findings"}
+              </span>
             </p>
             {hasSeverity && <ScanSeverityDots counts={summary.severity} />}
             <ul className="grid gap-3 text-sm leading-relaxed">
@@ -73,14 +75,18 @@ export function ScanSummary({ scan }: { scan: ScanStatus }) {
                   <span className="ml-1.5 text-sm font-normal tracking-normal text-muted-foreground">new</span>
                 </p>
                 <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-                  {diff === undefined ? "Comparing with the last scan…" : `${summary.carried} carried over from earlier scans and seen again. The rest of this page shows what changed.`}
+                  {diff === undefined
+                    ? "Comparing with the last scan…"
+                    : `${summary.carried} carried over from earlier scans and seen again. The rest of this page shows what changed.`}
                 </p>
               </>
             ) : (
               <>
                 <p className="text-[40px] font-semibold leading-none tracking-tight">None</p>
                 <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-                  {scan.branchId ? "This is the first scan of this branch, so there is nothing to compare with yet." : "A one-off scan has no history to compare with."}
+                  {scan.branchId
+                    ? "This is the first scan of this branch, so there is nothing to compare with yet."
+                    : "A one-off scan has no history to compare with."}
                 </p>
               </>
             )}
@@ -89,7 +95,9 @@ export function ScanSummary({ scan }: { scan: ScanStatus }) {
 
         {usage && (
           <Column label={scan.runner ? "What it would cost" : "What it cost"}>
-            <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">{scanCost(usage.costUsd)}</p>
+            <p className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
+              {scanCost(usage.costUsd)}
+            </p>
             <ul className="grid gap-3 text-sm leading-relaxed">
               {duration && <Line label="Took" value={duration} />}
               {tokens > 0 && <Line label="Tokens" value={scanTokens(tokens)} />}

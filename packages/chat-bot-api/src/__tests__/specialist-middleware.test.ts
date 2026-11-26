@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChatMiddlewareConfig, ModelMessage } from "@tanstack/ai";
-import {
-  toChatBotSpecialistConfig,
-  toChatBotSpecialistPrompt,
-} from "../run/specialist-middleware";
+import { toChatBotSpecialistConfig, toChatBotSpecialistPrompt } from "../run/specialist-middleware";
 
 function config(messages: Array<ModelMessage>, systemPrompts = ["persona"]): ChatMiddlewareConfig {
   return { messages, systemPrompts, tools: [] };
@@ -45,9 +42,7 @@ describe("toChatBotSpecialistConfig", () => {
     const call: ModelMessage = {
       role: "assistant",
       content: "",
-      toolCalls: [
-        { id: "c1", type: "function", function: { name: "addTwoNumbers", arguments: "{}" } },
-      ],
+      toolCalls: [{ id: "c1", type: "function", function: { name: "addTwoNumbers", arguments: "{}" } }],
     };
     expect(toChatBotSpecialistConfig(config([user, call]))).toBeUndefined();
   });

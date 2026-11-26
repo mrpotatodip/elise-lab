@@ -11,7 +11,8 @@ export const RUNNER_LOGIN_COMMAND = "elise-runner login";
 // -----
 // Where a private repository's access comes from, and what to run when it fails.
 // -----
-export const RUNNER_GIT_LOGIN_HINT = "Your Runner clones with this computer's git login. If a private repository fails, run `elise-runner doctor`.";
+export const RUNNER_GIT_LOGIN_HINT =
+  "Your Runner clones with this computer's git login. If a private repository fails, run `elise-runner doctor`.";
 
 // -----
 // What the person reads for each state of a Runner. Raw values

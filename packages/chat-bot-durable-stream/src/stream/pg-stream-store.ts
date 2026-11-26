@@ -3,23 +3,13 @@ import type { StreamChunk } from "@tanstack/ai";
 import { chatBotDurableStreamChunks, chatBotDurableStreams } from "../tables";
 import { CHAT_BOT_DURABLE_STREAM_DEFAULT_POLL_MS } from "./constants";
 import type { ChatBotDurableStreamDb } from "../pg-types";
-import type {
-  ChatBotDurableStreamKey,
-  ChatBotDurableStreamStore,
-  ChatBotDurableStreamStoreOptions,
-} from "./types";
+import type { ChatBotDurableStreamKey, ChatBotDurableStreamStore, ChatBotDurableStreamStoreOptions } from "./types";
 
 const streamWhere = (key: ChatBotDurableStreamKey) =>
-  and(
-    eq(chatBotDurableStreams.streamPrefix, key.streamPrefix),
-    eq(chatBotDurableStreams.runId, key.runId),
-  );
+  and(eq(chatBotDurableStreams.streamPrefix, key.streamPrefix), eq(chatBotDurableStreams.runId, key.runId));
 
 const chunksWhere = (key: ChatBotDurableStreamKey) =>
-  and(
-    eq(chatBotDurableStreamChunks.streamPrefix, key.streamPrefix),
-    eq(chatBotDurableStreamChunks.runId, key.runId),
-  );
+  and(eq(chatBotDurableStreamChunks.streamPrefix, key.streamPrefix), eq(chatBotDurableStreamChunks.runId, key.runId));
 
 // -----
 // Postgres store. Readers poll every pollMs;

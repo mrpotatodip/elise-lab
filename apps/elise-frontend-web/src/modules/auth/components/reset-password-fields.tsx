@@ -14,7 +14,10 @@ import { ResetPasswordSchema } from "../schemas";
 
 function AskAgainLink() {
   return (
-    <Link to="/forgot-password" className="inline-flex min-h-6 items-center text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <Link
+      to="/forgot-password"
+      className="inline-flex min-h-6 items-center text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       {AUTH_COPY.reset.askAgain}
     </Link>
   );
@@ -66,7 +69,16 @@ export function ResetPasswordFields({ token }: { token: string | undefined }) {
         {(field) => (
           <div className="grid gap-2">
             <Label htmlFor="password">New password</Label>
-            <Input id="password" name={field.name} type="password" autoComplete="new-password" value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "password", "password-hint")} />
+            <Input
+              id="password"
+              name={field.name}
+              type="password"
+              autoComplete="new-password"
+              value={field.state.value}
+              onBlur={field.handleBlur}
+              onChange={(event) => field.handleChange(event.target.value)}
+              {...fieldAria(field, "password", "password-hint")}
+            />
             <p id="password-hint" className="text-sm leading-relaxed text-muted-foreground">
               At least {SIGN_UP_PASSWORD_MIN} characters.
             </p>

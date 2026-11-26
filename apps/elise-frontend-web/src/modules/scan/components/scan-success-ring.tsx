@@ -37,14 +37,18 @@ export function ScanSuccessRing({ succeeded, failed, rate }: ScanSuccessRingProp
             )}
           </svg>
           <div className="absolute inset-0 grid place-content-center text-center">
-            <span className="text-4xl font-semibold leading-none tracking-tight tabular-nums">{rate === null ? "-" : rate}</span>
+            <span className="text-4xl font-semibold leading-none tracking-tight tabular-nums">
+              {rate === null ? "-" : rate}
+            </span>
             {rate !== null && <span className="mt-1 text-xs text-muted-foreground">percent</span>}
           </div>
         </div>
         <dl className="grid w-full grid-cols-2 gap-6 border-t pt-5 text-sm">
           <div className="grid gap-1">
             <dt className="text-muted-foreground">Succeeded</dt>
-            <dd className={cn("text-xl font-semibold tabular-nums", succeeded > 0 && "text-status-success")}>{succeeded}</dd>
+            <dd className={cn("text-xl font-semibold tabular-nums", succeeded > 0 && "text-status-success")}>
+              {succeeded}
+            </dd>
           </div>
           <div className="grid gap-1">
             <dt className="text-muted-foreground">Failed</dt>

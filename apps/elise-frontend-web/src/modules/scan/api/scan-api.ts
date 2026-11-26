@@ -34,7 +34,9 @@ export const fetchScans = createServerFn({ method: "GET" })
     return engineJson(ScanListSchema, `/scans${query}`, {}, await engineAuth());
   });
 
-export const fetchScanRepos = createServerFn({ method: "GET" }).handler(async () => engineJson(RepoListSchema, "/repos", {}, await engineAuth()));
+export const fetchScanRepos = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(RepoListSchema, "/repos", {}, await engineAuth()),
+);
 
 export const fetchScanRepoBranches = createServerFn({ method: "GET" })
   .validator(RepoParamSchema)
@@ -55,7 +57,15 @@ export const fetchScanTrace = createServerFn({ method: "GET" })
 
 export const stopScan = createServerFn({ method: "POST" })
   .validator(ScanIdInputSchema)
-  .handler(async ({ data }) => engineJson(ScanStatusSchema, `/scans/${data.scanId}/stop`, { method: "POST" }, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(ScanStatusSchema, `/scans/${data.scanId}/stop`, { method: "POST" }, await engineAuth()),
+  );
+
+export const resumeScan = createServerFn({ method: "POST" })
+  .validator(ScanIdInputSchema)
+  .handler(async ({ data }) =>
+    engineJson(ScanQueuedSchema, `/scans/${data.scanId}/resume`, { method: "POST" }, await engineAuth()),
+  );
 
 export const fetchScanFile = createServerFn({ method: "GET" })
   .validator(ScanFileInputSchema)
@@ -66,7 +76,9 @@ export const fetchScanFile = createServerFn({ method: "GET" })
 
 export const createScan = createServerFn({ method: "POST" })
   .validator(CreateScanInputSchema)
-  .handler(async ({ data }) => engineJson(ScanQueuedSchema, "/scans", jsonPost(JSON.stringify(scanCreateBodyOf(data))), await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(ScanQueuedSchema, "/scans", jsonPost(JSON.stringify(scanCreateBodyOf(data))), await engineAuth()),
+  );
 
 const RECORDED_PAGE = 100;
 
@@ -76,7 +88,12 @@ const RECORDED_PAGE = 100;
 // saved. Any other failure is raised, not shown as "No findings".
 // -----
 async function readFindings(auth: EngineAuth, scanId: string): Promise<Finding[]> {
-  const recorded = await engineJson(FindingListSchema, `/findings?scanId=${encodeURIComponent(scanId)}&limit=${RECORDED_PAGE}`, {}, auth);
+  const recorded = await engineJson(
+    FindingListSchema,
+    `/findings?scanId=${encodeURIComponent(scanId)}&limit=${RECORDED_PAGE}`,
+    {},
+    auth,
+  );
   if (recorded.findings.length > 0) return recorded.findings.map(fromRecorded);
   try {
     const res = await engineFetch(`/scans/${scanId}/files/findings.json`, {}, auth);
@@ -99,7 +116,10 @@ export const fetchScanFindings = createServerFn({ method: "GET" })
 // -----
 export const fetchOverview = createServerFn({ method: "GET" }).handler(async () => {
   const auth = await engineAuth();
-  const [list, repoList] = await Promise.all([engineJson(ScanListSchema, "/scans", {}, auth), engineJson(RepoListSchema, "/repos", {}, auth)]);
+  const [list, repoList] = await Promise.all([
+    engineJson(ScanListSchema, "/scans", {}, auth),
+    engineJson(RepoListSchema, "/repos", {}, auth),
+  ]);
 
   const byState = { queued: 0, running: 0, succeeded: 0, failed: 0 };
   for (const scan of list.scans) if (scan.status !== "stopped") byState[scan.status] += 1;
@@ -127,4 +147,6 @@ export const fetchScanDiff = createServerFn({ method: "GET" })
 
 export const fetchVerdict = createServerFn({ method: "GET" })
   .validator(VerdictInputSchema)
-  .handler(async ({ data }) => engineJson(VerdictSchema, `/repos/${data.repoId}/verdict?commit=${data.commit}`, {}, await engineAuth()));
+  .handler(async ({ data }) =>
+    engineJson(VerdictSchema, `/repos/${data.repoId}/verdict?commit=${data.commit}`, {}, await engineAuth()),
+  );

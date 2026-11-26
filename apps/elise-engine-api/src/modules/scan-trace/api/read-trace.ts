@@ -9,12 +9,21 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/:scanId/trace", readTraceDoc, zValidator("header", AccountHeaderSchema), zValidator("param", ScanIdParamSchema), zValidator("query", TraceQuerySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { scanId } = c.req.valid("param");
-  const query = c.req.valid("query");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(readTraceSvc(db, accountId, scanId, query)));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/:scanId/trace",
+  readTraceDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("param", ScanIdParamSchema),
+  zValidator("query", TraceQuerySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { scanId } = c.req.valid("param");
+    const query = c.req.valid("query");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(readTraceSvc(db, accountId, scanId, query)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

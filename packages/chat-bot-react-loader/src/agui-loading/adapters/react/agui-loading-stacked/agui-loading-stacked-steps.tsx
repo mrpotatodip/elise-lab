@@ -2,20 +2,14 @@ import { createContext, use, type ComponentProps, type ReactNode } from "react";
 
 import { AnimatePresence, motion } from "motion/react";
 
-import {
-  SLIDE_DURATION_MS,
-  type AGUILoadingStackedState,
-  type AGUILoadingStackedStep,
-} from "../../..";
+import { SLIDE_DURATION_MS, type AGUILoadingStackedState, type AGUILoadingStackedStep } from "../../..";
 import { cn } from "../cn";
 
 import { useAGUILoadingStackedContext } from "./agui-loading-stacked";
 
 const ROW_TRANSITION = { duration: SLIDE_DURATION_MS / 1000, ease: "easeOut" } as const;
 
-const AGUILoadingStackedStepContext = createContext<AGUILoadingStackedStep | null>(
-  null,
-);
+const AGUILoadingStackedStepContext = createContext<AGUILoadingStackedStep | null>(null);
 
 // The row's step. Throws if a row part is used outside Steps.
 export function useAGUILoadingStackedStep(part: string) {
@@ -81,14 +75,11 @@ export function AGUILoadingStackedSteps({
   className,
   ...props
 }: AGUILoadingStackedStepsProps) {
-  const { state, view, maxVisible } = useAGUILoadingStackedContext(
-    "AGUILoadingStackedSteps",
-  );
+  const { state, view, maxVisible } = useAGUILoadingStackedContext("AGUILoadingStackedSteps");
 
   if (view === "summary") return null;
 
-  const visibleIds =
-    maxVisible != null && maxVisible > 0 ? state.stepOrder.slice(-maxVisible) : state.stepOrder;
+  const visibleIds = maxVisible != null && maxVisible > 0 ? state.stepOrder.slice(-maxVisible) : state.stepOrder;
 
   const lastIndexByOwner = new Map<string, number>();
   if (tree) {

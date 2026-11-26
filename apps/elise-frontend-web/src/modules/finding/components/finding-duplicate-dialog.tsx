@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "#/components/ui/dialog";
 import { Label } from "#/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "#/components/ui/select";
 
@@ -16,7 +25,15 @@ type FindingDuplicateDialogProps = {
   onConfirm: (duplicateOf: string) => void;
 };
 
-export function FindingDuplicateDialog({ open, onOpenChange, findingTitle, candidates, suggested = null, pending, onConfirm }: FindingDuplicateDialogProps) {
+export function FindingDuplicateDialog({
+  open,
+  onOpenChange,
+  findingTitle,
+  candidates,
+  suggested = null,
+  pending,
+  onConfirm,
+}: FindingDuplicateDialogProps) {
   const [picked, setKept] = useState<string | null>(null);
   const kept = picked ?? suggested;
 
@@ -25,7 +42,9 @@ export function FindingDuplicateDialog({ open, onOpenChange, findingTitle, candi
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Mark as a duplicate?</DialogTitle>
-          <DialogDescription>The Finding you pick carries the problem. This one no longer counts in the Verdict.</DialogDescription>
+          <DialogDescription>
+            The Finding you pick carries the problem. This one no longer counts in the Verdict.
+          </DialogDescription>
         </DialogHeader>
         <DialogBody className="grid content-start gap-6">
           <p className="rounded-lg border bg-muted/50 px-4 py-3 text-sm leading-relaxed">
@@ -33,7 +52,11 @@ export function FindingDuplicateDialog({ open, onOpenChange, findingTitle, candi
           </p>
           <div className="grid gap-2">
             <Label htmlFor="duplicate-of">Which Finding does it duplicate?</Label>
-            <Select value={kept} items={candidates.map((candidate) => ({ value: candidate.fingerprint, label: candidate.title }))} onValueChange={setKept}>
+            <Select
+              value={kept}
+              items={candidates.map((candidate) => ({ value: candidate.fingerprint, label: candidate.title }))}
+              onValueChange={setKept}
+            >
               <SelectTrigger id="duplicate-of" className="w-full">
                 <SelectValue placeholder="Pick a Finding" />
               </SelectTrigger>
@@ -45,7 +68,9 @@ export function FindingDuplicateDialog({ open, onOpenChange, findingTitle, candi
                 ))}
               </SelectContent>
             </Select>
-            {candidates.length === 0 && <p className="text-xs text-muted-foreground">No other open Finding on this branch to point to.</p>}
+            {candidates.length === 0 && (
+              <p className="text-xs text-muted-foreground">No other open Finding on this branch to point to.</p>
+            )}
           </div>
         </DialogBody>
         <DialogFooter className="flex items-center justify-end gap-3">

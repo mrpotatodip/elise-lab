@@ -17,12 +17,8 @@ export function isEffectCall(node: Node, names: ReadonlySet<string>): node is ES
   return node.type === "CallExpression" && isEffectMember(node.callee, names);
 }
 
-export function isFunctionNode(
-  node: Node,
-): node is ESTree.Function | ESTree.ArrowFunctionExpression {
+export function isFunctionNode(node: Node): node is ESTree.Function | ESTree.ArrowFunctionExpression {
   return (
-    node.type === "FunctionDeclaration" ||
-    node.type === "FunctionExpression" ||
-    node.type === "ArrowFunctionExpression"
+    node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression"
   );
 }

@@ -10,7 +10,8 @@ export const noEngineClientImportRule = defineRule({
       description: "Disallow importing the engine client or the session helpers outside `api/`.",
     },
     messages: {
-      engineClientImport: "Call a server function from the module's `api/` folder. The engine client and session helpers belong to server functions only.",
+      engineClientImport:
+        "Call a server function from the module's `api/` folder. The engine client and session helpers belong to server functions only.",
     },
   },
   createOnce(context) {

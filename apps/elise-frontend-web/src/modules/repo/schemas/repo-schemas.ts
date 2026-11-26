@@ -1,8 +1,21 @@
 import { z } from "zod";
-import { FINDING_TRIAGE_STATUS_VALUES, REPO_BRANCH_LIMIT, REPO_FINDING_STATE_VALUES, FINDING_SEVERITY_VALUES } from "@repo/contracts/elise";
+import {
+  FINDING_TRIAGE_STATUS_VALUES,
+  REPO_BRANCH_LIMIT,
+  REPO_FINDING_STATE_VALUES,
+  FINDING_SEVERITY_VALUES,
+} from "@repo/contracts/elise";
 import { DEFAULT_SOURCE_PROVIDER_ENTRY } from "#/providers/registry";
 
-export { REPO_BRANCH_LIMIT, REPO_LIMIT_PER_TENANT, RepoDetailSchema, RepoFindingListSchema, RepoListSchema, RepoParamSchema, UploadArchiveRemovedSchema } from "@repo/contracts/elise";
+export {
+  REPO_BRANCH_LIMIT,
+  REPO_LIMIT_PER_TENANT,
+  RepoDetailSchema,
+  RepoFindingListSchema,
+  RepoListSchema,
+  RepoParamSchema,
+  UploadArchiveRemovedSchema,
+} from "@repo/contracts/elise";
 export type { Repo, RepoBranch, RepoFinding } from "@repo/contracts/elise";
 
 const { address } = DEFAULT_SOURCE_PROVIDER_ENTRY;
@@ -20,7 +33,8 @@ export function branchNameError(name: string): string | null {
   if (name === "") return "Type the exact name of the branch.";
   if (COMMIT_ID.test(name)) return "That is a commit, not a branch. Scan a commit from the new scan form.";
   if (name === "HEAD") return "HEAD is not a branch name.";
-  if (!BRANCH_NAME_PATTERN.test(name)) return "A branch name starts with a letter, digit or underscore, then letters, digits, . _ / or -, up to 100 characters.";
+  if (!BRANCH_NAME_PATTERN.test(name))
+    return "A branch name starts with a letter, digit or underscore, then letters, digits, . _ / or -, up to 100 characters.";
   return null;
 }
 
@@ -52,7 +66,6 @@ export const AddRepoDetailsSchema = z.object({
   repo: z.string().trim().regex(REPO_URL_PATTERN, REPO_URL_MESSAGE),
   branches: z.array(BranchRowSchema).max(REPO_BRANCH_LIMIT),
 });
-
 
 export const RepoFindingsFilterSchema = z.object({
   branch: z.string().min(1).optional(),

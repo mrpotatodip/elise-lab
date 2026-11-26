@@ -54,7 +54,10 @@ const requestResets = async (emails: string[], limiter: RateLimit) => {
 
 describe("the reset limit per address", () => {
   it("queues no email past the cap, whatever the letter case, and answers the same", async () => {
-    const { queued, answers } = await requestResets(["ada@example.com", "ADA@example.com", "Ada@Example.com", "ada@example.com", "ada@example.com"], countingLimiter(3));
+    const { queued, answers } = await requestResets(
+      ["ada@example.com", "ADA@example.com", "Ada@Example.com", "ada@example.com", "ada@example.com"],
+      countingLimiter(3),
+    );
 
     expect(queued).toHaveLength(3);
     expect(new Set(answers.map((a) => a.body)).size).toBe(1);

@@ -14,7 +14,9 @@ describe("fileQueryString", () => {
   });
 
   it("encodes the other filters and the cursor", () => {
-    const params = new URLSearchParams(fileQueryString({ filters: { branch: "feat/a b", name: "REPORT.md", q: "100%" }, cursor: "50" }));
+    const params = new URLSearchParams(
+      fileQueryString({ filters: { branch: "feat/a b", name: "REPORT.md", q: "100%" }, cursor: "50" }),
+    );
 
     expect(Object.fromEntries(params)).toEqual({ branch: "feat/a b", name: "REPORT.md", q: "100%", cursor: "50" });
   });
@@ -26,6 +28,9 @@ describe("FilesSearchSchema", () => {
   });
 
   it("keeps good filters", () => {
-    expect(FilesSearchSchema.parse({ name: "REPORT.md", from: "2026-11-02" })).toEqual({ name: "REPORT.md", from: "2026-11-02" });
+    expect(FilesSearchSchema.parse({ name: "REPORT.md", from: "2026-11-02" })).toEqual({
+      name: "REPORT.md",
+      from: "2026-11-02",
+    });
   });
 });

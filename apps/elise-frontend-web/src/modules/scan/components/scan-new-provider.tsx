@@ -20,11 +20,19 @@ export function ScanNewProvider({ value, onChange }: ScanNewProviderProps) {
       <Segmented
         label="Where does the code live?"
         value={value}
-        options={SOURCE_PROVIDER_LIST.map((provider) => ({ value: provider.id, label: provider.label, disabled: !provider.available }))}
+        options={SOURCE_PROVIDER_LIST.map((provider) => ({
+          value: provider.id,
+          label: provider.label,
+          disabled: !provider.available,
+        }))}
         onChange={onChange}
         className="w-full"
       />
-      {later.length > 0 && <p className="px-1 text-xs text-muted-foreground">{later.map((provider) => provider.label).join(", ")}: coming soon.</p>}
+      {later.length > 0 && (
+        <p className="px-1 text-xs text-muted-foreground">
+          {later.map((provider) => provider.label).join(", ")}: coming soon.
+        </p>
+      )}
     </div>
   );
 }

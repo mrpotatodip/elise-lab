@@ -42,18 +42,24 @@ pnpm --filter elise-runner-cli check       # tsc --noEmit, cargo fmt --check, ca
 
 ## The headless Runner
 
-`elise-runner` does what the desktop app does without a window, on macOS and Linux. It is its own Runner with its own token, so on one computer it and the desktop app are two Runners. Its commands, exit codes, token store order and setup are in `cli/README.md`. Build it with `cargo build -p elise-runner-cli` (or `--release`).
+`elise-runner` does what the desktop app does without a window, on macOS, Linux and Windows (x64). The desktop app is not built for Windows. It is its own Runner with its own token, so on one computer it and the desktop app are two Runners. Its commands, exit codes, token store order and setup are in `cli/README.md`. Build it with `cargo build -p elise-runner-cli` (or `--release`).
 
 ### Install
 
 On macOS (arm64 or x64) or Linux (x64 or arm64), one command installs the newest release of the headless Runner to `~/.local/bin` (set `ELISE_RUNNER_INSTALL_DIR` to change it):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mrpotatodip/ts-mrpotato-lab/main/apps/elise-runner-cli/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mrpotatodip/elise-lab/main/apps/elise-runner-cli/install.sh | sh
 ```
 
 Then run `elise-runner login`. The script is `install.sh` in this folder. It takes the newest GitHub Release whose tag starts with `elise-runner-v` and downloads `elise-runner-<darwin|linux>-<arm64|x64>`. Any other system is refused with a message.
 
-Pushing a tag `elise-runner-v<version>` (the version in `cli/Cargo.toml`) runs `.github/workflows/release-elise-runner.yml`: it builds the four binaries on native runners and publishes them on a release. Linux binaries link `libdbus` (for the keychain), so a minimal image needs `libdbus-1-3`. The script is checked by hand on a clean macOS and Linux computer, not by a test.
+On Windows (x64, PowerShell), `install.ps1` in this folder does the same: it installs `elise-runner.exe` for your user in `%LOCALAPPDATA%\elise-runner\bin` (set `ELISE_RUNNER_INSTALL_DIR` to change it), adds that folder to your user PATH and needs no administrator rights. It needs Git for Windows installed, and `elise-runner doctor` checks for it.
+
+```powershell
+irm https://raw.githubusercontent.com/mrpotatodip/elise-lab/main/apps/elise-runner-cli/install.ps1 | iex
+```
+
+Pushing a tag `elise-runner-v<version>` (the version in `cli/Cargo.toml`) runs `.github/workflows/release-elise-runner.yml`: it builds the five binaries on native runners and publishes them on a release. Linux binaries link `libdbus` (for the keychain), so a minimal image needs `libdbus-1-3`. The scripts are checked by hand on a clean macOS, Linux and Windows computer, not by a test.
 
 You need a Rust toolchain for `app:dev`, `app:build` and `check`. `pnpm check:apps` and the pre-commit check run `check` for this folder, so a commit that touches it runs the Rust tests.

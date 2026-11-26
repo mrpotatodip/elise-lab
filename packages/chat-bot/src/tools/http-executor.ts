@@ -1,11 +1,7 @@
 import type { JSONSchema } from "@tanstack/ai";
 import { Data, Effect } from "effect";
 import { z } from "zod";
-import {
-  ChatBotJsonSchema,
-  type ChatBotJson,
-  type ChatBotToolError,
-} from "@repo/contracts/chat-bots";
+import { ChatBotJsonSchema, type ChatBotJson, type ChatBotToolError } from "@repo/contracts/chat-bots";
 import type { ChatBotRuntime, ChatBotToolSpec } from "../lib";
 import {
   CHAT_BOT_HTTP_DEFAULT_TIMEOUT_MS,
@@ -19,11 +15,7 @@ import {
   CHAT_BOT_TOOL_ERROR_TOO_LARGE,
   CHAT_BOT_TOOL_ERROR_UNEXPECTED_RESPONSE,
 } from "./constants";
-import {
-  ChatBotHttpEnvelopeSchema,
-  ChatBotToolInputFieldsSchema,
-  type ChatBotToolInputFields,
-} from "./schemas";
+import { ChatBotHttpEnvelopeSchema, ChatBotToolInputFieldsSchema, type ChatBotToolInputFields } from "./schemas";
 import type { ChatBotFilledPath, ChatBotZodJsonSchema } from "./types";
 
 class ChatBotToolFailure extends Data.TaggedError("ChatBotToolFailure")<{
@@ -48,10 +40,7 @@ function toValidator(schema: JSONSchema) {
 // Fill {{name}} from input (URL-encoded) and
 // keep the fields the path did not use.
 // -----
-function fillPath(
-  path: string,
-  input: ChatBotToolInputFields,
-): Effect.Effect<ChatBotFilledPath, ChatBotToolFailure> {
+function fillPath(path: string, input: ChatBotToolInputFields): Effect.Effect<ChatBotFilledPath, ChatBotToolFailure> {
   const used = new Set<string>();
   let missing: string | null = null;
   const filled = path.replace(CHAT_BOT_HTTP_PATH_PLACEHOLDER, (_match, key: string) => {
@@ -74,8 +63,7 @@ function fillPath(
 // -----
 function toAllowedUrl(path: string, prefix: string): Effect.Effect<URL, ChatBotToolFailure> {
   const url = path.startsWith("/") ? new URL(path, CHAT_BOT_HTTP_PATH_BASE) : null;
-  const allowed =
-    url !== null && url.origin === CHAT_BOT_HTTP_PATH_BASE && url.pathname.startsWith(prefix);
+  const allowed = url !== null && url.origin === CHAT_BOT_HTTP_PATH_BASE && url.pathname.startsWith(prefix);
   return allowed
     ? Effect.succeed(url)
     : Effect.fail(new ChatBotToolFailure({ reason: CHAT_BOT_TOOL_ERROR_PATH_NOT_ALLOWED }));
@@ -148,10 +136,7 @@ function unwrapEnvelope(body: ChatBotJson): Effect.Effect<ChatBotJson, ChatBotTo
 // Hold the result to the row's result schema
 // when it has one.
 // -----
-function checkResult(
-  spec: ChatBotToolSpec,
-  result: ChatBotJson,
-): Effect.Effect<ChatBotJson, ChatBotToolFailure> {
+function checkResult(spec: ChatBotToolSpec, result: ChatBotJson): Effect.Effect<ChatBotJson, ChatBotToolFailure> {
   return Effect.gen(function* () {
     if (!spec.resultSchema) return result;
     const validator = yield* toValidator(spec.resultSchema);

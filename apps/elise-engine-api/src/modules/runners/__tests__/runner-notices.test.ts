@@ -62,8 +62,17 @@ describe("Runner notices", () => {
 
   it("queues a Runner added notice when a Runner login is approved", async () => {
     sent = [];
-    const started = await Effect.runPromise(startRunnerLoginSvc(test.http, { name: "box", os: "linux", cpu: "x64", version: "0.1.0" }, { ip: "203.0.113.7", dashboardUrl: "https://app.test" }));
-    const res = await callAs(app, tenantId, "/runners/login/approve", { method: "POST", body: { userCode: started.userCode, name: "Build box" } });
+    const started = await Effect.runPromise(
+      startRunnerLoginSvc(
+        test.http,
+        { name: "box", os: "linux", cpu: "x64", version: "0.1.0" },
+        { ip: "203.0.113.7", dashboardUrl: "https://app.test" },
+      ),
+    );
+    const res = await callAs(app, tenantId, "/runners/login/approve", {
+      method: "POST",
+      body: { userCode: started.userCode, name: "Build box" },
+    });
     const { data } = z.object({ data: z.object({ runnerId: z.string() }) }).parse(await res.json());
 
     expect(res.status).toBe(200);
@@ -73,20 +82,31 @@ describe("Runner notices", () => {
 
   it("queues no notice when the approval is refused", async () => {
     sent = [];
-    const res = await callAs(app, tenantId, "/runners/login/approve", { method: "POST", body: { userCode: "ZZZZ-ZZZZ", name: "Build box" } });
+    const res = await callAs(app, tenantId, "/runners/login/approve", {
+      method: "POST",
+      body: { userCode: "ZZZZ-ZZZZ", name: "Build box" },
+    });
 
     expect(res.status).toBe(403);
     expect(sent).toEqual([]);
   });
 
   it("queues a Runner removed notice to every holder of company:runners:delete when a Runner is removed", async () => {
-    const [runner] = await test.raw.insert(tenantRunners).values({ tenantId, name: "Old box", createdBy: actorPartyId }).returning({ id: tenantRunners.id });
+    const [runner] = await test.raw
+      .insert(tenantRunners)
+      .values({ tenantId, name: "Old box", createdBy: actorPartyId })
+      .returning({ id: tenantRunners.id });
     sent = [];
     const res = await callAs(app, tenantId, `/runners/${runner?.id}`, { method: "DELETE" });
 
     expect(res.status).toBe(200);
     expect(recipients()).toEqual(["actor@example.com", "second-admin@example.com"]);
-    expect(sent[0]).toMatchObject({ kind: "runner-removed", accountId: tenantId, runnerId: runner?.id, actorUserId: ACTOR });
+    expect(sent[0]).toMatchObject({
+      kind: "runner-removed",
+      accountId: tenantId,
+      runnerId: runner?.id,
+      actorUserId: ACTOR,
+    });
   });
 
   it("queues nothing for a Runner that is not in the Account", async () => {

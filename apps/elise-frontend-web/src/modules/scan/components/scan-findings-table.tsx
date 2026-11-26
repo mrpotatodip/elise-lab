@@ -33,7 +33,13 @@ const columns = column.columns([
       return (
         <span className="grid justify-items-start gap-1.5">
           <ScanSeverityBadge severity={severity} />
-          {state === "confirmed" ? <span className="sr-only">{SCAN_FINDING_STATE_COPY[state].label}</span> : <Badge variant={state === "needs_validation" ? "warning" : "neutral"}>{SCAN_FINDING_STATE_COPY[state].label}</Badge>}
+          {state === "confirmed" ? (
+            <span className="sr-only">{SCAN_FINDING_STATE_COPY[state].label}</span>
+          ) : (
+            <Badge variant={state === "needs_validation" ? "warning" : "neutral"}>
+              {SCAN_FINDING_STATE_COPY[state].label}
+            </Badge>
+          )}
         </span>
       );
     },
@@ -61,13 +67,19 @@ const columns = column.columns([
     id: "where",
     header: "Where",
     meta: { head: "whitespace-nowrap" },
-    cell: ({ row }) => <ScanFindingLocation file={row.original.finding.place?.file ?? null} line={row.original.finding.place?.line ?? null} />,
+    cell: ({ row }) => (
+      <ScanFindingLocation
+        file={row.original.finding.place?.file ?? null}
+        line={row.original.finding.place?.line ?? null}
+      />
+    ),
   }),
   column.display({
     id: "open",
     header: () => <span className="sr-only">Open</span>,
     meta: { head: "w-10" },
-    cell: ({ row }) => (row.original.finding.detail ? <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" /> : null),
+    cell: ({ row }) =>
+      row.original.finding.detail ? <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" /> : null,
   }),
 ]);
 
@@ -94,7 +106,11 @@ export function ScanFindingsTable({ scanId, repoId, repoLabel, commit, live = fa
   const { data } = useSuspenseQuery(scanFindingsQuery(scanId, live));
   const [selected, setSelected] = useState<number | undefined>();
   const sorted = data.toSorted((a, b) => (RANK.get(a.severity) ?? 0) - (RANK.get(b.severity) ?? 0));
-  const rows = sorted.map((finding, index) => ({ finding, selected: index === selected, open: () => setSelected(index) }));
+  const rows = sorted.map((finding, index) => ({
+    finding,
+    selected: index === selected,
+    open: () => setSelected(index),
+  }));
   const table = useTable({ features: dataTableFeatures, columns, data: rows, getRowId: (_, index) => String(index) });
 
   if (data.length === 0 && live) {
@@ -105,7 +121,9 @@ export function ScanFindingsTable({ scanId, repoId, repoLabel, commit, live = fa
             <ShieldCheck />
           </EmptyMedia>
           <EmptyTitle>Nothing verified yet</EmptyTitle>
-          <EmptyDescription>A finding shows here as soon as it is checked. This page updates by itself.</EmptyDescription>
+          <EmptyDescription>
+            A finding shows here as soon as it is checked. This page updates by itself.
+          </EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -119,7 +137,10 @@ export function ScanFindingsTable({ scanId, repoId, repoLabel, commit, live = fa
             <ShieldCheck />
           </EmptyMedia>
           <EmptyTitle>No findings recorded</EmptyTitle>
-          <EmptyDescription>The scan finished without reporting a problem. That is not proof the code is safe: it only covers what the review looked at.</EmptyDescription>
+          <EmptyDescription>
+            The scan finished without reporting a problem. That is not proof the code is safe: it only covers what the
+            review looked at.
+          </EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -131,10 +152,16 @@ export function ScanFindingsTable({ scanId, repoId, repoLabel, commit, live = fa
     <>
       {actionable.length > 0 && !live && (
         <div className="flex justify-end border-b px-5 py-3">
-          <ScanFindingCopy text={scanFindingsPrompt(sorted, { repo: repoLabel, commit })} label={`Copy ${actionable.length === 1 ? "finding" : `all ${actionable.length} findings`} for coding agent`} />
+          <ScanFindingCopy
+            text={scanFindingsPrompt(sorted, { repo: repoLabel, commit })}
+            label={`Copy ${actionable.length === 1 ? "finding" : `all ${actionable.length} findings`} for coding agent`}
+          />
         </div>
       )}
-      <DataTable table={table} rowProps={(row) => ({ className: cn("relative", row.original.selected && "bg-accent") })} />
+      <DataTable
+        table={table}
+        rowProps={(row) => ({ className: cn("relative", row.original.selected && "bg-accent") })}
+      />
       <ScanFindingSheet
         findings={sorted}
         selected={selected}

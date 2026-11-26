@@ -10,6 +10,10 @@ const NONE: ReadonlySet<string> = new Set();
 // request). Empty until it arrives, and for a branch with no commit yet.
 // -----
 export function useVerdictBlockers(repoId: string, commit: string | undefined): ReadonlySet<string> {
-  const { data } = useQuery({ ...verdictQuery(repoId, commit ?? ""), enabled: commit !== undefined, select: verdictBlockers });
+  const { data } = useQuery({
+    ...verdictQuery(repoId, commit ?? ""),
+    enabled: commit !== undefined,
+    select: verdictBlockers,
+  });
   return data ?? NONE;
 }

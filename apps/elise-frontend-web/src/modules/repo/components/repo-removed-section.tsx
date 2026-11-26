@@ -25,7 +25,14 @@ function RemovedRow({ repo }: { repo: Repo }) {
           )}
         </span>
       </span>
-      <Button type="button" variant="outline" size="sm" disabled={restore.isPending} aria-label={`Restore ${repoName(repo.url)}`} onClick={() => restore.mutate()}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={restore.isPending}
+        aria-label={`Restore ${repoName(repo.url)}`}
+        onClick={() => restore.mutate()}
+      >
         {restore.isPending ? "Restoring" : "Restore"}
       </Button>
     </li>
@@ -56,7 +63,11 @@ export function RepoRemovedSection() {
       </button>
       {open && (
         <ul className="divide-y border-t">
-          {repos.length === 0 ? <li className="px-6 py-4 text-sm text-muted-foreground">No Removed Repos.</li> : repos.map((repo) => <RemovedRow key={repo.id} repo={repo} />)}
+          {repos.length === 0 ? (
+            <li className="px-6 py-4 text-sm text-muted-foreground">No Removed Repos.</li>
+          ) : (
+            repos.map((repo) => <RemovedRow key={repo.id} repo={repo} />)
+          )}
         </ul>
       )}
     </Card>

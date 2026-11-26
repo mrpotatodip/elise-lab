@@ -5,10 +5,24 @@ import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "#/components/ui/collapsible";
 import { cn } from "#/lib/utils";
-import { SCAN_STEP_COPY, TRACE_LABEL_COPY, TRACE_NO_PHASE_COPY, TRACE_QUIET_MS, TRACE_VISIBLE_ENTRIES } from "../constants";
+import {
+  SCAN_STEP_COPY,
+  TRACE_LABEL_COPY,
+  TRACE_NO_PHASE_COPY,
+  TRACE_QUIET_MS,
+  TRACE_VISIBLE_ENTRIES,
+} from "../constants";
 import { useNow, useScanTrace } from "../hooks";
 import type { ScanStatus, TraceEntry } from "../schemas";
-import { groupTraceByPhase, isTraceWork, summarizeTraceGroup, tallyTraceLabels, traceAgo, traceSpan, type TracePhaseGroup } from "../utils";
+import {
+  groupTraceByPhase,
+  isTraceWork,
+  summarizeTraceGroup,
+  tallyTraceLabels,
+  traceAgo,
+  traceSpan,
+  type TracePhaseGroup,
+} from "../utils";
 import { TRACE_LABEL_ICON } from "./scan-trace-icons";
 
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
@@ -25,9 +39,19 @@ function Branch({ last, children }: { last: boolean; children: ReactNode }) {
   const reduce = useReducedMotion();
   return (
     <motion.li layout={reduce ? false : "position"} transition={{ duration: 0.2, ease: EASE_OUT }}>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: EASE_OUT }} className="relative pl-6">
-        <span aria-hidden="true" className="absolute left-0 top-0 h-[1.0625rem] w-4 rounded-bl-lg border-b border-l border-foreground/20" />
-        {!last && <span aria-hidden="true" className="absolute bottom-0 left-0 top-[1.0625rem] w-px bg-foreground/20" />}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2, ease: EASE_OUT }}
+        className="relative pl-6"
+      >
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-0 h-[1.0625rem] w-4 rounded-bl-lg border-b border-l border-foreground/20"
+        />
+        {!last && (
+          <span aria-hidden="true" className="absolute bottom-0 left-0 top-[1.0625rem] w-px bg-foreground/20" />
+        )}
         <div className="flex min-h-8 items-center gap-2 text-sm">{children}</div>
       </motion.div>
     </motion.li>
@@ -73,7 +97,10 @@ function PhaseNode({ group, now, last, running, stopped }: PhaseNodeProps) {
             <Time>{traceSpan(summarizeTraceGroup(group.entries).spentMs)}</Time>
             {stopped && <span className="ml-2 text-xs font-normal text-status-danger">Stopped here</span>}
           </span>
-          <ChevronDown aria-hidden="true" className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180" />
+          <ChevronDown
+            aria-hidden="true"
+            className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
+          />
         </CollapsibleTrigger>
         <CollapsiblePanel>
           <ul className="ml-[2.375rem] pb-2 pt-0.5">
@@ -143,13 +170,17 @@ export function TraceView({ entries, candidateFindings, now, active, failed, qui
             )}
             <Time>{traceAgo(newest.endedAt, now)}</Time>
           </p>
-          {candidateFindings !== null && <p className="text-xs tabular-nums text-muted-foreground/70">{candidateFindings} candidates</p>}
+          {candidateFindings !== null && (
+            <p className="text-xs tabular-nums text-muted-foreground/70">{candidateFindings} candidates</p>
+          )}
         </div>
       )}
       {quiet && (
         <Alert variant="info">
           <Info />
-          <AlertDescription>Nothing new has arrived for a few minutes. The scan is still running; some steps take a while.</AlertDescription>
+          <AlertDescription>
+            Nothing new has arrived for a few minutes. The scan is still running; some steps take a while.
+          </AlertDescription>
         </Alert>
       )}
       <ol>
@@ -185,7 +216,9 @@ function TraceEntries({ scan, active }: { scan: ScanStatus; active: boolean }) {
       {loaded && !loadFailed && active && step && <p>{step.label}. Nothing more detailed yet.</p>}
       {loaded && !loadFailed && !active && step && <p>Last step: {step.label}.</p>}
       {loaded && !loadFailed && active && <p>Waiting for the first entries.</p>}
-      {loaded && !loadFailed && !active && <p>{scan.runner ? "Live detail needs a newer Runner." : "No live detail was recorded for this scan."}</p>}
+      {loaded && !loadFailed && !active && (
+        <p>{scan.runner ? "Live detail needs a newer Runner." : "No live detail was recorded for this scan."}</p>
+      )}
       {quiet && <p>Nothing new has arrived for a few minutes. The scan is still running; some steps take a while.</p>}
     </>
   );
@@ -223,7 +256,10 @@ export function TraceShell({ active, narrow, children }: { active: boolean; narr
           <CardTitle>
             <CollapsibleTrigger className="group flex min-h-8 w-full items-center justify-between gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               Trace
-              <ChevronUp aria-hidden="true" className="size-4 shrink-0 rotate-180 text-muted-foreground transition-transform group-data-[panel-open]:rotate-0" />
+              <ChevronUp
+                aria-hidden="true"
+                className="size-4 shrink-0 rotate-180 text-muted-foreground transition-transform group-data-[panel-open]:rotate-0"
+              />
             </CollapsibleTrigger>
           </CardTitle>
           <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">What the scan did, by phase.</p>

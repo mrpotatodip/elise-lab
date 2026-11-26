@@ -32,7 +32,9 @@ export function ChatBotRoomWithProgress(props: ChatBotRoomProps) {
         progress.onTurnStart();
         props.onTurnStart?.();
       }}
-      progress={<ChatBotProgress state={progress.state} labels={labels} maxVisible={maxVisible} sounds={sounds} tree={tree} />}
+      progress={
+        <ChatBotProgress state={progress.state} labels={labels} maxVisible={maxVisible} sounds={sounds} tree={tree} />
+      }
     />
   );
 }

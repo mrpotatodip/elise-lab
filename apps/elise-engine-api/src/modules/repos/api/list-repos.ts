@@ -10,12 +10,20 @@ import type { AppEnv } from "#/types/variables";
 
 const app = new Hono<AppEnv>();
 
-app.get("/", listReposDoc, zValidator("header", AccountHeaderSchema), zValidator("query", RepoListQuerySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const removedOnly = c.req.valid("query").removed === "true";
-  if (removedOnly) await assertPower(c, "company:repos:delete");
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listReposSvc(db, accountId, removedOnly)));
-  return c.json({ data, error: null });
-});
+app.get(
+  "/",
+  listReposDoc,
+  zValidator("header", AccountHeaderSchema),
+  zValidator("query", RepoListQuerySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const removedOnly = c.req.valid("query").removed === "true";
+    if (removedOnly) await assertPower(c, "company:repos:delete");
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(listReposSvc(db, accountId, removedOnly)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

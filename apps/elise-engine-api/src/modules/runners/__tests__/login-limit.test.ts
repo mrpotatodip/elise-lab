@@ -22,7 +22,9 @@ const startApp = () => {
     if (err instanceof ForbiddenError) return c.json({ data: null, error: { message: err.message } }, 403);
     throw err;
   });
-  app.post("/login/start", requireLoginStartLimit, requireLoginStartTotalLimit, (c) => c.json({ data: { started: true }, error: null }));
+  app.post("/login/start", requireLoginStartLimit, requireLoginStartTotalLimit, (c) =>
+    c.json({ data: { started: true }, error: null }),
+  );
   return app;
 };
 
@@ -38,7 +40,10 @@ const starts = async (env: Partial<Bindings>, ips: string[]) => {
 
 describe("the login start limits", () => {
   it("refuse one address past its cap with 403 and let another address through", async () => {
-    const env = { RUNNER_LOGIN_START_LIMITER: countingLimiter(5), RUNNER_LOGIN_START_TOTAL_LIMITER: countingLimiter(100) };
+    const env = {
+      RUNNER_LOGIN_START_LIMITER: countingLimiter(5),
+      RUNNER_LOGIN_START_TOTAL_LIMITER: countingLimiter(100),
+    };
     const answers = await starts(env, [...Array(7).fill("203.0.113.1"), "203.0.113.2"]);
 
     expect(answers.map((a) => a.status)).toEqual([200, 200, 200, 200, 200, 403, 403, 200]);
@@ -46,8 +51,14 @@ describe("the login start limits", () => {
   });
 
   it("refuse starts from many addresses past the total", async () => {
-    const env = { RUNNER_LOGIN_START_LIMITER: countingLimiter(5), RUNNER_LOGIN_START_TOTAL_LIMITER: countingLimiter(30) };
-    const answers = await starts(env, Array.from({ length: 40 }, (_, i) => `203.0.113.${i}`));
+    const env = {
+      RUNNER_LOGIN_START_LIMITER: countingLimiter(5),
+      RUNNER_LOGIN_START_TOTAL_LIMITER: countingLimiter(30),
+    };
+    const answers = await starts(
+      env,
+      Array.from({ length: 40 }, (_, i) => `203.0.113.${i}`),
+    );
 
     expect(answers.filter((a) => a.status === 200)).toHaveLength(30);
     expect(answers.filter((a) => a.status === 403)).toHaveLength(10);

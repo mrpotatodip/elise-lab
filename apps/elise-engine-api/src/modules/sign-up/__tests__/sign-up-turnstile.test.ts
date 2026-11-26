@@ -5,7 +5,15 @@ import { testDeps } from "#/__tests__/test-deps";
 import { SIGN_UP_REFUSED } from "#/modules/sign-up/constants";
 import type { Bindings } from "#/types/variables";
 
-const body = { firstName: "Ada", lastName: "Rossi", email: "ada@example.com", password: "correct-horse-battery", accountName: "Acme Labs", timezone: "Europe/Rome", turnstileToken: "tok" };
+const body = {
+  firstName: "Ada",
+  lastName: "Rossi",
+  email: "ada@example.com",
+  password: "correct-horse-battery",
+  accountName: "Acme Labs",
+  timezone: "Europe/Rome",
+  turnstileToken: "tok",
+};
 
 type Payload = Omit<typeof body, "turnstileToken"> & { turnstileToken?: string };
 
@@ -19,7 +27,15 @@ const signUp = (verify: (token: string | undefined) => boolean, env: Bindings, p
       },
     }),
   );
-  const res = app.fetch(new Request("http://localhost/sign-up", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }), env, testExecutionContext);
+  const res = app.fetch(
+    new Request("http://localhost/sign-up", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+    env,
+    testExecutionContext,
+  );
   return { res, seen };
 };
 

@@ -5,9 +5,7 @@ import { ChatBotStreamBodySchema } from "../thread";
 // What TanStack AI's useChat posts: the whole
 // message list, not just the new message.
 // -----
-export const ChatBotWirePartSchema = z
-  .object({ type: z.string(), content: z.string().optional() })
-  .passthrough();
+export const ChatBotWirePartSchema = z.object({ type: z.string(), content: z.string().optional() }).passthrough();
 
 export const ChatBotWireMessageSchema = z
   .object({

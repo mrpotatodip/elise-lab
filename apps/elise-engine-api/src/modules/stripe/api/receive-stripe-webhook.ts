@@ -18,7 +18,9 @@ app.post("/webhook", stripeWebhookDoc, async (c) => {
   }
   const event = await runEffect(parseStripeEventSvc(rawBody));
   const deps = c.get("deps");
-  const data = await deps.withOwner(c, (db) => runEffect(handleStripeEventSvc(db, deps.stripe(c.env), event, new Date())));
+  const data = await deps.withOwner(c, (db) =>
+    runEffect(handleStripeEventSvc(db, deps.stripe(c.env), event, new Date())),
+  );
   return c.json({ data, error: null });
 });
 

@@ -5,7 +5,17 @@ import { useNavigate } from "@tanstack/react-router";
 import { GitBranch, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "#/components/ui/button";
-import { Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "#/components/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog";
 import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
@@ -31,7 +41,10 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
     onSuccess: async (repo) => {
       onDone();
       toast.success("Repository added. Nothing was scanned.");
-      await Promise.all([queryClient.invalidateQueries({ queryKey: repoKeys.all }), queryClient.invalidateQueries({ queryKey: scanKeys.all })]);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: repoKeys.all }),
+        queryClient.invalidateQueries({ queryKey: scanKeys.all }),
+      ]);
       await navigate({ to: "/repos/$repoId", params: { repoId: repo.id } });
     },
   });
@@ -58,14 +71,24 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
       <DialogBody className="grid content-start gap-6">
         <form.Field name="repo">
           {(field) => (
-        <div className="grid gap-2">
-          <Label htmlFor="add-repo-url">Link to the GitHub repository</Label>
-          <Input id="add-repo-url" name={field.name} autoComplete="off" placeholder={REPO_URL_EXAMPLE} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} {...fieldAria(field, "add-repo-url", "add-repo-help")} />
-          <FieldError id="add-repo-url" message={fieldMessage(field)} />
-          <p id="add-repo-help" className="text-xs text-muted-foreground">
-            Paste the link to a GitHub repository. Adding it does not scan it, and nothing is checked on GitHub. {RUNNER_GIT_LOGIN_HINT}
-          </p>
-        </div>
+            <div className="grid gap-2">
+              <Label htmlFor="add-repo-url">Link to the GitHub repository</Label>
+              <Input
+                id="add-repo-url"
+                name={field.name}
+                autoComplete="off"
+                placeholder={REPO_URL_EXAMPLE}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(event) => field.handleChange(event.target.value)}
+                {...fieldAria(field, "add-repo-url", "add-repo-help")}
+              />
+              <FieldError id="add-repo-url" message={fieldMessage(field)} />
+              <p id="add-repo-help" className="text-xs text-muted-foreground">
+                Paste the link to a GitHub repository. Adding it does not scan it, and nothing is checked on GitHub.{" "}
+                {RUNNER_GIT_LOGIN_HINT}
+              </p>
+            </div>
           )}
         </form.Field>
 
@@ -78,7 +101,10 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
                   {branches.state.value.length} of {REPO_BRANCH_LIMIT}
                 </span>
               </legend>
-              <p className="text-xs text-muted-foreground">Each branch keeps its own history of findings. Type the exact name: capital letters count, and a wrong name only fails when you scan it.</p>
+              <p className="text-xs text-muted-foreground">
+                Each branch keeps its own history of findings. Type the exact name: capital letters count, and a wrong
+                name only fails when you scan it.
+              </p>
               {branches.state.value.map((row, index) => (
                 <form.Field key={row.id} name={`branches[${index}].name`}>
                   {(field) => (
@@ -88,7 +114,10 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
                           Branch {index + 1}
                         </Label>
                         <div className="relative flex-1">
-                          <GitBranch aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <GitBranch
+                            aria-hidden="true"
+                            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                          />
                           <Input
                             id={`add-branch-${row.id}`}
                             name={field.name}
@@ -101,7 +130,13 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
                             {...fieldAria(field, `add-branch-${row.id}`)}
                           />
                         </div>
-                        <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove branch ${index + 1}`} onClick={() => void branches.removeValue(index)}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Remove branch ${index + 1}`}
+                          onClick={() => void branches.removeValue(index)}
+                        >
                           <X />
                         </Button>
                       </div>
@@ -110,7 +145,14 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
                   )}
                 </form.Field>
               ))}
-              <Button type="button" variant="outline" size="sm" className="w-fit" disabled={branches.state.value.length >= REPO_BRANCH_LIMIT} onClick={() => void branches.pushValue({ id: crypto.randomUUID(), name: "" })}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                disabled={branches.state.value.length >= REPO_BRANCH_LIMIT}
+                onClick={() => void branches.pushValue({ id: crypto.randomUUID(), name: "" })}
+              >
                 <Plus className="size-3.5" />
                 Add a branch
               </Button>
@@ -151,7 +193,10 @@ export function RepoAddDialog({ label = "Add repository", size = "sm", variant =
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a repository</DialogTitle>
-          <DialogDescription>Add a repository and its branches without scanning it. When you start a scan later, you pick them from a list.</DialogDescription>
+          <DialogDescription>
+            Add a repository and its branches without scanning it. When you start a scan later, you pick them from a
+            list.
+          </DialogDescription>
         </DialogHeader>
         {open && <RepoAddForm onDone={() => setOpen(false)} />}
       </DialogContent>

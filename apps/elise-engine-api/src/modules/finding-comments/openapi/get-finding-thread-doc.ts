@@ -1,6 +1,15 @@
 import { describeRoute } from "hono-openapi";
 import { FindingThreadSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const getFindingThreadDoc = describeRoute({
   tags: ["findings"],
@@ -23,5 +32,8 @@ export const getFindingThreadDoc = describeRoute({
       ),
     ],
   }),
-  responses: { 200: jsonResponse("The thread, oldest event first.", envelope(FindingThreadSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("The thread, oldest event first.", envelope(FindingThreadSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });

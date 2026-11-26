@@ -11,15 +11,40 @@ import {
   type UploadArchiveRemoved,
 } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
-import { Conflict, Invalid, toExternalError, type DbError, type ExternalError, type NotFound } from "#/lib/effect-query";
-import { MB, PATH_TOO_DEEP, STORAGE_FULL, TOO_MANY_ARCHIVES, TOO_MANY_FILES, UNPACKED_TOO_LARGE } from "#/modules/archives/constants";
+import {
+  Conflict,
+  Invalid,
+  toExternalError,
+  type DbError,
+  type ExternalError,
+  type NotFound,
+} from "#/lib/effect-query";
+import {
+  MB,
+  PATH_TOO_DEEP,
+  STORAGE_FULL,
+  TOO_MANY_ARCHIVES,
+  TOO_MANY_FILES,
+  UNPACKED_TOO_LARGE,
+} from "#/modules/archives/constants";
 import { deleteObjectsEffect, listObjectsEffect } from "#/modules/archives/lib";
-import { archiveUsageEffect, deleteArchiveEffect, findUploadAppEffect, insertArchiveEffect, listArchivesEffect, removeUploadAppEffect } from "#/modules/archives/queries";
+import {
+  archiveUsageEffect,
+  deleteArchiveEffect,
+  findUploadAppEffect,
+  insertArchiveEffect,
+  listArchivesEffect,
+  removeUploadAppEffect,
+} from "#/modules/archives/queries";
 import { archiveKeyOf, archivePrefixOf, isZip, sha256HexOf, zipContentsOf } from "#/modules/archives/utils";
 
 export const NOT_A_ZIP = UPLOAD_NOT_A_ZIP_MESSAGE;
 
-export const listArchivesSvc = (db: AppDbType, accountId: string, repoId: string): Effect.Effect<UploadArchiveList, NotFound | DbError> =>
+export const listArchivesSvc = (
+  db: AppDbType,
+  accountId: string,
+  repoId: string,
+): Effect.Effect<UploadArchiveList, NotFound | DbError> =>
   findUploadAppEffect(db, accountId, repoId).pipe(
     Effect.flatMap(() => listArchivesEffect(db, accountId, repoId)),
     Effect.map((archives) => ({ archives })),
@@ -34,7 +59,8 @@ const zipRefusalOf = (bytes: Uint8Array): Effect.Effect<void, Invalid> => {
   if (contents === null) return Effect.fail(new Invalid({ message: NOT_A_ZIP }));
   if (contents.files > UPLOAD_FILES_MAX) return Effect.fail(new Invalid({ message: TOO_MANY_FILES }));
   if (contents.deepestPath > UPLOAD_PATH_DEPTH_MAX) return Effect.fail(new Invalid({ message: PATH_TOO_DEEP }));
-  if (contents.unpackedBytes > UPLOAD_UNPACKED_MAX_MB * MB) return Effect.fail(new Invalid({ message: UNPACKED_TOO_LARGE }));
+  if (contents.unpackedBytes > UPLOAD_UNPACKED_MAX_MB * MB)
+    return Effect.fail(new Invalid({ message: UNPACKED_TOO_LARGE }));
   return Effect.void;
 };
 
@@ -56,12 +82,24 @@ export const uploadArchiveSvc = (
     yield* zipRefusalOf(new Uint8Array(bytes));
     const usage = yield* archiveUsageEffect(db, accountId, repoId);
     if (usage.inApp >= UPLOAD_ARCHIVES_PER_APP_MAX) return yield* new Conflict({ message: TOO_MANY_ARCHIVES });
-    if (usage.storedBytes + bytes.byteLength > UPLOAD_STORAGE_PER_TENANT_MAX_MB * MB) return yield* new Conflict({ message: STORAGE_FULL });
+    if (usage.storedBytes + bytes.byteLength > UPLOAD_STORAGE_PER_TENANT_MAX_MB * MB)
+      return yield* new Conflict({ message: STORAGE_FULL });
     const contentSha256 = yield* Effect.tryPromise({ try: () => sha256HexOf(bytes), catch: toExternalError });
     const id = crypto.randomUUID();
     const r2Key = archiveKeyOf(accountId, repoId, id);
-    const archive = yield* insertArchiveEffect(db, { id, tenantId: accountId, repoId, label, r2Key, sizeBytes: bytes.byteLength, contentSha256 });
-    yield* Effect.tryPromise({ try: () => reports.put(r2Key, bytes, { httpMetadata: { contentType: "application/zip" } }), catch: toExternalError });
+    const archive = yield* insertArchiveEffect(db, {
+      id,
+      tenantId: accountId,
+      repoId,
+      label,
+      r2Key,
+      sizeBytes: bytes.byteLength,
+      contentSha256,
+    });
+    yield* Effect.tryPromise({
+      try: () => reports.put(r2Key, bytes, { httpMetadata: { contentType: "application/zip" } }),
+      catch: toExternalError,
+    });
     return archive;
   });
 
@@ -91,7 +129,13 @@ export const removeArchiveSvc = (
 // and findings keep their History, each Scan with its zip's label
 // and no file.
 // -----
-export const removeUploadAppSvc = (db: AppDbType, reports: R2Bucket, accountId: string, repoId: string, userId: string): Effect.Effect<UploadArchiveRemoved, NotFound | Conflict | DbError | ExternalError> =>
+export const removeUploadAppSvc = (
+  db: AppDbType,
+  reports: R2Bucket,
+  accountId: string,
+  repoId: string,
+  userId: string,
+): Effect.Effect<UploadArchiveRemoved, NotFound | Conflict | DbError | ExternalError> =>
   Effect.gen(function* () {
     const rowKeys = yield* removeUploadAppEffect(db, accountId, repoId, userId);
     const stored = yield* listObjectsEffect(reports, archivePrefixOf(accountId, repoId));

@@ -10,7 +10,10 @@ import type { Verdict } from "../schemas";
 export function verdictBlockers(verdict: Verdict): Set<string> {
   const { counts, limits } = verdict;
   const blocks = (severity: Verdict["open"][number]["severity"]) =>
-    severity === null || (severity === "critical" && counts.critical > limits.critical) || (severity === "high" && counts.high > limits.high) || (severity === "medium" && counts.medium > limits.medium);
+    severity === null ||
+    (severity === "critical" && counts.critical > limits.critical) ||
+    (severity === "high" && counts.high > limits.high) ||
+    (severity === "medium" && counts.medium > limits.medium);
   return new Set(verdict.open.filter((finding) => blocks(finding.severity)).map((finding) => finding.fingerprint));
 }
 
@@ -20,6 +23,7 @@ export function verdictBlockers(verdict: Verdict): Set<string> {
 // -----
 export function openProblemsSummary(open: number, blocking: number): string {
   if (open > 0 && blocking === open) return open === 1 ? "It blocks shipping." : "All of them block shipping.";
-  if (blocking === 0) return open === 1 ? "It does not block shipping on its own." : "None of them blocks shipping on its own.";
+  if (blocking === 0)
+    return open === 1 ? "It does not block shipping on its own." : "None of them blocks shipping on its own.";
   return `${blocking} of them ${blocking === 1 ? "blocks" : "block"} shipping, marked in the list below. The rest are within the limits.`;
 }

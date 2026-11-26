@@ -1,10 +1,6 @@
 import { toolDefinition } from "@tanstack/ai";
 import { Cause, Effect, Exit, Ref } from "effect";
-import {
-  ChatBotJsonSchema,
-  type ChatBotJson,
-  type ChatBotToolError,
-} from "@repo/contracts/chat-bots";
+import { ChatBotJsonSchema, type ChatBotJson, type ChatBotToolError } from "@repo/contracts/chat-bots";
 import type { ChatBotRuntime, ChatBotToolBudget, ChatBotToolSpec } from "../lib";
 import {
   CHAT_BOT_MAX_TOOL_CALLS_PER_TURN,
@@ -45,11 +41,7 @@ function callChatBotTool(
 // TanStack awaits this callback: the run point,
 // and the boundary where model input is parsed.
 // -----
-export function toChatBotServerTool(
-  spec: ChatBotToolSpec,
-  runtime: ChatBotRuntime,
-  budget: ChatBotToolBudget,
-) {
+export function toChatBotServerTool(spec: ChatBotToolSpec, runtime: ChatBotRuntime, budget: ChatBotToolBudget) {
   return toolDefinition({
     name: spec.name,
     description: spec.description,

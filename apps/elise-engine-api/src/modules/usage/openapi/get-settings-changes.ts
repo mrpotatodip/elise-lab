@@ -1,6 +1,15 @@
 import { describeRoute } from "hono-openapi";
 import { SettingsChangesSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const getSettingsChangesDoc = describeRoute({
   tags: ["usage"],
@@ -15,8 +24,15 @@ export const getSettingsChangesDoc = describeRoute({
     ],
     example: [
       "Read the changes:",
-      bash(`curl ${EXAMPLE_BASE_URL}/usage/changes \\`, '  -H "authorization: Bearer $SESSION_TOKEN" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`),
+      bash(
+        `curl ${EXAMPLE_BASE_URL}/usage/changes \\`,
+        '  -H "authorization: Bearer $SESSION_TOKEN" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
     ],
   }),
-  responses: { 200: jsonResponse("The recent changes.", envelope(SettingsChangesSchema)), ...errorResponses(400, 401, 403) },
+  responses: {
+    200: jsonResponse("The recent changes.", envelope(SettingsChangesSchema)),
+    ...errorResponses(400, 401, 403),
+  },
 });

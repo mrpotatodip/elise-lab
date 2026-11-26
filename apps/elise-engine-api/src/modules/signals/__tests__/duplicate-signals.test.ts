@@ -34,7 +34,11 @@ const confirmed = (id: string, title: string, file = "src/a.ts", cls = "injectio
   remediation: { strategy: "add the tenant filter" },
 });
 
-const recordScan = async (name: string, findings: unknown[], read: { name: string | null; ref: string | null } = { name: "main", ref: null }) => {
+const recordScan = async (
+  name: string,
+  findings: unknown[],
+  read: { name: string | null; ref: string | null } = { name: "main", ref: null },
+) => {
   tick += 1;
   const scanId = `a${accounts}-${name}`;
   const params: ScanParams = {
@@ -48,15 +52,38 @@ const recordScan = async (name: string, findings: unknown[], read: { name: strin
   const outcome = await run(resolveScanBranchEffect(test.http, tenantId, repoId, read));
   const bindings = fakeBindings();
   bindings.store.set(`accounts/${tenantId}/scans/${scanId}/findings.json`, JSON.stringify(findings));
-  const record = await run(buildScanRecordSvc(bindings.env.REPORTS, params, repoId, { ...outcome, name: outcome.name ?? read.name }, "succeeded", null, null));
+  const record = await run(
+    buildScanRecordSvc(
+      bindings.env.REPORTS,
+      params,
+      repoId,
+      { ...outcome, name: outcome.name ?? read.name },
+      "succeeded",
+      null,
+      null,
+    ),
+  );
   await run(writeScanRecordEffect(test.http, record));
   return scanId;
 };
 
-const detect = (scanId: string, gateway: TypeSafeGateway | null) => run(detectDuplicateSignalsSvc(test.http, gateway, tenantId, scanId));
+const detect = (scanId: string, gateway: TypeSafeGateway | null) =>
+  run(detectDuplicateSignalsSvc(test.http, gateway, tenantId, scanId));
 const stored = () => test.raw.select().from(scanSignals).where(eq(scanSignals.tenantId, tenantId));
-const fingerprintOf = async (title: string) => (await test.raw.select({ fingerprint: scanFindings.fingerprint }).from(scanFindings).where(and(eq(scanFindings.tenantId, tenantId), eq(scanFindings.title, title))))[0]?.fingerprint;
-const skippedOf = async (scanId: string) => (await test.raw.select({ skipped: scans.signalPairsSkipped }).from(scans).where(and(eq(scans.id, scanId), eq(scans.tenantId, tenantId))))[0]?.skipped;
+const fingerprintOf = async (title: string) =>
+  (
+    await test.raw
+      .select({ fingerprint: scanFindings.fingerprint })
+      .from(scanFindings)
+      .where(and(eq(scanFindings.tenantId, tenantId), eq(scanFindings.title, title)))
+  )[0]?.fingerprint;
+const skippedOf = async (scanId: string) =>
+  (
+    await test.raw
+      .select({ skipped: scans.signalPairsSkipped })
+      .from(scans)
+      .where(and(eq(scans.id, scanId), eq(scans.tenantId, tenantId)))
+  )[0]?.skipped;
 
 beforeAll(async () => {
   test = await openTestDb();
@@ -108,14 +135,23 @@ describe("duplicatePairsOf", () => {
 describe("detectDuplicateSignalsSvc", () => {
   it("stores a Signal for a new finding and an open one that the model says are the same, and nothing for a no", async () => {
     await recordScan("s1", [confirmed("old", "tenant filter missing in orders")]);
-    const next = await recordScan("s2", [confirmed("old", "tenant filter missing in orders"), confirmed("new", "orders query lacks tenant scope")]);
+    const next = await recordScan("s2", [
+      confirmed("old", "tenant filter missing in orders"),
+      confirmed("new", "orders query lacks tenant scope"),
+    ]);
     const fake = fakeTypeSafe(0.9);
 
     await detect(next, fake.gateway);
 
     expect(fake.calls).toHaveLength(1);
     expect(await stored()).toMatchObject([
-      { fingerprint: await fingerprintOf("orders query lacks tenant scope"), relatedFingerprint: await fingerprintOf("tenant filter missing in orders"), kind: "possible_duplicate", probability: 0.9, modelVersion: "jev-fake" },
+      {
+        fingerprint: await fingerprintOf("orders query lacks tenant scope"),
+        relatedFingerprint: await fingerprintOf("tenant filter missing in orders"),
+        kind: "possible_duplicate",
+        probability: 0.9,
+        modelVersion: "jev-fake",
+      },
     ]);
     expect(await skippedOf(next)).toBe(0);
 
@@ -132,12 +168,17 @@ describe("detectDuplicateSignalsSvc", () => {
 
     await detect(next, fake.gateway);
 
-    expect(fake.calls[0]?.state).toMatchObject({ a: { title: expect.any(String), file: "src/a.ts" }, b: { title: expect.any(String), file: "src/a.ts" } });
+    expect(fake.calls[0]?.state).toMatchObject({
+      a: { title: expect.any(String), file: "src/a.ts" },
+      b: { title: expect.any(String), file: "src/a.ts" },
+    });
     expect(JSON.stringify(fake.calls[0])).toContain("tenant filter missing");
   });
 
   it("caps the pairs of one Scan and stores how many it skipped", async () => {
-    const olds = Array.from({ length: SIGNAL_DUPLICATE_PAIR_CAP + 3 }, (_, i) => confirmed(`old-${String(i).padStart(2, "0")}`, `old ${i}`, "src/a.ts"));
+    const olds = Array.from({ length: SIGNAL_DUPLICATE_PAIR_CAP + 3 }, (_, i) =>
+      confirmed(`old-${String(i).padStart(2, "0")}`, `old ${i}`, "src/a.ts"),
+    );
     await recordScan("s1", olds);
     const next = await recordScan("s2", [...olds, confirmed("new", "fresh", "src/a.ts")]);
     const fake = fakeTypeSafe(0.1);

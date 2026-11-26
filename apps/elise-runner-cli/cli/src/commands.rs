@@ -13,7 +13,6 @@ use std::io::{BufRead, Write};
 use std::pin::Pin;
 use std::sync::Mutex;
 use std::task::Poll;
-use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::sleep;
 
 const TOKEN_WARNING: &str = "\
@@ -179,6 +178,40 @@ fn confirm(question: &str) -> bool {
 }
 
 pub async fn status(store: &Store) -> Exit {
+    let exit = connection_status(store).await;
+    let kept = scan::kept_folders();
+    if !kept.is_empty() {
+        println!("Kept work folders (a failed or stopped Scan leaves one; delete a folder you no longer need):");
+        for folder in kept {
+            let state = match folder.done {
+                Some(done) if done.is_empty() => "can be resumed from the start".to_string(),
+                Some(done) => format!("can be resumed after {}", done.join(", ")),
+                None => "cannot be resumed (`elise-runner resume` says why)".to_string(),
+            };
+            println!("  Scan {}: {state}\n    {}", folder.scan_id, folder.path.display());
+        }
+    }
+    exit
+}
+
+pub fn resume(scan_id: &str) -> Exit {
+    match scan::check_kept(scan_id) {
+        Ok(done) => {
+            let held =
+                if done.is_empty() { "no finished Phase yet".to_string() } else { format!("the finished Phases {}", done.join(", ")) };
+            println!(
+                "Scan {scan_id}'s work folder holds {held} and can be resumed. Press Resume on that Scan in Elise; `elise-runner run` on this computer then claims it."
+            );
+            Exit::Ok
+        }
+        Err(why) => {
+            eprintln!("{why}");
+            Exit::Error
+        }
+    }
+}
+
+async fn connection_status(store: &Store) -> Exit {
     let place = store.describe();
     match pairing::status(store.tokens()).await {
         RunnerStatus::Connected { name, account_name } => {
@@ -257,7 +290,19 @@ pub async fn doctor(store: &Store, named: &[String]) -> Exit {
     let git = git_installed().await;
     let git_found = git.is_ok();
     report("git", git);
+    #[cfg(windows)]
+    {
+        use elise_runner_core::find;
+        report("git for windows", find::git_for_windows_verdict(git_found, &find::WinEnv::from_process(), &|p| p.is_file()));
+    }
     report("claude", claude_signed_in().await);
+    #[cfg(windows)]
+    report(
+        "node",
+        elise_runner_core::find::find_on_windows("node").map(|node| node.display().to_string()).ok_or_else(|| {
+            "`node` (Node.js) was not found on this computer. Install it from https://nodejs.org, then run doctor again.".to_string()
+        }),
+    );
     report("paired", runner_paired(store).await);
 
     let settings = Settings::load(&settings_file());
@@ -473,9 +518,19 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
     }
 }
 
+#[cfg(unix)]
+fn stop_signals() -> Option<(tokio::signal::unix::Signal, tokio::signal::unix::Signal)> {
+    use tokio::signal::unix::{signal, SignalKind};
+    Some((signal(SignalKind::interrupt()).ok()?, signal(SignalKind::terminate()).ok()?))
+}
+
+#[cfg(windows)]
+fn stop_signals() -> Option<(tokio::signal::windows::CtrlC, tokio::signal::windows::CtrlBreak)> {
+    Some((tokio::signal::windows::ctrl_c().ok()?, tokio::signal::windows::ctrl_break().ok()?))
+}
+
 fn stop_on_signal(message: &'static str) -> Option<Stop> {
-    let mut interrupt = signal(SignalKind::interrupt()).ok()?;
-    let mut terminate = signal(SignalKind::terminate()).ok()?;
+    let (mut interrupt, mut terminate) = stop_signals()?;
     let (stopper, stop) = Stopper::new();
     tokio::spawn(async move {
         tokio::select! {

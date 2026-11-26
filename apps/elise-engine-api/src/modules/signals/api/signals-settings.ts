@@ -16,12 +16,21 @@ app.get("/", getSignalsSettingsDoc, zValidator("header", AccountHeaderSchema), a
   return c.json({ data, error: null });
 });
 
-app.put("/", setSignalsSettingsDoc, requirePower("company:signals:update"), zValidator("header", AccountHeaderSchema), zValidator("json", UpdateSignalsSettingsBodySchema), async (c) => {
-  const { "x-account-id": accountId } = c.req.valid("header");
-  const { enabled } = c.req.valid("json");
-  const userId = userIdOf(c);
-  const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(setSignalsEnabledSvc(db, accountId, userId, enabled)));
-  return c.json({ data, error: null });
-});
+app.put(
+  "/",
+  setSignalsSettingsDoc,
+  requirePower("company:signals:update"),
+  zValidator("header", AccountHeaderSchema),
+  zValidator("json", UpdateSignalsSettingsBodySchema),
+  async (c) => {
+    const { "x-account-id": accountId } = c.req.valid("header");
+    const { enabled } = c.req.valid("json");
+    const userId = userIdOf(c);
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(setSignalsEnabledSvc(db, accountId, userId, enabled)));
+    return c.json({ data, error: null });
+  },
+);
 
 export default app;

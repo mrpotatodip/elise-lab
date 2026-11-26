@@ -10,7 +10,12 @@ const scan = (chunks: string[]) => {
   return seen;
 };
 
-const start = { type: "message_start", message: { usage: { input_tokens: 100, output_tokens: 1, cache_read_input_tokens: 50, cache_creation_input_tokens: 10 } } };
+const start = {
+  type: "message_start",
+  message: {
+    usage: { input_tokens: 100, output_tokens: 1, cache_read_input_tokens: 50, cache_creation_input_tokens: 10 },
+  },
+};
 const delta = { type: "message_delta", usage: { output_tokens: 40 } };
 const sse = (event: typeof start | typeof delta) => `event: x\ndata: ${JSON.stringify(event)}\n\n`;
 
@@ -23,7 +28,10 @@ describe("createUsageScanner", () => {
   });
 
   it("counts input and cache once when message_delta repeats their running totals", () => {
-    const final = { type: "message_delta", usage: { input_tokens: 100, output_tokens: 40, cache_read_input_tokens: 50, cache_creation_input_tokens: 10 } };
+    const final = {
+      type: "message_delta",
+      usage: { input_tokens: 100, output_tokens: 40, cache_read_input_tokens: 50, cache_creation_input_tokens: 10 },
+    };
     const tokens = scan([sse(start), `data: ${JSON.stringify(final)}\n\n`]);
 
     expect(tokens[1]).toEqual({ inputTokens: 0, outputTokens: 39, cacheReadTokens: 0, cacheWriteTokens: 0 });

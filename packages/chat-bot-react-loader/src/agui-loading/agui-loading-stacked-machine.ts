@@ -25,13 +25,7 @@ export type AGUILoadingStackedEvent =
 
 // "error" is the row RUN_ERROR adds so the failure is always visible,
 // even when every other row had already finished.
-export type AGUILoadingStackedStepKind =
-  | "run"
-  | "tool"
-  | "message"
-  | "reasoning"
-  | "subagent"
-  | "error";
+export type AGUILoadingStackedStepKind = "run" | "tool" | "message" | "reasoning" | "subagent" | "error";
 
 export type AGUILoadingStackedStepStatus = "active" | "waiting" | "done" | "failed";
 
@@ -185,12 +179,10 @@ function settleOpenSteps(
 function reasoningTarget(state: AGUILoadingStackedState, messageId: string): string {
   const id = reasoningStepId(messageId);
   if (state.steps[id]) return id;
-  const open = [...state.stepOrder]
-    .reverse()
-    .find((stepId) => {
-      const step = state.steps[stepId]!;
-      return step.kind === "reasoning" && step.status === "active";
-    });
+  const open = [...state.stepOrder].reverse().find((stepId) => {
+    const step = state.steps[stepId]!;
+    return step.kind === "reasoning" && step.status === "active";
+  });
   return open ?? id;
 }
 
@@ -223,26 +215,17 @@ function startSubagent(
   state: AGUILoadingStackedState,
   event: Extract<AGUILoadingStackedEvent, { type: EventType.SUBAGENT_STARTED }>,
 ): AGUILoadingStackedState {
-  const parentToolStepId =
-    event.parentToolCallId !== undefined ? toolStepId(event.parentToolCallId) : undefined;
+  const parentToolStepId = event.parentToolCallId !== undefined ? toolStepId(event.parentToolCallId) : undefined;
   const id =
     state.subagentStepIds[event.subagentRunId] ??
-    (parentToolStepId && state.steps[parentToolStepId]
-      ? parentToolStepId
-      : subagentStepId(event.subagentRunId));
-  const next = upsertStep(
-    state,
-    id,
-    "subagent",
-    event.type,
-    {
-      kind: "subagent",
-      status: "active",
-      subagentRunId: event.subagentRunId,
-      subagentName: event.name,
-      parentSubagentRunId: event.parentSubagentRunId ?? null,
-    },
-  );
+    (parentToolStepId && state.steps[parentToolStepId] ? parentToolStepId : subagentStepId(event.subagentRunId));
+  const next = upsertStep(state, id, "subagent", event.type, {
+    kind: "subagent",
+    status: "active",
+    subagentRunId: event.subagentRunId,
+    subagentName: event.name,
+    parentSubagentRunId: event.parentSubagentRunId ?? null,
+  });
   return {
     ...next,
     subagentNames: { ...next.subagentNames, [event.subagentRunId]: event.name },
@@ -359,25 +342,11 @@ export function aguiLoadingStackedReducer(
       );
 
     case EventType.TOOL_CALL_END:
-      return upsertStep(
-        state,
-        toolStepId(event.toolCallId),
-        "tool",
-        event.type,
-        {},
-        findOwner(state, event),
-      );
+      return upsertStep(state, toolStepId(event.toolCallId), "tool", event.type, {}, findOwner(state, event));
 
     case EventType.TEXT_MESSAGE_START:
     case EventType.TEXT_MESSAGE_CONTENT:
-      return upsertStep(
-        state,
-        messageStepId(event.messageId),
-        "message",
-        event.type,
-        {},
-        findOwner(state, event),
-      );
+      return upsertStep(state, messageStepId(event.messageId), "message", event.type, {}, findOwner(state, event));
 
     case EventType.TEXT_MESSAGE_END:
       return upsertStep(

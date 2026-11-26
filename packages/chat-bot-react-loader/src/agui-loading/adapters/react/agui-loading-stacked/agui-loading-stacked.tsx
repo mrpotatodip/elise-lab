@@ -14,8 +14,7 @@ type AGUILoadingStackedContextValue = {
   maxVisible: number | undefined;
 };
 
-const AGUILoadingStackedContext =
-  createContext<AGUILoadingStackedContextValue | null>(null);
+const AGUILoadingStackedContext = createContext<AGUILoadingStackedContextValue | null>(null);
 
 // Shared state for the parts. Throws if a part is used outside the root.
 export function useAGUILoadingStackedContext(part: string) {

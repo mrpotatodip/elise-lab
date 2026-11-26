@@ -53,7 +53,11 @@ describe("email queue consumer", () => {
     ["E_FIELD_MISSING", "ack"],
     ["SOMETHING_NEW", "ack"],
   ])("sorts %s into %s", async (code, expected) => {
-    const { calls } = await run("elise-invite-emails", { kind: "password-reset", to: "bo@example.com", link: "https://x/y", expiresAt: "2026-11-15T09:00:00.000Z" }, code);
+    const { calls } = await run(
+      "elise-invite-emails",
+      { kind: "password-reset", to: "bo@example.com", link: "https://x/y", expiresAt: "2026-11-15T09:00:00.000Z" },
+      code,
+    );
 
     expect(calls).toEqual([expected]);
   });

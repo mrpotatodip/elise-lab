@@ -15,7 +15,11 @@ type Failure = Conflict | DbError;
 // Pick a slug and insert. If a concurrent sign-up
 // took the slug between the two, pick again.
 // -----
-const insertWithFreshSlug = (db: PoolDbType, account: Omit<NewAccount, "slug">, attempt: number): Effect.Effect<SignUp, Failure> =>
+const insertWithFreshSlug = (
+  db: PoolDbType,
+  account: Omit<NewAccount, "slug">,
+  attempt: number,
+): Effect.Effect<SignUp, Failure> =>
   Effect.gen(function* () {
     const slug = yield* pickFreeSlugEffect(db, account.accountName);
     return yield* insertAccountEffect(db, { ...account, slug }).pipe(
@@ -51,4 +55,5 @@ export const createAccountSvc = (db: PoolDbType, body: SignUpBody, auth: AuthCon
     return created;
   });
 
-export const resendVerificationSvc = (auth: AuthConfig, email: string): Effect.Effect<void> => sendVerificationEmailQuietly(auth, email);
+export const resendVerificationSvc = (auth: AuthConfig, email: string): Effect.Effect<void> =>
+  sendVerificationEmailQuietly(auth, email);

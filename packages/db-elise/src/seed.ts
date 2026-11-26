@@ -1,7 +1,16 @@
 import { eq } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import { db } from "./client";
-import { authAccount, authUser, partyMasterTypes, partyOrganizations, parties, partyRoles, partyPersons, tenants } from "./schema";
+import {
+  authAccount,
+  authUser,
+  partyMasterTypes,
+  partyOrganizations,
+  parties,
+  partyRoles,
+  partyPersons,
+  tenants,
+} from "./schema";
 import { ensureTenantRoles, findTenantRole } from "./tenant-roles";
 
 // -----
@@ -17,7 +26,10 @@ const OWNER_EMAIL = process.env.SEED_OWNER_EMAIL ?? "owner@elise.test";
 const OWNER_PASSWORD = process.env.SEED_OWNER_PASSWORD;
 
 async function findPartyTypeId(key: string) {
-  const [row] = await db.select({ id: partyMasterTypes.id }).from(partyMasterTypes).where(eq(partyMasterTypes.key, key));
+  const [row] = await db
+    .select({ id: partyMasterTypes.id })
+    .from(partyMasterTypes)
+    .where(eq(partyMasterTypes.key, key));
   if (!row) throw new Error(`Party type ${key} is missing; run the migrations`);
   return row.id;
 }
@@ -25,7 +37,10 @@ async function findPartyTypeId(key: string) {
 async function seedTenant() {
   const [existing] = await db.select().from(tenants).where(eq(tenants.slug, DEMO.slug));
   if (existing) return existing.id;
-  const [party] = await db.insert(parties).values({ masterTypeId: await findPartyTypeId("organization") }).returning();
+  const [party] = await db
+    .insert(parties)
+    .values({ masterTypeId: await findPartyTypeId("organization") })
+    .returning();
   await db.insert(partyOrganizations).values({ partyId: party.id, name: DEMO.name });
   const [tenant] = await db
     .insert(tenants)
@@ -41,7 +56,10 @@ async function seedTenant() {
 async function seedOwner(password: string) {
   const [existing] = await db.select().from(authUser).where(eq(authUser.email, OWNER_EMAIL));
   if (existing) return existing.partyId;
-  const [party] = await db.insert(parties).values({ masterTypeId: await findPartyTypeId("person") }).returning();
+  const [party] = await db
+    .insert(parties)
+    .values({ masterTypeId: await findPartyTypeId("person") })
+    .returning();
   await db.insert(partyPersons).values({ partyId: party.id, firstName: "Example", lastName: "Owner" });
   const userId = crypto.randomUUID();
   await db.insert(authUser).values({

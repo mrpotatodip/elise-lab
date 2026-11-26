@@ -1,7 +1,12 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { z } from "zod";
-import { FINDING_THREAD_EVENT_LIMIT, FINDING_TRIAGE_STATUS_VALUES, type FindingCommentsQuery, type FindingThreadEvent } from "@repo/contracts/elise";
+import {
+  FINDING_THREAD_EVENT_LIMIT,
+  FINDING_TRIAGE_STATUS_VALUES,
+  type FindingCommentsQuery,
+  type FindingThreadEvent,
+} from "@repo/contracts/elise";
 import { accessAuditLog } from "@repo/db-elise";
 import { partyPersons, scanFindingComments, scanFindingTriage, scanRepos } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
@@ -17,7 +22,8 @@ const DecisionAfterSchema = z.object({
   duplicateOf: z.string().nullish(),
 });
 
-const oldestFirst = (a: FindingThreadEvent, b: FindingThreadEvent) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+const oldestFirst = (a: FindingThreadEvent, b: FindingThreadEvent) =>
+  a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
 // -----
 // A Finding's thread, oldest first, at most
@@ -29,7 +35,11 @@ const oldestFirst = (a: FindingThreadEvent, b: FindingThreadEvent) => a.createdA
 // the latest of the merge is among them. A row whose `after`
 // does not parse is left out.
 // -----
-export const findingThreadEffect = (db: AppDbType, tenantId: string, query: FindingCommentsQuery): Effect.Effect<FindingThreadEvent[], DbError> =>
+export const findingThreadEffect = (
+  db: AppDbType,
+  tenantId: string,
+  query: FindingCommentsQuery,
+): Effect.Effect<FindingThreadEvent[], DbError> =>
   Effect.tryPromise({
     try: async () => {
       const repoIds = db
@@ -40,7 +50,13 @@ export const findingThreadEffect = (db: AppDbType, tenantId: string, query: Find
         .select({ comment: scanFindingComments, person: partyPersons })
         .from(scanFindingComments)
         .leftJoin(partyPersons, eq(partyPersons.partyId, scanFindingComments.authorPartyId))
-        .where(and(eq(scanFindingComments.tenantId, tenantId), eq(scanFindingComments.fingerprint, query.fingerprint), inArray(scanFindingComments.repoId, repoIds)))
+        .where(
+          and(
+            eq(scanFindingComments.tenantId, tenantId),
+            eq(scanFindingComments.fingerprint, query.fingerprint),
+            inArray(scanFindingComments.repoId, repoIds),
+          ),
+        )
         .orderBy(desc(scanFindingComments.createdAt), desc(scanFindingComments.id))
         .limit(FINDING_THREAD_EVENT_LIMIT);
       const decisionRows = await db
@@ -56,7 +72,13 @@ export const findingThreadEffect = (db: AppDbType, tenantId: string, query: Find
               db
                 .select({ id: scanFindingTriage.id })
                 .from(scanFindingTriage)
-                .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.fingerprint, query.fingerprint), inArray(scanFindingTriage.repoId, repoIds))),
+                .where(
+                  and(
+                    eq(scanFindingTriage.tenantId, tenantId),
+                    eq(scanFindingTriage.fingerprint, query.fingerprint),
+                    inArray(scanFindingTriage.repoId, repoIds),
+                  ),
+                ),
             ),
           ),
         )

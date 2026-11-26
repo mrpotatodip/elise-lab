@@ -9,19 +9,64 @@ import { Collapsible, CollapsiblePanel } from "#/components/ui/collapsible";
 import { cn } from "#/lib/utils";
 import { SEVERITIES, ScanTime, scanPlural } from "#/modules/scan";
 import type { Repo } from "../schemas";
-import { overviewActions, overviewLatestScanAt, overviewVerdict, repoTotals, type OverviewAction, type OverviewTone } from "../utils";
+import {
+  overviewActions,
+  overviewLatestScanAt,
+  overviewVerdict,
+  repoTotals,
+  type OverviewAction,
+  type OverviewTone,
+} from "../utils";
 import { RepoAddDialog } from "./repo-add-dialog";
 
 const TONE = {
-  danger: { icon: CircleAlert, text: "text-status-danger", soft: "bg-status-danger-soft", mark: "bg-mark-danger", badge: "destructive", label: "Urgent" },
-  warning: { icon: TriangleAlert, text: "text-status-warning", soft: "bg-status-warning-soft", mark: "bg-mark-warning", badge: "warning", label: "Needs a look" },
-  info: { icon: Info, text: "text-status-info", soft: "bg-status-info-soft", mark: "bg-mark-info", badge: "info", label: "When convenient" },
-} as const satisfies Record<OverviewTone, { icon: typeof Info; text: string; soft: string; mark: string; badge: "destructive" | "warning" | "info"; label: string }>;
+  danger: {
+    icon: CircleAlert,
+    text: "text-status-danger",
+    soft: "bg-status-danger-soft",
+    mark: "bg-mark-danger",
+    badge: "destructive",
+    label: "Urgent",
+  },
+  warning: {
+    icon: TriangleAlert,
+    text: "text-status-warning",
+    soft: "bg-status-warning-soft",
+    mark: "bg-mark-warning",
+    badge: "warning",
+    label: "Needs a look",
+  },
+  info: {
+    icon: Info,
+    text: "text-status-info",
+    soft: "bg-status-info-soft",
+    mark: "bg-mark-info",
+    badge: "info",
+    label: "When convenient",
+  },
+} as const satisfies Record<
+  OverviewTone,
+  {
+    icon: typeof Info;
+    text: string;
+    soft: string;
+    mark: string;
+    badge: "destructive" | "warning" | "info";
+    label: string;
+  }
+>;
 
 const ALERT = { danger: "destructive", warning: "warning", success: "success" } as const;
-const MARK = { critical: "bg-mark-critical", high: "bg-mark-high", medium: "bg-mark-medium", low: "bg-mark-low", informational: "bg-mark-informational" } as const;
+const MARK = {
+  critical: "bg-mark-critical",
+  high: "bg-mark-high",
+  medium: "bg-mark-medium",
+  low: "bg-mark-low",
+  informational: "bg-mark-informational",
+} as const;
 const noun = (count: number, one: string, many: string) => (count === 1 ? one : many);
-const LINK ="inline-flex min-h-6 items-center gap-1 rounded-sm text-xs font-medium text-primary-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const LINK =
+  "inline-flex min-h-6 items-center gap-1 rounded-sm text-xs font-medium text-primary-ink underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function ActionLink({ action }: { action: OverviewAction }) {
   if (action.repoId === null) return null;
@@ -32,17 +77,33 @@ function ActionLink({ action }: { action: OverviewAction }) {
   );
 }
 
-function ActionRow({ action, open, onOpenChange, first }: { action: OverviewAction; open: boolean; onOpenChange: (open: boolean) => void; first: boolean }) {
+function ActionRow({
+  action,
+  open,
+  onOpenChange,
+  first,
+}: {
+  action: OverviewAction;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  first: boolean;
+}) {
   const tone = TONE[action.tone];
   const Icon = tone.icon;
   const hasRepos = action.repos.length > 0;
   return (
     <li id={`overview-action-${action.key}`} className="relative scroll-mt-24 py-5 pl-5 first:pt-0 last:pb-0">
-      <span aria-hidden="true" className={cn("absolute bottom-5 left-0 top-5 w-[3px] rounded-full first:top-0 last:bottom-0", tone.mark)} />
+      <span
+        aria-hidden="true"
+        className={cn("absolute bottom-5 left-0 top-5 w-[3px] rounded-full first:top-0 last:bottom-0", tone.mark)}
+      />
       <Collapsible open={open} onOpenChange={onOpenChange}>
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-8">
           <div className="flex min-w-0 gap-4">
-            <span aria-hidden="true" className={cn("mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg", tone.soft, tone.text)}>
+            <span
+              aria-hidden="true"
+              className={cn("mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg", tone.soft, tone.text)}
+            >
               <Icon className="size-4" />
             </span>
             <div className="grid min-w-0 gap-2">
@@ -65,7 +126,10 @@ function ActionRow({ action, open, onOpenChange, first }: { action: OverviewActi
             {hasRepos && (
               <Button variant="outline" size="sm" aria-expanded={open} onClick={() => onOpenChange(!open)}>
                 {open ? "Hide" : "Show"} where
-                <ChevronDown aria-hidden="true" className={cn("transition-transform duration-200 ease-out", open && "rotate-180")} />
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn("transition-transform duration-200 ease-out", open && "rotate-180")}
+                />
               </Button>
             )}
           </div>
@@ -77,7 +141,9 @@ function ActionRow({ action, open, onOpenChange, first }: { action: OverviewActi
                 <li key={share.id} className="flex min-h-12 items-center justify-between gap-4 py-2 text-sm">
                   <span className="truncate font-medium">{share.name}</span>
                   <span className="flex shrink-0 items-center gap-4">
-                    {action.key !== "failed" && action.key !== "unscanned" && <span className="tabular-nums text-muted-foreground">{share.count}</span>}
+                    {action.key !== "failed" && action.key !== "unscanned" && (
+                      <span className="tabular-nums text-muted-foreground">{share.count}</span>
+                    )}
                     <Link to="/repos/$repoId" params={{ repoId: share.id }} className={LINK}>
                       Open
                     </Link>
@@ -104,7 +170,14 @@ function KpiTile({ kpi, onJump }: { kpi: Kpi; onJump: (key: string) => void }) {
       className="grid grid-rows-[auto_auto_1fr_auto] gap-3 p-6 text-left transition-colors enabled:hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-default"
     >
       <span className="text-sm font-medium text-muted-foreground">{kpi.label}</span>
-      <span className={cn("text-[32px] font-semibold leading-none tracking-tight tabular-nums", kpi.value === 0 ? "text-muted-foreground" : kpi.tone && TONE[kpi.tone].text)}>{kpi.value}</span>
+      <span
+        className={cn(
+          "text-[32px] font-semibold leading-none tracking-tight tabular-nums",
+          kpi.value === 0 ? "text-muted-foreground" : kpi.tone && TONE[kpi.tone].text,
+        )}
+      >
+        {kpi.value}
+      </span>
       <span className="grid gap-1 text-sm leading-relaxed text-muted-foreground">{kpi.note}</span>
       {target && (
         <span className={LINK}>
@@ -128,7 +201,10 @@ export function RepoOverviewBrief({ repos, hideWhenEmpty = false }: RepoOverview
       <Card>
         <CardHeader>
           <CardTitle>Nothing is being watched yet</CardTitle>
-          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Add a repository and run a first scan. What needs your attention will be listed here, in plain words, with what to do about it.</p>
+          <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+            Add a repository and run a first scan. What needs your attention will be listed here, in plain words, with
+            what to do about it.
+          </p>
         </CardHeader>
         <CardContent>
           <RepoAddDialog />
@@ -154,7 +230,12 @@ export function RepoOverviewBrief({ repos, hideWhenEmpty = false }: RepoOverview
     if (!visible.includes(target)) setShowAll(true);
     setOpenKey(key);
     requestAnimationFrame(() =>
-      requestAnimationFrame(() => document.getElementById(`overview-action-${key}`)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" })),
+      requestAnimationFrame(() =>
+        document.getElementById(`overview-action-${key}`)?.scrollIntoView({
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+          block: "start",
+        }),
+      ),
     );
   };
   const has = (key: string) => (actions.some((a) => a.key === key) ? key : undefined);
@@ -186,9 +267,34 @@ export function RepoOverviewBrief({ repos, hideWhenEmpty = false }: RepoOverview
           </span>
         ),
     },
-    { label: "Came back", value: totals.regressed, tone: "danger", target: has("back"), cta: `See the ${noun(totals.regressed, "problem", "problems")}`, note: totals.regressed > 0 ? "Fixed before, found again." : "Nothing fixed has returned." },
-    { label: "Waiting for a person", value: totals.needsValidation, tone: "warning", target: has("check"), cta: `See the ${noun(totals.needsValidation, "finding", "findings")}`, note: totals.needsValidation > 0 ? "Likely, but nobody has confirmed them yet." : "Every open finding was verified." },
-    { label: "Possibly out of date", value: totals.unchecked, tone: "info", target: has("stale"), cta: `See the ${noun(totals.unchecked, "finding", "findings")}`, note: totals.unchecked > 0 ? "The latest full scan did not see them." : "Every open finding is in the latest full scan." },
+    {
+      label: "Came back",
+      value: totals.regressed,
+      tone: "danger",
+      target: has("back"),
+      cta: `See the ${noun(totals.regressed, "problem", "problems")}`,
+      note: totals.regressed > 0 ? "Fixed before, found again." : "Nothing fixed has returned.",
+    },
+    {
+      label: "Waiting for a person",
+      value: totals.needsValidation,
+      tone: "warning",
+      target: has("check"),
+      cta: `See the ${noun(totals.needsValidation, "finding", "findings")}`,
+      note:
+        totals.needsValidation > 0 ? "Likely, but nobody has confirmed them yet." : "Every open finding was verified.",
+    },
+    {
+      label: "Possibly out of date",
+      value: totals.unchecked,
+      tone: "info",
+      target: has("stale"),
+      cta: `See the ${noun(totals.unchecked, "finding", "findings")}`,
+      note:
+        totals.unchecked > 0
+          ? "The latest full scan did not see them."
+          : "Every open finding is in the latest full scan.",
+    },
   ];
 
   return (
@@ -224,18 +330,37 @@ export function RepoOverviewBrief({ repos, hideWhenEmpty = false }: RepoOverview
         <Card>
           <CardHeader>
             <CardTitle>What to do, most urgent first</CardTitle>
-            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">Grouped by what to do about each problem. Each group says what it means, who can deal with it and where to go.</p>
+            <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
+              Grouped by what to do about each problem. Each group says what it means, who can deal with it and where to
+              go.
+            </p>
           </CardHeader>
           <CardContent className="grid gap-5">
             <ol className="grid divide-y">
               {visible.map((action, index) => (
-                <ActionRow key={action.key} action={action} first={index === 0} open={openKey === action.key} onOpenChange={(next) => setOpenKey(next ? action.key : null)} />
+                <ActionRow
+                  key={action.key}
+                  action={action}
+                  first={index === 0}
+                  open={openKey === action.key}
+                  onOpenChange={(next) => setOpenKey(next ? action.key : null)}
+                />
               ))}
             </ol>
             {(hidden > 0 || showAll) && (
-              <Button variant="ghost" size="sm" className="justify-self-start" onClick={() => setShowAll((value) => !value)}>
-                {showAll ? "Show fewer actions" : `Show ${scanPlural(hidden, "lower-priority action", "lower-priority actions")}`}
-                <ChevronDown aria-hidden="true" className={cn("transition-transform duration-200 ease-out", showAll && "rotate-180")} />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-self-start"
+                onClick={() => setShowAll((value) => !value)}
+              >
+                {showAll
+                  ? "Show fewer actions"
+                  : `Show ${scanPlural(hidden, "lower-priority action", "lower-priority actions")}`}
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn("transition-transform duration-200 ease-out", showAll && "rotate-180")}
+                />
               </Button>
             )}
           </CardContent>

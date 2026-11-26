@@ -55,7 +55,7 @@ pub fn message(address: &Address, failure: Failure) -> String {
 }
 
 pub async fn check_host(address: &Address) -> Result<(), String> {
-    let helper = Helper::for_host("doctor", &address.host)?;
+    let helper = Helper::for_host(&address.host);
     match probe(address, helper.as_ref()).await {
         Probe::Reachable => Ok(()),
         Probe::Login(failure) => Err(format!("{}. {}", cause(&address.host, failure), login_fix(address))),

@@ -1,5 +1,15 @@
 import { noop, queryOptions, type QueryClient } from "@tanstack/react-query";
-import { fetchOverview, fetchScan, fetchScanRepoBranches, fetchScanRepos, fetchScanDiff, fetchScanFile, fetchScanFindings, fetchScans, fetchVerdict } from "../api";
+import {
+  fetchOverview,
+  fetchScan,
+  fetchScanRepoBranches,
+  fetchScanRepos,
+  fetchScanDiff,
+  fetchScanFile,
+  fetchScanFindings,
+  fetchScans,
+  fetchVerdict,
+} from "../api";
 import type { ScanState, ScanStatus } from "../schemas";
 
 export const scanKeys = {
@@ -75,7 +85,8 @@ export const verdictQuery = (repoId: string, commit: string) =>
 
 export const scanReposQuery = () => queryOptions({ queryKey: scanKeys.repos(), queryFn: () => fetchScanRepos() });
 
-export const scanRepoBranchesQuery = (repoId: string) => queryOptions({ queryKey: scanKeys.repoBranches(repoId), queryFn: () => fetchScanRepoBranches({ data: { repoId } }) });
+export const scanRepoBranchesQuery = (repoId: string) =>
+  queryOptions({ queryKey: scanKeys.repoBranches(repoId), queryFn: () => fetchScanRepoBranches({ data: { repoId } }) });
 
 // -----
 // Starts the report's other reads as soon as the scan itself has arrived, so

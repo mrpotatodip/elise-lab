@@ -29,10 +29,15 @@ type Kind = "A" | "B" | "none";
 async function main() {
   const ownerUrl = process.env.BRANCH_OWNER_URL;
   const appUrl = process.env.BRANCH_APP_URL;
-  if (!ownerUrl || !appUrl) throw new Error("Set BRANCH_OWNER_URL and BRANCH_APP_URL to the Neon branch (owner role, and elise_app on the -pooler host).");
+  if (!ownerUrl || !appUrl)
+    throw new Error(
+      "Set BRANCH_OWNER_URL and BRANCH_APP_URL to the Neon branch (owner role, and elise_app on the -pooler host).",
+    );
   const live = process.env.DATABASE_URL ? endpoint(process.env.DATABASE_URL) : undefined;
-  if (live && (endpoint(ownerUrl) === live || endpoint(appUrl) === live)) throw new Error(`Refusing: ${live} is the live endpoint in DATABASE_URL. Point both URLs at a branch.`);
-  if (!new URL(appUrl).hostname.includes("-pooler")) throw new Error("BRANCH_APP_URL must use the -pooler host: the pooled connection is what this checks.");
+  if (live && (endpoint(ownerUrl) === live || endpoint(appUrl) === live))
+    throw new Error(`Refusing: ${live} is the live endpoint in DATABASE_URL. Point both URLs at a branch.`);
+  if (!new URL(appUrl).hostname.includes("-pooler"))
+    throw new Error("BRANCH_APP_URL must use the -pooler host: the pooled connection is what this checks.");
 
   const requests = arg("requests", 2000);
   const connections = arg("connections", 10);
@@ -49,13 +54,17 @@ async function main() {
     const seeded: Record<string, string[]> = { [a]: [], [b]: [] };
     for (const tenant of [a, b]) {
       for (let i = 0; i < perTenant; i += 1) {
-        const { rows } = await owner.query<{ id: string }>("insert into tenant_groups (tenant_id, name) values ($1, $2) returning id", [tenant, `pool-check-${run}-${i}`]);
+        const { rows } = await owner.query<{ id: string }>(
+          "insert into tenant_groups (tenant_id, name) values ($1, $2) returning id",
+          [tenant, `pool-check-${run}-${i}`],
+        );
         seeded[tenant]!.push(rows[0]!.id);
       }
     }
 
     const { rows: role } = await pool.query<{ current_user: string }>("select current_user");
-    if (role[0]!.current_user !== "elise_app") throw new Error(`BRANCH_APP_URL signs in as ${role[0]!.current_user}, not elise_app.`);
+    if (role[0]!.current_user !== "elise_app")
+      throw new Error(`BRANCH_APP_URL signs in as ${role[0]!.current_user}, not elise_app.`);
 
     const seen = { A: 0, B: 0, none: 0 };
     const counts = { A: 0, B: 0, none: 0 };
@@ -73,7 +82,9 @@ async function main() {
         const tenant = kind === "A" ? a : b;
         await client.query("begin");
         await client.query("select set_config('app.tenant_id', $1, true)", [tenant]);
-        const { rows } = await client.query<{ id: string; tenant_id: string }>("select id, tenant_id from tenant_groups");
+        const { rows } = await client.query<{ id: string; tenant_id: string }>(
+          "select id, tenant_id from tenant_groups",
+        );
         await client.query("commit");
         seen[kind] += rows.length;
         const foreign = rows.filter((row) => row.tenant_id !== tenant);
@@ -98,7 +109,11 @@ async function main() {
     console.log(`Account A: ${counts.A} requests, ${seen.A} rows seen in total (${seen.A / counts.A} per request)`);
     console.log(`Account B: ${counts.B} requests, ${seen.B} rows seen in total (${seen.B / counts.B} per request)`);
     console.log(`No tenant: ${counts.none} requests, ${seen.none} rows seen`);
-    console.log(failures.length === 0 ? "PASS: no row crossed Accounts, no-tenant requests saw nothing" : `FAIL: ${failures.length} problem(s)\n${[...new Set(failures)].join("\n")}`);
+    console.log(
+      failures.length === 0
+        ? "PASS: no row crossed Accounts, no-tenant requests saw nothing"
+        : `FAIL: ${failures.length} problem(s)\n${[...new Set(failures)].join("\n")}`,
+    );
     if (failures.length > 0) process.exitCode = 1;
   } finally {
     await owner.query("delete from tenant_groups where name like $1", [`pool-check-${run}-%`]);

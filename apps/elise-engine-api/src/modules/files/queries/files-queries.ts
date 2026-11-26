@@ -1,6 +1,13 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, like, lte, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
-import { FILE_LISTED_NAMES, type FileCount, type FileEntry, type FileName, type FilesQuery, type ScanState } from "@repo/contracts/elise";
+import {
+  FILE_LISTED_NAMES,
+  type FileCount,
+  type FileEntry,
+  type FileName,
+  type FilesQuery,
+  type ScanState,
+} from "@repo/contracts/elise";
 import { scanFiles, scans } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
@@ -29,7 +36,11 @@ const accountFilters = (accountId: string, query: FilesQuery): (SQL | undefined)
 // How many files each type has under every filter except the type,
 // so a tab says what it would show. A type with no files counts 0.
 // -----
-export const countFilesEffect = (db: AppDbType, accountId: string, query: FilesQuery): Effect.Effect<FileCount[], DbError> =>
+export const countFilesEffect = (
+  db: AppDbType,
+  accountId: string,
+  query: FilesQuery,
+): Effect.Effect<FileCount[], DbError> =>
   Effect.tryPromise({
     try: async () => {
       const rows = await db
@@ -46,7 +57,11 @@ export const countFilesEffect = (db: AppDbType, accountId: string, query: FilesQ
 // -----
 // One row more than asked tells whether another page exists.
 // -----
-export const listFilesEffect = (db: AppDbType, accountId: string, query: FilesQuery): Effect.Effect<FileEntry[], DbError> =>
+export const listFilesEffect = (
+  db: AppDbType,
+  accountId: string,
+  query: FilesQuery,
+): Effect.Effect<FileEntry[], DbError> =>
   Effect.tryPromise({
     try: async () => {
       const rows = await db

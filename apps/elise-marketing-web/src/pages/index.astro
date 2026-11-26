@@ -92,6 +92,11 @@ import { CLOSING, CLOUDFLARE_SKILL_URL, FACTS, HERO_HINT, LEDE, OPEN_SOURCE, PIC
           <p class="runner-install__label" id="runner-command-label">{RUNNER.commandLabel}</p>
           <pre class="runner-install__command" tabindex="0" aria-labelledby="runner-command-label"><code>{RUNNER.command}</code></pre>
         </div>
+        <div class="runner-install">
+          <p class="runner-install__label" id="runner-windows-command-label">{RUNNER.windowsCommandLabel}</p>
+          <pre class="runner-install__command" tabindex="0" aria-labelledby="runner-windows-command-label"><code>{RUNNER.windowsCommand}</code></pre>
+        </div>
+        <p class="section-note">{RUNNER.windowsNote}</p>
         <p class="section-note">{RUNNER.after.map((part) => (typeof part === "string" ? part : <code>{part.code}</code>))}</p>
         <p class="section-note">{RUNNER.needs}</p>
         <p class="section-note"><a href={RUNNER.releasesUrl} rel="noopener">{RUNNER.releasesLabel}</a></p>

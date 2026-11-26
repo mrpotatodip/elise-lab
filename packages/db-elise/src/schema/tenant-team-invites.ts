@@ -40,7 +40,10 @@ export const tenantTeamInvites = pgTable(
       columns: [t.roleId, t.tenantId],
       foreignColumns: [partyMasterRoles.id, partyMasterRoles.tenantId],
     }).onDelete("restrict"),
-    chkEmailStatus: check("tenant_team_invites_email_status", sql`${t.emailStatus} in (${inList(INVITE_EMAIL_STATUS_VALUES)})`),
+    chkEmailStatus: check(
+      "tenant_team_invites_email_status",
+      sql`${t.emailStatus} in (${inList(INVITE_EMAIL_STATUS_VALUES)})`,
+    ),
     uqIdTenant: uniqueIndex("uq_tenant_team_invites_id_tenant").on(t.id, t.tenantId),
     idxTenant: index("idx_tenant_team_invites_tenant_id").on(t.tenantId),
   }),

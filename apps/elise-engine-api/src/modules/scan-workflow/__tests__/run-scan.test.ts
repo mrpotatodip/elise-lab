@@ -11,7 +11,15 @@ import type { SandboxPort } from "#/modules/scan-workflow/types";
 
 const ACCOUNT = "0b8c1d2e-3f4a-4b5c-8d6e-7f8091a2b3c4";
 const REPO_ID = "5d1f0c9a-2b3e-4f60-9a71-8b92c3d4e5f6";
-const usage: ScanUsage = { inputTokens: 1, outputTokens: 2, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.1, turns: 3, durationMs: 4000 };
+const usage: ScanUsage = {
+  inputTokens: 1,
+  outputTokens: 2,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  costUsd: 0.1,
+  turns: 3,
+  durationMs: 4000,
+};
 
 const params = (extra: Partial<ScanParams> = {}): ScanParams => ({
   scanId: "scan-1",
@@ -72,7 +80,8 @@ const setup = (options: SetupOptions = {}) => {
     },
     capReached: async () => capReached,
     pollAgent: async () => {
-      if (options.failingPhase !== undefined && options.failingPhase === currentPhase) return { state: "failed", error: "claude exited 1" };
+      if (options.failingPhase !== undefined && options.failingPhase === currentPhase)
+        return { state: "failed", error: "claude exited 1" };
       if (options.pollThrows) throw new Error("sandbox unreachable");
       if (options.agent === "running") return { state: "running" };
       return options.agent === "failed" ? { state: "failed", error: "claude exited 1" } : { state: "succeeded" };
@@ -108,7 +117,8 @@ const queue = async (ledger: ReturnType<typeof memoryScanRepo>, input: ScanParam
 };
 
 describe("runScan, a full scan in phases", () => {
-  const full = (extra: Partial<ScanParams> = {}) => params({ options: { ...params().options, skill: "full" }, ...extra });
+  const full = (extra: Partial<ScanParams> = {}) =>
+    params({ options: { ...params().options, skill: "full" }, ...extra });
 
   it("runs recon, hunt, check and report in order, each started and waited for, and no single-run launch", async () => {
     const { names, calls, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES });
@@ -116,7 +126,12 @@ describe("runScan, a full scan in phases", () => {
 
     await runScan(deps, full(), fakeStep(names));
 
-    expect(calls.filter((call) => call.startsWith("launch:"))).toEqual(["launch:recon", "launch:hunt", "launch:check", "launch:report"]);
+    expect(calls.filter((call) => call.startsWith("launch:"))).toEqual([
+      "launch:recon",
+      "launch:hunt",
+      "launch:check",
+      "launch:report",
+    ]);
     expect(names).not.toContain("launch-agent");
     expect(ledger.rows.get("scan-1")).toMatchObject({ status: "succeeded" });
   });
@@ -132,10 +147,16 @@ describe("runScan, a full scan in phases", () => {
   });
 
   it("fails the scan with an error that says the cap was reached when a phase ends with an error after the whole pool was spent, and charges what the meter counted", async () => {
-    const { names, calls, ledger, settles, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES, failingPhase: "hunt", capReachedInPhase: "hunt" });
+    const { names, calls, ledger, settles, deps } = setup({
+      phases: SCAN_SANDBOX_FULL_PHASES,
+      failingPhase: "hunt",
+      capReachedInPhase: "hunt",
+    });
     await queue(ledger, full());
 
-    await expect(runScan(deps, full(), fakeStep(names))).rejects.toThrow("the budget cap of $1 was reached during the hunt phase");
+    await expect(runScan(deps, full(), fakeStep(names))).rejects.toThrow(
+      "the budget cap of $1 was reached during the hunt phase",
+    );
 
     expect(calls).not.toContain("launch:check");
     expect(ledger.rows.get("scan-1")).toMatchObject({ status: "failed", usage });
@@ -163,7 +184,14 @@ describe("runScan, a full scan in phases", () => {
   it("never fails the scan when its trace cannot be read or written", async () => {
     const { names, ledger, deps } = setup({ phases: SCAN_SANDBOX_FULL_PHASES });
     await queue(ledger, full());
-    const entry = { id: "0190f1a2-b3c4-7d5e-8f60-000000000001", label: "searching", phase: "recon", startedAt: "2026-11-19T09:00:00.000Z", endedAt: "2026-11-19T09:00:00.000Z", count: 1 } as const;
+    const entry = {
+      id: "0190f1a2-b3c4-7d5e-8f60-000000000001",
+      label: "searching",
+      phase: "recon",
+      startedAt: "2026-11-19T09:00:00.000Z",
+      endedAt: "2026-11-19T09:00:00.000Z",
+      count: 1,
+    } as const;
     const sandbox: SandboxPort = {
       ...deps.sandbox,
       drainTrace: async (ended) => {
@@ -186,11 +214,31 @@ describe("runScan, a full scan in phases", () => {
       ...deps.sandbox,
       drainTrace: async (ended) => {
         calls.push(ended);
-        return [{ id: "0190f1a2-b3c4-7d5e-8f60-000000000001", label: "searching", phase: "recon", startedAt: "2026-11-19T09:00:00.000Z", endedAt: "2026-11-19T09:00:00.000Z", count: 1 }];
+        return [
+          {
+            id: "0190f1a2-b3c4-7d5e-8f60-000000000001",
+            label: "searching",
+            phase: "recon",
+            startedAt: "2026-11-19T09:00:00.000Z",
+            endedAt: "2026-11-19T09:00:00.000Z",
+            count: 1,
+          },
+        ];
       },
     };
 
-    await runScan({ ...deps, sandbox, saveTrace: async (_params, body) => (saved.push(body.entries.length), { accepted: body.entries.length, dropped: 0 }) }, full(), fakeStep(names));
+    await runScan(
+      {
+        ...deps,
+        sandbox,
+        saveTrace: async (_params, body) => (
+          saved.push(body.entries.length),
+          { accepted: body.entries.length, dropped: 0 }
+        ),
+      },
+      full(),
+      fakeStep(names),
+    );
 
     expect(calls.filter(Boolean)).toHaveLength(4);
     expect(saved.length).toBeGreaterThanOrEqual(4);
@@ -325,7 +373,10 @@ describe("runScan", () => {
 
     await expect(runScan(deps, params(), fakeStep(names))).rejects.toThrow("could not be recorded: database down");
 
-    expect(ledger.rows.get("scan-1")).toMatchObject({ status: "failed", error: expect.stringContaining("the results were saved but could not be recorded") });
+    expect(ledger.rows.get("scan-1")).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("the results were saved but could not be recorded"),
+    });
     expect(calls).toEqual(["record:succeeded:running", "record:failed:failed", "destroy"]);
   });
 
@@ -351,7 +402,9 @@ describe("runScan", () => {
   it("does not let a scan that a newer request closed come back to life", async () => {
     const { names, ledger, deps } = setup();
     await queue(ledger, params());
-    await Effect.runPromise(ledger.repo.mark(ACCOUNT, "scan-1", { status: "failed", error: "closed by a newer request" }));
+    await Effect.runPromise(
+      ledger.repo.mark(ACCOUNT, "scan-1", { status: "failed", error: "closed by a newer request" }),
+    );
 
     await runScan(deps, params(), fakeStep(names));
 

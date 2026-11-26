@@ -1,39 +1,28 @@
-import { Card, CardContent, CardHeader } from "#/components/ui/card"
-import { cn } from "#/lib/utils"
+import { Card, CardContent, CardHeader } from "#/components/ui/card";
+import { cn } from "#/lib/utils";
 
-function Skeleton({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("animate-pulse rounded-lg bg-muted", className)}
-      {...props}
-    />
-  )
+function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("animate-pulse rounded-lg bg-muted", className)} {...props} />;
 }
 
 // -----
 // bg-muted is the card header's own colour and vanishes there, so a bar that
 // sits inside a card uses a foreground tint instead.
 // -----
-function SkeletonBar({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  return <Skeleton className={cn("bg-foreground/10", className)} {...props} />
+function SkeletonBar({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <Skeleton className={cn("bg-foreground/10", className)} {...props} />;
 }
 
-const range = (count: number) => Array.from({ length: count }, (_, index) => index)
+const range = (count: number) => Array.from({ length: count }, (_, index) => index);
 
 function SkeletonCard({
   rows = 3,
   rowClassName = "h-14",
   className,
 }: {
-  rows?: number
-  rowClassName?: string
-  className?: string
+  rows?: number;
+  rowClassName?: string;
+  className?: string;
 }) {
   return (
     <Card className={className}>
@@ -47,7 +36,7 @@ function SkeletonCard({
         ))}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function SkeletonStatStrip() {
@@ -61,7 +50,7 @@ function SkeletonStatStrip() {
         </div>
       ))}
     </Card>
-  )
+  );
 }
 
-export { range, Skeleton, SkeletonBar, SkeletonCard, SkeletonStatStrip }
+export { range, Skeleton, SkeletonBar, SkeletonCard, SkeletonStatStrip };

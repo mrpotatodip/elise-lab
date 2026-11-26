@@ -40,7 +40,11 @@ const guessesFromManyAddresses = async (env: Partial<Bindings>, count: number) =
   const app = enrollApp();
   const answers: { status: number; body: string }[] = [];
   for (let i = 0; i < count; i += 1) {
-    const res = await app.request("/enroll", { method: "POST", headers: { "cf-connecting-ip": `203.0.113.${i}` } }, env);
+    const res = await app.request(
+      "/enroll",
+      { method: "POST", headers: { "cf-connecting-ip": `203.0.113.${i}` } },
+      env,
+    );
     answers.push({ status: res.status, body: await res.text() });
   }
   return answers;
@@ -64,7 +68,10 @@ describe("the enroll limits", () => {
         return result;
       },
     };
-    await guessesFromManyAddresses({ RUNNER_ENROLL_LIMITER: countingLimiter(5), RUNNER_ENROLL_TOTAL_LIMITER: counting }, 100);
+    await guessesFromManyAddresses(
+      { RUNNER_ENROLL_LIMITER: countingLimiter(5), RUNNER_ENROLL_TOTAL_LIMITER: counting },
+      100,
+    );
     expect(checked).toBe(30);
   });
 });

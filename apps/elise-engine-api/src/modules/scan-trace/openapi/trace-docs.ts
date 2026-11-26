@@ -1,6 +1,16 @@
 import { describeRoute } from "hono-openapi";
 import { TraceSavedSchema, TraceSchema } from "@repo/contracts/elise";
-import { EXAMPLE_ACCOUNT_ID, EXAMPLE_BASE_URL, EXAMPLE_SCAN_ID, SERVICE_SECURITY, bash, envelope, errorResponses, jsonResponse, routeText } from "#/lib/openapi";
+import {
+  EXAMPLE_ACCOUNT_ID,
+  EXAMPLE_BASE_URL,
+  EXAMPLE_SCAN_ID,
+  SERVICE_SECURITY,
+  bash,
+  envelope,
+  errorResponses,
+  jsonResponse,
+  routeText,
+} from "#/lib/openapi";
 
 export const readTraceDoc = describeRoute({
   tags: ["scans"],
@@ -16,10 +26,17 @@ export const readTraceDoc = describeRoute({
     ],
     example: [
       "Read the whole Trace:",
-      bash(`curl ${EXAMPLE_BASE_URL}/scans/${EXAMPLE_SCAN_ID}/trace \\`, '  -H "authorization: Bearer $SCAN_API_TOKEN" \\', `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`),
+      bash(
+        `curl ${EXAMPLE_BASE_URL}/scans/${EXAMPLE_SCAN_ID}/trace \\`,
+        '  -H "authorization: Bearer $SCAN_API_TOKEN" \\',
+        `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}"`,
+      ),
     ],
   }),
-  responses: { 200: jsonResponse("The entries and the next cursor.", envelope(TraceSchema)), ...errorResponses(400, 401, 404) },
+  responses: {
+    200: jsonResponse("The entries and the next cursor.", envelope(TraceSchema)),
+    ...errorResponses(400, 401, 404),
+  },
 });
 
 export const saveTraceDoc = describeRoute({
@@ -44,5 +61,8 @@ export const saveTraceDoc = describeRoute({
       ),
     ],
   }),
-  responses: { 200: jsonResponse("How many entries were kept.", envelope(TraceSavedSchema)), ...errorResponses(400, 401, 404) },
+  responses: {
+    200: jsonResponse("How many entries were kept.", envelope(TraceSavedSchema)),
+    ...errorResponses(400, 401, 404),
+  },
 });

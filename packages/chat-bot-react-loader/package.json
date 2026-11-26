@@ -24,10 +24,6 @@
     "clsx": "^2.1.1",
     "motion": "^13.4.2"
   },
-  "peerDependencies": {
-    "@tanstack/ai": "^0.63.0",
-    "react": "^19.2.0"
-  },
   "devDependencies": {
     "@repo/chat-bot-api": "workspace:*",
     "@tanstack/ai": "^0.63.0",
@@ -43,5 +39,9 @@
     "vite": "^8.0.0",
     "vitest": "^4.1.7",
     "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@tanstack/ai": "^0.63.0",
+    "react": "^19.2.0"
   }
 }

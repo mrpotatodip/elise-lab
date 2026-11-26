@@ -740,8 +740,36 @@
     {
       "idx": 105,
       "version": "7",
+      "when": 1795414168685,
+      "tag": "0105_two_factor",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1795414743436,
+      "tag": "0106_two_factor_reset_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1795415860853,
+      "tag": "0107_two_factor_requirement",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1795574961931,
+      "tag": "0108_resumed_scans",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
       "when": 1795637253535,
-      "tag": "0105_repo_delete_power",
+      "tag": "0109_repo_delete_power",
       "breakpoints": true
     }
   ]

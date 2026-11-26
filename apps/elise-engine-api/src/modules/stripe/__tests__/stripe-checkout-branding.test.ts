@@ -33,6 +33,8 @@ describe("Checkout Session branding", () => {
 
   it("sends the display name only when no file id is configured", async () => {
     const form = await sentForm();
-    expect(Object.fromEntries([...form].filter(([key]) => key.startsWith("branding_settings")))).toEqual({ "branding_settings[display_name]": "EliseLAB" });
+    expect(Object.fromEntries([...form].filter(([key]) => key.startsWith("branding_settings")))).toEqual({
+      "branding_settings[display_name]": "EliseLAB",
+    });
   });
 });

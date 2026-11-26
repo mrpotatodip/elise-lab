@@ -1,11 +1,19 @@
 import type { FindingState, FindingTriage } from "../schemas";
 
-export type FindingStatusKey = "open" | "came_back" | "fixed_by_scan" | "marked_fixed" | "false_positive" | "accepted_risk" | "duplicate";
+export type FindingStatusKey =
+  | "open"
+  | "came_back"
+  | "fixed_by_scan"
+  | "marked_fixed"
+  | "false_positive"
+  | "accepted_risk"
+  | "duplicate";
 export type FindingGroup = "action" | "decided" | "scan";
 
 const RESOLVED_BY_PERSON: ReadonlySet<string> = new Set(["fixed", "false_positive", "accepted_risk", "duplicate"]);
 
-export const isResolvedByPerson = (triage: FindingTriage | null) => triage !== null && RESOLVED_BY_PERSON.has(triage.status);
+export const isResolvedByPerson = (triage: FindingTriage | null) =>
+  triage !== null && RESOLVED_BY_PERSON.has(triage.status);
 
 // -----
 // A finding has two truths: what the scans found (its state) and what a
@@ -38,4 +46,7 @@ export const FINDING_STATUS_BADGE = {
   false_positive: { label: "False positive", variant: "neutral" },
   accepted_risk: { label: "Risk accepted", variant: "warning" },
   duplicate: { label: "Duplicate", variant: "neutral" },
-} as const satisfies Record<FindingStatusKey, { label: string; variant: "outline" | "destructive" | "success" | "neutral" | "warning" }>;
+} as const satisfies Record<
+  FindingStatusKey,
+  { label: string; variant: "outline" | "destructive" | "success" | "neutral" | "warning" }
+>;

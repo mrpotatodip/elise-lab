@@ -29,13 +29,24 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
       {
         maxPolls: maxPollsOf(event.payload.runnerId),
         phases: event.payload.runnerId ? undefined : SCAN_SANDBOX_FULL_PHASES,
-        sandbox: event.payload.runnerId ? runnerSandbox(dbConnect(this.env.DATABASE_URL), event.payload, event.payload.runnerId) : this.env.SANDBOX_FULL.getByName(event.payload.scanId),
+        sandbox: event.payload.runnerId
+          ? runnerSandbox(dbConnect(this.env.DATABASE_URL), event.payload, event.payload.runnerId)
+          : this.env.SANDBOX_FULL.getByName(event.payload.scanId),
         ledger: neonScanRepo(dbConnect(this.env.DATABASE_URL)),
         reports: this.env.REPORTS,
         sealedKeyFor: (accountId) => runEffect(findSealedKeyEffect(dbConnect(this.env.DATABASE_URL), accountId)),
         recordScan: (params, status, error, usage) => runEffect(recordScanSvc(this.env, params, status, error, usage)),
-        saveTrace: (params, body) => runEffect(keepTraceBatchSvc(dbConnect(this.env.DATABASE_URL), params.accountId, params.scanId, body)),
-        detectSignals: (params) => runEffect(detectDuplicateSignalsSvc(dbConnect(this.env.DATABASE_URL), realAppDeps.typesafe(this.env), params.accountId, params.scanId)),
+        saveTrace: (params, body) =>
+          runEffect(keepTraceBatchSvc(dbConnect(this.env.DATABASE_URL), params.accountId, params.scanId, body)),
+        detectSignals: (params) =>
+          runEffect(
+            detectDuplicateSignalsSvc(
+              dbConnect(this.env.DATABASE_URL),
+              realAppDeps.typesafe(this.env),
+              params.accountId,
+              params.scanId,
+            ),
+          ),
         settleCredit: (params, status, usage) => settleScanCredit(this.env, params, status, usage),
       },
       event.payload,

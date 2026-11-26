@@ -9,7 +9,9 @@ type CopyCommandProps = {
 export function CopyCommand({ command }: CopyCommandProps) {
   return (
     <div className="flex w-full items-center gap-2">
-      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded border bg-foreground/5 px-2 py-1.5 text-left font-mono text-xs">{command}</code>
+      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded border bg-foreground/5 px-2 py-1.5 text-left font-mono text-xs">
+        {command}
+      </code>
       <Button
         type="button"
         size="sm"

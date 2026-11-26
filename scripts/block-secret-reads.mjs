@@ -14,6 +14,8 @@ const prints = new RegExp(String.raw`\b(?:${READERS})\b[^|;&\n]*\s${SECRET_FILE}
 const onlyCounts = /\bgrep\s+(?:-[A-Za-z]*[cql][A-Za-z]*)\b/;
 
 if (prints.test(command) && !onlyCounts.test(command)) {
-  console.error("This command would print a secret file (.dev.vars or .env). Name the key you need and test it without printing: `grep -c '^KEY=.' <file>`, or `source` the file in a subshell that prints nothing. Never echo its values.");
+  console.error(
+    "This command would print a secret file (.dev.vars or .env). Name the key you need and test it without printing: `grep -c '^KEY=.' <file>`, or `source` the file in a subshell that prints nothing. Never echo its values.",
+  );
   process.exit(2);
 }

@@ -12,16 +12,32 @@ import { findingCommentView } from "./finding-comment-view";
 // "edited" for a save that changed nothing. The row must still
 // be live: a comment deleted a moment ago gives null.
 // -----
-export const editFindingCommentEffect = (db: AppDbType, tenantId: string, commentId: string, body: string): Effect.Effect<FindingComment | null, DbError> =>
+export const editFindingCommentEffect = (
+  db: AppDbType,
+  tenantId: string,
+  commentId: string,
+  body: string,
+): Effect.Effect<FindingComment | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [row] = await db
         .update(scanFindingComments)
-        .set({ body, editedAt: sql`CASE WHEN ${scanFindingComments.body} = ${body} THEN ${scanFindingComments.editedAt} ELSE now() END` })
-        .where(and(eq(scanFindingComments.tenantId, tenantId), eq(scanFindingComments.id, commentId), isNull(scanFindingComments.deletedAt)))
+        .set({
+          body,
+          editedAt: sql`CASE WHEN ${scanFindingComments.body} = ${body} THEN ${scanFindingComments.editedAt} ELSE now() END`,
+        })
+        .where(
+          and(
+            eq(scanFindingComments.tenantId, tenantId),
+            eq(scanFindingComments.id, commentId),
+            isNull(scanFindingComments.deletedAt),
+          ),
+        )
         .returning();
       if (!row) return null;
-      const [person] = row.authorPartyId ? await db.select().from(partyPersons).where(eq(partyPersons.partyId, row.authorPartyId)) : [];
+      const [person] = row.authorPartyId
+        ? await db.select().from(partyPersons).where(eq(partyPersons.partyId, row.authorPartyId))
+        : [];
       return findingCommentView(row, person);
     },
     catch: toDbError,

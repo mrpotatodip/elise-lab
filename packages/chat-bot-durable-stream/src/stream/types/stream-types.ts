@@ -1,8 +1,5 @@
 import type { StreamChunk } from "@tanstack/ai";
-import type {
-  CHAT_BOT_DURABLE_STREAM_OFFSET_INVALID,
-  CHAT_BOT_DURABLE_STREAM_OFFSET_OTHER_RUN,
-} from "../constants";
+import type { CHAT_BOT_DURABLE_STREAM_OFFSET_INVALID, CHAT_BOT_DURABLE_STREAM_OFFSET_OTHER_RUN } from "../constants";
 
 // -----
 // Store
@@ -13,10 +10,7 @@ export type ChatBotDurableStreamRow = { seq: number; chunk: StreamChunk };
 
 export type ChatBotDurableStreamStore = {
   append: (key: ChatBotDurableStreamKey, chunks: Array<StreamChunk>) => Promise<Array<number>>;
-  listAfter: (
-    key: ChatBotDurableStreamKey,
-    afterSeq: number,
-  ) => Promise<Array<ChatBotDurableStreamRow>>;
+  listAfter: (key: ChatBotDurableStreamKey, afterSeq: number) => Promise<Array<ChatBotDurableStreamRow>>;
   isClosed: (key: ChatBotDurableStreamKey) => Promise<boolean>;
   close: (key: ChatBotDurableStreamKey) => Promise<void>;
   prune: (streamPrefix: string, closedBefore: Date) => Promise<void>;
@@ -43,9 +37,7 @@ export type ChatBotDurableStreamInit = {
 export type ChatBotDurableStreamCursor = { runId: string; seq: number };
 
 export type ChatBotDurableStreamOffsetError = {
-  error:
-    | typeof CHAT_BOT_DURABLE_STREAM_OFFSET_INVALID
-    | typeof CHAT_BOT_DURABLE_STREAM_OFFSET_OTHER_RUN;
+  error: typeof CHAT_BOT_DURABLE_STREAM_OFFSET_INVALID | typeof CHAT_BOT_DURABLE_STREAM_OFFSET_OTHER_RUN;
 };
 
 export type ChatBotDurableStreamOffsetCheck = { seq: number } | ChatBotDurableStreamOffsetError;

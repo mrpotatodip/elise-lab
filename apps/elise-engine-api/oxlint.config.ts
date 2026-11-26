@@ -1,9 +1,19 @@
 import { readdirSync } from "node:fs";
 import { defineConfig, type OxlintOverride } from "oxlint";
 
-const FORBID_HONO_RPC = { name: "hono/client", message: "No Hono RPC client: the frontend calls the API through a server function (Hono JS 9.2)." };
-const FORBID_DEEP_IMPORT = { group: ["#/modules/*/*/*"], message: "Import through the folder's barrel: `#/modules/{module}/{folder}` (Hono JS 8.2). Inside one folder, import the sibling with `./file`." };
-const FORBID_HONO_IN_SERVICES = { group: ["hono", "hono/*"], message: "Services never import from `hono`: pass plain values, not a Context (Hono JS 2.3)." };
+const FORBID_HONO_RPC = {
+  name: "hono/client",
+  message: "No Hono RPC client: the frontend calls the API through a server function (Hono JS 9.2).",
+};
+const FORBID_DEEP_IMPORT = {
+  group: ["#/modules/*/*/*"],
+  message:
+    "Import through the folder's barrel: `#/modules/{module}/{folder}` (Hono JS 8.2). Inside one folder, import the sibling with `./file`.",
+};
+const FORBID_HONO_IN_SERVICES = {
+  group: ["hono", "hono/*"],
+  message: "Services never import from `hono`: pass plain values, not a Context (Hono JS 2.3).",
+};
 
 // -----
 // Source providers (docs/adr/0008-git-providers.md): core reads a provider
@@ -14,7 +24,8 @@ const FORBID_HONO_IN_SERVICES = { group: ["hono", "hono/*"], message: "Services 
 // -----
 const FORBID_PROVIDER_IN_CORE = {
   group: ["#/providers/*", "#/providers/*/**", "!#/providers/port", "!#/providers/registry"],
-  message: "Core reads a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
+  message:
+    "Core reads a provider only through `#/providers/registry` and `#/providers/port`, never its folder (ADR 0008).",
 };
 const PROVIDER_IDS = readdirSync(new URL("src/providers", import.meta.url), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -29,8 +40,15 @@ const providerOverride = (id: string): OxlintOverride => ({
         patterns: [
           FORBID_DEEP_IMPORT,
           {
-            group: ["#/providers/*", "#/providers/*/**", "!#/providers/port", `!#/providers/${id}`, `!#/providers/${id}/**`],
-            message: "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
+            group: [
+              "#/providers/*",
+              "#/providers/*/**",
+              "!#/providers/port",
+              `!#/providers/${id}`,
+              `!#/providers/${id}/**`,
+            ],
+            message:
+              "A provider imports only `#/providers/port` and its own folder: never the registry or another provider (ADR 0008).",
           },
         ],
       },
@@ -83,7 +101,10 @@ export default defineConfig({
     "typescript/consistent-type-definitions": ["error", "type"],
     "typescript/no-explicit-any": "error",
     "node/no-process-env": "error",
-    "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [FORBID_DEEP_IMPORT, FORBID_PROVIDER_IN_CORE] }],
+    "no-restricted-imports": [
+      "error",
+      { paths: [FORBID_HONO_RPC], patterns: [FORBID_DEEP_IMPORT, FORBID_PROVIDER_IN_CORE] },
+    ],
     // -----
     // Effect's tagged errors discriminate on
     // its own `_tag` field.
@@ -103,7 +124,13 @@ export default defineConfig({
     {
       files: ["src/modules/**/handlers/**", "src/modules/**/queries/**", "src/modules/**/utils/**"],
       rules: {
-        "no-restricted-imports": ["error", { paths: [FORBID_HONO_RPC], patterns: [FORBID_DEEP_IMPORT, FORBID_HONO_IN_SERVICES, FORBID_PROVIDER_IN_CORE] }],
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [FORBID_HONO_RPC],
+            patterns: [FORBID_DEEP_IMPORT, FORBID_HONO_IN_SERVICES, FORBID_PROVIDER_IN_CORE],
+          },
+        ],
       },
     },
     ...PROVIDER_IDS.map(providerOverride),
@@ -166,7 +193,13 @@ export default defineConfig({
         "vitest/no-disabled-tests": "error",
         "vitest/no-focused-tests": "error",
         "vitest/no-identical-title": "error",
-        "vitest/no-restricted-matchers": ["error", { toMatchSnapshot: "No snapshot tests (General 2.2).", toMatchInlineSnapshot: "No snapshot tests (General 2.2)." }],
+        "vitest/no-restricted-matchers": [
+          "error",
+          {
+            toMatchSnapshot: "No snapshot tests (General 2.2).",
+            toMatchInlineSnapshot: "No snapshot tests (General 2.2).",
+          },
+        ],
       },
     },
   ],

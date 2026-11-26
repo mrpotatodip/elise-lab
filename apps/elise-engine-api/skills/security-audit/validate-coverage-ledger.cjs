@@ -84,7 +84,8 @@ const AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const WINDOWS_RESERVED_AGENT_ID = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/;
 const VISIBLE_CONTENT = /[^\p{White_Space}\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}]/u;
 const PATH_FORBIDDEN_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u;
-const WINDOWS_RESERVED_COMPONENT = /^(?:con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu;
+const WINDOWS_RESERVED_COMPONENT =
+  /^(?:con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3])(?:\.|$)/iu;
 const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const UNSAFE_DIAGNOSTIC_CHARACTER = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/gu;
 const MAX_DIAGNOSTIC_STRING_LENGTH = 256;
@@ -97,18 +98,15 @@ class SafeInputError extends Error {}
 function escapeUnsafeDiagnosticCharacters(value) {
   return String(value).replace(UNSAFE_DIAGNOSTIC_CHARACTER, (character) => {
     const codePoint = character.codePointAt(0);
-    return codePoint <= 0xffff
-      ? `\\u${codePoint.toString(16).padStart(4, "0")}`
-      : `\\u{${codePoint.toString(16)}}`;
+    return codePoint <= 0xffff ? `\\u${codePoint.toString(16).padStart(4, "0")}` : `\\u{${codePoint.toString(16)}}`;
   });
 }
 
 function safeQuote(value) {
   let serialized;
   if (typeof value === "string") {
-    const clipped = value.length > MAX_DIAGNOSTIC_STRING_LENGTH
-      ? `${value.slice(0, MAX_DIAGNOSTIC_STRING_LENGTH)}...`
-      : value;
+    const clipped =
+      value.length > MAX_DIAGNOSTIC_STRING_LENGTH ? `${value.slice(0, MAX_DIAGNOSTIC_STRING_LENGTH)}...` : value;
     serialized = JSON.stringify(clipped);
   } else if (value === null || typeof value === "boolean") {
     serialized = String(value);
@@ -172,9 +170,7 @@ function preflightJsonText(contents) {
       container.items++;
       const limit = container.topLevel ? MAX_UNITS : LIMITS.collectionItems;
       if (container.items > limit) {
-        fail(container.topLevel
-          ? `exceeds ${limit} top-level unit limit`
-          : `exceeds ${limit} item array limit`);
+        fail(container.topLevel ? `exceeds ${limit} top-level unit limit` : `exceeds ${limit} item array limit`);
       }
       container.state = "commaOrEnd";
     } else {
@@ -186,8 +182,11 @@ function preflightJsonText(contents) {
 
   function beginString() {
     const container = currentContainer();
-    if (container && container.type === "object" &&
-        (container.state === "firstKeyOrEnd" || container.state === "key")) {
+    if (
+      container &&
+      container.type === "object" &&
+      (container.state === "firstKeyOrEnd" || container.state === "key")
+    ) {
       container.fields++;
       if (container.fields > LIMITS.objectFields) {
         fail(`exceeds ${LIMITS.objectFields} field object limit`);
@@ -204,17 +203,20 @@ function preflightJsonText(contents) {
     if (containers.length >= LIMITS.nestingDepth) {
       fail(`exceeds nesting depth limit ${LIMITS.nestingDepth}`);
     }
-    containers.push(type === "array"
-      ? { type, state: "firstValueOrEnd", items: 0, topLevel: containers.length === 0 }
-      : { type, state: "firstKeyOrEnd", fields: 0 });
+    containers.push(
+      type === "array"
+        ? { type, state: "firstValueOrEnd", items: 0, topLevel: containers.length === 0 }
+        : { type, state: "firstKeyOrEnd", fields: 0 },
+    );
   }
 
   function closeContainer(type) {
     const container = currentContainer();
     if (!container || container.type !== type) fail("has mismatched JSON containers");
-    const canClose = type === "array"
-      ? container.state === "firstValueOrEnd" || container.state === "commaOrEnd"
-      : container.state === "firstKeyOrEnd" || container.state === "commaOrEnd";
+    const canClose =
+      type === "array"
+        ? container.state === "firstValueOrEnd" || container.state === "commaOrEnd"
+        : container.state === "firstKeyOrEnd" || container.state === "commaOrEnd";
     if (!canClose) fail(`has malformed JSON ${type} structure`);
     containers.pop();
   }
@@ -224,9 +226,16 @@ function preflightJsonText(contents) {
   }
 
   function isTokenDelimiter(character) {
-    return isWhitespace(character) || character === "," || character === ":" ||
-      character === "[" || character === "]" || character === "{" ||
-      character === "}" || character === "\"";
+    return (
+      isWhitespace(character) ||
+      character === "," ||
+      character === ":" ||
+      character === "[" ||
+      character === "]" ||
+      character === "{" ||
+      character === "}" ||
+      character === '"'
+    );
   }
 
   for (let index = 0; index < contents.length; index++) {
@@ -236,14 +245,14 @@ function preflightJsonText(contents) {
         escaped = false;
       } else if (character === "\\") {
         escaped = true;
-      } else if (character === "\"") {
+      } else if (character === '"') {
         inString = false;
       }
       continue;
     }
     if (isWhitespace(character)) continue;
 
-    if (character === "\"") {
+    if (character === '"') {
       beginString();
     } else if (character === "[") {
       beginContainer("array");
@@ -338,17 +347,17 @@ function hasVisibleProse(value) {
 }
 
 function isVisibleText(value, maxLength = MAX_TEXT_LENGTH) {
-  return typeof value === "string" &&
+  return (
+    typeof value === "string" &&
     value.length > 0 &&
     value.length <= maxLength &&
     value.trim() === value &&
-    hasVisibleProse(value);
+    hasVisibleProse(value)
+  );
 }
 
 function isCanonicalRef(value) {
-  return isVisibleText(value, 1024) &&
-    !PATH_FORBIDDEN_CHARACTER.test(value) &&
-    value.normalize("NFC") === value;
+  return isVisibleText(value, 1024) && !PATH_FORBIDDEN_CHARACTER.test(value) && value.normalize("NFC") === value;
 }
 
 function encodeCanonicalRef(value) {
@@ -359,7 +368,10 @@ function encodeCanonicalRef(value) {
       (byte >= 0x41 && byte <= 0x5a) ||
       (byte >= 0x61 && byte <= 0x7a) ||
       (byte >= 0x30 && byte <= 0x39) ||
-      byte === 0x2d || byte === 0x2e || byte === 0x5f || byte === 0x7e;
+      byte === 0x2d ||
+      byte === 0x2e ||
+      byte === 0x5f ||
+      byte === 0x7e;
     encoded += unreserved ? String.fromCharCode(byte) : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
   }
   return encoded;
@@ -375,20 +387,32 @@ function canonicalCoverageId(refs) {
 }
 
 function isSafeRelativePath(value) {
-  if (typeof value !== "string" || value.length === 0 || !hasValidUnicodeScalarValues(value) || value.trim() !== value || PATH_FORBIDDEN_CHARACTER.test(value) || value.includes("\\") || value.includes(":")) return false;
-  if (path.posix.isAbsolute(value) || path.win32.isAbsolute(value) || /^[A-Za-z]:/.test(value) || value.startsWith("~")) return false;
-  return value.split("/").every((segment) =>
-    segment !== "" &&
-    segment !== "." &&
-    segment !== ".." &&
-    !/[ .]$/u.test(segment) &&
-    !WINDOWS_RESERVED_COMPONENT.test(segment));
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    !hasValidUnicodeScalarValues(value) ||
+    value.trim() !== value ||
+    PATH_FORBIDDEN_CHARACTER.test(value) ||
+    value.includes("\\") ||
+    value.includes(":")
+  )
+    return false;
+  if (path.posix.isAbsolute(value) || path.win32.isAbsolute(value) || /^[A-Za-z]:/.test(value) || value.startsWith("~"))
+    return false;
+  return value
+    .split("/")
+    .every(
+      (segment) =>
+        segment !== "" &&
+        segment !== "." &&
+        segment !== ".." &&
+        !/[ .]$/u.test(segment) &&
+        !WINDOWS_RESERVED_COMPONENT.test(segment),
+    );
 }
 
 function isSafeAgentId(value) {
-  return typeof value === "string" &&
-    AGENT_ID_PATTERN.test(value) &&
-    !WINDOWS_RESERVED_AGENT_ID.test(value);
+  return typeof value === "string" && AGENT_ID_PATTERN.test(value) && !WINDOWS_RESERVED_AGENT_ID.test(value);
 }
 
 function isOwnedArtifactPath(value, agentId) {
@@ -436,15 +460,23 @@ function validateChecks(value, location, errors) {
     if (!isSafeAgentId(check.agent_id)) errors.push(`${base}.agent_id: expected a canonical lowercase agent ID`);
     validateStringArray(check.reviewed_paths, `${base}.reviewed_paths`, errors, { allowEmpty: false, pathValue: true });
     if (!isVisibleText(check.invariant)) errors.push(`${base}.invariant: invalid text`);
-    if (check.method !== "source" && check.method !== "local") errors.push(`${base}.method: expected "source" or "local"`);
+    if (check.method !== "source" && check.method !== "local")
+      errors.push(`${base}.method: expected "source" or "local"`);
     if (!isVisibleText(check.result)) errors.push(`${base}.result: invalid text`);
     if (check.method === "source" && check.artifact !== null) {
       errors.push(`${base}.artifact: source-only check must use null`);
     } else if (check.method === "local") {
       if (!isOwnedArtifactPath(check.artifact, check.agent_id)) {
-        errors.push(`${base}.artifact: local check requires an artifact owned by agent ${safeQuote(isSafeAgentId(check.agent_id) ? check.agent_id : "<agent-id>")}`);
+        errors.push(
+          `${base}.artifact: local check requires an artifact owned by agent ${safeQuote(isSafeAgentId(check.agent_id) ? check.agent_id : "<agent-id>")}`,
+        );
       }
-    } else if (check.method !== "source" && check.method !== "local" && check.artifact !== null && !isSafeRelativePath(check.artifact)) {
+    } else if (
+      check.method !== "source" &&
+      check.method !== "local" &&
+      check.artifact !== null &&
+      !isSafeRelativePath(check.artifact)
+    ) {
       errors.push(`${base}.artifact: expected null or a safe output-relative path`);
     }
   });
@@ -461,10 +493,14 @@ function validateReviewedPathOwnership(unit, base, errors) {
     }
   }
   for (const reviewedPath of aggregatePaths) {
-    if (!ownedPaths.has(reviewedPath)) errors.push(`${base}.reviewed_paths: ${safeQuote(reviewedPath)} has no check owner`);
+    if (!ownedPaths.has(reviewedPath))
+      errors.push(`${base}.reviewed_paths: ${safeQuote(reviewedPath)} has no check owner`);
   }
   for (const reviewedPath of ownedPaths) {
-    if (!aggregatePaths.has(reviewedPath)) errors.push(`${base}.local_checks: owned path ${safeQuote(reviewedPath)} is absent from aggregate reviewed_paths`);
+    if (!aggregatePaths.has(reviewedPath))
+      errors.push(
+        `${base}.local_checks: owned path ${safeQuote(reviewedPath)} is absent from aggregate reviewed_paths`,
+      );
   }
 }
 
@@ -499,8 +535,10 @@ function semanticKey(unit) {
 }
 
 function hasValidSemanticFields(unit) {
-  return ["surface", "boundary", "subsystem", "attack_class"].every((field) => isVisibleText(unit[field])) &&
-    (!hasOwn(unit, "lifecycle") || isVisibleText(unit.lifecycle));
+  return (
+    ["surface", "boundary", "subsystem", "attack_class"].every((field) => isVisibleText(unit[field])) &&
+    (!hasOwn(unit, "lifecycle") || isVisibleText(unit.lifecycle))
+  );
 }
 
 function requireEmptyArray(unit, field, base, errors) {
@@ -521,7 +559,10 @@ function validateStateInvariants(unit, base, errors) {
     requireEmptyArray(unit, "local_checks", base, errors);
   };
   const requireOwner = () => {
-    if (!isSafeAgentId(unit.agent_id)) errors.push(`${base}.agent_id: unit with status ${safeQuote(unit.status)} requires a canonical lowercase agent ID`);
+    if (!isSafeAgentId(unit.agent_id))
+      errors.push(
+        `${base}.agent_id: unit with status ${safeQuote(unit.status)} requires a canonical lowercase agent ID`,
+      );
   };
 
   if (unit.status !== "candidate") requireEmptyArray(unit, "result_fingerprints", base, errors);
@@ -535,7 +576,8 @@ function validateStateInvariants(unit, base, errors) {
     case "not_applicable":
     case "out_of_scope":
     case "deferred":
-      if (unit.agent_id !== null) errors.push(`${base}.agent_id: unit with status ${safeQuote(unit.status)} must be unassigned`);
+      if (unit.agent_id !== null)
+        errors.push(`${base}.agent_id: unit with status ${safeQuote(unit.status)} must be unassigned`);
       emptyEvidence();
       requireNonemptyArray(unit, "unresolved", base, errors);
       break;
@@ -587,7 +629,8 @@ function validateAttempts(value, unit, base, errors) {
     if (!Number.isInteger(attempt.wave) || attempt.wave < 1) {
       errors.push(`${attemptBase}.wave: expected a positive integer`);
     } else {
-      if (attempt.wave <= previousWave) errors.push(`${attemptBase}.wave: archived attempt waves must be strictly increasing`);
+      if (attempt.wave <= previousWave)
+        errors.push(`${attemptBase}.wave: archived attempt waves must be strictly increasing`);
       if (Number.isInteger(unit.wave) && attempt.wave >= unit.wave) {
         errors.push(`${attemptBase}.wave: archived attempt wave must precede current wave ${safeQuote(unit.wave)}`);
       }
@@ -607,7 +650,9 @@ function validateAttempts(value, unit, base, errors) {
     validateStringArray(attempt.reviewed_paths, `${attemptBase}.reviewed_paths`, errors, { pathValue: true });
     validateChecks(attempt.local_checks, `${attemptBase}.local_checks`, errors);
     validateReviewedPathOwnership(attempt, attemptBase, errors);
-    validateStringArray(attempt.result_fingerprints, `${attemptBase}.result_fingerprints`, errors, { fingerprint: true });
+    validateStringArray(attempt.result_fingerprints, `${attemptBase}.result_fingerprints`, errors, {
+      fingerprint: true,
+    });
     validateStringArray(attempt.unresolved, `${attemptBase}.unresolved`, errors);
     if (!isVisibleText(attempt.reassignment_reason)) errors.push(`${attemptBase}.reassignment_reason: invalid text`);
     validateStateInvariants(attempt, attemptBase, errors);
@@ -616,10 +661,14 @@ function validateAttempts(value, unit, base, errors) {
       attempt.local_checks.forEach((check, checkIndex) => {
         if (!isObject(check)) return;
         if (priorOwners.has(check.agent_id)) {
-          errors.push(`${attemptBase}.local_checks[${checkIndex}].agent_id: prior assignment owner evidence must remain in its earlier attempt`);
+          errors.push(
+            `${attemptBase}.local_checks[${checkIndex}].agent_id: prior assignment owner evidence must remain in its earlier attempt`,
+          );
         }
         if (typeof check.artifact === "string" && priorArtifacts.has(check.artifact)) {
-          errors.push(`${attemptBase}.local_checks[${checkIndex}].artifact: artifact from an earlier attempt cannot be reused`);
+          errors.push(
+            `${attemptBase}.local_checks[${checkIndex}].artifact: artifact from an earlier attempt cannot be reused`,
+          );
         }
         if (check.method === "local" && typeof check.artifact === "string") priorArtifacts.add(check.artifact);
       });
@@ -634,7 +683,9 @@ function validateAttempts(value, unit, base, errors) {
     unit.local_checks.forEach((check, index) => {
       if (!isObject(check)) return;
       if (priorOwners.has(check.agent_id)) {
-        errors.push(`${base}.local_checks[${index}].agent_id: prior assignment owner evidence must remain in its archived attempt`);
+        errors.push(
+          `${base}.local_checks[${index}].agent_id: prior assignment owner evidence must remain in its archived attempt`,
+        );
       }
       if (typeof check.artifact === "string" && priorArtifacts.has(check.artifact)) {
         errors.push(`${base}.local_checks[${index}].artifact: artifact from an archived attempt cannot be reused`);
@@ -701,10 +752,12 @@ function collectUnitErrors(unit, index) {
     });
   }
 
-  if (!PRIOR_STATUSES.has(unit.prior_status)) errors.push(`${base}.prior_status: invalid value ${safeQuote(unit.prior_status)}`);
+  if (!PRIOR_STATUSES.has(unit.prior_status))
+    errors.push(`${base}.prior_status: invalid value ${safeQuote(unit.prior_status)}`);
   if (!STATUSES.has(unit.status)) errors.push(`${base}.status: invalid value ${safeQuote(unit.status)}`);
   if (!Number.isInteger(unit.wave) || unit.wave < 1) errors.push(`${base}.wave: expected a positive integer`);
-  if (unit.agent_id !== null && !isSafeAgentId(unit.agent_id)) errors.push(`${base}.agent_id: expected null or a safe agent ID`);
+  if (unit.agent_id !== null && !isSafeAgentId(unit.agent_id))
+    errors.push(`${base}.agent_id: expected null or a safe agent ID`);
 
   validateAttempts(unit.attempts, unit, base, errors);
   validateStringArray(unit.reviewed_paths, `${base}.reviewed_paths`, errors, { pathValue: true });
@@ -730,7 +783,8 @@ function readFileWithinLimit(file) {
   try {
     descriptor = fs.openSync(file, fs.constants.O_RDONLY | noFollow | nonBlock);
   } catch (error) {
-    if (error && (error.code === "ELOOP" || error.code === "EMLINK")) throw new SafeInputError("input must not be a symlink");
+    if (error && (error.code === "ELOOP" || error.code === "EMLINK"))
+      throw new SafeInputError("input must not be a symlink");
     throw error;
   }
   try {
@@ -784,16 +838,19 @@ function validateDocument(ledger) {
     const key = hasValidSemanticFields(unit) ? semanticKey(unit) : null;
     if (ids.has(unit.coverage_id)) {
       const previous = ids.get(unit.coverage_id);
-      const qualifier = key !== null && previous.key !== null && previous.key !== key
-        ? "canonical identity collision with different semantic fields"
-        : "duplicate coverage ID";
+      const qualifier =
+        key !== null && previous.key !== null && previous.key !== key
+          ? "canonical identity collision with different semantic fields"
+          : "duplicate coverage ID";
       errors.push(`$[${index}].coverage_id: ${qualifier} at $[${previous.index}]`);
     } else {
       ids.set(unit.coverage_id, { index, key });
     }
     if (key !== null && semantics.has(key) && semantics.get(key).id !== unit.coverage_id) {
       const previous = semantics.get(key);
-      errors.push(`$[${index}].canonical_refs: semantic tuple already uses coverage ID ${safeQuote(previous.id)} at $[${previous.index}]`);
+      errors.push(
+        `$[${index}].canonical_refs: semantic tuple already uses coverage ID ${safeQuote(previous.id)} at $[${previous.index}]`,
+      );
     } else if (key !== null) {
       semantics.set(key, { id: unit.coverage_id, index });
     }
