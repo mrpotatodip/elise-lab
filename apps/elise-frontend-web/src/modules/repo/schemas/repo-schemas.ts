@@ -51,6 +51,7 @@ const BranchRowSchema = z.object({
 export const AddRepoDetailsSchema = z.object({
   repo: z.string().trim().regex(REPO_URL_PATTERN, REPO_URL_MESSAGE),
   branches: z.array(BranchRowSchema).max(REPO_BRANCH_LIMIT),
+  projectId: z.string().nullable(),
 });
 
 

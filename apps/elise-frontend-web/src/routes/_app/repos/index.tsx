@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { RepoList, RepoListSkeleton, reposQuery } from "#/modules/repo";
+import { projectsQuery } from "#/modules/project";
 import { ShellPageHeader } from "#/modules/shell";
 
 export const Route = createFileRoute("/_app/repos/")({
   head: () => ({ meta: [{ title: "Repositories · Elise" }] }),
-  loader: ({ context }) => context.queryClient.query({ ...reposQuery(), staleTime: "static" }),
+  loader: ({ context }) => Promise.all([context.queryClient.query({ ...reposQuery(), staleTime: "static" }), context.queryClient.query({ ...projectsQuery(), staleTime: "static" })]),
   component: ReposPage,
 });
 
