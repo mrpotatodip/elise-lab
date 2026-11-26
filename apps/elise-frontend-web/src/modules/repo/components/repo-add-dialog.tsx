@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { GitBranch, Plus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -20,15 +20,19 @@ import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
 import { fieldAria, fieldMessage } from "#/lib/form-field";
+import { moveRepoToProject, projectKeys, projectsQuery, useCanManageProjects } from "#/modules/project";
 import { RUNNER_GIT_LOGIN_HINT } from "#/modules/runner";
 import { scanKeys } from "#/modules/scan";
 import { addRepo } from "../api";
 import { repoKeys } from "../hooks";
+import { ProjectPicker } from "./repo-project-dialogs";
 import { AddRepoDetailsSchema, AddRepoInputSchema, REPO_BRANCH_LIMIT, REPO_URL_EXAMPLE } from "../schemas";
 
 type BranchRow = { id: string; name: string };
 
 const noBranches = (): BranchRow[] => [];
+
+const noProject = (): string | null => null;
 
 type RepoAddFormProps = { onDone: () => void };
 
@@ -36,25 +40,44 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  const { data: projects = [] } = useQuery(projectsQuery());
+  const canPick = useCanManageProjects() && projects.length > 0;
+
   const add = useMutation({
-    mutationFn: (input: typeof AddRepoInputSchema._output) => addRepo({ data: input }),
+    mutationFn: async ({ projectId, ...input }: typeof AddRepoInputSchema._output & { projectId: string | null }) => {
+      const repo = await addRepo({ data: input });
+      if (projectId === null) return repo;
+      try {
+        await moveRepoToProject({ data: { repoId: repo.id, projectId } });
+      } catch (error) {
+        toast.error(
+          `The repository was added, but we couldn't put it in the project. ${error instanceof Error ? error.message : ""}`,
+        );
+      }
+      return repo;
+    },
     onSuccess: async (repo) => {
       onDone();
       toast.success("Repository added. Nothing was scanned.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: repoKeys.all }),
         queryClient.invalidateQueries({ queryKey: scanKeys.all }),
+        queryClient.invalidateQueries({ queryKey: projectKeys.all }),
       ]);
       await navigate({ to: "/repos/$repoId", params: { repoId: repo.id } });
     },
   });
 
   const form = useForm({
-    defaultValues: { repo: "", branches: noBranches() },
+    defaultValues: { repo: "", branches: noBranches(), projectId: noProject() },
     validators: { onSubmit: AddRepoDetailsSchema },
     onSubmit: ({ value }) => {
       const branches = value.branches.map((row) => row.name).filter((name) => name !== "");
-      add.mutate({ repo: value.repo.trim(), ...(branches.length > 0 && { branches }) });
+      add.mutate({
+        repo: value.repo.trim(),
+        ...(branches.length > 0 && { branches }),
+        projectId: canPick ? value.projectId : null,
+      });
     },
   });
 
@@ -159,6 +182,25 @@ function RepoAddForm({ onDone }: RepoAddFormProps) {
             </fieldset>
           )}
         </form.Field>
+
+        {canPick && (
+          <form.Field name="projectId">
+            {(field) => (
+              <div className="grid gap-2">
+                <Label htmlFor="add-repo-project">Project (optional)</Label>
+                <ProjectPicker
+                  id="add-repo-project"
+                  projects={projects}
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave it as no project to keep the repository ungrouped.
+                </p>
+              </div>
+            )}
+          </form.Field>
+        )}
 
         {add.error && (
           <p role="alert" className="text-sm text-destructive">

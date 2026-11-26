@@ -339,6 +339,7 @@ export const listReposEffect = (
         url: repo.url,
         canonical: repo.canonical,
         isPrivate: repo.isPrivate,
+        projectId: repo.projectId,
         defaultBranch,
         branchNames,
         scans: totals.find((row) => row.repoId === repo.id)?.total ?? 0,

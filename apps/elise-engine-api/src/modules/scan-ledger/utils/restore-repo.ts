@@ -13,7 +13,7 @@ export const restoreRemovedRepo = async (
   const live = sql`(select count(*) from scan_repos where tenant_id = ${accountId} and removed_at is null) < ${REPO_LIMIT_PER_TENANT}`;
   const [row] = await db
     .update(scanRepos)
-    .set({ removedAt: null })
+    .set({ removedAt: null, projectId: null })
     .where(and(repoWhere, isNotNull(scanRepos.removedAt), live))
     .returning({ id: scanRepos.id });
   return row?.id ?? null;

@@ -90,7 +90,7 @@ export const removeUploadAppEffect = (
         .returning({ r2Key: scanUploadArchives.r2Key });
       await db
         .update(scanRepos)
-        .set({ removedAt: new Date() })
+        .set({ removedAt: new Date(), projectId: null })
         .where(and(eq(scanRepos.tenantId, tenantId), eq(scanRepos.id, repoId)));
       // SAFETY: the tenant transaction's insert answers like the pool's one AuditDb names, and access_audit_log has no row-level security.
       await insertAuditEntry(db as never, { actorPartyId, action: "repo.removed", subjectId: repoId, tenantId });

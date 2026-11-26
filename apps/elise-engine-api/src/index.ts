@@ -17,6 +17,7 @@ import findingCommentsRoutes from "#/modules/finding-comments";
 import findingsRoutes from "#/modules/findings";
 import groupsRoutes from "#/modules/groups";
 import meRoutes from "#/modules/me";
+import projectsRoutes, { moveRepoProjectAPI } from "#/modules/projects";
 import reposRoutes from "#/modules/repos";
 import runnersRoutes from "#/modules/runners";
 import scansRoutes from "#/modules/scans";
@@ -61,6 +62,7 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
   app.use("/findings/*", requireScanAccess);
   app.use("/files/*", requireScanAccess);
   app.use("/repos/*", requireScanAccess);
+  app.use("/projects/*", requireScanAccess);
   app.use(
     "/auth/sign-in/*",
     rateLimitByIp(
@@ -121,6 +123,8 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     .route("/files", filesRoutes)
     .route("/team", teamRoutes)
     .route("/groups", groupsRoutes)
+    .route("/projects", projectsRoutes)
+    .route("/repos", moveRepoProjectAPI)
     .route("/repos", reposRoutes)
     .route("/repos", verdictRoutes)
     .route("/repos", archivesRoutes)

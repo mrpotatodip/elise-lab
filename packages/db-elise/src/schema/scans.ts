@@ -38,6 +38,7 @@ import {
 } from "@repo/contracts/elise";
 import { parties } from "./party";
 import { tenants } from "./tenant";
+import { tenantProjects } from "./tenant-projects";
 
 const inList = (values: readonly string[]) => sql.raw(values.map((value) => `'${value}'`).join(", "));
 
@@ -67,9 +68,16 @@ export const scanRepos = pgTable(
     isPrivate: boolean("is_private"),
     // Set when a person removes an upload app: its zips are deleted, and the row stays so its Scans keep their History. Adding the app again clears it.
     removedAt: timestamp("removed_at", { withTimezone: true }),
+    projectId: uuid("project_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
+    fkProject: foreignKey({
+      name: "scan_repos_project_tenant_fk",
+      columns: [t.projectId, t.tenantId],
+      foreignColumns: [tenantProjects.id, tenantProjects.tenantId],
+    }).onDelete("set null"),
+    idxProject: index("idx_scan_repos_project").on(t.tenantId, t.projectId),
     chkProvider: check("scan_repos_provider", sql`${t.provider} in (${inList(SOURCE_PROVIDER_VALUES)})`),
     chkHost: check("scan_repos_host", sql`${t.host} = lower(${t.host})`),
     // A constraint, not an index: only a constraint takes NULLS NOT DISTINCT in drizzle, and two upload apps of one name both have a null host.
