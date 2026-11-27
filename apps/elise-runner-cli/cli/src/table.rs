@@ -80,7 +80,7 @@ pub const COMMANDS: &[Spec] = &[
             "elise pair \"$CODE\" --yes   # CI: no question asked",
         ],
         exits: &[0, 1, 2, 5],
-        json: "schemaVersion, ok, exitCode, account, runner, tokenPlace; with --print-token: token instead of tokenPlace. Failure codes: invalid_code, declined, read_only_token, save_failed, offline, usage",
+        json: "schemaVersion, ok, exitCode, account, runner, tokenPlace; with --print-token: token instead of tokenPlace. Failure codes: needs_yes, invalid_code, declined, read_only_token, save_failed, offline, usage",
     },
     Spec {
         name: "login",
@@ -209,6 +209,19 @@ pub const COMMANDS: &[Spec] = &[
         json: "none: help is text",
     },
     Spec {
+        name: "completions",
+        group: "Help",
+        summary: "Print a shell completion script for zsh, bash or fish.",
+        usage: "elise completions <zsh|bash|fish>",
+        about: "Completes commands, flags and help topics. Load it with: source <(elise completions zsh), source <(elise completions bash) or elise completions fish | source.",
+        flags: NO_FLAGS,
+        needs: "Nothing.",
+        env: &[],
+        examples: &["elise completions zsh", "elise commands --json   # the table the script is made from", "elise completions bash > elise.bash   # CI: a file to ship"],
+        exits: &[0, 2],
+        json: "none: the output is a shell script",
+    },
+    Spec {
         name: "commands",
         group: "Help",
         summary: "List every command, flag, exit code and topic.",
@@ -305,6 +318,8 @@ Every `run` log line starts with [repo scan-id]. Ids are opaque: compare them, d
 Run `elise commands --json` once to learn every command, flag, exit code and JSON shape.
 Use `--json` and read the exit code. Never rely on prose.
 Use `--yes` for `pair`, because an agent cannot answer a question.
+With no terminal on stdin, or with `--no-input`, the program never asks. `pair` without `--yes`
+then exits 2 and names `--yes`.
 ",
     },
 ];
@@ -317,6 +332,19 @@ pub fn topic(name: &str) -> Option<&'static Topic> {
     TOPICS.iter().find(|topic| topic.name == name)
 }
 
+pub const GLOBAL_FLAGS: &[Flag] = &[Flag {
+    name: "--no-input",
+    short: None,
+    value: None,
+    default: "off; on when stdin is not a terminal",
+    cost: "none",
+    about: "Never ask a question. A command that needs an answer exits 2 and names the flag that gives it.",
+}];
+
+pub fn flags(spec: &Spec) -> impl Iterator<Item = &'static Flag> {
+    spec.flags.iter().chain(GLOBAL_FLAGS)
+}
+
 pub fn accepts(spec: &Spec, flag: &str) -> bool {
-    spec.flags.iter().any(|known| known.name == flag || known.short == Some(flag))
+    flags(spec).any(|known| known.name == flag || known.short == Some(flag))
 }

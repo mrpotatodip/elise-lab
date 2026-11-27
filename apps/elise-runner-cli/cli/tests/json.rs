@@ -73,7 +73,10 @@ fn pair_failures_are_json_with_the_exit_code() {
     let engine = Engine::start();
     let runner = Runner::new(&engine);
     failure_code(&runner.run(&["pair", "WRONG", "--yes", "--json"], ""), 1, "invalid_code");
-    failure_code(&runner.run(&["pair", CODE, "--json"], "n\n"), 1, "declined");
+    failure_code(&runner.run(&["pair", CODE, "--json"], ""), 2, "needs_yes");
+    let mut asking = Runner::new(&engine);
+    asking.env.push(("ELISE_TEST_TERMINAL", "1".to_string()));
+    failure_code(&asking.run(&["pair", CODE, "--json"], "n\n"), 1, "declined");
     failure_code(&runner.run(&["pair", "--json"], ""), 2, "usage");
 
     let mut offline = Runner::new(&engine);

@@ -41,7 +41,11 @@ fn token_place(store: &Store) -> &'static str {
     }
 }
 
-pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool, json: bool) -> Exit {
+pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool, interactive: bool, json: bool) -> Exit {
+    if !yes && !interactive {
+        let message = "`pair` asks before it connects this computer, and no question can be asked here. Add `--yes` to accept.";
+        return fail(json, Exit::Usage, "needs_yes", message, "elise pair <code> --yes");
+    }
     let say = |line: &str| {
         if print_token {
             eprintln!("{line}");
