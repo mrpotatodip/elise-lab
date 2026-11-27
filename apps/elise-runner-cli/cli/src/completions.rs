@@ -27,7 +27,10 @@ fn bash() -> String {
     let names: Vec<&str> = COMMANDS.iter().map(|spec| spec.name).collect();
     let mut text = String::from("# bash completion for elise. Load it with: source <(elise completions bash)\n_elise() {\n");
     text.push_str("  local cur=\"${COMP_WORDS[COMP_CWORD]}\"\n  COMPREPLY=()\n");
-    text.push_str(&format!("  if [ \"$COMP_CWORD\" -eq 1 ]; then\n    COMPREPLY=( $(compgen -W \"{} --help --version\" -- \"$cur\") )\n    return\n  fi\n", names.join(" ")));
+    text.push_str(&format!(
+        "  if [ \"$COMP_CWORD\" -eq 1 ]; then\n    COMPREPLY=( $(compgen -W \"{} --help --version\" -- \"$cur\") )\n    return\n  fi\n",
+        names.join(" ")
+    ));
     text.push_str("  case \"${COMP_WORDS[1]}\" in\n");
     for spec in COMMANDS {
         let mut words = flag_words(spec);
@@ -79,11 +82,7 @@ fn zsh() -> String {
 fn fish() -> String {
     let mut text = String::from("# fish completion for elise. Load it with: elise completions fish | source\ncomplete -c elise -f\n");
     for spec in COMMANDS {
-        text.push_str(&format!(
-            "complete -c elise -n __fish_use_subcommand -a {} -d {}\n",
-            spec.name,
-            fish_quote(spec.summary)
-        ));
+        text.push_str(&format!("complete -c elise -n __fish_use_subcommand -a {} -d {}\n", spec.name, fish_quote(spec.summary)));
     }
     for spec in COMMANDS {
         let seen = format!("'__fish_seen_subcommand_from {}'", spec.name);
