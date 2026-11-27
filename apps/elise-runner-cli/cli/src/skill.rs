@@ -1,5 +1,5 @@
 use crate::json;
-use crate::table::{flags, EXIT_CODES, GROUPS, COMMANDS, TOPICS};
+use crate::table::{flags, COMMANDS, EXIT_CODES, GROUPS, TOPICS};
 use crate::Exit;
 use std::path::PathBuf;
 

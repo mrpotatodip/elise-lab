@@ -1,7 +1,7 @@
 mod support;
 
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use support::{Engine, Runner};
 
 fn runner() -> Runner {
@@ -14,7 +14,7 @@ fn target(runner: &Runner) -> PathBuf {
     runner.home.join("skills-folder")
 }
 
-fn install(runner: &Runner, dir: &PathBuf) -> support::Output {
+fn install(runner: &Runner, dir: &Path) -> support::Output {
     runner.run(&["skill", "install", "--dir", dir.to_str().unwrap()], "")
 }
 
