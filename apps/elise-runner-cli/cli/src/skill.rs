@@ -11,7 +11,7 @@ pub fn text() -> String {
         "`elise` is the command-line program of EliseLAB. It acts as a Runner: it claims Scans from Elise and runs them on this computer with the person's own Claude. This file is generated from the program's own command table. Run `elise commands --json` for the same facts as one JSON object, and `elise <command> --help` for a full page.\n\n",
     );
     text.push_str("## Rules for an agent\n\n");
-    text.push_str("- Add `--json` to a command. It prints one JSON object on standard output with `schemaVersion`, `ok` and `exitCode`; prose goes to standard error. `run --json` prints one object per line.\n");
+    text.push_str("- Add `--json` to a command. It prints one JSON object on standard output with `schemaVersion`, `ok` and `exitCode`; prose goes to standard error. `run --json` prints one object per line (`finding` events arrive per Phase, just before `phase_finished`, not live); if `run` ends without a Scan it prints one failure object.\n");
     text.push_str("- Read the exit code. It equals `exitCode` in the JSON. A failure is `{ ok: false, error: { code, message, next } }`, and `next` is the command to run.\n");
     text.push_str("- Never wait for input. With no terminal on stdin, or with `--no-input`, the program never asks a question; a command that needs an answer exits 2 and names the flag that gives it (`pair` needs `--yes`).\n");
     text.push_str("- No command prints a token, except `pair --print-token`. Never put a token in a log or a message.\n");

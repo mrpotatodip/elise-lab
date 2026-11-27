@@ -101,12 +101,13 @@ fn help_for(wanted: &str) -> Parsed {
 pub fn parse(args: &[String]) -> Parsed {
     let wants_help = args.iter().any(|arg| arg == "--help" || arg == "-h");
     if wants_help {
-        return match args.first().and_then(|first| table::command(first)) {
+        return match args.iter().find(|arg| !arg.starts_with('-')).and_then(|first| table::command(first)) {
             Some(spec) => Parsed::Page(spec),
             None => Parsed::Help,
         };
     }
-    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
+    let before_command = args.iter().take_while(|arg| arg.starts_with('-'));
+    if before_command.into_iter().any(|arg| arg == "--version" || arg == "-V") {
         return Parsed::Version;
     }
     let Some((command, rest)) = args.split_first() else {
@@ -159,6 +160,9 @@ pub fn parse(args: &[String]) -> Parsed {
         ("completions", []) => Parsed::Usage(format!("`completions` needs a shell: {}", crate::completions::supported())),
         ("skill", [sub]) if sub.as_str() == "install" => Parsed::Command(Command::SkillInstall { dir, json: has("--json") }),
         ("skill", []) => Parsed::Usage("`skill` needs a subcommand: `elise skill install`".to_string()),
+        ("skill", [other, ..]) if other.as_str() != "install" => {
+            Parsed::Usage(format!("unknown `skill` subcommand `{other}`. Use `elise skill install`"))
+        }
         ("commands", []) if has("--json") && has("--markdown") => {
             Parsed::Usage("`commands` takes `--json` or `--markdown`, not both".to_string())
         }

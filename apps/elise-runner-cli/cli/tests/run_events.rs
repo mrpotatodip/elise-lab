@@ -120,7 +120,7 @@ fn a_scan_stopped_from_elise_ends_its_events_with_stopped_and_exits_with_code_7(
 }
 
 #[test]
-fn run_once_with_json_and_nothing_to_claim_still_exits_with_code_6_and_prints_no_event() {
+fn run_once_with_nothing_to_claim_prints_one_failure_object_and_exits_with_code_6() {
     let engine = Engine::start();
     let mut runner = paired(&engine);
     runner.stub_tools(&["claude", "node"]);
@@ -128,6 +128,38 @@ fn run_once_with_json_and_nothing_to_claim_still_exits_with_code_6_and_prints_no
     let output = runner.run(&["run", "--once", "--json"], "");
 
     assert_eq!(output.code, 6, "{}{}", output.stdout, output.stderr);
-    assert_eq!(output.stdout, "");
+    let body: Value =
+        serde_json::from_str(output.stdout.trim()).unwrap_or_else(|why| panic!("not one JSON object ({why}): {}", output.stdout));
+    assert_eq!((body["ok"].as_bool(), body["exitCode"].as_i64()), (Some(false), Some(6)), "{body}");
+    assert_eq!(body["error"]["code"], "nothing_to_claim");
+    assert!(body["error"]["next"].as_str().is_some() && body["schemaVersion"] == 1, "{body}");
     assert!(output.stderr.contains("Nothing to claim."), "{}", output.stderr);
+}
+
+#[test]
+fn run_on_an_unpaired_computer_prints_one_failure_object_and_exits_with_code_3() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+
+    let output = runner.run(&["run", "--once", "--json"], "");
+
+    assert_eq!(output.code, 3, "{}{}", output.stdout, output.stderr);
+    let body: Value =
+        serde_json::from_str(output.stdout.trim()).unwrap_or_else(|why| panic!("not one JSON object ({why}): {}", output.stdout));
+    assert_eq!((body["ok"].as_bool(), body["error"]["code"].as_str()), (Some(false), Some("unpaired")), "{body}");
+}
+
+#[test]
+fn findings_still_print_when_the_engine_refuses_the_live_upload_with_a_conflict() {
+    let engine = Engine::start();
+    let mut runner = paired(&engine);
+    runner.stub_tools(&["claude", "node"]);
+    engine.answer_findings_with(409);
+    engine.queue_job(job("scan_2", ["phase=recon", "phase=hunt", "phase=check live=spread", "phase=report"]));
+
+    let output = runner.run(&["run", "--once", "--json"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    let found = events_of(&output).iter().filter(|event| event["event"] == "finding").count();
+    assert_eq!(found, 3, "{}", output.stdout);
 }

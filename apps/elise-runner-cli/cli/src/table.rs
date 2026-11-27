@@ -162,7 +162,7 @@ pub const COMMANDS: &[Spec] = &[
             "elise run --parallel 2",
         ],
         exits: &[0, 1, 2, 3, 4, 5, 6, 7],
-        json: "one event object per line, each with schemaVersion, event, scanId and at (UTC time); labels, counts and IDs only, never model text. claimed (repo); phase_started (phase); phase_finished (phase, costUsd or null, poolLeftUsd); finding (fingerprint, verdict confirmed|needs_validation, severity or null; the full record goes to Elise); result (state succeeded|failed, sent, workFolder when kept); stopped (workFolder when kept: the Scan was stopped from Elise and sent no result). The exit code is the one without --json",
+        json: "one event object per line, each with schemaVersion, event, scanId and at (UTC time); labels, counts and IDs only, never model text. claimed (repo); phase_started (phase); phase_finished (phase, costUsd or null, poolLeftUsd); finding (fingerprint, verdict confirmed|needs_validation, severity or null; the full record goes to Elise; findings arrive per Phase, just before its phase_finished, not live); result (state succeeded|failed, sent, workFolder when kept); stopped (workFolder when kept: the Scan was stopped from Elise and sent no result). When run ends without a Scan (not paired, revoked, offline, nothing to claim with --once, no signal handler) it prints one result object instead: schemaVersion, ok false, exitCode, error {code, message, next}. Failure codes: unpaired, revoked, offline, nothing_to_claim, signals_unavailable. The exit code is the one without --json",
     },
     Spec {
         name: "resume",

@@ -8,7 +8,7 @@ How people, scripts and AI agents rely on the `elise` command (#475). Terms: `ap
 
 - **Exit codes:** 0 success, 1 error, 2 bad usage, 3 unpaired, 4 revoked, 5 offline, 6 nothing to claim (`run --once`), 7 a Scan was stopped from Elise. A refusal to prompt reuses 2.
 - **`--json`:** one object on standard output with `schemaVersion`, `ok`, `exitCode` and the command's fields. A failure is `{ ok: false, error: { code, message, next } }`. Prose and progress go to standard error. The `exitCode` field and the process exit code agree.
-- **`run --json`:** one object per line, in six events: `claimed`, `phase_started`, `phase_finished`, `finding`, `result`, `stopped`. They hold labels, counts and IDs only.
+- **`run --json`:** one object per line, in six events: `claimed`, `phase_started`, `phase_finished`, `finding`, `result`, `stopped`. They hold labels, counts and IDs only. `finding` events arrive per Phase, just before its `phase_finished`, not live. When `run` ends without running a Scan (unpaired, revoked, offline, nothing to claim, no signal handler) it prints one failure object, as any other command does, with the same exit code.
 - **No input:** with no terminal on stdin, or with `--no-input`, the program never prompts. `pair` then needs `--yes` and exits 2 without it.
 - **No token in output:** no command prints a token except `pair --print-token`.
 - **One table:** `src/table.rs` declares every command, flag, exit code and topic once. `--help`, `help <topic>`, `commands --json`, the completions, the agent skill and the README command reference are generated from it, so they cannot disagree. The README region is checked by a test and fails when stale.

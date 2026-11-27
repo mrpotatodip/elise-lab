@@ -529,10 +529,14 @@ impl Ends {
     }
 }
 
+fn revoked_body(json: bool, message: &str) -> Exit {
+    fail_quietly(json, Exit::Revoked, "revoked", message, "elise pair <code>")
+}
+
 pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit {
     let Some(stop) = stop_on_signal("Stopping.") else {
-        eprintln!("Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.");
-        return Exit::Error;
+        let message = "Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.";
+        return fail(json, Exit::Error, "signals_unavailable", message, "elise run");
     };
     let skill = Skill::new();
     let find_tools = || skill.tools();
@@ -572,7 +576,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit
     loop {
         if ends.removed {
             ends.drain(store, &mut running).await;
-            return Exit::Revoked;
+            return revoked_body(json, "Elise rejected the token during the Scan: the Runner was removed. Pair again with a new code.");
         }
         if stop.is_stopped() {
             ends.drain(store, &mut running).await;
@@ -581,8 +585,8 @@ pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit
         let claiming = !(once && claimed_any);
         if claiming && running.len() < parallel {
             let Some(token) = store.tokens().token() else {
-                eprintln!("This computer is not paired. Pair it with `elise pair <code>`.");
-                return Exit::Unpaired;
+                let message = "This computer is not paired. Pair it with `elise pair <code>`.";
+                return fail(json, Exit::Unpaired, "unpaired", message, "elise pair <code>");
             };
             while running.len() < parallel {
                 match scan::claim(&token).await {
@@ -596,22 +600,25 @@ pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit
                     }
                     Claimed::Removed => {
                         store.tokens().forget();
-                        if store.is_read_only() {
-                            eprintln!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.");
+                        let message = if store.is_read_only() {
+                            format!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.")
                         } else {
-                            eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
-                        }
+                            "Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code."
+                                .to_string()
+                        };
+                        eprintln!("{message}");
                         ends.drain(store, &mut running).await;
-                        return Exit::Revoked;
+                        return revoked_body(json, &message);
                     }
                     _ if stop.is_stopped() => break,
                     Claimed::Nothing if once && !claimed_any => {
-                        json::say(json, "Nothing to claim.");
-                        return Exit::NothingToClaim;
+                        let message = "Nothing to claim.";
+                        json::say(json, message);
+                        return fail_quietly(json, Exit::NothingToClaim, "nothing_to_claim", message, "elise run --once");
                     }
                     Claimed::Offline if once && !claimed_any => {
-                        eprintln!("Could not reach Elise. Check the connection and try again.");
-                        return Exit::Offline;
+                        let message = "Could not reach Elise. Check the connection and try again.";
+                        return fail(json, Exit::Offline, "offline", message, "elise run --once");
                     }
                     Claimed::Nothing => {
                         offline = false;
@@ -631,6 +638,9 @@ pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit
             }
         }
         if once && claimed_any && running.is_empty() {
+            if ends.removed {
+                return revoked_body(json, "Elise rejected the token during the Scan: the Runner was removed. Pair again with a new code.");
+            }
             return finished(&ends);
         }
         let may_claim = !(once && claimed_any) && running.len() < parallel;

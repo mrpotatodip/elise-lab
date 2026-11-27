@@ -177,3 +177,17 @@ fn the_exit_code_table_is_pinned_and_shown_in_all_four_places() {
         assert!(readme.lines().any(|found| found == row), "README lacks `{row}`");
     }
 }
+
+#[test]
+fn a_flag_before_the_command_still_shows_the_commands_page_and_skill_names_its_subcommand() {
+    let runner = Runner::new(&Engine::start());
+
+    let page = runner.run(&["--no-input", "pair", "--help"], "");
+    let short = runner.run(&["--json", "run", "-h"], "");
+    let skill = runner.run(&["skill", "bogus"], "");
+
+    assert!(page.stdout.contains("elise pair"), "{}", page.stdout);
+    assert!(short.stdout.contains("elise run"), "{}", short.stdout);
+    assert_eq!(skill.code, 2);
+    assert!(skill.stderr.contains("elise skill install"), "{}", skill.stderr);
+}
