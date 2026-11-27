@@ -9,6 +9,7 @@ pub enum Command {
     Unpair { json: bool },
     Run { once: bool, parallel: usize },
     Resume { scan_id: String, json: bool },
+    SkillInstall { dir: Option<String>, json: bool },
 }
 
 pub enum Parsed {
@@ -44,6 +45,24 @@ fn take_parallel(rest: &[String]) -> Result<(Vec<String>, usize), String> {
         };
     }
     Ok((kept, parallel))
+}
+
+fn take_dir(rest: &[String]) -> Result<(Vec<String>, Option<String>), String> {
+    let mut kept = Vec::new();
+    let mut dir = None;
+    let mut items = rest.iter();
+    while let Some(item) = items.next() {
+        let value = if item == "--dir" { items.next().map(String::as_str) } else { item.strip_prefix("--dir=") };
+        if item != "--dir" && !item.starts_with("--dir=") {
+            kept.push(item.clone());
+            continue;
+        }
+        match value {
+            Some(value) if !value.is_empty() && !value.starts_with("--") => dir = Some(value.to_string()),
+            _ => return Err("`--dir` takes a folder path".to_string()),
+        }
+    }
+    Ok((kept, dir))
 }
 
 fn distance(a: &str, b: &str) -> usize {
@@ -104,6 +123,14 @@ pub fn parse(args: &[String]) -> Parsed {
     } else {
         (rest.to_vec(), 1)
     };
+    let (rest, dir) = if table::accepts(spec, "--dir") {
+        match take_dir(&rest) {
+            Ok(taken) => taken,
+            Err(problem) => return Parsed::Usage(problem),
+        }
+    } else {
+        (rest, None)
+    };
     let (flags, positional): (Vec<&String>, Vec<&String>) = rest.iter().partition(|arg| arg.starts_with('-'));
     if let Some(flag) = flags.iter().find(|flag| !table::accepts(spec, flag)) {
         return Parsed::Usage(format!("`{command}` does not take `{flag}`"));
@@ -130,6 +157,8 @@ pub fn parse(args: &[String]) -> Parsed {
         ("help", [wanted]) => help_for(wanted),
         ("completions", [shell]) => Parsed::Completions(shell.to_string()),
         ("completions", []) => Parsed::Usage(format!("`completions` needs a shell: {}", crate::completions::supported())),
+        ("skill", [sub]) if sub.as_str() == "install" => Parsed::Command(Command::SkillInstall { dir, json: has("--json") }),
+        ("skill", []) => Parsed::Usage("`skill` needs a subcommand: `elise skill install`".to_string()),
         ("commands", []) => Parsed::Commands { json: has("--json") },
         _ => Parsed::Usage(format!("too many arguments for `{command}`")),
     }
