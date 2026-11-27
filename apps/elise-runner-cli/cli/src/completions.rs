@@ -1,4 +1,4 @@
-use crate::table::{Spec, COMMANDS, TOPICS};
+use crate::table::{flags, Spec, COMMANDS, TOPICS};
 
 pub const SHELLS: &[&str] = &["zsh", "bash", "fish"];
 
@@ -16,7 +16,7 @@ pub fn script(shell: &str) -> Option<String> {
 }
 
 fn flag_words(spec: &Spec) -> Vec<&'static str> {
-    spec.flags.iter().flat_map(|flag| [Some(flag.name), flag.short]).flatten().collect()
+    flags(spec).flat_map(|flag| [Some(flag.name), flag.short]).flatten().collect()
 }
 
 fn quote(text: &str) -> String {
@@ -57,7 +57,7 @@ fn zsh() -> String {
     text.push_str("  case ${words[2]} in\n");
     for spec in COMMANDS {
         let mut specs: Vec<String> = Vec::new();
-        for flag in spec.flags {
+        for flag in flags(spec) {
             let about = flag.about.replace('[', "(").replace(']', ")").replace(':', "\\:");
             let value = flag.value.map(|value| format!(":{value}:")).unwrap_or_default();
             for word in [Some(flag.name), flag.short].into_iter().flatten() {
@@ -86,7 +86,7 @@ fn fish() -> String {
     }
     for spec in COMMANDS {
         let seen = format!("'__fish_seen_subcommand_from {}'", spec.name);
-        for flag in spec.flags {
+        for flag in flags(spec) {
             let short = flag.short.map(|short| format!(" -s {}", short.trim_start_matches('-'))).unwrap_or_default();
             let value = if flag.value.is_some() { " -r" } else { "" };
             text.push_str(&format!(
