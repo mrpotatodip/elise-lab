@@ -5,7 +5,7 @@ export const DEVICE_COPY = {
   hint: "Check that this code matches the one in your terminal.",
   codeLabel: "Code in your terminal",
   warningBefore: "Only approve if you ran ",
-  warningCommand: "elise-runner login",
+  warningCommand: "elise login",
   warningAfter: " yourself just now.",
   ipDiffers:
     "This login was requested from a different IP address than the one you are using now. That is not blocked, but approve only if you started it.",
@@ -21,7 +21,7 @@ export const DEVICE_COPY = {
   doneHint: "You can close this page.",
   unusableTitle: "This code can't be used",
   unusableDescription:
-    "It may be wrong, have expired after 10 minutes, or already been used. Run elise-runner login again in your terminal to get a new one.",
+    "It may be wrong, have expired after 10 minutes, or already been used. Run elise login again in your terminal to get a new one.",
   unusableAction: "Go to the dashboard",
   tabTitle: "This code can't be used · Elise",
 } as const;

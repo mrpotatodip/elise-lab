@@ -26,11 +26,11 @@ pub fn main(args: &[String]) -> Exit {
             return Exit::Ok;
         }
         Parsed::Version => {
-            println!("elise-runner {}", env!("CARGO_PKG_VERSION"));
+            println!("elise {}", env!("CARGO_PKG_VERSION"));
             return Exit::Ok;
         }
         Parsed::Usage(problem) => {
-            eprintln!("elise-runner: {problem}\nRun `elise-runner --help` for the commands.");
+            eprintln!("elise: {problem}\nRun `elise --help` for the commands.");
             return Exit::Usage;
         }
     };

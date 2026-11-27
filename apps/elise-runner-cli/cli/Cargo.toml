@@ -5,7 +5,7 @@ description = "The headless Elise Runner: pairs and runs Scans from a terminal"
 edition = "2021"
 
 [[bin]]
-name = "elise-runner"
+name = "elise"
 path = "src/main.rs"
 
 # The stand-in for git, claude, node and the browser openers in the integration tests (see its header).

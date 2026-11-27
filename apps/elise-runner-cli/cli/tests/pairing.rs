@@ -235,7 +235,7 @@ fn with_elise_runner_home_the_token_is_in_an_owner_only_file_there() {
 fn the_command_line_is_checked() {
     let cases: [(&[&str], i32, &str); 6] = [
         (&["--help"], 0, "Exit codes:"),
-        (&["--version"], 0, concat!("elise-runner ", env!("CARGO_PKG_VERSION"))),
+        (&["--version"], 0, concat!("elise ", env!("CARGO_PKG_VERSION"))),
         (&[], 2, "no command given"),
         (&["pair"], 2, "needs the pairing code"),
         (&["status", "--yes"], 2, "does not take `--yes`"),

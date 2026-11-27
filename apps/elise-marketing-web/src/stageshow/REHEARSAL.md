@@ -4,7 +4,7 @@
 
 `RunnerScene.tsx` and `runner.css` replace `ScansCard` as the hero picture in `index.astro` (`ScansCard` stays: `RunnerScene` imports its row pieces, and the old tour is unmounted, not deleted). Story, about 21s, plays once. It shows only what the dashboard does today (checked against `scan-list.tsx`, `scan-detail.tsx`, `scan-findings-table.tsx`, `scan-trace.tsx` on main, 2026-11-22):
 
-1. `elise-runner run` is typed in a terminal at the lower left. New scan is clicked and a Queued row arrives on the Scans list.
+1. `elise run` is typed in a terminal at the lower left. New scan is clicked and a Queued row arrives on the Scans list.
 2. The Runner prints "Scan claimed" and the row turns Running. The list row says only "In progress" and Cost stays "-", as the real list does: no phase and no live findings there.
 3. The cursor opens the Scan page. It shows the info notice ("Scanning."), "Findings so far" (empty state "Nothing verified yet") and the Trace, newest Phase first, the running one open with its entries (Reading files ×8, Searching the code ×9 and so on) and a candidates count.
 4. The page scrolls to the Trace during recon and hunt, then back up to the table: findings are decided in the check phase, so they arrive then, worst first, one marked "Needs a person".

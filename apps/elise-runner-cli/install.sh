@@ -6,7 +6,7 @@ tag_prefix="elise-runner-v"
 dir="${ELISE_RUNNER_INSTALL_DIR:-$HOME/.local/bin}"
 
 fail() {
-  echo "elise-runner install: $*" >&2
+  echo "elise install: $*" >&2
   exit 1
 }
 
@@ -40,18 +40,21 @@ fi
 
 url="https://github.com/$repo/releases/download/$tag/$asset"
 mkdir -p "$dir" || fail "cannot create $dir. Set ELISE_RUNNER_INSTALL_DIR to a folder you can write to."
-tmp=$(mktemp "$dir/.elise-runner.XXXXXX") || fail "cannot write to $dir."
+tmp=$(mktemp "$dir/.elise.XXXXXX") || fail "cannot write to $dir."
 trap 'rm -f "$tmp"' EXIT
 
 echo "Downloading $asset from release $tag"
 curl -fSL --progress-bar -o "$tmp" "$url" || fail "download failed: $url"
 chmod 755 "$tmp"
-mv -f "$tmp" "$dir/elise-runner"
+mv -f "$tmp" "$dir/elise"
 trap - EXIT
 
-echo "Installed elise-runner ($tag) to $dir/elise-runner"
+echo "Installed elise ($tag) to $dir/elise"
+if [ -e "$dir/elise-runner" ] || [ -L "$dir/elise-runner" ]; then
+  rm -f "$dir/elise-runner" && echo "Removed the old $dir/elise-runner: the command is now elise."
+fi
 case ":$PATH:" in
   *":$dir:"*) ;;
   *) echo "Warning: $dir is not on your PATH. Add it, for example: export PATH=\"$dir:\$PATH\"" ;;
 esac
-echo "Next, run: elise-runner login"
+echo "Next, run: elise login"

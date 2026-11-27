@@ -12,8 +12,8 @@ describe("scanFailure", () => {
     expect(failure.advice).not.toBe("");
   });
 
-  it("points an unreadable repository at `elise-runner doctor`, since a private one looks the same", () => {
-    expect(scanFailure(NOT_FOUND, "repo_unreadable").advice).toContain("elise-runner doctor");
+  it("points an unreadable repository at `elise doctor`, since a private one looks the same", () => {
+    expect(scanFailure(NOT_FOUND, "repo_unreadable").advice).toContain("elise doctor");
   });
 
   it("keeps git's own text as the detail", () => {

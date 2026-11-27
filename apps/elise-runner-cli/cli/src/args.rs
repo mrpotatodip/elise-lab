@@ -18,17 +18,17 @@ pub enum Parsed {
 }
 
 pub const HELP: &str = "\
-elise-runner: the headless Elise Runner. It runs Scans started in Elise on this computer.
+elise: the Elise CLI. It runs Scans started in Elise on this computer.
 
 Usage:
-  elise-runner pair <code> [--yes] [--print-token]
-  elise-runner login [--no-browser]
-  elise-runner status
-  elise-runner doctor [host...]
-  elise-runner run [--once] [--parallel N]
-  elise-runner resume <scan-id>
-  elise-runner unpair
-  elise-runner --help | --version
+  elise pair <code> [--yes] [--print-token]
+  elise login [--no-browser]
+  elise status
+  elise doctor [host...]
+  elise run [--once] [--parallel N]
+  elise resume <scan-id>
+  elise unpair
+  elise --help | --version
 
 Commands:
   pair <code>     Pair this computer with an Elise account, using a one-time code from Elise.

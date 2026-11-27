@@ -7,7 +7,7 @@ $tagPrefix = 'elise-runner-v'
 $asset = 'elise-runner-windows-x64.exe'
 
 function Fail([string]$message) {
-  Write-Host "elise-runner install: $message" -ForegroundColor Red
+  Write-Host "elise install: $message" -ForegroundColor Red
   exit 1
 }
 
@@ -28,7 +28,7 @@ if ($arch -eq 'ARM64') {
 $tag = $env:ELISE_RUNNER_VERSION
 if ([string]::IsNullOrEmpty($tag)) {
   try {
-    $releases = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$repo/releases?per_page=100" -Headers @{ 'User-Agent' = 'elise-runner-install' }
+    $releases = Invoke-RestMethod -UseBasicParsing -Uri "https://api.github.com/repos/$repo/releases?per_page=100" -Headers @{ 'User-Agent' = 'elise-install' }
   } catch {
     Fail "could not list releases from the GitHub API (a rate limit, HTTP 403, or no network). Wait a few minutes and run this again, or skip the lookup: `$env:ELISE_RUNNER_VERSION='${tagPrefix}X.Y.Z' (a tag from https://github.com/$repo/releases) and run this again"
   }
@@ -44,22 +44,31 @@ try {
   Fail "cannot create $dir. Set ELISE_RUNNER_INSTALL_DIR to a folder you can write to."
 }
 
-$tmp = Join-Path $dir ('.elise-runner.' + [Guid]::NewGuid().ToString('N') + '.tmp')
+$tmp = Join-Path $dir ('.elise.' +[Guid]::NewGuid().ToString('N') + '.tmp')
 try {
   Write-Host "Downloading $asset from release $tag"
   try {
-    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $tmp -Headers @{ 'User-Agent' = 'elise-runner-install' }
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $tmp -Headers @{ 'User-Agent' = 'elise-install' }
   } catch {
     Fail "download failed: $url"
   }
-  Move-Item -Force -Path $tmp -Destination (Join-Path $dir 'elise-runner.exe')
+  Move-Item -Force -Path $tmp -Destination (Join-Path $dir 'elise.exe')
 } catch {
-  Fail "cannot write to $dir. A running elise-runner.exe blocks the replacement: close it and run this again. ($($_.Exception.Message))"
+  Fail "cannot write to $dir. A running elise.exe blocks the replacement: close it and run this again. ($($_.Exception.Message))"
 } finally {
   if (Test-Path -LiteralPath $tmp) { Remove-Item -Force -LiteralPath $tmp }
 }
 
-Write-Host "Installed elise-runner ($tag) to $(Join-Path $dir 'elise-runner.exe')"
+Write-Host "Installed elise ($tag) to $(Join-Path $dir 'elise.exe')"
+$old = Join-Path $dir 'elise-runner.exe'
+if (Test-Path -LiteralPath $old) {
+  try {
+    Remove-Item -Force -LiteralPath $old
+    Write-Host "Removed the old $old: the command is now elise."
+  } catch {
+    Write-Host "Could not remove the old $old (is it running?). Delete it by hand: the command is now elise."
+  }
+}
 
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if ($null -eq $userPath) { $userPath = '' }
@@ -74,5 +83,5 @@ if (-not (($env:Path -split ';') | Where-Object { $_.TrimEnd('\') -ieq $dir.Trim
 }
 
 Write-Host 'The Runner needs Git for Windows (git and its bash): https://gitforwindows.org'
-Write-Host 'Next, run: elise-runner login'
-Write-Host 'Then run: elise-runner doctor'
+Write-Host 'Next, run: elise login'
+Write-Host 'Then run: elise doctor'

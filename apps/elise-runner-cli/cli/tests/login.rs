@@ -119,7 +119,7 @@ fn an_engine_without_the_login_routes_gets_the_pair_message() {
     let failed = runner.run(&["login", "--no-browser"], "");
 
     assert_eq!(failed.code, 1, "{}{}", failed.stdout, failed.stderr);
-    assert_eq!(failed.stderr.trim(), "This Elise does not support login yet; use `elise-runner pair <code>`.");
+    assert_eq!(failed.stderr.trim(), "This Elise does not support login yet; use `elise pair <code>`.");
     assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
 }
 
@@ -152,7 +152,7 @@ fn a_refusal_from_the_check_ends_the_login_with_one_sentence() {
     let done = login.finish();
 
     assert_eq!(done.code, 1, "{}{}", done.stdout, done.stderr);
-    assert_eq!(done.stderr.trim(), "Elise did not accept this login. Run `elise-runner login` again.");
+    assert_eq!(done.stderr.trim(), "Elise did not accept this login. Run `elise login` again.");
     assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
 }
 
@@ -179,7 +179,7 @@ fn an_expired_answer_ends_the_login_with_one_sentence_and_saves_nothing() {
     let done = runner.run(&["login", "--no-browser"], "");
 
     assert_eq!(done.code, 1, "{}{}", done.stdout, done.stderr);
-    assert_eq!(done.stderr.trim(), "The code expired; run `elise-runner login` again.");
+    assert_eq!(done.stderr.trim(), "The code expired; run `elise login` again.");
     assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
 }
 
@@ -192,7 +192,7 @@ fn the_wait_ends_at_the_expiry_the_engine_named_even_if_it_keeps_answering_pendi
     let done = runner.run(&["login", "--no-browser"], "");
 
     assert_eq!(done.code, 1, "{}{}", done.stdout, done.stderr);
-    assert_eq!(done.stderr.trim(), "The code expired; run `elise-runner login` again.");
+    assert_eq!(done.stderr.trim(), "The code expired; run `elise login` again.");
     assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
 }
 
@@ -222,6 +222,6 @@ fn the_help_lists_login_and_its_flag() {
 
     let help = runner.run(&["--help"], "");
 
-    assert!(help.stdout.contains("elise-runner login [--no-browser]"), "{}", help.stdout);
+    assert!(help.stdout.contains("elise login [--no-browser]"), "{}", help.stdout);
     assert!(help.stdout.contains("--no-browser  Only print"), "{}", help.stdout);
 }

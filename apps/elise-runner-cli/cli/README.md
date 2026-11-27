@@ -1,6 +1,6 @@
-# elise-runner (the headless Runner)
+# elise (the Elise CLI)
 
-`elise-runner` is a command-line program that runs Scans started in Elise on this computer, with no window. Pair it with a one-time code, start it, and leave it running on a server, a build machine or a terminal-only box. It claims the Scans that are started for it in the dashboard, runs them, and logs what it does to standard output.
+`elise` (its package is still `elise-runner-cli`) is a command-line program that runs Scans started in Elise on this computer, with no window. Pair it with a one-time code, start it, and leave it running on a server, a build machine or a terminal-only box. It claims the Scans that are started for it in the dashboard, runs them, and logs what it does to standard output.
 
 It is a Runner like the desktop app (the folder above): both run Scans through one shared core, `core/` (`elise-runner-core`), so a Scan behaves the same whichever runs it. Its rules are in `docs/adr/0006-full-worker-and-phase-budget.md`, under "Runner Scans". To Elise the two are two Runners. On one computer each is paired with its own code and holds its own token, so neither reads or changes the other's. The desktop app runs one Scan at a time. The headless Runner runs one by default, and up to three with `--parallel`. The headless Runner shows in the Runners list in Elise like any other Runner, and removing it there stops it claiming Scans.
 
@@ -8,25 +8,25 @@ It supports macOS, Linux and Windows (x64). Windows is new: it needs Git for Win
 
 ## What you need
 
-- A Rust toolchain to build it: `cargo build -p elise-runner-cli --release` in `apps/elise-runner-cli` (the binary is `target/release/elise-runner`). The `full` Skill is built into the binary, so that one file is all you install.
+- A Rust toolchain to build it: `cargo build -p elise-runner-cli --release` in `apps/elise-runner-cli` (the binary is `target/release/elise`). The `full` Skill is built into the binary, so that one file is all you install.
 - Claude Code (`claude`) installed and signed in, as the user the Runner runs as. The Runner uses that login.
 - Node.js (`node`). The Skill's validators run on it.
-- A way to connect: `elise-runner login` (approve in the browser), or a pairing code. Add a Runner in Elise to get a code. A code works once and expires after 10 minutes.
+- A way to connect: `elise login` (approve in the browser), or a pairing code. Add a Runner in Elise to get a code. A code works once and expires after 10 minutes.
 
 `claude` and `node` are found the way the desktop app finds them. A Scan fails with an error that names the one it could not find.
 
 ## Commands
 
 ```
-elise-runner login [--no-browser]
-elise-runner pair <code> [--yes] [--print-token]
-elise-runner status
-elise-runner run [--once] [--parallel N]
-elise-runner unpair
-elise-runner --help | --version
+elise login [--no-browser]
+elise pair <code> [--yes] [--print-token]
+elise status
+elise run [--once] [--parallel N]
+elise unpair
+elise --help | --version
 ```
 
-- `login` connects this Runner with no code. It starts a login with Elise (sending this computer's name, its OS and CPU, and the program's version, nothing else), prints a link and a code, and opens the link in the browser when the computer has a desktop session: `open` on macOS, `xdg-open` on Linux only when `DISPLAY` or `WAYLAND_DISPLAY` is set, never when `SSH_CONNECTION` is set or with `--no-browser`. A browser that fails to open is not an error. The link is the dashboard's `/device` page: a signed-in member sees this computer's name, OS, CPU, the program's version and the IP that asked, picks the Account, sets the Runner's name, and approves or denies. It then checks every 5 seconds, until the expiry Elise named for the code (10 minutes), until you approve the login in Elise, and saves the token. If Elise answers "slow down" it keeps the longer interval Elise names. A denied login ends with "The request was denied in Elise." and an expired one with "The code expired; run `elise-runner login` again.", each with exit 1. Approving in the browser is the confirmation, so it does not ask `y/N`. Ctrl-C cancels the wait and exits with 1. If this Runner already holds a token, it says that logging in replaces that Runner, and revokes the old token after the new one is saved, as `pair` does. With `ELISE_RUNNER_TOKEN` set it refuses, as `pair` does. Against an Elise without the login routes it says to use `pair <code>` and exits with 1.
+- `login` connects this Runner with no code. It starts a login with Elise (sending this computer's name, its OS and CPU, and the program's version, nothing else), prints a link and a code, and opens the link in the browser when the computer has a desktop session: `open` on macOS, `xdg-open` on Linux only when `DISPLAY` or `WAYLAND_DISPLAY` is set, never when `SSH_CONNECTION` is set or with `--no-browser`. A browser that fails to open is not an error. The link is the dashboard's `/device` page: a signed-in member sees this computer's name, OS, CPU, the program's version and the IP that asked, picks the Account, sets the Runner's name, and approves or denies. It then checks every 5 seconds, until the expiry Elise named for the code (10 minutes), until you approve the login in Elise, and saves the token. If Elise answers "slow down" it keeps the longer interval Elise names. A denied login ends with "The request was denied in Elise." and an expired one with "The code expired; run `elise login` again.", each with exit 1. Approving in the browser is the confirmation, so it does not ask `y/N`. Ctrl-C cancels the wait and exits with 1. If this Runner already holds a token, it says that logging in replaces that Runner, and revokes the old token after the new one is saved, as `pair` does. With `ELISE_RUNNER_TOKEN` set it refuses, as `pair` does. Against an Elise without the login routes it says to use `pair <code>` and exits with 1.
 - `pair <code>` is the way for CI, scripts and a box with no browser: you get the code first in Elise (Add a Runner), then give it here. It shows the Account name and the Runner name the code belongs to and asks `y/N`. On yes it saves the token. On no it revokes the token Elise issued, so none is left. `--yes` accepts without asking, for a script. If this Runner already holds a token, the new one is saved first and then the old one is revoked; if that revoke cannot reach Elise, the program says so and names the old Runner, so an admin can remove it in Elise.
 - `pair <code> --print-token` enrolls and confirms as usual, then prints the token once on standard output and saves nothing. See "In a container".
 - `doctor [host...]` checks that git is installed, `claude` is signed in, this Runner is paired and git can read from each host you name or list in settings (`github.com` and `gitlab.com` when there are none), one `pass` or `FAIL` line each with the fix beside a failure. A host git cannot reach (a timeout, DNS, no route) fails with the tail of git's message. It exits 1 when any check fails.
@@ -77,7 +77,7 @@ The Runner clones only `https://` addresses, with your own git login and no term
 
 A private `gitlab.com` repository clones with your own git login (checked 2026-11-19, #227). The Runner never asks for a password, so store the login once with a normal `git clone` in a terminal. A gitlab.com fine-grained token needs the project permission "Code: Download", and GitLab refuses an account password when two-factor sign-in is on. A private GitHub repository was checked on 2026-11-20 (`git ls-remote` with the login saved in the keychain worked). A private repository on a company GitLab server is not tested yet.
 
-Git login on a computer: sign in once with the provider's CLI (`gh auth login` then `gh auth setup-git`, or `glab auth login`), or store a read-only token with a normal `git clone` in a terminal. Before it clones, the Runner checks git access and, when it fails, the Scan error names the host and the fix. The Runner prints the fix and never runs it. `elise-runner doctor` runs the same check ahead of time.
+Git login on a computer: sign in once with the provider's CLI (`gh auth login` then `gh auth setup-git`, or `glab auth login`), or store a read-only token with a normal `git clone` in a terminal. Before it clones, the Runner checks git access and, when it fails, the Scan error names the host and the fix. The Runner prints the fix and never runs it. `elise doctor` runs the same check ahead of time.
 
 A headless Runner with no keychain (CI, a container) can take one git token in `ELISE_GIT_TOKEN`. It is opt-in and is for those places: on a computer with a git login, leave it unset. For each clone the Runner writes a temporary credential helper that answers only for the host that Scan clones from (the host of the checked address, never one the job text alone names), and deletes it when the clone ends, success or failure. The token goes into no file: the helper reads it from the clone's own environment. The agent never gets `ELISE_GIT_TOKEN`. Make it a read-only token (GitHub: fine-grained "Contents: read"; GitLab: `read_repository`).
 
@@ -95,18 +95,18 @@ A Scan stopped from Elise (the Stop button in the dashboard) is found within abo
 
 ## Under a service manager
 
-Run `elise-runner run` as the user that is signed in to Claude Code, as a long-running service. A stop signal (`SIGTERM`, what systemd sends) ends a running Scan as described above, so give the service enough stop time to send that result. Pair once by hand first (`elise-runner pair <code>`); with no keychain service the token is then in the config file of that user. For a build job or a timer, use `elise-runner run --once` and read the exit code: 0 a Scan ran and succeeded, 1 it failed, 6 there was nothing to claim, 7 the Scan was stopped from Elise.
+Run `elise run` as the user that is signed in to Claude Code, as a long-running service. A stop signal (`SIGTERM`, what systemd sends) ends a running Scan as described above, so give the service enough stop time to send that result. Pair once by hand first (`elise pair <code>`); with no keychain service the token is then in the config file of that user. For a build job or a timer, use `elise run --once` and read the exit code: 0 a Scan ran and succeeded, 1 it failed, 6 there was nothing to claim, 7 the Scan was stopped from Elise.
 
 ## In a container
 
 Pair once outside the container, then give the token to the container as a secret:
 
 ```bash
-elise-runner pair <code> --print-token    # the token on standard output, a warning on standard error
-docker run -e ELISE_RUNNER_TOKEN ... your-image elise-runner run
+elise pair <code> --print-token    # the token on standard output, a warning on standard error
+docker run -e ELISE_RUNNER_TOKEN ... your-image elise run
 ```
 
-The token is a credential that lasts until the Runner is removed in Elise. Copies stay wherever it is pasted (shell history, CI variables, container settings), so keep it as you would a password. The image needs the `elise-runner` binary, `claude` signed in, and `node`. This repo ships no Docker image or unit file.
+The token is a credential that lasts until the Runner is removed in Elise. Copies stay wherever it is pasted (shell history, CI variables, container settings), so keep it as you would a password. The image needs the `elise` binary, `claude` signed in, and `node`. This repo ships no Docker image or unit file.
 
 ## Developing
 
@@ -119,6 +119,6 @@ A debug build reads `ELISE_RUNNER_HOME` (the token file goes in that folder, the
 | `src/store.rs` | Which token store a run uses. |
 | `src/commands.rs` | One function per command, and the log of `run`. |
 | `src/tools.rs` | The built-in Skill, `claude` and `node`. |
-| `tests/` | Process tests: the debug `elise-runner` run against a stub engine. |
+| `tests/` | Process tests: the debug `elise` run against a stub engine. |
 
-`elise-runner --help` is the source for the commands and exit codes above. Change them together.
+`elise --help` is the source for the commands and exit codes above. Change them together.

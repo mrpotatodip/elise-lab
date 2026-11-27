@@ -30,7 +30,7 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
     };
     if !print_token && store.is_read_only() {
         eprintln!(
-            "The token comes from {TOKEN_VARIABLE}, which elise-runner does not manage. \
+            "The token comes from {TOKEN_VARIABLE}, which elise does not manage. \
              Unset it to pair this computer, or use `pair <code> --print-token` to get a token for it."
         );
         return Exit::Error;
@@ -100,7 +100,7 @@ async fn earlier_runner(store: &Store, say: &dyn Fn(&str)) -> Option<String> {
 pub async fn login(store: &Store, no_browser: bool) -> Exit {
     if store.is_read_only() {
         eprintln!(
-            "The token comes from {TOKEN_VARIABLE}, which elise-runner does not manage. \
+            "The token comes from {TOKEN_VARIABLE}, which elise does not manage. \
              Unset it to log in this computer."
         );
         return Exit::Error;
@@ -117,7 +117,7 @@ pub async fn login(store: &Store, no_browser: bool) -> Exit {
     let started = match login::start(env!("CARGO_PKG_VERSION")).await {
         Ok(started) => started,
         Err(LoginError::Unsupported) => {
-            eprintln!("This Elise does not support login yet; use `elise-runner pair <code>`.");
+            eprintln!("This Elise does not support login yet; use `elise pair <code>`.");
             return Exit::Error;
         }
         Err(LoginError::Unreachable) => {
@@ -135,7 +135,7 @@ pub async fn login(store: &Store, no_browser: bool) -> Exit {
         Waited::Approved(enrolled) => enrolled,
         Waited::Cancelled => return Exit::Error,
         Waited::Expired => {
-            eprintln!("The code expired; run `elise-runner login` again.");
+            eprintln!("The code expired; run `elise login` again.");
             return Exit::Error;
         }
         Waited::Denied => {
@@ -143,7 +143,7 @@ pub async fn login(store: &Store, no_browser: bool) -> Exit {
             return Exit::Error;
         }
         Waited::Refused => {
-            eprintln!("Elise did not accept this login. Run `elise-runner login` again.");
+            eprintln!("Elise did not accept this login. Run `elise login` again.");
             return Exit::Error;
         }
     };
@@ -186,7 +186,7 @@ pub async fn status(store: &Store) -> Exit {
             let state = match folder.done {
                 Some(done) if done.is_empty() => "can be resumed from the start".to_string(),
                 Some(done) => format!("can be resumed after {}", done.join(", ")),
-                None => "cannot be resumed (`elise-runner resume` says why)".to_string(),
+                None => "cannot be resumed (`elise resume` says why)".to_string(),
             };
             println!("  Scan {}: {state}\n    {}", folder.scan_id, folder.path.display());
         }
@@ -200,7 +200,7 @@ pub fn resume(scan_id: &str) -> Exit {
             let held =
                 if done.is_empty() { "no finished Phase yet".to_string() } else { format!("the finished Phases {}", done.join(", ")) };
             println!(
-                "Scan {scan_id}'s work folder holds {held} and can be resumed. Press Resume on that Scan in Elise; `elise-runner run` on this computer then claims it."
+                "Scan {scan_id}'s work folder holds {held} and can be resumed. Press Resume on that Scan in Elise; `elise run` on this computer then claims it."
             );
             Exit::Ok
         }
@@ -219,7 +219,7 @@ async fn connection_status(store: &Store) -> Exit {
             Exit::Ok
         }
         RunnerStatus::Unpaired => {
-            println!("unpaired: no token in {place}. Pair with `elise-runner pair <code>`.");
+            println!("unpaired: no token in {place}. Pair with `elise pair <code>`.");
             Exit::Unpaired
         }
         RunnerStatus::Revoked if store.is_read_only() => {
@@ -269,11 +269,9 @@ async fn runner_paired(store: &Store) -> Result<String, String> {
     match pairing::status(store.tokens()).await {
         RunnerStatus::Connected { name, account_name } => Ok(format!("Runner \"{name}\" in {account_name}")),
         RunnerStatus::Unpaired => {
-            Err("this computer is not paired. Run `elise-runner login`, or `elise-runner pair <code>` with a code from Elise.".to_string())
+            Err("this computer is not paired. Run `elise login`, or `elise pair <code>` with a code from Elise.".to_string())
         }
-        RunnerStatus::Revoked => {
-            Err("Elise rejected this Runner's token. Run `elise-runner login` or `elise-runner pair <code>` again.".to_string())
-        }
+        RunnerStatus::Revoked => Err("Elise rejected this Runner's token. Run `elise login` or `elise pair <code>` again.".to_string()),
         RunnerStatus::Offline => Err("Elise could not be reached. Check the connection, then run doctor again.".to_string()),
     }
 }
@@ -340,7 +338,7 @@ pub async fn doctor(store: &Store, named: &[String]) -> Exit {
 pub async fn unpair(store: &Store) -> Exit {
     if store.is_read_only() {
         eprintln!(
-            "The token comes from {TOKEN_VARIABLE}, which elise-runner does not manage. \
+            "The token comes from {TOKEN_VARIABLE}, which elise does not manage. \
              Remove the Runner in Elise, then unset the variable."
         );
         return Exit::Error;
@@ -355,7 +353,7 @@ pub async fn unpair(store: &Store) -> Exit {
             Exit::Ok
         }
         Err(_) => {
-            eprintln!("Could not reach Elise. The token is kept in {}, so you can run `elise-runner unpair` again.", store.describe());
+            eprintln!("Could not reach Elise. The token is kept in {}, so you can run `elise unpair` again.", store.describe());
             Exit::Offline
         }
     }
@@ -450,7 +448,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
         let claiming = !(once && claimed_any);
         if claiming && running.len() < parallel {
             let Some(token) = store.tokens().token() else {
-                eprintln!("This computer is not paired. Pair it with `elise-runner pair <code>`.");
+                eprintln!("This computer is not paired. Pair it with `elise pair <code>`.");
                 return Exit::Unpaired;
             };
             while running.len() < parallel {
