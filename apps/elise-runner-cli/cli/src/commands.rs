@@ -529,24 +529,29 @@ impl Ends {
     }
 }
 
-pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
+pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit {
     let Some(stop) = stop_on_signal("Stopping.") else {
         eprintln!("Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.");
         return Exit::Error;
     };
     let skill = Skill::new();
     let find_tools = || skill.tools();
-    let log = ScanLog::default();
+    let log = ScanLog { json, ..ScanLog::default() };
     let on_event = |scan_id: &str, event: Event| log.tell(scan_id, event);
     let (find_tools, on_event, stop) = (&find_tools, &on_event, &stop);
     let mut running: Running<'_> = Vec::new();
     let mut claimed_any = false;
     let mut offline = false;
     if !once {
-        println!("Waiting for Scans from Elise. Stop with Ctrl-C.");
+        json::say(json, "Waiting for Scans from Elise. Stop with Ctrl-C.");
     }
     if parallel > 1 {
-        println!("Running up to {parallel} Scans at once. Elise allows 3 live Runner Scans for an Account, shared with its other Runners.");
+        json::say(
+            json,
+            &format!(
+                "Running up to {parallel} Scans at once. Elise allows 3 live Runner Scans for an Account, shared with its other Runners."
+            ),
+        );
     }
     let stopped_idle = || {
         eprintln!("Stopped. No Scan was running.");
@@ -601,7 +606,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
                     }
                     _ if stop.is_stopped() => break,
                     Claimed::Nothing if once && !claimed_any => {
-                        println!("Nothing to claim.");
+                        json::say(json, "Nothing to claim.");
                         return Exit::NothingToClaim;
                     }
                     Claimed::Offline if once && !claimed_any => {
@@ -671,12 +676,14 @@ fn stop_on_signal(message: &'static str) -> Option<Stop> {
 
 #[derive(Default)]
 struct ScanLog {
+    json: bool,
     state: Mutex<LogState>,
 }
 
 #[derive(Default)]
 struct LogState {
     repos: HashMap<String, String>,
+    sent: HashMap<String, bool>,
     ended: usize,
     failed: usize,
 }
@@ -688,21 +695,44 @@ impl ScanLog {
             state.repos.insert(scan_id.to_string(), repo.clone());
         }
         let repo = state.repos.get(scan_id).cloned().unwrap_or_default();
+        let mut line_event: Option<serde_json::Value> = None;
+        let mut say = |name: &str, fields: serde_json::Value| line_event = Some(json::event(name, scan_id, fields));
         let line = match event {
-            Event::Claimed { .. } => "Scan claimed".to_string(),
-            Event::PhaseStarted { phase } => format!("{} started", scan::run_label(&phase)),
+            Event::Claimed { repo, .. } => {
+                say("claimed", serde_json::json!({ "repo": repo }));
+                "Scan claimed".to_string()
+            }
+            Event::PhaseStarted { phase } => {
+                say("phase_started", serde_json::json!({ "phase": phase }));
+                format!("{} started", scan::run_label(&phase))
+            }
             Event::PhaseEnded { phase, cost_usd, pool_left_usd } => {
+                say("phase_finished", serde_json::json!({ "phase": phase, "costUsd": cost_usd, "poolLeftUsd": pool_left_usd }));
                 let spent = cost_usd.map(dollars).unwrap_or_else(|| "an unknown amount".to_string());
                 format!("{} ended: spent {spent}, {} left of the Pool", scan::run_label(&phase), dollars(pool_left_usd))
             }
+            Event::Finding { fingerprint, verdict, severity } => {
+                say("finding", serde_json::json!({ "fingerprint": fingerprint, "verdict": verdict, "severity": severity }));
+                String::new()
+            }
             Event::RepairStarted => "the repair run started: the check failed, the agent gets one run to fix it".to_string(),
-            Event::ResultSent { sent: true } => "result sent to Elise".to_string(),
-            Event::ResultSent { sent: false } => "the result could not be sent to Elise".to_string(),
+            Event::ResultSent { sent } => {
+                state.sent.insert(scan_id.to_string(), sent);
+                if sent { "result sent to Elise" } else { "the result could not be sent to Elise" }.to_string()
+            }
             Event::StoppedFromElise { kept, .. } => {
+                say("stopped", serde_json::json!({ "workFolder": kept.as_ref().map(|path| path.display().to_string()) }));
                 let kept = kept.map(|path| format!(" Work folder kept: {}", path.display())).unwrap_or_default();
                 format!("Scan stopped from Elise.{kept}")
             }
             Event::Ended { ok, message, kept, .. } => {
+                let sent = state.sent.remove(scan_id).unwrap_or(false);
+                let fields = serde_json::json!({
+                    "state": if ok { "succeeded" } else { "failed" },
+                    "sent": sent,
+                    "workFolder": kept.as_ref().map(|path| path.display().to_string()),
+                });
+                say("result", fields);
                 state.ended += 1;
                 if !ok {
                     state.failed += 1;
@@ -715,7 +745,16 @@ impl ScanLog {
                 }
             }
         };
-        println!("[{repo} {scan_id}] {line}");
+        if self.json {
+            if let Some(event) = line_event {
+                println!("{event}");
+            }
+            if !line.is_empty() {
+                eprintln!("[{repo} {scan_id}] {line}");
+            }
+        } else if !line.is_empty() {
+            println!("[{repo} {scan_id}] {line}");
+        }
     }
 
     fn any_ended(&self) -> bool {

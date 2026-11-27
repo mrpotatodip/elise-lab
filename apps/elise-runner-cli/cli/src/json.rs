@@ -28,6 +28,18 @@ pub fn emit(exit: Exit, fields: Value, failure: Option<Failure>) -> Exit {
     exit
 }
 
+pub fn event(name: &str, scan_id: &str, fields: Value) -> Value {
+    let mut object = Map::new();
+    object.insert("schemaVersion".into(), json!(SCHEMA_VERSION));
+    object.insert("event".into(), json!(name));
+    object.insert("scanId".into(), json!(scan_id));
+    object.insert("at".into(), json!(elise_runner_core::now_iso()));
+    if let Value::Object(fields) = fields {
+        object.extend(fields);
+    }
+    Value::Object(object)
+}
+
 pub fn say(json: bool, line: &str) {
     if json {
         eprintln!("{line}");

@@ -82,7 +82,7 @@ pub fn main(args: &[String]) -> Exit {
             Command::Status { json } => commands::status(&store, json).await,
             Command::Doctor { hosts, json } => commands::doctor(&store, &hosts, json).await,
             Command::Unpair { json } => commands::unpair(&store, json).await,
-            Command::Run { once, parallel } => commands::run(&store, once, parallel).await,
+            Command::Run { once, parallel, json } => commands::run(&store, once, parallel, json).await,
             Command::Resume { scan_id, json } => commands::resume(&scan_id, json),
         }
     })

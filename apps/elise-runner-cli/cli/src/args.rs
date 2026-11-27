@@ -7,7 +7,7 @@ pub enum Command {
     Status { json: bool },
     Doctor { hosts: Vec<String>, json: bool },
     Unpair { json: bool },
-    Run { once: bool, parallel: usize },
+    Run { once: bool, parallel: usize, json: bool },
     Resume { scan_id: String, json: bool },
 }
 
@@ -123,7 +123,7 @@ pub fn parse(args: &[String]) -> Parsed {
             Parsed::Command(Command::Doctor { hosts: hosts.iter().map(|host| host.to_ascii_lowercase()).collect(), json: has("--json") })
         }
         ("unpair", []) => Parsed::Command(Command::Unpair { json: has("--json") }),
-        ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel }),
+        ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel, json: has("--json") }),
         ("resume", [scan_id]) => Parsed::Command(Command::Resume { scan_id: scan_id.to_string(), json: has("--json") }),
         ("resume", []) => Parsed::Usage("`resume` needs the Scan id of a kept work folder (`status` lists them)".to_string()),
         ("help", []) => Parsed::Help,

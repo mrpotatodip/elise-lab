@@ -122,7 +122,7 @@ pub const COMMANDS: &[Spec] = &[
         name: "run",
         group: "Run Scans",
         summary: "Claim and run Scans until stopped.",
-        usage: "elise run [--once] [--parallel N]",
+        usage: "elise run [--once] [--parallel N] [--json]",
         about: "Runs each Scan on this computer with your own Claude. Ctrl-C stops every running Scan and sends its report first.",
         flags: &[
             Flag {
@@ -141,6 +141,14 @@ pub const COMMANDS: &[Spec] = &[
                 cost: "N Scans at once use N times the CPU, memory and Claude usage.",
                 about: "Run up to N Scans at once, from 1 to 3.",
             },
+            Flag {
+                name: "--json",
+                short: None,
+                value: None,
+                default: "off",
+                cost: "none",
+                about: "Print one JSON event per line on standard output while Scans run. Prose goes to standard error.",
+            },
         ],
         needs: "A paired Runner, git, and `claude` signed in.",
         env: &[
@@ -154,7 +162,7 @@ pub const COMMANDS: &[Spec] = &[
             "elise run --parallel 2",
         ],
         exits: &[0, 1, 2, 3, 4, 5, 6, 7],
-        json: "one event per line: claimed, phase_started, phase_finished, finding, result, stopped",
+        json: "one event object per line, each with schemaVersion, event, scanId and at (UTC time); labels, counts and IDs only, never model text. claimed (repo); phase_started (phase); phase_finished (phase, costUsd or null, poolLeftUsd); finding (fingerprint, verdict confirmed|needs_validation, severity or null; the full record goes to Elise); result (state succeeded|failed, sent, workFolder when kept); stopped (workFolder when kept: the Scan was stopped from Elise and sent no result). The exit code is the one without --json",
     },
     Spec {
         name: "resume",
