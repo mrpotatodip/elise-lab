@@ -7,6 +7,7 @@ pub mod table;
 pub mod tools;
 
 use args::{Command, Parsed};
+use std::io::IsTerminal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exit {
@@ -52,11 +53,13 @@ pub fn main(args: &[String]) -> Exit {
             return Exit::Usage;
         }
     };
+    let interactive = !args.iter().any(|arg| arg == "--no-input")
+        && (std::io::stdin().is_terminal() || std::env::var_os("ELISE_TEST_TERMINAL").is_some());
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("the async runtime starts");
     let store = store::Store::open();
     runtime.block_on(async {
         match command {
-            Command::Pair { code, yes, print_token } => commands::pair(&store, &code, yes, print_token).await,
+            Command::Pair { code, yes, print_token } => commands::pair(&store, &code, yes, print_token, interactive).await,
             Command::Login { no_browser } => commands::login(&store, no_browser).await,
             Command::Status => commands::status(&store).await,
             Command::Doctor { hosts } => commands::doctor(&store, &hosts).await,

@@ -20,7 +20,11 @@ The line above is this Runner's token. It is a credential: anyone who has it can
 this Runner until the Runner is removed in Elise. Copies stay wherever it is pasted (shell history,
 CI variables, container settings).";
 
-pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Exit {
+pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool, interactive: bool) -> Exit {
+    if !yes && !interactive {
+        eprintln!("`pair` asks before it connects this computer, and no question can be asked here. Add `--yes` to accept.");
+        return Exit::Usage;
+    }
     let say = |line: &str| {
         if print_token {
             eprintln!("{line}");

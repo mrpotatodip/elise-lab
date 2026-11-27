@@ -2,6 +2,48 @@ mod support;
 
 use support::{Engine, Runner, ACCOUNT_NAME, CODE, RUNNER_NAME};
 
+const TERMINAL: (&str, String) = ("ELISE_TEST_TERMINAL", String::new());
+
+#[test]
+fn pair_without_yes_and_without_a_terminal_exits_2_naming_yes_and_asks_nothing() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+
+    let refused = runner.run(&["pair", CODE], "y\n");
+
+    assert_eq!(refused.code, 2, "{}{}", refused.stdout, refused.stderr);
+    assert!(refused.stderr.contains("--yes"), "{}", refused.stderr);
+    assert!(!refused.stderr.contains("[y/N]"), "{}", refused.stderr);
+    assert!(engine.live().is_empty());
+    assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
+}
+
+#[test]
+fn no_input_refuses_to_ask_even_with_a_terminal() {
+    let engine = Engine::start();
+    let mut runner = Runner::new(&engine);
+    runner.env.push(TERMINAL);
+
+    let refused = runner.run(&["pair", CODE, "--no-input"], "y\n");
+
+    assert_eq!(refused.code, 2, "{}{}", refused.stdout, refused.stderr);
+    assert!(refused.stderr.contains("--yes"), "{}", refused.stderr);
+    assert!(engine.live().is_empty());
+    assert!(runner.home_files().is_empty(), "{:?}", runner.home_files());
+}
+
+#[test]
+fn no_input_with_yes_still_pairs_and_no_command_waits_on_a_closed_stdin() {
+    let engine = Engine::start();
+    let runner = Runner::new(&engine);
+
+    assert_eq!(runner.run(&["pair", CODE, "--yes", "--no-input"], "").code, 0);
+    for args in [&["status"][..], &["doctor"][..], &["unpair"][..], &["resume", "none"][..], &["commands"][..]] {
+        let output = runner.run(args, "");
+        assert!(matches!(output.code, 0 | 1 | 3), "{args:?}: {}{}", output.stdout, output.stderr);
+    }
+}
+
 #[test]
 fn pair_with_yes_saves_the_token_and_status_reports_connected() {
     let engine = Engine::start();
@@ -21,7 +63,8 @@ fn pair_with_yes_saves_the_token_and_status_reports_connected() {
 #[test]
 fn pair_answered_no_revokes_the_token_and_saves_nothing() {
     let engine = Engine::start();
-    let runner = Runner::new(&engine);
+    let mut runner = Runner::new(&engine);
+    runner.env.push(TERMINAL);
 
     let declined = runner.run(&["pair", CODE], "n\n");
 
@@ -51,7 +94,8 @@ fn pairing_again_saves_the_new_token_and_revokes_the_old_one() {
 #[test]
 fn pairing_again_after_elise_rejected_the_old_token_says_it_was_removed_before_asking() {
     let engine = Engine::start();
-    let runner = Runner::new(&engine);
+    let mut runner = Runner::new(&engine);
+    runner.env.push(TERMINAL);
     runner.run(&["pair", CODE, "--yes"], "");
     engine.remove_all_runners();
 

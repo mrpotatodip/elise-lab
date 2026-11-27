@@ -1,4 +1,4 @@
-use crate::table::{Spec, Topic, COMMANDS, EXIT_CODES, GROUPS, TOPICS};
+use crate::table::{self, Spec, Topic, COMMANDS, EXIT_CODES, GROUPS, TOPICS};
 use serde_json::{json, Value};
 
 pub fn overview() -> String {
@@ -29,9 +29,9 @@ fn exit_lines(codes: impl Iterator<Item = i32>) -> String {
 
 pub fn page(spec: &Spec) -> String {
     let mut text = format!("elise {}: {}\n\nUsage:\n  {}\n\n{}\n", spec.name, spec.summary, spec.usage, spec.about);
-    if !spec.flags.is_empty() {
+    {
         text.push_str("\nFlags:\n");
-        for flag in spec.flags {
+        for flag in table::flags(spec) {
             let short = flag.short.map(|short| format!(", {short}")).unwrap_or_default();
             let value = flag.value.map(|value| format!(" {value}")).unwrap_or_default();
             text.push_str(&format!(
@@ -73,9 +73,7 @@ pub fn commands_json() -> Value {
     let commands: Vec<Value> = COMMANDS
         .iter()
         .map(|spec| {
-            let flags: Vec<Value> = spec
-                .flags
-                .iter()
+            let flags: Vec<Value> = table::flags(spec)
                 .map(|flag| {
                     json!({ "name": flag.name, "short": flag.short, "value": flag.value, "default": flag.default, "cost": flag.cost, "about": flag.about })
                 })

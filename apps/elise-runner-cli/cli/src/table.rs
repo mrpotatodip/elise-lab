@@ -288,6 +288,8 @@ Every `run` log line starts with [repo scan-id]. Ids are opaque: compare them, d
 Run `elise commands --json` once to learn every command, flag, exit code and JSON shape.
 Use `--json` and read the exit code. Never rely on prose.
 Use `--yes` for `pair`, because an agent cannot answer a question.
+With no terminal on stdin, or with `--no-input`, the program never asks. `pair` without `--yes`
+then exits 2 and names `--yes`.
 ",
     },
 ];
@@ -300,6 +302,19 @@ pub fn topic(name: &str) -> Option<&'static Topic> {
     TOPICS.iter().find(|topic| topic.name == name)
 }
 
+pub const GLOBAL_FLAGS: &[Flag] = &[Flag {
+    name: "--no-input",
+    short: None,
+    value: None,
+    default: "off; on when stdin is not a terminal",
+    cost: "none",
+    about: "Never ask a question. A command that needs an answer exits 2 and names the flag that gives it.",
+}];
+
+pub fn flags(spec: &Spec) -> impl Iterator<Item = &'static Flag> {
+    spec.flags.iter().chain(GLOBAL_FLAGS)
+}
+
 pub fn accepts(spec: &Spec, flag: &str) -> bool {
-    spec.flags.iter().any(|known| known.name == flag || known.short == Some(flag))
+    flags(spec).any(|known| known.name == flag || known.short == Some(flag))
 }
