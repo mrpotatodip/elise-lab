@@ -17,7 +17,7 @@ pub enum Parsed {
     Help,
     Page(&'static Spec),
     Topic(&'static Topic),
-    Commands { json: bool },
+    Commands { json: bool, markdown: bool },
     Completions(String),
     Version,
     Usage(String),
@@ -159,7 +159,10 @@ pub fn parse(args: &[String]) -> Parsed {
         ("completions", []) => Parsed::Usage(format!("`completions` needs a shell: {}", crate::completions::supported())),
         ("skill", [sub]) if sub.as_str() == "install" => Parsed::Command(Command::SkillInstall { dir, json: has("--json") }),
         ("skill", []) => Parsed::Usage("`skill` needs a subcommand: `elise skill install`".to_string()),
-        ("commands", []) => Parsed::Commands { json: has("--json") },
+        ("commands", []) if has("--json") && has("--markdown") => {
+            Parsed::Usage("`commands` takes `--json` or `--markdown`, not both".to_string())
+        }
+        ("commands", []) => Parsed::Commands { json: has("--json"), markdown: has("--markdown") },
         _ => Parsed::Usage(format!("too many arguments for `{command}`")),
     }
 }

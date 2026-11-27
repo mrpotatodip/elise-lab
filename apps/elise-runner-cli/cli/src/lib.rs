@@ -39,8 +39,10 @@ pub fn main(args: &[String]) -> Exit {
             print!("{}", help::topic(topic));
             return Exit::Ok;
         }
-        Parsed::Commands { json } => {
-            if json {
+        Parsed::Commands { json, markdown } => {
+            if markdown {
+                print!("{}", help::reference_markdown());
+            } else if json {
                 println!("{}", help::commands_json());
             } else {
                 print!("{}", help::commands_list());

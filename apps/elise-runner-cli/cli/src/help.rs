@@ -69,6 +69,40 @@ pub fn commands_list() -> String {
     COMMANDS.iter().map(|spec| format!("{:<10}{}\n", spec.name, spec.summary)).collect()
 }
 
+fn cell(text: &str) -> String {
+    text.replace('|', "\\|")
+}
+
+pub fn reference_markdown() -> String {
+    let mut text = String::new();
+    for group in GROUPS {
+        text.push_str(&format!("### {group}\n\n"));
+        for spec in COMMANDS.iter().filter(|spec| spec.group == *group) {
+            text.push_str(&format!("#### `elise {}`\n\n{}\n\n```\n{}\n```\n\n", spec.name, spec.summary, spec.usage));
+            text.push_str(&format!("{}\n\nNeeds: {}\n\n", spec.about, spec.needs));
+            text.push_str("| Flag | Default | Cost | What it does |\n| --- | --- | --- | --- |\n");
+            for flag in table::flags(spec) {
+                let short = flag.short.map(|short| format!(", `{short}`")).unwrap_or_default();
+                let value = flag.value.map(|value| format!(" `<{value}>`")).unwrap_or_default();
+                text.push_str(&format!(
+                    "| `{}`{short}{value} | {} | {} | {} |\n",
+                    flag.name,
+                    cell(flag.default),
+                    cell(flag.cost),
+                    cell(flag.about)
+                ));
+            }
+            let codes: Vec<String> = spec.exits.iter().map(|code| code.to_string()).collect();
+            text.push_str(&format!("\nExit codes: {}. JSON shape: {}\n\n", codes.join(", "), spec.json));
+        }
+    }
+    text.push_str("### Exit codes\n\n| Code | Meaning |\n| --- | --- |\n");
+    for (code, _, meaning) in EXIT_CODES {
+        text.push_str(&format!("| {code} | {} |\n", cell(meaning)));
+    }
+    text
+}
+
 pub fn commands_json() -> Value {
     let commands: Vec<Value> = COMMANDS
         .iter()
