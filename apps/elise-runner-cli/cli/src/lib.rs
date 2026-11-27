@@ -4,6 +4,7 @@ pub mod commands;
 pub mod completions;
 pub mod help;
 pub mod json;
+pub mod skill;
 pub mod store;
 pub mod table;
 pub mod tools;
@@ -84,6 +85,7 @@ pub fn main(args: &[String]) -> Exit {
             Command::Unpair { json } => commands::unpair(&store, json).await,
             Command::Run { once, parallel, json } => commands::run(&store, once, parallel, json).await,
             Command::Resume { scan_id, json } => commands::resume(&scan_id, json),
+            Command::SkillInstall { dir, json } => skill::install(dir.as_deref(), json),
         }
     })
 }

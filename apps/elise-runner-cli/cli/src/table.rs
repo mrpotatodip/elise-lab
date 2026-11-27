@@ -249,6 +249,29 @@ pub const COMMANDS: &[Spec] = &[
         exits: &[0, 2],
         json: "schemaVersion, commands, exitCodes, topics",
     },
+    Spec {
+        name: "skill",
+        group: "Help",
+        summary: "Install the agent skill that teaches an AI agent to use the Elise CLI.",
+        usage: "elise skill install [--dir <path>] [--json]",
+        about: "Writes SKILL.md, built from this command table, to ~/.claude/skills/elise (or the folder given) and prints a snippet for AGENTS.md or CLAUDE.md. Run it again after an update: it replaces the file.",
+        flags: &[
+            Flag {
+                name: "--dir",
+                short: None,
+                value: Some("path"),
+                default: "~/.claude/skills/elise",
+                cost: "none",
+                about: "Write SKILL.md into this folder instead, for an agent tool other than Claude Code.",
+            },
+            JSON_FLAG,
+        ],
+        needs: "Nothing. It works unpaired.",
+        env: &[],
+        examples: &["elise skill install", "elise skill install --json", "elise skill install --dir ./agent-skills/elise   # CI or another agent tool"],
+        exits: &[0, 1, 2],
+        json: "schemaVersion, ok, exitCode, path, snippet. Failure codes: write_failed, usage",
+    },
 ];
 
 pub const TOPICS: &[Topic] = &[
