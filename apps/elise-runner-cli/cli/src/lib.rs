@@ -1,7 +1,9 @@
 pub mod args;
 pub mod browser;
 pub mod commands;
+pub mod help;
 pub mod store;
+pub mod table;
 pub mod tools;
 
 use args::{Command, Parsed};
@@ -22,7 +24,23 @@ pub fn main(args: &[String]) -> Exit {
     let command = match args::parse(args) {
         Parsed::Command(command) => command,
         Parsed::Help => {
-            print!("{}", args::HELP);
+            print!("{}", help::overview());
+            return Exit::Ok;
+        }
+        Parsed::Page(spec) => {
+            print!("{}", help::page(spec));
+            return Exit::Ok;
+        }
+        Parsed::Topic(topic) => {
+            print!("{}", help::topic(topic));
+            return Exit::Ok;
+        }
+        Parsed::Commands { json } => {
+            if json {
+                println!("{}", help::commands_json());
+            } else {
+                print!("{}", help::commands_list());
+            }
             return Exit::Ok;
         }
         Parsed::Version => {

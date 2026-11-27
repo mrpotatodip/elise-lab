@@ -114,11 +114,13 @@ A debug build reads `ELISE_RUNNER_HOME` (the token file goes in that folder, the
 
 | Path | What it is |
 | --- | --- |
-| `src/args.rs` | The command line and the help text. |
+| `src/table.rs` | The command table: every command, flag, exit code and help topic, declared once. |
+| `src/help.rs` | Renders the table: `--help`, `<command> --help`, `help <topic>`, `commands --json`. |
+| `src/args.rs` | The command line. The flags a command accepts come from the table. |
 | `src/browser.rs` | Opens the login link when the computer has a desktop session. |
 | `src/store.rs` | Which token store a run uses. |
 | `src/commands.rs` | One function per command, and the log of `run`. |
 | `src/tools.rs` | The built-in Skill, `claude` and `node`. |
 | `tests/` | Process tests: the debug `elise` run against a stub engine. |
 
-`elise --help` is the source for the commands and exit codes above. Change them together.
+`src/table.rs` is the source for the commands and exit codes above, and `elise --help` is generated from it. Change them together. To add a command, add a `Spec` to `COMMANDS` (and its group to `GROUPS` if new), then a match arm in `args.rs` and `lib.rs`. To add a flag, add a `Flag` to its `Spec`: the parser then accepts it and the help shows it.

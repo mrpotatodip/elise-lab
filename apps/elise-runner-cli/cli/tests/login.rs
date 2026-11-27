@@ -220,8 +220,8 @@ fn the_help_lists_login_and_its_flag() {
     let engine = Engine::start();
     let runner = Runner::new(&engine);
 
-    let help = runner.run(&["--help"], "");
+    let help = runner.run(&["login", "--help"], "");
 
     assert!(help.stdout.contains("elise login [--no-browser]"), "{}", help.stdout);
-    assert!(help.stdout.contains("--no-browser  Only print"), "{}", help.stdout);
+    assert!(help.stdout.contains("--no-browser\n      Only print"), "{}", help.stdout);
 }
