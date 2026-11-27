@@ -14,6 +14,7 @@ pub fn overview() -> String {
     for topic in TOPICS {
         text.push_str(&format!("  {:<12}{}\n", topic.name, topic.summary));
     }
+    text.push_str(&format!("\nExit codes:\n{}", exit_lines(EXIT_CODES.iter().map(|(code, _, _)| *code))));
     text.push_str("\nRun `elise <command> --help` for a command and `elise help <topic>` for a topic.\n");
     text
 }
