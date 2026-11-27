@@ -42,6 +42,17 @@ pub const GROUPS: &[&str] = &["Connect this computer", "Run Scans", "Check", "He
 
 const NO_FLAGS: &[Flag] = &[];
 
+const JSON_FLAG: Flag = Flag {
+    name: "--json",
+    short: None,
+    value: None,
+    default: "off",
+    cost: "none",
+    about: "Print one JSON object on standard output. Prose goes to standard error.",
+};
+
+const ONLY_JSON: &[Flag] = &[JSON_FLAG];
+
 pub const COMMANDS: &[Spec] = &[
     Spec {
         name: "pair",
@@ -59,6 +70,7 @@ pub const COMMANDS: &[Spec] = &[
                 cost: "none",
                 about: "Print the token once on standard output and save nothing. The token is a credential: treat it as a password.",
             },
+            JSON_FLAG,
         ],
         needs: "A one-time code from Elise (Add a Runner). Not paired yet.",
         env: &[("ELISE_RUNNER_TOKEN", "If set, pair refuses: that token is read only.")],
@@ -68,7 +80,7 @@ pub const COMMANDS: &[Spec] = &[
             "elise pair \"$CODE\" --yes   # CI: no question asked",
         ],
         exits: &[0, 1, 2, 5],
-        json: "schemaVersion, ok, exitCode, account, runner",
+        json: "schemaVersion, ok, exitCode, account, runner, tokenPlace; with --print-token: token instead of tokenPlace. Failure codes: invalid_code, declined, read_only_token, save_failed, offline, usage",
     },
     Spec {
         name: "login",
@@ -76,19 +88,22 @@ pub const COMMANDS: &[Spec] = &[
         summary: "Connect through the browser, with no code.",
         usage: "elise login [--no-browser]",
         about: "Prints a link and a code, opens the link when this computer has a desktop session, and waits up to 10 minutes for you to approve it in Elise.",
-        flags: &[Flag {
-            name: "--no-browser",
-            short: None,
-            value: None,
-            default: "off",
-            cost: "none",
-            about: "Only print the link and the code.",
-        }],
+        flags: &[
+            Flag {
+                name: "--no-browser",
+                short: None,
+                value: None,
+                default: "off",
+                cost: "none",
+                about: "Only print the link and the code.",
+            },
+            JSON_FLAG,
+        ],
         needs: "A person who can approve the login in Elise. Not paired yet.",
         env: &[("ELISE_RUNNER_TOKEN", "If set, login refuses: that token is read only.")],
         examples: &["elise login", "elise login --json", "elise login --no-browser   # CI or a box with no desktop session"],
         exits: &[0, 1, 2, 5],
-        json: "schemaVersion, ok, exitCode, account, runner",
+        json: "schemaVersion, ok, exitCode, account, runner, tokenPlace. Failure codes: unsupported, read_only_token, no_signals, cancelled, expired, denied, refused, save_failed, offline, usage",
     },
     Spec {
         name: "unpair",
@@ -96,12 +111,12 @@ pub const COMMANDS: &[Spec] = &[
         summary: "Tell Elise to drop this Runner's token, then forget it.",
         usage: "elise unpair",
         about: "The Runner stops claiming Scans and disappears from the Runners list.",
-        flags: NO_FLAGS,
+        flags: ONLY_JSON,
         needs: "A paired Runner.",
         env: &[("ELISE_RUNNER_TOKEN", "If set, unpair refuses: that token is read only.")],
         examples: &["elise unpair", "elise unpair --json", "elise unpair && echo gone   # CI cleanup"],
         exits: &[0, 1, 3, 5],
-        json: "schemaVersion, ok, exitCode",
+        json: "schemaVersion, ok, exitCode, wasPaired. Failure codes: read_only_token, offline, usage",
     },
     Spec {
         name: "run",
@@ -147,12 +162,12 @@ pub const COMMANDS: &[Spec] = &[
         summary: "Say whether a failed or stopped Scan can be resumed here.",
         usage: "elise resume <scan-id>",
         about: "Lists the Phases the kept work folder holds. The resume itself starts in Elise (the Resume button on that Scan); `run` then claims it.",
-        flags: NO_FLAGS,
+        flags: ONLY_JSON,
         needs: "The work folder the Scan kept on this computer.",
         env: &[],
         examples: &["elise resume SCAN_ID", "elise resume SCAN_ID --json", "elise resume \"$SCAN_ID\" || echo no folder   # CI"],
         exits: &[0, 1, 2],
-        json: "schemaVersion, ok, exitCode, scanId, resumable, phases",
+        json: "schemaVersion, ok, exitCode, scanId, resumable, phases (the finished Phases). Failure codes: not_resumable, usage",
     },
     Spec {
         name: "status",
@@ -160,12 +175,12 @@ pub const COMMANDS: &[Spec] = &[
         summary: "Say whether this Runner is unpaired, connected, revoked or offline.",
         usage: "elise status",
         about: "Also says where the token is kept and lists the kept work folders.",
-        flags: NO_FLAGS,
+        flags: ONLY_JSON,
         needs: "Nothing. It works unpaired.",
         env: &[("ELISE_RUNNER_TOKEN", "If set, it is the token used.")],
         examples: &["elise status", "elise status --json", "elise status || echo not ready   # CI: exit 3, 4 or 5"],
         exits: &[0, 3, 4, 5],
-        json: "schemaVersion, ok, exitCode, state, tokenPlace, folders",
+        json: "schemaVersion, ok, exitCode, state (connected, unpaired, revoked, offline), tokenPlace (variable, keychain, file), runner and account when connected, folders (scanId, path, resumable, phases). Failure codes: unpaired, revoked, offline, usage",
     },
     Spec {
         name: "doctor",
@@ -173,12 +188,12 @@ pub const COMMANDS: &[Spec] = &[
         summary: "Check this computer's setup, one line per check.",
         usage: "elise doctor [host...]",
         about: "Checks that git is installed, `claude` is signed in, this Runner is paired, and git can read from each host (default github.com and gitlab.com, plus those in settings). Each failure shows the fix.",
-        flags: NO_FLAGS,
+        flags: ONLY_JSON,
         needs: "Nothing. It works unpaired, and reports that.",
         env: &[],
         examples: &["elise doctor", "elise doctor --json", "elise doctor git.example.com   # CI: exit 1 on any failure"],
         exits: &[0, 1, 2],
-        json: "schemaVersion, ok, exitCode, checks",
+        json: "schemaVersion, ok, exitCode, checks (name, status pass|fail|skip, detail: the fix when it failed). Failure codes: check_failed, usage",
     },
     Spec {
         name: "help",
@@ -250,7 +265,9 @@ Other commands take `--json` too, and print one object with:
   schemaVersion  a number; it changes when a field changes meaning
   ok             true or false
   exitCode       the same number as the exit code
-A failure is { ok: false, error: { code, message, next } }.
+A failure is { ok: false, error: { code, message, next } }: `code` is a stable word, `next` the command to run.
+A bad command line is a failure too: error code `usage`, exit 2.
+No JSON holds a token, except `pair --print-token --json`, where it is the field `token`.
 The result goes to standard output. Prose goes to standard error.
 `elise run --json` prints one object per line.
 ",

@@ -2,13 +2,13 @@ use crate::table::{self, Spec, Topic};
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
-    Pair { code: String, yes: bool, print_token: bool },
-    Login { no_browser: bool },
-    Status,
-    Doctor { hosts: Vec<String> },
-    Unpair,
+    Pair { code: String, yes: bool, print_token: bool, json: bool },
+    Login { no_browser: bool, json: bool },
+    Status { json: bool },
+    Doctor { hosts: Vec<String>, json: bool },
+    Unpair { json: bool },
     Run { once: bool, parallel: usize },
-    Resume { scan_id: String },
+    Resume { scan_id: String, json: bool },
 }
 
 pub enum Parsed {
@@ -109,16 +109,21 @@ pub fn parse(args: &[String]) -> Parsed {
     }
     let has = |name: &str| flags.iter().any(|flag| flag.as_str() == name);
     match (command.as_str(), positional.as_slice()) {
-        ("pair", [code]) => {
-            Parsed::Command(Command::Pair { code: code.to_string(), yes: has("--yes") || has("-y"), print_token: has("--print-token") })
-        }
+        ("pair", [code]) => Parsed::Command(Command::Pair {
+            code: code.to_string(),
+            yes: has("--yes") || has("-y"),
+            print_token: has("--print-token"),
+            json: has("--json"),
+        }),
         ("pair", []) => Parsed::Usage("`pair` needs the pairing code from Elise".to_string()),
-        ("login", []) => Parsed::Command(Command::Login { no_browser: has("--no-browser") }),
-        ("status", []) => Parsed::Command(Command::Status),
-        ("doctor", hosts) => Parsed::Command(Command::Doctor { hosts: hosts.iter().map(|host| host.to_ascii_lowercase()).collect() }),
-        ("unpair", []) => Parsed::Command(Command::Unpair),
+        ("login", []) => Parsed::Command(Command::Login { no_browser: has("--no-browser"), json: has("--json") }),
+        ("status", []) => Parsed::Command(Command::Status { json: has("--json") }),
+        ("doctor", hosts) => {
+            Parsed::Command(Command::Doctor { hosts: hosts.iter().map(|host| host.to_ascii_lowercase()).collect(), json: has("--json") })
+        }
+        ("unpair", []) => Parsed::Command(Command::Unpair { json: has("--json") }),
         ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel }),
-        ("resume", [scan_id]) => Parsed::Command(Command::Resume { scan_id: scan_id.to_string() }),
+        ("resume", [scan_id]) => Parsed::Command(Command::Resume { scan_id: scan_id.to_string(), json: has("--json") }),
         ("resume", []) => Parsed::Usage("`resume` needs the Scan id of a kept work folder (`status` lists them)".to_string()),
         ("help", []) => Parsed::Help,
         ("help", [wanted]) => help_for(wanted),

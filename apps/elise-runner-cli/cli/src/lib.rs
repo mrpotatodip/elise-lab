@@ -2,6 +2,7 @@ pub mod args;
 pub mod browser;
 pub mod commands;
 pub mod help;
+pub mod json;
 pub mod store;
 pub mod table;
 pub mod tools;
@@ -49,6 +50,10 @@ pub fn main(args: &[String]) -> Exit {
         }
         Parsed::Usage(problem) => {
             eprintln!("elise: {problem}\nRun `elise --help` for the commands.");
+            if args.iter().any(|arg| arg == "--json") {
+                let failure = json::Failure { code: "usage", message: &problem, next: "elise --help" };
+                return json::emit(Exit::Usage, serde_json::json!({}), Some(failure));
+            }
             return Exit::Usage;
         }
     };
@@ -56,13 +61,13 @@ pub fn main(args: &[String]) -> Exit {
     let store = store::Store::open();
     runtime.block_on(async {
         match command {
-            Command::Pair { code, yes, print_token } => commands::pair(&store, &code, yes, print_token).await,
-            Command::Login { no_browser } => commands::login(&store, no_browser).await,
-            Command::Status => commands::status(&store).await,
-            Command::Doctor { hosts } => commands::doctor(&store, &hosts).await,
-            Command::Unpair => commands::unpair(&store).await,
+            Command::Pair { code, yes, print_token, json } => commands::pair(&store, &code, yes, print_token, json).await,
+            Command::Login { no_browser, json } => commands::login(&store, no_browser, json).await,
+            Command::Status { json } => commands::status(&store, json).await,
+            Command::Doctor { hosts, json } => commands::doctor(&store, &hosts, json).await,
+            Command::Unpair { json } => commands::unpair(&store, json).await,
             Command::Run { once, parallel } => commands::run(&store, once, parallel).await,
-            Command::Resume { scan_id } => commands::resume(&scan_id),
+            Command::Resume { scan_id, json } => commands::resume(&scan_id, json),
         }
     })
 }
