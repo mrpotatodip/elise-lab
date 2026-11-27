@@ -17,6 +17,7 @@ pub enum Parsed {
     Page(&'static Spec),
     Topic(&'static Topic),
     Commands { json: bool },
+    Completions(String),
     Version,
     Usage(String),
 }
@@ -122,6 +123,8 @@ pub fn parse(args: &[String]) -> Parsed {
         ("resume", []) => Parsed::Usage("`resume` needs the Scan id of a kept work folder (`status` lists them)".to_string()),
         ("help", []) => Parsed::Help,
         ("help", [wanted]) => help_for(wanted),
+        ("completions", [shell]) => Parsed::Completions(shell.to_string()),
+        ("completions", []) => Parsed::Usage(format!("`completions` needs a shell: {}", crate::completions::supported())),
         ("commands", []) => Parsed::Commands { json: has("--json") },
         _ => Parsed::Usage(format!("too many arguments for `{command}`")),
     }

@@ -1,6 +1,7 @@
 pub mod args;
 pub mod browser;
 pub mod commands;
+pub mod completions;
 pub mod help;
 pub mod store;
 pub mod table;
@@ -42,6 +43,18 @@ pub fn main(args: &[String]) -> Exit {
                 print!("{}", help::commands_list());
             }
             return Exit::Ok;
+        }
+        Parsed::Completions(shell) => {
+            return match completions::script(&shell) {
+                Some(script) => {
+                    print!("{script}");
+                    Exit::Ok
+                }
+                None => {
+                    eprintln!("elise: no completions for `{shell}`. Supported shells: {}", completions::supported());
+                    Exit::Usage
+                }
+            };
         }
         Parsed::Version => {
             println!("elise {}", env!("CARGO_PKG_VERSION"));
