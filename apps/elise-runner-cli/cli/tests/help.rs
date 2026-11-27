@@ -141,3 +141,39 @@ fn an_unknown_topic_exits_2() {
     assert_eq!(output.code, 2);
     assert!(output.stderr.contains("no help for `nonsense`"), "{}", output.stderr);
 }
+
+const PINNED_EXIT_CODES: [(i64, &str, &str); 8] = [
+    (0, "ok", "success; status: connected"),
+    (1, "error", "an error"),
+    (2, "usage", "bad command-line usage"),
+    (3, "unpaired", "this computer has no token"),
+    (4, "revoked", "Elise rejected the token"),
+    (5, "offline", "Elise could not be reached"),
+    (6, "nothing_to_claim", "run --once: nothing to claim"),
+    (7, "stopped_from_elise", "run --once: a Scan was stopped from Elise"),
+];
+
+#[test]
+fn the_exit_code_table_is_pinned_and_shown_in_all_four_places() {
+    let runner = offline_runner();
+    let table = table(&runner);
+
+    let json: Vec<(i64, &str, &str)> = table["exitCodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|code| (code["code"].as_i64().unwrap(), code["name"].as_str().unwrap(), code["meaning"].as_str().unwrap()))
+        .collect();
+    assert_eq!(json, PINNED_EXIT_CODES);
+
+    let top_help = runner.run(&["--help"], "").stdout;
+    let topic = runner.run(&["help", "exit-codes"], "").stdout;
+    let readme = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md")).unwrap();
+    for (code, _, meaning) in PINNED_EXIT_CODES {
+        let line = format!("  {code}  {meaning}");
+        assert!(top_help.lines().any(|found| found == line), "--help lacks `{line}`:\n{top_help}");
+        assert!(topic.lines().any(|found| found == line), "help exit-codes lacks `{line}`:\n{topic}");
+        let row = format!("| {code} | {meaning} |");
+        assert!(readme.lines().any(|found| found == row), "README lacks `{row}`");
+    }
+}

@@ -42,14 +42,16 @@ The program never prints the token in its log, in `status` or in an error. `pair
 
 | Code | Meaning |
 | --- | --- |
-| 0 | success; `status`: connected |
-| 1 | an error (including a Scan that failed under `run --once`) |
+| 0 | success; status: connected |
+| 1 | an error |
 | 2 | bad command-line usage |
-| 3 | unpaired |
-| 4 | revoked (Elise rejected the token) |
-| 5 | offline (Elise could not be reached) |
-| 6 | `run --once`: nothing to claim |
-| 7 | `run --once`: the Scan was stopped from Elise |
+| 3 | this computer has no token |
+| 4 | Elise rejected the token |
+| 5 | Elise could not be reached |
+| 6 | run --once: nothing to claim |
+| 7 | run --once: a Scan was stopped from Elise |
+
+These rows are the table in `src/table.rs`, shown the same in `elise --help`, `elise help exit-codes` and `elise commands --json`. A test pins them. A code is only ever added, never changed. Code 1 also covers a Scan that failed under `run --once`; 4 means the token was rejected (unpaired is 3).
 
 When Elise rejects the token during `run` (an admin removed the Runner), the program forgets the token, says so and exits with 4. Pair again with a new code. The same goes for a rejection while a Scan runs: the agent is stopped first, nothing is sent and the work folder is kept.
 
