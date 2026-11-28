@@ -12,6 +12,7 @@ import { requireScanAccess } from "#/lib/require-scan-access";
 import { requireTwoFactor } from "#/lib/require-two-factor";
 import archivesRoutes, { runUploadRetention } from "#/modules/archives";
 import authRoutes from "#/modules/auth";
+import cliAccessRoutes from "#/modules/cli-access";
 import filesRoutes from "#/modules/files";
 import findingCommentsRoutes from "#/modules/finding-comments";
 import findingsRoutes from "#/modules/findings";
@@ -129,6 +130,7 @@ export const buildApp = (deps: AppDeps = realAppDeps) => {
     .route("/repos", verdictRoutes)
     .route("/repos", archivesRoutes)
     .route("/runners", runnersRoutes)
+    .route("/cli-access", cliAccessRoutes)
     .route("/stripe", stripeRoutes);
 
   // -----

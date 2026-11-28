@@ -79,6 +79,16 @@ export const SCAN_KEY_SOURCE_VALUES = ["platform", "account"] as const;
 // -----
 export const RUNNER_LOGIN_STATE_VALUES = ["pending", "approved", "denied", "collected"] as const;
 
+// -----
+// What one CLI access may do. read: list and read. start: read plus
+// start, stop, resume, add repos and upload zips. admin: reserved
+// for settings, not given by any login yet. A Role limits every
+// scope. Twin of the CHECK on tenant_cli_access.scope.
+// A login can grant only the first two.
+// -----
+export const CLI_ACCESS_SCOPE_VALUES = ["read", "start", "admin"] as const;
+export const CLI_ACCESS_GRANTABLE_SCOPE_VALUES = ["read", "start"] as const;
+
 export const RUNNER_JOB_STATE_VALUES = ["queued", "claimed", "succeeded", "failed", "cancelled"] as const;
 
 // -----
@@ -112,6 +122,7 @@ export type FindingSeverityValue = (typeof FINDING_SEVERITY_VALUES)[number];
 export type FindingTriageStatusValue = (typeof FINDING_TRIAGE_STATUS_VALUES)[number];
 export type ScanKeySourceValue = (typeof SCAN_KEY_SOURCE_VALUES)[number];
 export type RunnerLoginStateValue = (typeof RUNNER_LOGIN_STATE_VALUES)[number];
+export type CliAccessScopeValue = (typeof CLI_ACCESS_SCOPE_VALUES)[number];
 export type RunnerJobStateValue = (typeof RUNNER_JOB_STATE_VALUES)[number];
 export type SubscriptionStatusValue = (typeof SUBSCRIPTION_STATUS_VALUES)[number];
 export type SubscriptionSourceValue = (typeof SUBSCRIPTION_SOURCE_VALUES)[number];

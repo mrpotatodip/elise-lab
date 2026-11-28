@@ -32,6 +32,7 @@ export const testDeps = (overrides: Partial<AppDeps> = {}): AppDeps => ({
   teardownScan: async () => null,
   sessionUserId: async () => undefined,
   runnerIdentity: async () => null,
+  cliAccess: async () => null,
   userHasAccount: async () => true,
   userHasPower: async () => true,
   twoFactorSetupRequired: async () => false,

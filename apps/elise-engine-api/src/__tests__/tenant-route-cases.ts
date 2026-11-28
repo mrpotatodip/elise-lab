@@ -321,6 +321,13 @@ export const CROSS_ACCOUNT_CASES = {
     expect: "own",
     own: { source: "platform", lastFour: null },
   },
+  "GET /cli-access": { kind: "run", path: "/cli-access", expect: "empty" },
+  "DELETE /cli-access/:cliAccessId": {
+    kind: "run",
+    path: `/cli-access/${OTHER_RUNNER_ID}`,
+    method: "DELETE",
+    expect: "not-found",
+  },
   "GET /runners": { kind: "run", path: "/runners", expect: "empty" },
   "DELETE /runners/:runnerId": {
     kind: "run",

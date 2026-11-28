@@ -1,6 +1,7 @@
 import type { AccessPower } from "@repo/contracts/elise";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
+import { callerUserId } from "#/lib/caller";
 import { ForbiddenError, UnauthorizedError, ValidationError } from "#/lib/errors";
 import { AccountHeaderSchema } from "#/modules/scans/schemas";
 import type { AppEnv } from "#/types/variables";
@@ -13,7 +14,7 @@ import type { AppEnv } from "#/types/variables";
 // user's session.
 // -----
 export const signedInUserId = async (c: Context<AppEnv>): Promise<string> => {
-  const userId = await c.get("deps").sessionUserId(c);
+  const userId = await callerUserId(c);
   if (!userId) throw new UnauthorizedError();
   return userId;
 };

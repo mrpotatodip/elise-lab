@@ -1,4 +1,5 @@
 import { createMiddleware } from "hono/factory";
+import { callerUserId } from "#/lib/caller";
 import { ForbiddenError, UnauthorizedError, ValidationError } from "#/lib/errors";
 import { AccountHeaderSchema } from "#/modules/scans/schemas";
 import type { AppEnv } from "#/types/variables";
@@ -11,7 +12,7 @@ import type { AppEnv } from "#/types/variables";
 // -----
 export const requireAccountMember = createMiddleware<AppEnv>(async (c, next) => {
   const deps = c.get("deps");
-  const userId = await deps.sessionUserId(c);
+  const userId = await callerUserId(c);
   if (!userId) throw new UnauthorizedError();
 
   const header = AccountHeaderSchema.safeParse({ "x-account-id": c.req.header("x-account-id") });

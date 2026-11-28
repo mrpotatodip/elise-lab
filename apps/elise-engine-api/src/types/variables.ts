@@ -5,6 +5,7 @@ import type { PoolDbType, TenantDbType } from "#/lib/db-connection";
 import type { StripeGateway } from "#/modules/stripe/types";
 import type { TypeSafeGateway } from "#/modules/typesafe";
 import type { DbError, Invalid } from "#/lib/effect-query";
+import type { CliAccessIdentity } from "#/modules/cli-access";
 import type { ScanArchiveLink } from "#/modules/archives/queries";
 import type { HoldResult, SettleResult } from "#/modules/credit";
 import type { ScanRepo } from "#/modules/scan-ledger";
@@ -81,6 +82,7 @@ export type AppDeps = {
   teardownScan: (env: Bindings, scanId: string) => Promise<ScanUsage | null>;
   sessionUserId: (c: Context<AppEnv>) => Promise<string | undefined>;
   runnerIdentity: (c: Context<AppEnv>, token: string) => Promise<RunnerIdentity | null>;
+  cliAccess: (c: Context<AppEnv>, token: string) => Promise<CliAccessIdentity | null>;
   userHasAccount: (c: Context<AppEnv>, userId: string, accountId: string) => Promise<boolean>;
   userHasPower: (c: Context<AppEnv>, userId: string, accountId: string, power: AccessPower) => Promise<boolean>;
   twoFactorSetupRequired: (c: Context<AppEnv>, userId: string) => Promise<boolean>;

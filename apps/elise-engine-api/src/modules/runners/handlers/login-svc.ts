@@ -12,6 +12,7 @@ import {
   type StartRunnerLoginBody,
 } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
+import { generateCliAccessToken, hashCliAccessToken } from "#/modules/cli-access";
 import { Forbidden, type DbError } from "#/lib/effect-query";
 import {
   RUNNER_LOGIN_CLEANUP_BATCH,
@@ -102,11 +103,13 @@ export const approveRunnerLoginSvc = (
       tenantId: accountId,
       actorUserId: userId,
       name: body.name,
+      runScans: body.runScans,
+      cliScope: body.cliScope,
       approverIp: ip,
       now: new Date(),
     });
     if (!approved) return yield* Effect.fail(new Forbidden({ message: RUNNER_LOGIN_INVALID }));
-    return { approved: true as const, runnerId: approved.runnerId };
+    return { approved: true as const, runnerId: approved.runnerId, cliScope: body.cliScope };
   });
 
 export const denyRunnerLoginSvc = (
@@ -140,15 +143,24 @@ export const checkRunnerLoginSvc = (
   body: CheckRunnerLoginBody,
 ): Effect.Effect<RunnerLoginCheck, Forbidden | DbError> =>
   Effect.gen(function* () {
-    const token = generateRunnerToken();
-    const [deviceCodeHash, tokenHash] = yield* Effect.promise(() =>
-      Promise.all([hashDeviceCode(body.deviceCode), hashRunnerToken(token)]),
+    const runnerToken = generateRunnerToken();
+    const cliAccessToken = generateCliAccessToken();
+    const [deviceCodeHash, runnerTokenHash, cliAccessTokenHash] = yield* Effect.promise(() =>
+      Promise.all([hashDeviceCode(body.deviceCode), hashRunnerToken(runnerToken), hashCliAccessToken(cliAccessToken)]),
     );
-    const result = yield* collectLoginEffect(db, deviceCodeHash, tokenHash, new Date());
+    const result = yield* collectLoginEffect(db, deviceCodeHash, { runnerTokenHash, cliAccessTokenHash }, new Date());
     if (result.kind === "missing") return yield* Effect.fail(new Forbidden({ message: RUNNER_LOGIN_INVALID }));
     if (result.kind === "pending") return { status: "pending" as const };
     if (result.kind === "denied") return { status: "denied" as const };
     if (result.kind === "expired") return { status: "expired" as const };
     if (result.kind === "slow_down") return { status: "slow_down" as const, interval: result.interval };
-    return { status: "approved" as const, ...result.identity, token };
+    return {
+      status: "approved" as const,
+      accountId: result.accountId,
+      accountName: result.accountName,
+      runnerId: result.runner?.runnerId,
+      name: result.runner?.name,
+      token: result.runner ? runnerToken : undefined,
+      cliAccess: result.cliAccess ? { ...result.cliAccess, token: cliAccessToken } : undefined,
+    };
   });

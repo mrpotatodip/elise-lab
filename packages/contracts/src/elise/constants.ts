@@ -30,6 +30,11 @@ export const RUNNER_PAIRING_CODE_TTL_MS = 10 * 60 * 1000;
 export const RUNNER_TOKEN_BYTES = 32;
 
 // -----
+// CLI access: the token is 32 random bytes, like a Runner token.
+// -----
+export const CLI_ACCESS_TOKEN_BYTES = 32;
+
+// -----
 // A Runner login from the terminal: both codes work once, for
 // 10 minutes. The device code is 32 random bytes only the Runner
 // sees. The suggested fields are capped so one start cannot fill

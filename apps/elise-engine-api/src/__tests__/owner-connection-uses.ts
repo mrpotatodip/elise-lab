@@ -12,9 +12,9 @@
 // -----
 export const OWNER_CONNECTION_USES = {
   "lib/app-deps.ts": {
-    uses: 10,
+    uses: 12,
     reason:
-      "The membership checks and the Two-factor gate read a person's Roles across Accounts before one is chosen; a Runner token names the Runner, and only the Runner row names its Account; Stripe's webhook has no session, so only the event names its Account",
+      "The membership checks and the Two-factor gate read a person's Roles across Accounts before one is chosen; a Runner token names the Runner, and only the Runner row names its Account; a CLI access token names its row, and only the row names its Account and person; Stripe's webhook has no session, so only the event names its Account",
   },
   "lib/auth.ts": { uses: 2, reason: "better-auth reads users and sessions before any Account is known" },
   "lib/db-connection.ts": { uses: 3, reason: "Defines the owner connections the other entries open" },

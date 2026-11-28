@@ -26,9 +26,12 @@ const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
 const start = () => run(startRunnerLoginSvc(test.http, START, { ip: "203.0.113.7", dashboardUrl: DASHBOARD }));
 const approveEffect = (userCode: string, name: string) =>
   asTenantEffect(test, tenantId, (db) =>
-    approveRunnerLoginSvc(db, tenantId, userId, "198.51.100.9", { userCode, name }),
+    approveRunnerLoginSvc(db, tenantId, userId, "198.51.100.9", { userCode, name, runScans: true, cliScope: null }),
   );
-const approve = (userCode: string, name = "Build box") => run(approveEffect(userCode, name));
+const approve = async (userCode: string, name = "Build box") => {
+  const approved = await run(approveEffect(userCode, name));
+  return { ...approved, runnerId: approved.runnerId ?? "" };
+};
 const refusedApproval = (userCode: string) =>
   run(Effect.flip(approveEffect(userCode, "Build box")).pipe(Effect.map((error) => error._tag)));
 const check = (deviceCode: string) => run(checkRunnerLoginSvc(test.http, { deviceCode }));
@@ -206,12 +209,13 @@ describe("collecting the token", () => {
       accountId: tenantId,
       accountName: "acme",
     });
-    expect(first.token).toMatch(/^elr_/);
+    const token = first.token ?? "";
+    expect(token).toMatch(/^elr_/);
     const [row] = await test.raw.select().from(tenantRunners).where(eq(tenantRunners.id, approved.runnerId));
-    expect(row?.tokenHash).toBe(await hashRunnerToken(first.token));
-    expect(JSON.stringify(row)).not.toContain(first.token);
+    expect(row?.tokenHash).toBe(await hashRunnerToken(token));
+    expect(JSON.stringify(row)).not.toContain(token);
     expect(await refusedCheck(started.deviceCode)).toBe("Forbidden");
-    const identity = await run(runnerIdentitySvc(test.http, first.token));
+    const identity = await run(runnerIdentitySvc(test.http, token));
     expect(identity).toMatchObject({ runnerId: approved.runnerId, accountId: tenantId });
     expect(await run(claimJobSvc(test.http, approved.runnerId))).toBeNull();
   });

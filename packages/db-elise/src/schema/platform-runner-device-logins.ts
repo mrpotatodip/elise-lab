@@ -1,6 +1,11 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { RUNNER_LOGIN_STATE_VALUES, type RunnerLoginStateValue } from "@repo/contracts/elise";
+import { boolean, check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  CLI_ACCESS_SCOPE_VALUES,
+  RUNNER_LOGIN_STATE_VALUES,
+  type CliAccessScopeValue,
+  type RunnerLoginStateValue,
+} from "@repo/contracts/elise";
 import { partyPersons } from "./party";
 import { tenantRunners } from "./tenant-runners";
 import { tenants } from "./tenant";
@@ -34,6 +39,15 @@ export const platformRunnerDeviceLogins = pgTable(
     runnerId: uuid("runner_id").references(() => tenantRunners.id, { onDelete: "cascade" }),
     approvedBy: uuid("approved_by").references(() => partyPersons.partyId, { onDelete: "restrict" }),
     approverIp: text("approver_ip"),
+    // -----
+    // The approval's choices: whether a Runner is connected, and the
+    // CLI access scope to give (null: none). approved_name is the
+    // name the member chose, for the CLI access made when the login
+    // is collected.
+    // -----
+    runScans: boolean("run_scans").notNull().default(true),
+    cliScope: text("cli_scope").$type<CliAccessScopeValue>(),
+    approvedName: text("approved_name"),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     collectedAt: timestamp("collected_at", { withTimezone: true }),
     lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
@@ -44,6 +58,10 @@ export const platformRunnerDeviceLogins = pgTable(
     uqUserCodeHash: uniqueIndex("uq_platform_runner_device_logins_user_code_hash").on(t.userCodeHash),
     uqDeviceCodeHash: uniqueIndex("uq_platform_runner_device_logins_device_code_hash").on(t.deviceCodeHash),
     chkState: check("platform_runner_device_logins_state", sql`${t.state} in (${inList(RUNNER_LOGIN_STATE_VALUES)})`),
+    chkCliScope: check(
+      "platform_runner_device_logins_cli_scope",
+      sql`${t.cliScope} is null or ${t.cliScope} in (${inList(CLI_ACCESS_SCOPE_VALUES)})`,
+    ),
     idxExpires: index("idx_platform_runner_device_logins_expires_at").on(t.expiresAt),
   }),
 );

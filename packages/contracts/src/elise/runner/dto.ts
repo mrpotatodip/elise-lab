@@ -14,6 +14,7 @@ import {
   RUNNER_NAME_MAX,
   RUNNER_PAIRING_CODE_MAX,
 } from "../constants";
+import { CliAccessGrantableScopeSchema, CliAccessGrantSchema } from "../cli-access";
 import { RUNNER_JOB_PHASE_VALUES, RUNNER_JOB_STATE_VALUES, type RunnerJobSourceValue } from "../enums";
 import { SCAN_PROFILES } from "../scan/dto";
 import { SCAN_SCOPE_PATHS_MAX } from "../scan/scope-paths";
@@ -226,14 +227,31 @@ export const StartedRunnerLoginSchema = z.object({
   expiresAt: z.iso.datetime(),
 });
 
+// -----
+// The two choices of the approval page. runScans: connect this
+// computer as a Runner (the default, so an older dashboard that
+// sends neither field changes nothing). cliScope: also give the
+// Elise CLI access to the Account with this scope, or null for none.
+// At least one must be chosen: the engine answers 400 otherwise.
+// The approver's Role must hold the Power for each choice: the
+// Runner Power for runScans, and for a scope the Dashboard Power
+// (the Summary Power is enough for read, so a Watcher gets read at
+// most). The name labels the Runner and the CLI access alike.
+// -----
 export const ApproveRunnerLoginBodySchema = z.object({
   userCode: z.string().trim().min(1).max(RUNNER_LOGIN_USER_CODE_MAX),
   name: z.string().trim().min(1).max(RUNNER_NAME_MAX),
+  runScans: z.boolean().default(true),
+  cliScope: CliAccessGrantableScopeSchema.nullable().default(null),
 });
 
+// -----
+// runnerId is null when the approval did not connect a Runner.
+// -----
 export const ApprovedRunnerLoginSchema = z.object({
   approved: z.literal(true),
-  runnerId: RunnerIdSchema,
+  runnerId: RunnerIdSchema.nullable(),
+  cliScope: CliAccessGrantableScopeSchema.nullable(),
 });
 
 export const RunnerLoginLookupQuerySchema = z.object({
@@ -253,9 +271,26 @@ export const CheckRunnerLoginBodySchema = z.object({
   deviceCode: z.string().trim().min(1).max(RUNNER_LOGIN_DEVICE_CODE_MAX),
 });
 
+// -----
+// An approved check carries what the approval chose, collected once.
+// accountId and accountName are always there. runnerId, name and
+// token (the Runner token) are there when the approval connected a
+// Runner, which is every approval an older dashboard made. cliAccess
+// is there when it gave CLI access.
+// -----
+export const ApprovedRunnerLoginCheckSchema = z.object({
+  status: z.literal("approved"),
+  accountId: z.uuid(),
+  accountName: z.string(),
+  runnerId: RunnerIdSchema.optional(),
+  name: z.string().optional(),
+  token: z.string().optional(),
+  cliAccess: CliAccessGrantSchema.optional(),
+});
+
 export const RunnerLoginCheckSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("pending") }),
-  EnrolledRunnerSchema.extend({ status: z.literal("approved") }),
+  ApprovedRunnerLoginCheckSchema,
   z.object({ status: z.literal("denied") }),
   z.object({ status: z.literal("expired") }),
   z.object({ status: z.literal("slow_down"), interval: z.number().int().positive() }),
@@ -291,6 +326,7 @@ export type ApprovedRunnerLogin = z.infer<typeof ApprovedRunnerLoginSchema>;
 export type RunnerLoginLookupQuery = z.infer<typeof RunnerLoginLookupQuerySchema>;
 export type PendingRunnerLogin = z.infer<typeof PendingRunnerLoginSchema>;
 export type CheckRunnerLoginBody = z.infer<typeof CheckRunnerLoginBodySchema>;
+export type ApprovedRunnerLoginCheck = z.infer<typeof ApprovedRunnerLoginCheckSchema>;
 export type RunnerLoginCheck = z.infer<typeof RunnerLoginCheckSchema>;
 export type DenyRunnerLoginBody = z.infer<typeof DenyRunnerLoginBodySchema>;
 export type DeniedRunnerLogin = z.infer<typeof DeniedRunnerLoginSchema>;

@@ -86,9 +86,10 @@ export const approveRunnerLoginDoc = describeRoute({
     context:
       "A signed-in member opens the link, picks an Account where they may add Runners, and names the Runner. The Runner then collects its token.",
     steps: [
-      "The Worker checks the session and that the Role in the account named by `x-account-id` holds `company:runners:create`.",
+      "The body carries two choices: `runScans` (default true) connects the computer as a Runner, and `cliScope` (`read`, `start` or null) also gives the Elise CLI access to the account. At least one is needed, or the Worker answers 400.",
+      "The Worker checks the session and that the Role in the account named by `x-account-id` holds `company:runners:create` for `runScans`, and for a `cliScope` the Dashboard Power (the Summary Power is enough for `read`, so a Watcher gets read at most). A Role without the Power gets a 403.",
       "In the Account's transaction the Worker finds a login that is pending and unexpired and marks it approved, with the approver and the approver's IP.",
-      "The Worker adds the Runner to the Account with no token yet. A code that matches no live login gets a 403 and nothing is kept.",
+      "The Worker adds the Runner to the Account with no token yet when `runScans` is true. The CLI access is made when the CLI collects the login, so its token is shown once with the Runner's. A code that matches no live login gets a 403 and nothing is kept.",
     ],
     example: [
       "Approve:",
@@ -97,9 +98,9 @@ export const approveRunnerLoginDoc = describeRoute({
         '  -H "authorization: Bearer $SESSION_TOKEN" \\',
         `  -H "x-account-id: ${EXAMPLE_ACCOUNT_ID}" \\`,
         '  -H "Content-Type: application/json" \\',
-        `  -d '{"userCode":"K7QM-4TXD","name":"Build box"}'`,
+        `  -d '{"userCode":"K7QM-4TXD","name":"Build box","runScans":true,"cliScope":"read"}'`,
       ),
-      json(`{ "data": { "approved": true, "runnerId": "${RUNNER_ID}" }, "error": null }`),
+      json(`{ "data": { "approved": true, "runnerId": "${RUNNER_ID}", "cliScope": "read" }, "error": null }`),
     ],
   }),
   responses: {

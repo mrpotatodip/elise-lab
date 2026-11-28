@@ -36,6 +36,7 @@ describe("GET /openapi.json", () => {
         .map(({ route }) => route)
         .toSorted(),
     ).toEqual([
+      "DELETE /cli-access/{cliAccessId}",
       "DELETE /findings/comments/{commentId}",
       "DELETE /groups/{groupId}",
       "DELETE /groups/{groupId}/members/{partyId}",
@@ -46,6 +47,7 @@ describe("GET /openapi.json", () => {
       "DELETE /runners/{runnerId}",
       "DELETE /team/invites/{inviteId}",
       "DELETE /usage/anthropic-key",
+      "GET /cli-access",
       "GET /files",
       "GET /findings",
       "GET /findings/comments",
@@ -142,6 +144,7 @@ describe("GET /openapi.json", () => {
         "scans",
         "files",
         "runners",
+        "cli-access",
         "findings",
         "usage",
         "me",

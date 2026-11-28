@@ -1,11 +1,15 @@
 import { and, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 import { Effect } from "effect";
-import { platformRunnerDeviceLogins, tenantRunners } from "@repo/db-elise";
-import { RUNNER_LOGIN_SLOW_DOWN_STEP_S, type PendingRunnerLogin, type RunnerIdentity } from "@repo/contracts/elise";
+import { platformRunnerDeviceLogins, tenantCliAccess, tenantRunners, tenants } from "@repo/db-elise";
+import {
+  RUNNER_LOGIN_SLOW_DOWN_STEP_S,
+  type CliAccessScope,
+  type PendingRunnerLogin,
+  type RunnerIdentity,
+} from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
-import { identityOrNull } from "./runner-queries";
 import type { NewRunnerLogin, RunnerLoginApproval, RunnerLoginDenial } from "#/modules/runners/types";
 
 export type LoginCollection =
@@ -14,11 +18,24 @@ export type LoginCollection =
   | { kind: "denied" }
   | { kind: "expired" }
   | { kind: "slow_down"; interval: number }
-  | { kind: "collected"; identity: RunnerIdentity };
+  | {
+      kind: "collected";
+      accountId: string;
+      accountName: string;
+      runner: RunnerIdentity | null;
+      cliAccess: { id: string; name: string; scope: CliAccessScope } | null;
+    };
 
 type LoginAttempt =
   | Exclude<LoginCollection, { kind: "collected" }>
-  | { kind: "collected"; rows: { id: string; name: string; tenantId: string }[] };
+  | {
+      kind: "collected";
+      accountId: string;
+      runnerRows: { id: string; name: string; tenantId: string }[];
+      cliAccess: { id: string; name: string; scope: CliAccessScope } | null;
+    };
+
+export type CollectTokens = { runnerTokenHash: string; cliAccessTokenHash: string };
 
 export const startLoginEffect = (db: DbConnectType, login: NewRunnerLogin): Effect.Effect<void, DbError> =>
   Effect.tryPromise({
@@ -70,7 +87,7 @@ export const findPendingLoginEffect = (
 export const approveLoginEffect = (
   db: AppDbType,
   approval: RunnerLoginApproval,
-): Effect.Effect<{ runnerId: string } | null, DbError> =>
+): Effect.Effect<{ runnerId: string | null } | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const createdBy = await actorPartyOf(db, approval.actorUserId);
@@ -83,6 +100,9 @@ export const approveLoginEffect = (
           approvedBy: createdBy,
           approverIp: approval.approverIp,
           approvedAt: approval.now,
+          runScans: approval.runScans,
+          cliScope: approval.cliScope,
+          approvedName: approval.name,
         })
         .where(
           and(
@@ -97,23 +117,32 @@ export const approveLoginEffect = (
           requestIp: platformRunnerDeviceLogins.requestIp,
         });
       if (!login) return null;
-      const [runner] = await db
-        .insert(tenantRunners)
-        .values({ tenantId: approval.tenantId, name: approval.name, pairingExpiresAt: login.expiresAt, createdBy })
-        .returning({ id: tenantRunners.id });
-      if (!runner) return null;
-      await db
-        .update(platformRunnerDeviceLogins)
-        .set({ runnerId: runner.id })
-        .where(eq(platformRunnerDeviceLogins.id, login.id));
+      const [runner] = approval.runScans
+        ? await db
+            .insert(tenantRunners)
+            .values({ tenantId: approval.tenantId, name: approval.name, pairingExpiresAt: login.expiresAt, createdBy })
+            .returning({ id: tenantRunners.id })
+        : [];
+      if (approval.runScans && !runner) return null;
+      if (runner)
+        await db
+          .update(platformRunnerDeviceLogins)
+          .set({ runnerId: runner.id })
+          .where(eq(platformRunnerDeviceLogins.id, login.id));
       await insertAuditEntry(db, {
         actorPartyId: createdBy,
         action: "runner.login.approve",
-        subjectId: runner.id,
+        subjectId: runner?.id ?? login.id,
         tenantId: approval.tenantId,
-        after: { name: approval.name, requestIp: login.requestIp, approverIp: approval.approverIp },
+        after: {
+          name: approval.name,
+          requestIp: login.requestIp,
+          approverIp: approval.approverIp,
+          runScans: approval.runScans,
+          cliScope: approval.cliScope,
+        },
       });
-      return { runnerId: runner.id };
+      return { runnerId: runner?.id ?? null };
     },
     catch: toDbError,
   });
@@ -131,7 +160,7 @@ export const approveLoginEffect = (
 export const collectLoginEffect = (
   db: DbConnectType,
   deviceCodeHash: string,
-  tokenHash: string,
+  tokens: CollectTokens,
   now: Date,
 ): Effect.Effect<LoginCollection, DbError> =>
   Effect.tryPromise({
@@ -141,6 +170,13 @@ export const collectLoginEffect = (
           id: platformRunnerDeviceLogins.id,
           state: platformRunnerDeviceLogins.state,
           runnerId: platformRunnerDeviceLogins.runnerId,
+          runScans: platformRunnerDeviceLogins.runScans,
+          cliScope: platformRunnerDeviceLogins.cliScope,
+          approvedName: platformRunnerDeviceLogins.approvedName,
+          suggestedName: platformRunnerDeviceLogins.suggestedName,
+          approvedBy: platformRunnerDeviceLogins.approvedBy,
+          approvedAt: platformRunnerDeviceLogins.approvedAt,
+          tenantId: platformRunnerDeviceLogins.tenantId,
           expiresAt: platformRunnerDeviceLogins.expiresAt,
           lastCheckedAt: platformRunnerDeviceLogins.lastCheckedAt,
           interval: platformRunnerDeviceLogins.checkIntervalSeconds,
@@ -170,27 +206,69 @@ export const collectLoginEffect = (
       if (tooEarly) return { kind: "slow_down", interval };
       if (login.state === "pending") return { kind: "pending" };
       if (login.state === "denied") return { kind: "denied" };
-      if (login.state !== "approved" || !login.runnerId) return { kind: "missing" };
-      const rows = await db
-        .update(tenantRunners)
-        .set({ tokenHash, pairingExpiresAt: null, pairedAt: now, lastSeenAt: now })
-        .where(
-          and(eq(tenantRunners.id, login.runnerId), isNull(tenantRunners.tokenHash), isNull(tenantRunners.revokedAt)),
-        )
-        .returning({ id: tenantRunners.id, name: tenantRunners.name, tenantId: tenantRunners.tenantId });
-      if (rows.length === 0) return { kind: "missing" };
-      await db
+      const { tenantId, approvedBy } = login;
+      if (login.state !== "approved" || !tenantId || !approvedBy) return { kind: "missing" };
+      if (login.runScans && !login.runnerId) return { kind: "missing" };
+      const runnerRows =
+        login.runScans && login.runnerId
+          ? await db
+              .update(tenantRunners)
+              .set({ tokenHash: tokens.runnerTokenHash, pairingExpiresAt: null, pairedAt: now, lastSeenAt: now })
+              .where(
+                and(
+                  eq(tenantRunners.id, login.runnerId),
+                  isNull(tenantRunners.tokenHash),
+                  isNull(tenantRunners.revokedAt),
+                ),
+              )
+              .returning({ id: tenantRunners.id, name: tenantRunners.name, tenantId: tenantRunners.tenantId })
+          : [];
+      if (login.runScans && runnerRows.length === 0) return { kind: "missing" };
+      const claimed = await db
         .update(platformRunnerDeviceLogins)
         .set({ state: "collected", collectedAt: now })
-        .where(eq(platformRunnerDeviceLogins.id, login.id));
-      return { kind: "collected", rows };
+        .where(and(eq(platformRunnerDeviceLogins.id, login.id), eq(platformRunnerDeviceLogins.state, "approved")))
+        .returning({ id: platformRunnerDeviceLogins.id });
+      if (claimed.length === 0) return { kind: "missing" };
+      const cliName = login.approvedName ?? login.suggestedName;
+      const [cliRow] = login.cliScope
+        ? await db
+            .insert(tenantCliAccess)
+            .values({
+              tenantId,
+              personId: approvedBy,
+              name: cliName,
+              scope: login.cliScope,
+              tokenHash: tokens.cliAccessTokenHash,
+              approvedAt: login.approvedAt ?? now,
+            })
+            .returning({ id: tenantCliAccess.id })
+        : [];
+      const cliAccess = login.cliScope && cliRow ? { id: cliRow.id, name: cliName, scope: login.cliScope } : null;
+      return { kind: "collected", accountId: tenantId, runnerRows, cliAccess };
     },
     catch: toDbError,
   }).pipe(
     Effect.flatMap((attempt): Effect.Effect<LoginCollection, DbError> => {
       if (attempt.kind !== "collected") return Effect.succeed(attempt);
-      return identityOrNull(db, attempt.rows).pipe(
-        Effect.map((identity): LoginCollection => (identity ? { kind: "collected", identity } : { kind: "missing" })),
+      return Effect.tryPromise({
+        try: () => db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, attempt.accountId)),
+        catch: toDbError,
+      }).pipe(
+        Effect.map(([tenant]): LoginCollection => ({
+          kind: "collected",
+          accountId: attempt.accountId,
+          accountName: tenant?.name ?? "",
+          runner: attempt.runnerRows[0]
+            ? {
+                runnerId: attempt.runnerRows[0].id,
+                name: attempt.runnerRows[0].name,
+                accountId: attempt.accountId,
+                accountName: tenant?.name ?? "",
+              }
+            : null,
+          cliAccess: attempt.cliAccess,
+        })),
       );
     }),
   );

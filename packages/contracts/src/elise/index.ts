@@ -21,6 +21,7 @@ export * from "./verdict";
 export * from "./file";
 export * from "./gitlab";
 export * from "./gitlab-sh";
+export * from "./cli-access";
 export * from "./runner";
 export * from "./trace";
 export * from "./live-finding";
