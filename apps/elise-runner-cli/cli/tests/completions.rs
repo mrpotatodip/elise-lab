@@ -41,6 +41,37 @@ fn each_shell_script_completes_every_command_flag_and_topic_in_the_table() {
     }
 }
 
+fn on_path(shell: &str) -> Option<std::path::PathBuf> {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .map(|folder| folder.join(format!("{shell}{}", std::env::consts::EXE_SUFFIX)))
+        .find(|candidate| candidate.is_file())
+}
+
+#[test]
+fn each_shell_script_passes_its_own_shells_syntax_check_where_the_shell_is_installed() {
+    let runner = runner();
+    let mut checked = vec![];
+    for shell in ["bash", "zsh", "fish"] {
+        let Some(binary) = on_path(shell) else {
+            continue;
+        };
+        let script = runner.run(&["completions", shell], "").stdout;
+        let mut child = std::process::Command::new(binary)
+            .arg("-n")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        std::io::Write::write_all(&mut child.stdin.take().unwrap(), script.as_bytes()).unwrap();
+        let checked_output = child.wait_with_output().unwrap();
+        assert!(checked_output.status.success(), "{shell} -n rejects the script: {}", String::from_utf8_lossy(&checked_output.stderr));
+        checked.push(shell);
+    }
+    assert!(checked.contains(&"bash"), "bash is not on PATH");
+}
+
 #[test]
 fn an_unknown_shell_exits_2_and_lists_the_supported_ones() {
     let output = runner().run(&["completions", "powershell"], "");

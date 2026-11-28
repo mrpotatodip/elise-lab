@@ -61,6 +61,20 @@ fn pair_with_yes_saves_the_token_and_status_reports_connected() {
 }
 
 #[test]
+fn a_runner_paired_by_the_old_elise_runner_token_file_is_still_paired() {
+    let engine = Engine::start();
+    let before = Runner::new(&engine);
+    assert_eq!(before.run(&["pair", CODE, "--yes"], "").code, 0);
+    let after = Runner::new(&engine);
+    std::fs::write(after.home.join("token"), format!("{}\n", engine.tokens()[0])).unwrap();
+
+    let status = after.run(&["status"], "");
+
+    assert_eq!(status.code, 0, "{}{}", status.stdout, status.stderr);
+    assert!(status.stdout.contains("connected") && status.stdout.contains(RUNNER_NAME), "{}", status.stdout);
+}
+
+#[test]
 fn pair_answered_no_revokes_the_token_and_saves_nothing() {
     let engine = Engine::start();
     let mut runner = Runner::new(&engine);
