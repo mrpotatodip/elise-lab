@@ -8,6 +8,8 @@ export {
   RunnerRemovedSchema,
   RunnersSchema,
 } from "@repo/contracts/elise";
+export { CliAccessListSchema, CliAccessParamSchema, CliAccessRevokedSchema } from "@repo/contracts/elise";
+export type { CliAccess, CliAccessList } from "@repo/contracts/elise";
 export type { CreatedRunner, Runner, RunnerState, Runners } from "@repo/contracts/elise";
 
 // -----

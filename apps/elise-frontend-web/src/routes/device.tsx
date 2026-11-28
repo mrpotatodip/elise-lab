@@ -6,7 +6,7 @@ import { DeviceApproval, DeviceUnusable, deviceLoginQuery } from "#/modules/devi
 const SearchSchema = z.object({ code: z.string().optional() });
 
 export const Route = createFileRoute("/device")({
-  head: () => ({ meta: [{ title: "Connect a Runner · Elise" }] }),
+  head: () => ({ meta: [{ title: "Approve a login · Elise" }] }),
   validateSearch: SearchSchema,
   beforeLoad: ({ context, search }) => {
     if (context.user?.twoFactorSetupRequired) throw redirect({ to: "/two-factor-setup" });

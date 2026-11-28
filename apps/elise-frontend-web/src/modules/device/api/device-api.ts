@@ -13,7 +13,8 @@ import {
   type DeviceLoginView,
   type PendingRunnerLogin,
 } from "../schemas";
-import { runnerAccounts } from "../utils";
+import { DEVICE_COPY } from "../constants";
+import { approvalBody, clampChoices, deviceAccounts } from "../utils";
 
 const UNUSABLE_CODE_STATUSES = new Set([400, 403, 404]);
 
@@ -42,7 +43,7 @@ export const fetchDeviceLogin = createServerFn({ method: "GET" })
     const me = await engineJson(MeSchema, "/me", {}, { token });
     return {
       login: await lookupLogin(token, data.code),
-      accounts: runnerAccounts(me.accounts),
+      accounts: deviceAccounts(me.accounts),
       yourIp: getRequestHeader("cf-connecting-ip") ?? null,
     };
   });
@@ -56,9 +57,12 @@ export const approveDeviceLogin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { token } = await requireSession();
     const me = await engineJson(MeSchema, "/me", {}, { token });
-    if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId))
-      throw new Error("You can't add a Runner to this account.");
-    const body = JSON.stringify({ userCode: data.userCode, name: data.name });
+    const account = deviceAccounts(me.accounts).find((listed) => listed.id === data.accountId);
+    if (!account) throw new Error("You can't approve a login for this account.");
+    const sent = clampChoices(account, { runScans: data.runScans, cli: data.cliScope ?? "none" });
+    if (sent.runScans !== data.runScans || sent.cli !== (data.cliScope ?? "none"))
+      throw new Error(DEVICE_COPY.roleLimit);
+    const body = JSON.stringify(approvalBody({ userCode: data.userCode, name: data.name, ...sent }));
     return engineJson(ApprovedRunnerLoginSchema, "/runners/login/approve", jsonPost(body), {
       token,
       accountId: data.accountId,
@@ -74,8 +78,8 @@ export const denyDeviceLogin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { token } = await requireSession();
     const me = await engineJson(MeSchema, "/me", {}, { token });
-    if (!runnerAccounts(me.accounts).some((account) => account.id === data.accountId))
-      throw new Error("You can't deny a Runner login for this account.");
+    if (!deviceAccounts(me.accounts).some((account) => account.id === data.accountId))
+      throw new Error("You can't deny a login for this account.");
     const body = JSON.stringify({ userCode: data.userCode });
     return engineJson(DeniedRunnerLoginSchema, "/runners/login/deny", jsonPost(body), {
       token,

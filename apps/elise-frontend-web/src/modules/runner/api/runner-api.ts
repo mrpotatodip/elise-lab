@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { engineJson, jsonPost } from "#/lib/engine-client";
 import { engineAuth } from "#/modules/auth/server/session";
 import {
+  CliAccessListSchema,
+  CliAccessParamSchema,
+  CliAccessRevokedSchema,
   CreatedRunnerSchema,
   CreateRunnerBodySchema,
   RunnerParamSchema,
@@ -12,6 +15,21 @@ import {
 export const fetchRunners = createServerFn({ method: "GET" }).handler(async () =>
   engineJson(RunnersSchema, "/runners", {}, await engineAuth()),
 );
+
+export const fetchCliAccess = createServerFn({ method: "GET" }).handler(async () =>
+  engineJson(CliAccessListSchema, "/cli-access", {}, await engineAuth()),
+);
+
+export const revokeCliAccess = createServerFn({ method: "POST" })
+  .validator(CliAccessParamSchema)
+  .handler(async ({ data }) =>
+    engineJson(
+      CliAccessRevokedSchema,
+      `/cli-access/${encodeURIComponent(data.cliAccessId)}`,
+      { method: "DELETE" },
+      await engineAuth(),
+    ),
+  );
 
 export const createRunner = createServerFn({ method: "POST" })
   .validator(CreateRunnerBodySchema)

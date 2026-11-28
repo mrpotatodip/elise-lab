@@ -1,5 +1,5 @@
 import { RUNNER_OFFLINE_AFTER_MS, type RUNNER_STATE_COPY } from "../constants";
-import type { Runner } from "../schemas";
+import type { CliAccess, Runner } from "../schemas";
 
 const WHEN = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -13,6 +13,14 @@ const WHEN = new Intl.DateTimeFormat("en", {
 export const runnerWhen = (iso: string): string => {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : `${WHEN.format(date)} UTC`;
+};
+
+export const cliAccessDetail = (access: CliAccess): string => {
+  const approved = access.approvedByName
+    ? `Approved by ${access.approvedByName}, ${runnerWhen(access.approvedAt)}.`
+    : `Approved ${runnerWhen(access.approvedAt)}.`;
+  const used = access.lastUsedAt === null ? "Not used yet." : `Last used ${runnerWhen(access.lastUsedAt)}.`;
+  return `${approved} ${used}`;
 };
 
 export const runnerShownState = (runner: Runner, nowMs: number): keyof typeof RUNNER_STATE_COPY => {

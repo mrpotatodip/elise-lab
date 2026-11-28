@@ -26,6 +26,15 @@ export const RUNNER_STATE_COPY = {
 } as const;
 
 // -----
+// What the person reads for each CLI access scope.
+// -----
+export const CLI_ACCESS_SCOPE_COPY = {
+  read: "Read only",
+  start: "Read and start",
+  admin: "Full access",
+} as const;
+
+// -----
 // A paired Runner that is running asks for work every few seconds. One not
 // seen for this long is shown as not running, though it stays paired.
 // -----
