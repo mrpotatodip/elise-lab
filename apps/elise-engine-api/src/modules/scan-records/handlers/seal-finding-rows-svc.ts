@@ -22,12 +22,14 @@ export const sealFindingRowsSvc = (
     return yield* Effect.tryPromise({
       try: () =>
         Promise.all(
-          rows.map(async (row) =>
-            sealFindingText(sealer, {
+          rows.map(async (row) => {
+            const hmac = await sealer.fingerprint(row.findingId);
+            return sealFindingText(sealer, {
               ...row,
-              fingerprint: legacy.has(row.fingerprint) ? row.fingerprint : await sealer.fingerprint(row.findingId),
-            }),
-          ),
+              fingerprint: legacy.has(row.fingerprint) ? row.fingerprint : hmac,
+              fingerprintHmac: hmac,
+            });
+          }),
         ),
       catch: toExternalError,
     });

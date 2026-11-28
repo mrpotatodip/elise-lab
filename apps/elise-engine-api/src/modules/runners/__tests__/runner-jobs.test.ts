@@ -6,7 +6,7 @@ import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/el
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
-import { jobStateSvc } from "#/modules/runners/handlers";
+import { claimJobSvc as claimJobUnkeyed, jobStateSvc } from "#/modules/runners/handlers";
 import { claimJobSvc, jobArchiveSvc, neonScanRepo, reportJobSvc, runnerSandbox } from "#/__tests__/keyed-test-deps";
 import { buildScanRecordSvc, writeScanRecordEffect } from "#/modules/scan-records";
 import { saveScanFilesEffect } from "#/modules/scan-store";
@@ -111,6 +111,18 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await test.close();
+});
+
+describe("claiming a job with no usable master key", () => {
+  it("fails and leaves the job queued for the next poll", async () => {
+    const scanId = await queue(await newScan());
+
+    const failed = await Effect.runPromiseExit(claimJobUnkeyed(test.http, runnerId));
+    const claimed = await run(claimJobSvc(test.http, runnerId));
+
+    expect(failed._tag).toBe("Failure");
+    expect(claimed?.scanId).toBe(scanId);
+  });
 });
 
 describe("claiming a job", () => {

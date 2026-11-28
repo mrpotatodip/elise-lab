@@ -1,3 +1,5 @@
+export const UNMAPPED_HMAC = "unmapped";
+
 export type BackfillColumn = { name: string; unless?: string };
 
 export type BackfillStep = {

@@ -17,7 +17,7 @@ export const lockScanStatusEffect = (
         .select({ status: scans.status, repoId: scans.repoId })
         .from(scans)
         .where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId)))
-        .for("share")
+        .for("update")
         .then(([row]) => row ?? null),
     catch: toDbError,
   });
@@ -25,11 +25,11 @@ export const lockScanStatusEffect = (
 export const liveFindingIdsEffect = (
   db: AppDbType,
   scanId: string,
-): Effect.Effect<{ id: string; findingId: string }[], DbError> =>
+): Effect.Effect<{ id: string; fingerprint: string }[], DbError> =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ id: scanFindings.id, findingId: scanFindings.findingId })
+        .select({ id: scanFindings.id, fingerprint: scanFindings.fingerprint })
         .from(scanFindings)
         .where(eq(scanFindings.scanId, scanId)),
     catch: toDbError,

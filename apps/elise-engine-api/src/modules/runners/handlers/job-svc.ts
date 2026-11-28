@@ -28,6 +28,7 @@ import {
   earlierScanIdsEffect,
   readRunnerJobEffect,
   recordRunnerSourcesEffect,
+  releaseRunnerJobEffect,
   reportRunnerJobEffect,
 } from "#/modules/runners/queries";
 import { archiveKeyEffect, scanArchiveOfEffect } from "#/modules/archives/queries";
@@ -101,7 +102,9 @@ const claimNextJob = (
     const now = new Date();
     const claimed = yield* claimRunnerJobEffect(db, runnerId, now, readsArchive);
     if (claimed === null) return null;
-    const sealer = yield* sealerEffect(db, masterKey, claimed.tenantId);
+    const sealer = yield* sealerEffect(db, masterKey, claimed.tenantId).pipe(
+      Effect.tapError(() => Effect.ignore(releaseRunnerJobEffect(db, claimed.scanId))),
+    );
     const unsealer = sealer.open;
     const row = yield* Effect.promise(() => openJobText(unsealer, claimed));
     if (row.prompt === CANNOT_READ || row.priorsJson === CANNOT_READ) {

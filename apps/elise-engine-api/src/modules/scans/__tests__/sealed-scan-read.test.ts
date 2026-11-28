@@ -99,20 +99,23 @@ describe("GET /scans/:scanId/files/:file with a sealed report", () => {
     const res = await callAs(app, acme, "/scans/sealed-scan/files/REPORT.md", {
       env: { ...fakeBindings().env, REPORTS: bucket },
     });
-    return res.text();
+    return { status: res.status, text: await res.text() };
   };
 
   it("opens a sealed report for its own Account", async () => {
     const sealed = await seal.bytes(await new Blob(["# Report"]).arrayBuffer());
 
-    expect(await readReport(sealed, true)).toBe("# Report");
+    expect(await readReport(sealed, true)).toEqual({ status: 200, text: "# Report" });
   });
 
   it("still serves a plain report", async () => {
-    expect(await readReport("# Plain report", false)).toBe("# Plain report");
+    expect(await readReport("# Plain report", false)).toEqual({ status: 200, text: "# Plain report" });
   });
 
-  it("shows 'cannot be read', not the sealed bytes, when the report will not open", async () => {
-    expect(await readReport("garbage bytes that are not sealed at all", true)).toBe("cannot be read");
+  it("answers 422, not the sealed bytes, when the report will not open", async () => {
+    const result = await readReport("garbage bytes that are not sealed at all", true);
+
+    expect(result.status).toBe(422);
+    expect(result.text).not.toContain("garbage");
   });
 });

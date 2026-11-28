@@ -100,7 +100,7 @@ export const listFindingsEffect = (
             triageFilter(query.triage),
           ),
         )
-        .orderBy(asc(severityRank), desc(scanFindings.createdAt), asc(scanFindings.fingerprint))
+        .orderBy(asc(severityRank), desc(scanFindings.createdAt), asc(scanFindings.fingerprint), asc(scanFindings.id))
         .limit(query.limit + 1)
         .offset(query.cursor ? Number(query.cursor) : 0);
       return Promise.all(

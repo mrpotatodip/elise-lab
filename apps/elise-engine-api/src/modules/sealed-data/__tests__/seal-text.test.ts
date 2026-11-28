@@ -79,6 +79,13 @@ describe("sealText and openText", () => {
     expect(await openText(dataKey, "other", sealed)).toBeNull();
   });
 
+  it("seals and opens a 1 MB value", async () => {
+    const { dataKey } = await keyOf();
+    const big = "x".repeat(1024 * 1024);
+
+    expect(await openText(dataKey, "acme", await sealText(dataKey, "acme", big))).toBe(big);
+  });
+
   it.each([
     ["no dot", "sealed:v1:garbage"],
     ["damaged data", "sealed:v1:AAAA.AAAA"],

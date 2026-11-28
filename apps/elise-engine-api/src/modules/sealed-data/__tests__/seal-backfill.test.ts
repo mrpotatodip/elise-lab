@@ -115,7 +115,15 @@ beforeAll(async () => {
     status: "false_positive",
     note: "plain note",
   });
+  await test.raw.insert(scanFindingTriage).values({
+    tenantId: acme,
+    repoId,
+    fingerprint: await sha256Hex("F-gone"),
+    status: "false_positive",
+    note: "note on a Finding that is gone",
+  });
   await test.raw.insert(scanFindingComments).values([
+    { tenantId: acme, repoId, fingerprint: await sha256Hex("F-gone"), body: "", deletedAt: new Date() },
     { tenantId: acme, repoId, fingerprint: await sha256Hex("F-1"), body: "plain comment" },
     { tenantId: acme, repoId, fingerprint: await sha256Hex("F-2"), body: await seal("sealed comment") },
   ]);
@@ -173,7 +181,7 @@ const plainTextLeft = async () => {
   return [
     ...findings.flatMap((row) => [row.findingId, row.title, row.class, row.impact]),
     ...triage.map((row) => row.note),
-    ...comments.map((row) => row.body),
+    ...comments.filter((row) => row.deletedAt === null).map((row) => row.body),
     ...jobs.flatMap((row) => [row.prompt, row.optionsJson, row.priorsJson]),
     ...ledger.map((row) => row.note),
     ...archives.map((row) => row.label),
@@ -203,7 +211,8 @@ describe("sealBackfillEffect", () => {
     expect(first.stopped).toBe(true);
     expect(second.stopped).toBe(false);
     expect(second.rows).toBeGreaterThan(0);
-    expect(third).toMatchObject({ rows: 0, objects: 0 });
+    expect(second.unmapped).toBeGreaterThanOrEqual(2);
+    expect(third).toMatchObject({ rows: 0, objects: 0, unmapped: 0, failed: 0 });
     expect(await plainTextLeft()).toEqual([]);
     expect(after).toEqual(before);
   });

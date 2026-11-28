@@ -7,7 +7,15 @@ export const SEALED_OBJECT_VERSION = "v1";
 
 export type DataKey = { enc: CryptoKey; mac: CryptoKey };
 
-const toBase64 = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes));
+const BASE64_CHUNK = 0x8000;
+
+const toBase64 = (bytes: Uint8Array): string => {
+  let binary = "";
+  for (let start = 0; start < bytes.length; start += BASE64_CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(start, start + BASE64_CHUNK));
+  }
+  return btoa(binary);
+};
 const fromBase64 = (text: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
 
 const toHex = (bytes: Uint8Array): string => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");

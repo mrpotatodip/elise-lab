@@ -43,27 +43,20 @@ export const saveLiveFindingsSvc = (
         Promise.all(records.map((record) => fullFindingRowOf(record, { accountId: runner.accountId, scanId }))),
       catch: toExternalError,
     });
+    const unique = [...new Map(rows.map((row) => [row.findingId, row])).values()];
+    const sealedAll = yield* sealFindingRowsSvc(db, sealer, runner.accountId, scan.repoId, unique);
     const stored = yield* liveFindingIdsEffect(db, scanId);
-    const rowOf = new Map(
-      yield* Effect.tryPromise({
-        try: () =>
-          Promise.all(
-            stored.map(async (row): Promise<[string, string]> => [await sealer.open.text(row.findingId), row.id]),
-          ),
-        catch: toExternalError,
-      }),
-    );
+    const rowOf = new Map(stored.map((row) => [row.fingerprint, row.id]));
     const room = Math.max(0, LIVE_FINDINGS_PER_SCAN_MAX - stored.length);
-    const kept = [
-      ...rows.filter((row) => rowOf.has(row.findingId)),
-      ...rows.filter((row) => !rowOf.has(row.findingId)).slice(0, room),
+    const sealed = [
+      ...sealedAll.filter((row) => rowOf.has(row.fingerprint)),
+      ...sealedAll.filter((row) => !rowOf.has(row.fingerprint)).slice(0, room),
     ];
-    const sealed = yield* sealFindingRowsSvc(db, sealer, runner.accountId, scan.repoId, kept);
 
     yield* replaceLiveFindingsEffect(
       db,
-      kept.flatMap((row) => rowOf.get(row.findingId) ?? []),
+      sealed.flatMap((row) => rowOf.get(row.fingerprint) ?? []),
       sealed,
     );
-    return { accepted: kept.length, dropped: body.findings.length - kept.length };
+    return { accepted: sealed.length, dropped: body.findings.length - sealed.length };
   });

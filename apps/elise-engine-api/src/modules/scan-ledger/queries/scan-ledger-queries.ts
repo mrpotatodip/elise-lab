@@ -36,6 +36,7 @@ type ScanRow = typeof scans.$inferSelect;
 
 const ACTIVE_SCAN_CONFLICT = "This repo already has an active scan";
 export const SCAN_ALREADY_ENDED = "This Scan already ended";
+export const SEAL_FAILED_ERROR = "the scan failed and its error could not be stored";
 
 // -----
 // The Runner each of these scans is on, from its job row. A scan
@@ -397,6 +398,10 @@ const scanWrites = (db: AppDbType, masterKey?: string): Omit<ScanRepo, "create">
             Effect.flatMap((sealer) =>
               Effect.tryPromise({ try: () => sealer.text(patch.error ?? ""), catch: toExternalError }),
             ),
+            Effect.catchTags({
+              ExternalError: () => Effect.succeed(SEAL_FAILED_ERROR),
+              DbError: () => Effect.succeed(SEAL_FAILED_ERROR),
+            }),
           );
     return sealedError.pipe(
       Effect.flatMap((error) =>

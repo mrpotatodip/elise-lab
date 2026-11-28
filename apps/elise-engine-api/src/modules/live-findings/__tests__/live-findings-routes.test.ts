@@ -189,15 +189,18 @@ describe("POST /runners/jobs/:scanId/findings", () => {
 
   it("drops a new fingerprint past the per-Scan cap but still updates one it holds", async () => {
     const { scanId } = await runnerScan();
-    const seeded = Array.from({ length: LIVE_FINDINGS_PER_SCAN_MAX }, (_, n) => ({
-      tenantId,
-      scanId,
-      findingId: `seed-${n}`,
-      fingerprint: `fp-${n}`,
-      status: "needs_validation" as const,
-      title: "seeded",
-      class: "full-audit",
-    }));
+    const sealer = await Effect.runPromise(sealerEffect(test.pool, TEST_DATA_MASTER_KEY, tenantId));
+    const seeded = await Promise.all(
+      Array.from({ length: LIVE_FINDINGS_PER_SCAN_MAX }, async (_, n) => ({
+        tenantId,
+        scanId,
+        findingId: `seed-${n}`,
+        fingerprint: await sealer.fingerprint(`seed-${n}`),
+        status: "needs_validation" as const,
+        title: "seeded",
+        class: "full-audit",
+      })),
+    );
     for (let at = 0; at < seeded.length; at += 250)
       await test.raw.insert(scanFindings).values(seeded.slice(at, at + 250));
     const res = SavedEnvelope.parse(

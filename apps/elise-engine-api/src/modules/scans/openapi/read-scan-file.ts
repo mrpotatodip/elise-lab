@@ -35,6 +35,6 @@ export const readScanFileDoc = describeRoute({
       description: "The file.",
       content: { "text/markdown": { schema: { type: "string" } }, "application/json": { schema: { type: "object" } } },
     },
-    ...errorResponses(400, 401, 404),
+    ...errorResponses(400, 401, 404, 422),
   },
 });

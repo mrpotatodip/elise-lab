@@ -14,6 +14,7 @@ import {
   BACKFILL_STEPS,
   CANNOT_READ,
   SEALED_OBJECT_METADATA,
+  UNMAPPED_HMAC,
   isSealed,
   type BackfillStep,
   type Sealer,
@@ -82,7 +83,10 @@ const planRowEffect = (
       state.failed += 1;
       return null;
     }
-    if (step.fingerprint === "mapped" && hmac === null) state.unmapped += 1;
+    if (step.fingerprint === "mapped" && hmac === null) {
+      state.unmapped += 1;
+      return { keys: row.keys, changes, hmac: UNMAPPED_HMAC };
+    }
     return changes.length === 0 && hmac === null ? null : { keys: row.keys, changes, hmac };
   });
 
