@@ -86,19 +86,21 @@ Exit codes: 0, 1, 3, 5. JSON shape: schemaVersion, ok, exitCode, wasPaired (a Ru
 
 #### `elise scan`
 
-Start a Scan of a git repo, and follow it with --wait.
+Start a Scan of a git repo or an uploaded zip, and follow it with --wait.
 
 ```
-elise scan [repo] [--branch B] [--profile P] [--budget USD] [--runner R] [--run] [--wait [--timeout T]] [--yes]
+elise scan [repo] [--branch B] [--zip FILE --app NAME] [--profile P] [--budget USD] [--runner R] [--run] [--wait [--timeout T]] [--yes]
 ```
 
-Name the repo by URL, `owner/name` (GitHub), `gitlab:owner/name`, ID or `.`; with no argument it is `.`, this checkout and its current branch. A repo that is not added yet is added first. The profile is `standard` unless you pick one (`quick`, `standard`, `deep`, also `focused`, `balanced`, `exhaustive`). In a terminal it shows the repo, branch, profile, cap and Runner and asks `y/N`; with no terminal it needs `--yes` and exits 2 without it, starting nothing. The Runner is `--runner`, else this computer's Runner, else the Account's only connected Runner; with several it exits 2 and lists them. Without `--wait` it returns at once with the Scan ID and link. `--wait` follows the Scan and exits 0 succeeded, 1 failed, 7 stopped, 8 when `--timeout` runs out (the Scan keeps running) or 9 for a Partial Scan. `--run` also runs the Scan on this computer, as `elise run --once` does, and follows it to the end.
+Name the repo by URL, `owner/name` (GitHub), `gitlab:owner/name`, ID or `.`; with no argument it is `.`, this checkout and its current branch. A repo that is not added yet is added first. To scan code that is not in a git host, give `--zip FILE --app NAME` instead of a repo: the zip is checked here with the dashboard's rules (a .zip file of at most 50 MB, see `elise archives add`), the upload app is created if it is new, the zip is streamed up and Elise Scans it; a zip that fails a rule exits 2 before anything is sent. `--zip` and `--app` go together and take no repo and no `--branch`. The profile is `standard` unless you pick one (`quick`, `standard`, `deep`, also `focused`, `balanced`, `exhaustive`). In a terminal it shows the repo, branch, profile, cap and Runner and asks `y/N`; with no terminal it needs `--yes` and exits 2 without it, starting nothing. The Runner is `--runner`, else this computer's Runner, else the Account's only connected Runner; with several it exits 2 and lists them. Without `--wait` it returns at once with the Scan ID and link. `--wait` follows the Scan and exits 0 succeeded, 1 failed, 7 stopped, 8 when `--timeout` runs out (the Scan keeps running) or 9 for a Partial Scan. `--run` also runs the Scan on this computer, as `elise run --once` does, and follows it to the end.
 
 Needs: CLI access with scope start, from `elise login` or ELISE_TOKEN, and a connected Runner. `--run` also needs this computer's Runner token, git and `claude` signed in.
 
 | Flag | Default | Cost | What it does |
 | --- | --- | --- | --- |
 | `--branch` `<name>` | the checkout's branch for `.`, else the repo's default branch | none | Scan this branch, tag or commit. |
+| `--zip` `<file>` | none: scan a git repo | Uploads the zip to Elise, which deletes it 30 days after upload unless a Scan reads it. | Scan this .zip file instead of a git repo. Needs --app. |
+| `--app` `<name>` | none | A name that is new makes an upload app. | The upload app the zip goes under, by name or ID. Needs --zip. |
 | `--profile` `<profile>` | standard | A deeper profile looks longer and costs more of your Claude plan. | How deep the Scan looks: quick, standard or deep (focused, balanced and exhaustive also work). |
 | `--budget` `<USD>` | the profile's own cap | The most this Scan may spend, in dollars. | Set the Scan's cap. |
 | `--runner` `<name>` | this computer's Runner, else the Account's only Runner | none | The Runner that takes the Scan, by name or ID. |
@@ -109,7 +111,7 @@ Needs: CLI access with scope start, from `elise login` or ELISE_TOKEN, and a con
 | `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
 | `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
 
-Exit codes: 0, 1, 2, 3, 4, 5, 7, 8, 9. JSON shape: schemaVersion, ok, exitCode, scan (id, repo, branch or null, profile quick|standard|deep, capUsd or null, runner: {id, name}, status queued|running|succeeded|failed|stopped, link; with --wait or --run also costUsd or null, summary or null, error or null, partial), error {code, message, next} unless the Scan succeeded. Without --wait and --run the Scan is queued and status is queued. Failure codes: bad_profile, bad_budget, bad_timeout, timeout_needs_wait, needs_yes, bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches), upload_repo, unknown_runner (with matches: [{id, name}]), runner_needed (with matches), run_needs_this_runner, no_runner, unpaired, declined, scan_failed, scan_stopped, partial_scan, wait_timeout, scan_unfinished, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+Exit codes: 0, 1, 2, 3, 4, 5, 7, 8, 9. JSON shape: schemaVersion, ok, exitCode, scan (id, repo, branch or null, profile quick|standard|deep, capUsd or null, runner: {id, name}, status queued|running|succeeded|failed|stopped, link; with --wait or --run also costUsd or null, summary or null, error or null, partial), error {code, message, next} unless the Scan succeeded. With --zip, branch is null and the scan also holds archive (id, label, sizeBytes: the zip sent) and app (id, created: true when this call made the app). Without --wait and --run the Scan is queued and status is queued. Failure codes: bad_profile, bad_budget, bad_timeout, timeout_needs_wait, needs_yes, zip_needs_app, app_needs_zip, zip_takes_no_repo, zip_takes_no_branch, bad_app_name, zip_not_found, not_a_zip_file, zip_too_large, not_a_zip, too_many_files, path_too_deep, unpacked_too_large, too_many_zips (the zip ones exit 2 and send nothing), bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches), upload_repo, unknown_runner (with matches: [{id, name}]), runner_needed (with matches), run_needs_this_runner, no_runner, unpaired, declined, scan_failed, scan_stopped, partial_scan, wait_timeout, scan_unfinished, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
 
 #### `elise run`
 
@@ -267,6 +269,64 @@ Needs: CLI access from `elise login`, or ELISE_TOKEN.
 | `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
 
 Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, repo (id, name, provider, host, url, project, private, defaultBranch: as in repos), branches (name, isDefault, latestScanId, latestCommit, latestScanAt: each or null), verdict ({branch, commit, verdict pass|fail|cannot_tell, reasons: [{code, message}], scans: {required, counted}, counts: {critical, high, medium, low, informational, needsValidation}} or null when the default branch has no succeeded Scan). Failure codes: bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches: [{id, name, provider, host}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise archives-add`
+
+Upload a zip to an upload app, creating the app if it is new.
+
+```
+elise archives add <app> <file> [--json]
+```
+
+An upload app holds the zips of code that is not in a git host. Name it by its name or its ID; a name that is new makes the app. The zip is checked here first with the dashboard's rules and sent only if it passes: a .zip file of at most 50 MB that unpacks to at most 250 MB, holds at most 20,000 files and has no path deeper than 20 levels; an app holds at most 20 zips. The file is streamed, not read into memory, and its name is its label. Elise checks the same rules again. Needs CLI access with scope start. Scan it with `elise scan --zip <file> --app <app>`.
+
+Needs: CLI access with scope start, from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, app (id, name, created: true when this call made the app), archive (id, label, sizeBytes, contentSha256, uploadedAt). Failure codes: bad_app_name, zip_not_found, not_a_zip_file, zip_too_large, not_a_zip, too_many_files, path_too_deep, unpacked_too_large, too_many_zips (all exit 2 and send nothing), no_cli_access, needs_scope (exit 2: the CLI access holds scope read), revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise archives-list`
+
+List the zips of an upload app.
+
+```
+elise archives list <app> [--json]
+```
+
+Name the upload app by its name or its ID. One line per zip, newest first, with its label, size, upload time and ID. Uses CLI access (scope read is enough).
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, app (id, name), archives (id, label, sizeBytes, contentSha256, uploadedAt). Failure codes: app_not_found, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise archives-remove`
+
+Delete one zip of an upload app.
+
+```
+elise archives remove <app> <label or ID> [--yes] [--json]
+```
+
+Name the upload app by its name or its ID, and the zip by its ID or its label. A label that fits several zips exits 2 and lists them with their IDs. The zip is deleted from Elise for good; the Scans that read it stay in the History, marked as having no file. In a terminal it asks `y/N`; with no terminal it needs `--yes` and exits 2 without it, deleting nothing. Needs CLI access with scope start.
+
+Needs: CLI access with scope start, from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--yes`, `-y` | off | Deletes the zip without asking. | Do not ask. Needed when there is no terminal. |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, app (id, name), archive (id, label), removed: true. Failure codes: app_not_found, archive_not_found, ambiguous_archive (with matches: [{id, label, uploadedAt}]), needs_yes, declined, no_cli_access, needs_scope (exit 2: the CLI access holds scope read), revoked, offline, not_found, refused, unreadable, usage
 
 ### Results
 

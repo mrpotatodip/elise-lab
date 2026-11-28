@@ -118,6 +118,7 @@ pub struct Request<'a> {
     pub profile: &'a str,
     pub budget: Option<f64>,
     pub runner_id: &'a str,
+    pub archive_id: Option<&'a str>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -140,6 +141,9 @@ pub async fn start(client: &EngineClient<'_>, request: &Request<'_>) -> Result<Q
     }
     if let Some(budget) = request.budget {
         body["max_budget_usd"] = json!(budget);
+    }
+    if let Some(archive_id) = request.archive_id {
+        body["archive_id"] = json!(archive_id);
     }
     client.post("/scans", &body).await
 }

@@ -116,7 +116,7 @@ fn the_top_help_groups_commands_one_line_each() {
 
     assert_eq!(help.code, 0);
     for command in table["commands"].as_array().unwrap() {
-        let line = format!("{:<10}{}", command["name"].as_str().unwrap(), command["summary"].as_str().unwrap());
+        let line = format!("{:<17}{}", command["name"].as_str().unwrap(), command["summary"].as_str().unwrap());
         assert!(help.stdout.lines().any(|found| found.trim() == line.trim()), "{line}\n{}", help.stdout);
     }
     assert!(help.stdout.contains("Run Scans:"), "{}", help.stdout);

@@ -6,17 +6,21 @@ pub struct ScanArgs {
     pub budget: Option<String>,
     pub runner: Option<String>,
     pub timeout: Option<String>,
+    pub zip: Option<String>,
+    pub app: Option<String>,
     pub run: bool,
     pub wait: bool,
     pub yes: bool,
     pub json: bool,
 }
 
-const WITH_VALUE: [(&str, &str); 5] = [
+const WITH_VALUE: [(&str, &str); 7] = [
     ("--branch", "a branch name"),
     ("--profile", "a profile"),
     ("--budget", "a number of dollars"),
     ("--runner", "a Runner name or ID"),
+    ("--zip", "the path of a .zip file"),
+    ("--app", "an upload app's name or ID"),
     ("--timeout", "a time such as 90, 30m or 2h"),
 ];
 
@@ -40,6 +44,8 @@ pub fn take(rest: &[String], args: &mut ScanArgs) -> Result<Vec<String>, String>
             "--profile" => &mut args.profile,
             "--budget" => &mut args.budget,
             "--runner" => &mut args.runner,
+            "--zip" => &mut args.zip,
+            "--app" => &mut args.app,
             _ => &mut args.timeout,
         };
         *slot = Some(value.to_string());

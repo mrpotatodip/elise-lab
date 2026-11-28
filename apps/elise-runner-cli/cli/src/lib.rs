@@ -1,4 +1,5 @@
 pub mod access;
+pub mod archives;
 pub mod args;
 pub mod browser;
 pub mod commands;
@@ -100,6 +101,9 @@ pub fn main(args: &[String]) -> Exit {
             Command::ScanShow { scan_id, json } => scans::show(&store, &scan_id, json).await,
             Command::Trace { scan_id, json } => scans::trace(&store, &scan_id, json).await,
             Command::Stop { scan_id, json } => scans::stop(&store, &scan_id, json).await,
+            Command::ArchivesAdd { app, file, json } => archives::add(&store, &app, &file, json).await,
+            Command::ArchivesList { app, json } => archives::list(&store, &app, json).await,
+            Command::ArchivesRemove { app, archive, yes, json } => archives::remove(&store, &app, &archive, yes, interactive, json).await,
             Command::Repos { json } => repos::repos(&store, json).await,
             Command::Repo { repo, json } => repos::repo(&store, &repo, json).await,
             Command::Scan(args) => scan::scan(&store, &args, interactive).await,

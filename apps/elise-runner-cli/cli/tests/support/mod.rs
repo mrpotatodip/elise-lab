@@ -63,6 +63,18 @@ struct State {
     result_files: BTreeMap<(String, String), Vec<u8>>,
     result_diffs: BTreeMap<String, serde_json::Value>,
     traces: BTreeMap<String, serde_json::Value>,
+    app_archives: BTreeMap<String, Vec<serde_json::Value>>,
+    archive_uploads: Vec<Upload>,
+    archive_removals: Vec<String>,
+    archive_refusal: Option<(u16, String)>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Upload {
+    pub path: String,
+    pub content_type: Option<String>,
+    pub declared_length: Option<usize>,
+    pub bytes: Vec<u8>,
 }
 
 pub const NEW_SCAN_ID: &str = "zd3u73nfd-06ac9c07-b80c-45da-8fc5-ece4768b5b22";
@@ -269,6 +281,22 @@ impl Engine {
         self.state.lock().unwrap().repo_posts.clone()
     }
 
+    pub fn add_archive(&self, repo_id: &str, archive: serde_json::Value) {
+        self.state.lock().unwrap().app_archives.entry(repo_id.to_string()).or_default().push(archive);
+    }
+
+    pub fn archive_uploads(&self) -> Vec<Upload> {
+        self.state.lock().unwrap().archive_uploads.clone()
+    }
+
+    pub fn archive_removals(&self) -> Vec<String> {
+        self.state.lock().unwrap().archive_removals.clone()
+    }
+
+    pub fn refuse_archive_uploads(&self, status: u16, message: &str) {
+        self.state.lock().unwrap().archive_refusal = Some((status, message.to_string()));
+    }
+
     pub fn script_new_scan(&self, statuses: &[&str]) {
         self.state.lock().unwrap().status_script = statuses.iter().map(|status| status.to_string()).collect();
     }
@@ -410,6 +438,9 @@ struct Request {
     bearer: Option<String>,
     account: Option<String>,
     body: String,
+    raw: Vec<u8>,
+    content_type: Option<String>,
+    declared_length: Option<usize>,
 }
 
 fn read_request(stream: &TcpStream) -> Option<Request> {
@@ -422,6 +453,8 @@ fn read_request(stream: &TcpStream) -> Option<Request> {
     let mut length = 0;
     let mut bearer = None;
     let mut account = None;
+    let mut content_type = None;
+    let mut declared_length = None;
     loop {
         let mut header = String::new();
         reader.read_line(&mut header).ok()?;
@@ -432,7 +465,11 @@ fn read_request(stream: &TcpStream) -> Option<Request> {
         let (name, value) = header.split_once(':')?;
         let value = value.trim();
         match name.to_ascii_lowercase().as_str() {
-            "content-length" => length = value.parse().ok()?,
+            "content-length" => {
+                length = value.parse().ok()?;
+                declared_length = Some(length);
+            }
+            "content-type" => content_type = Some(value.to_string()),
             "authorization" => bearer = value.strip_prefix("Bearer ").map(str::to_string),
             "x-account-id" => account = Some(value.to_string()),
             _ => {}
@@ -440,7 +477,16 @@ fn read_request(stream: &TcpStream) -> Option<Request> {
     }
     let mut body = vec![0; length];
     reader.read_exact(&mut body).ok()?;
-    Some(Request { method, path, bearer, account, body: String::from_utf8(body).ok()? })
+    Some(Request {
+        method,
+        path,
+        bearer,
+        account,
+        body: String::from_utf8_lossy(&body).into_owned(),
+        raw: body,
+        content_type,
+        declared_length,
+    })
 }
 
 fn serve(mut stream: TcpStream, state: &Mutex<State>) {
@@ -752,8 +798,47 @@ fn cli_answer(request: &Request, state: &mut State) -> (u16, String) {
         }
         ("GET", ["runners"]) => data(serde_json::json!(state.runners)),
         ("POST", ["repos"]) => {
-            state.repo_posts.push(serde_json::from_str(&request.body).unwrap_or_default());
-            data(serde_json::json!({ "id": "d1111111-1111-4111-8111-111111111111" }))
+            let body: serde_json::Value = serde_json::from_str(&request.body).unwrap_or_default();
+            state.repo_posts.push(body.clone());
+            if body["provider"] == "upload" {
+                state.repos.push(upload_app_json(NEW_APP_ID, body["repo"].as_str().unwrap_or_default()));
+            }
+            data(serde_json::json!({ "id": NEW_APP_ID }))
+        }
+        ("GET", ["repos", id, "archives"]) => match (repo_of(state, id), state.app_archives.get(*id)) {
+            (None, None) => refusal(404, "Upload app not found"),
+            (_, archives) => data(serde_json::json!({ "archives": archives.cloned().unwrap_or_default() })),
+        },
+        ("POST", ["repos", id, "archives"]) => {
+            if let Some((status, message)) = state.archive_refusal.clone() {
+                return refusal(status, &message);
+            }
+            state.archive_uploads.push(Upload {
+                path: request.path.clone(),
+                content_type: request.content_type.clone(),
+                declared_length: request.declared_length,
+                bytes: request.raw.clone(),
+            });
+            let number = state.archive_uploads.len();
+            let archive = serde_json::json!({
+                "id": format!("f000000{number}-0000-4000-8000-000000000000"),
+                "repoId": id,
+                "label": decoded(&query_value(query, "label").unwrap_or_default()),
+                "sizeBytes": request.raw.len(),
+                "contentSha256": format!("sha-of-{number}"),
+                "uploadedAt": "2026-11-20T10:00:00.000Z",
+            });
+            state.app_archives.entry(id.to_string()).or_default().push(archive.clone());
+            (201, serde_json::json!({ "data": archive, "error": null }).to_string())
+        }
+        ("DELETE", ["repos", id, "archives", archive_id]) => {
+            let archives = state.app_archives.entry(id.to_string()).or_default();
+            let Some(index) = archives.iter().position(|archive| archive["id"] == *archive_id) else {
+                return refusal(404, "Zip not found");
+            };
+            archives.remove(index);
+            state.archive_removals.push(archive_id.to_string());
+            data(serde_json::json!({ "removed": true }))
         }
         ("POST", ["scans"]) => {
             if let Some((status, message)) = state.scan_start_refusal.clone() {
@@ -876,6 +961,27 @@ pub fn finding_json(scan_id: &str, repo: &str, severity: Option<&str>, status: &
         "needs": null,
         "createdAt": "2026-11-20T10:05:00.000Z",
         "triage": null,
+    })
+}
+
+pub const NEW_APP_ID: &str = "d1111111-1111-4111-8111-111111111111";
+
+pub fn upload_app_json(id: &str, name: &str) -> serde_json::Value {
+    let mut app = repo_json(id, "upload", None, &name.to_lowercase());
+    app["url"] = name.into();
+    app["defaultBranch"] = "upload".into();
+    app["branchNames"] = serde_json::json!(["upload"]);
+    app
+}
+
+pub fn archive_json(id: &str, repo_id: &str, label: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "repoId": repo_id,
+        "label": label,
+        "sizeBytes": 2048,
+        "contentSha256": "abc123",
+        "uploadedAt": "2026-11-18T09:00:00.000Z",
     })
 }
 

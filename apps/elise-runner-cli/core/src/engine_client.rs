@@ -6,8 +6,11 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::Value;
 use std::future::Future;
+use std::path::Path;
 use std::sync::Mutex;
+use std::time::Duration;
 
+const UPLOAD_TIMEOUT: Duration = Duration::from_secs(300);
 pub const SCOPE_REFUSED: &str = "This CLI access cannot do this";
 const OTHER_ACCOUNT: &str = "This CLI access belongs to another account";
 
@@ -103,6 +106,38 @@ impl<'a> EngineClient<'a> {
         self.send(Method::POST, path, Some(body)).await
     }
 
+    pub async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T, Denied> {
+        self.send(Method::DELETE, path, None).await
+    }
+
+    pub async fn post_file<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &[(&str, String)],
+        file: &Path,
+        content_type: &str,
+    ) -> Result<T, Denied> {
+        let path = with_query(path, query);
+        let path = path.as_str();
+        self.across(|id| async move {
+            let unreadable = |_| Denied::Refused("The file could not be read".to_string());
+            let opened = tokio::fs::File::open(file).await.map_err(unreadable)?;
+            let size = opened.metadata().await.map_err(unreadable)?.len();
+            let request = self
+                .http
+                .post(format!("{}{path}", engine_url()))
+                .bearer_auth(&self.held.token)
+                .header("x-account-id", id)
+                .header(reqwest::header::CONTENT_TYPE, content_type)
+                .header(reqwest::header::CONTENT_LENGTH, size)
+                .timeout(UPLOAD_TIMEOUT)
+                .body(reqwest::Body::from(opened));
+            let response = self.finish(request).await?;
+            response.json::<Envelope<T>>().await.map(|envelope| envelope.data).map_err(|_| Denied::Unreadable)
+        })
+        .await
+    }
+
     pub async fn get_bytes(&self, path: &str, query: &[(&str, String)]) -> Result<Vec<u8>, Denied> {
         let path = with_query(path, query);
         let path = path.as_str();
@@ -173,6 +208,10 @@ impl<'a> EngineClient<'a> {
         if let Some(body) = body {
             request = request.json(body);
         }
+        self.finish(request).await
+    }
+
+    async fn finish(&self, request: reqwest::RequestBuilder) -> Result<reqwest::Response, Denied> {
         let response = request.send().await.map_err(|_| Denied::Offline)?;
         let status = response.status();
         if status.is_success() {

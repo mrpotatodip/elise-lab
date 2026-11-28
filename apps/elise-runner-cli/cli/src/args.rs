@@ -17,6 +17,9 @@ pub enum Command {
     ScanShow { scan_id: String, json: bool },
     Trace { scan_id: String, json: bool },
     Stop { scan_id: String, json: bool },
+    ArchivesAdd { app: String, file: String, json: bool },
+    ArchivesList { app: String, json: bool },
+    ArchivesRemove { app: String, archive: String, yes: bool, json: bool },
     SkillInstall { dir: Option<String>, json: bool },
     Results(crate::results_args::Request),
 }
@@ -113,6 +116,13 @@ pub fn parse(args: &[String]) -> Parsed {
             let renamed: Vec<String> = std::iter::once("scan-show".to_string()).chain(rest.iter().cloned()).collect();
             return parse(&renamed);
         }
+        if first == "archives" && matches!(second.as_str(), "add" | "list" | "remove") {
+            let renamed: Vec<String> = std::iter::once(format!("archives-{second}")).chain(rest.iter().cloned()).collect();
+            return parse(&renamed);
+        }
+    }
+    if args.first().is_some_and(|first| first == "archives") && !args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        return Parsed::Usage("`archives` needs a subcommand: `elise archives add`, `list` or `remove`".to_string());
     }
     let wants_help = args.iter().any(|arg| arg == "--help" || arg == "-h");
     if wants_help {
@@ -209,6 +219,23 @@ pub fn parse(args: &[String]) -> Parsed {
         ("trace", []) => Parsed::Usage("`trace` needs a Scan: a full ID, a prefix of 8 or more characters, or `latest`".to_string()),
         ("stop", [scan_id]) => Parsed::Command(Command::Stop { scan_id: scan_id.to_string(), json: has("--json") }),
         ("stop", []) => Parsed::Usage("`stop` needs a Scan: a full ID, a prefix of 8 or more characters, or `latest`".to_string()),
+        ("archives-add", [app, file]) => {
+            Parsed::Command(Command::ArchivesAdd { app: app.to_string(), file: file.to_string(), json: has("--json") })
+        }
+        ("archives-add", _) => {
+            Parsed::Usage("`archives add` needs an upload app and a .zip file: `elise archives add <app> <file>`".to_string())
+        }
+        ("archives-list", [app]) => Parsed::Command(Command::ArchivesList { app: app.to_string(), json: has("--json") }),
+        ("archives-list", _) => Parsed::Usage("`archives list` needs an upload app: a name or an ID".to_string()),
+        ("archives-remove", [app, archive]) => Parsed::Command(Command::ArchivesRemove {
+            app: app.to_string(),
+            archive: archive.to_string(),
+            yes: has("--yes") || has("-y"),
+            json: has("--json"),
+        }),
+        ("archives-remove", _) => {
+            Parsed::Usage("`archives remove` needs an upload app and a zip: `elise archives remove <app> <label or ID>`".to_string())
+        }
         ("help", []) => Parsed::Help,
         ("help", [wanted]) => help_for(wanted),
         ("completions", [shell]) => Parsed::Completions(shell.to_string()),

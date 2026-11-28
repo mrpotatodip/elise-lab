@@ -1,4 +1,5 @@
 pub mod cli_access;
+pub mod cli_archives;
 pub mod cli_repos;
 pub mod cli_results;
 pub mod cli_scans;

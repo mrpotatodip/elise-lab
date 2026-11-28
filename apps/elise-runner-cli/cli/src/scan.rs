@@ -1,4 +1,5 @@
 use crate::access::{self, Resolved};
+use crate::archives;
 use crate::commands::{self, confirm, dollars, fail};
 use crate::json;
 use crate::scan_args::ScanArgs;
@@ -23,7 +24,7 @@ fn poll_every() -> Duration {
     POLL_EVERY
 }
 
-fn usage(json: bool, code: &str, message: &str) -> Exit {
+pub(crate) fn usage(json: bool, code: &str, message: &str) -> Exit {
     fail(json, Exit::Usage, code, message, "elise help scan")
 }
 
@@ -90,7 +91,7 @@ async fn follow(client: &EngineClient<'_>, scan_id: &str, seconds: u64, json: bo
     }
 }
 
-async fn choose_runner(store: &Store, client: &EngineClient<'_>, args: &ScanArgs) -> Result<RunnerRow, Exit> {
+pub(crate) async fn choose_runner(store: &Store, client: &EngineClient<'_>, args: &ScanArgs) -> Result<RunnerRow, Exit> {
     let json = args.json;
     let here = scan_start::this_runner(store.tokens()).await;
     if args.run {
@@ -162,6 +163,9 @@ pub async fn scan(store: &Store, args: &ScanArgs, interactive: bool) -> Exit {
     if args.timeout.is_some() && !args.wait {
         return usage(json, "timeout_needs_wait", "`--timeout` goes with `--wait`");
     }
+    if let Some(exit) = archives::zip_flags_problem(args) {
+        return exit;
+    }
     if !args.yes && !interactive {
         let message = "`scan` asks before it starts a Scan, and no question can be asked here. Add `--yes` to start it.";
         return fail(json, Exit::Usage, "needs_yes", message, "elise scan --yes");
@@ -170,6 +174,9 @@ pub async fn scan(store: &Store, args: &ScanArgs, interactive: bool) -> Exit {
         Ok(client) => client,
         Err(exit) => return exit,
     };
+    if args.zip.is_some() {
+        return archives::scan_zip(store, &client, args, profile, budget, timeout).await;
+    }
     let text = args.repo.as_deref().unwrap_or(".");
     let (known, added, local_branch) = match access::resolve_repo(&client, text, json).await {
         Ok(Resolved::Known(target)) => (Some(target.repo), None, target.branch),
@@ -185,7 +192,7 @@ pub async fn scan(store: &Store, args: &ScanArgs, interactive: bool) -> Exit {
         (None, None) => return usage(json, "bad_repo_name", &format!("`{text}` is not a repo elise can add")),
     };
     if provider == "upload" {
-        return usage(json, "upload_repo", &format!("`{shown_repo}` is an uploaded app. Scan it with `elise scan --zip`."));
+        return usage(json, "upload_repo", &format!("`{shown_repo}` is an uploaded app. Scan it with `elise scan --zip FILE --app NAME`."));
     }
     let branch = args.branch.clone().or(local_branch);
     let runner = match choose_runner(store, &client, args).await {
@@ -207,22 +214,42 @@ pub async fn scan(store: &Store, args: &ScanArgs, interactive: bool) -> Exit {
             return access::denied(json, why);
         }
     }
-    let request = scan_start::Request { provider: &provider, url: &url, branch: branch.as_deref(), profile, budget, runner_id: &runner.id };
+    let request = scan_start::Request {
+        provider: &provider,
+        url: &url,
+        branch: branch.as_deref(),
+        profile,
+        budget,
+        runner_id: &runner.id,
+        archive_id: None,
+    };
     let queued = match scan_start::start(&client, &request).await {
         Ok(queued) => queued,
         Err(why) => return access::denied(json, why),
     };
-    let link = format!("{}/scans/{}", dashboard_url(), queued.scan_id);
-    let mut shown = json!({
+    let shown = json!({
         "id": queued.scan_id,
         "repo": shown_repo,
         "branch": shown_branch,
         "profile": queued.profile.as_deref().unwrap_or(profile),
         "capUsd": queued.max_budget_usd.or(budget),
         "runner": { "id": runner.id, "name": runner.name },
-        "status": "queued",
-        "link": link,
     });
+    started(store, &client, args, &queued, shown, timeout).await
+}
+
+pub(crate) async fn started(
+    store: &Store,
+    client: &EngineClient<'_>,
+    args: &ScanArgs,
+    queued: &scan_start::Queued,
+    mut shown: Value,
+    timeout: u64,
+) -> Exit {
+    let json = args.json;
+    let link = format!("{}/scans/{}", dashboard_url(), queued.scan_id);
+    shown["status"] = json!("queued");
+    shown["link"] = json!(link);
     json::say(json, &format!("Scan queued: {}", queued.scan_id));
     json::say(json, &format!("Link: {link}"));
     if !args.wait && !args.run {
@@ -237,9 +264,9 @@ pub async fn scan(store: &Store, args: &ScanArgs, interactive: bool) -> Exit {
         if !matches!(exit, Exit::Ok | Exit::Error | Exit::StoppedFromElise) {
             return exit;
         }
-        follow(&client, &queued.scan_id, AFTER_RUN_SECS, json).await
+        follow(client, &queued.scan_id, AFTER_RUN_SECS, json).await
     } else {
-        follow(&client, &queued.scan_id, timeout, json).await
+        follow(client, &queued.scan_id, timeout, json).await
     };
     let done = match finished {
         Ok(Followed::Over(done)) => done,
@@ -260,7 +287,7 @@ pub async fn scan(store: &Store, args: &ScanArgs, interactive: bool) -> Exit {
     shown["summary"] = json!(done.summary);
     shown["error"] = json!(done.error);
     let partial = done.status == "succeeded"
-        && match scan_start::is_partial(&client, &queued.scan_id).await {
+        && match scan_start::is_partial(client, &queued.scan_id).await {
             Ok(partial) => partial,
             Err(why) => return access::denied(json, why),
         };
