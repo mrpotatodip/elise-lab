@@ -298,8 +298,9 @@ fn scan_needs_start_scope_and_a_clean_command_line() {
 
     let read_only = reader.run(&["scan", "acme/widgets", "--yes", "--json"], "");
 
-    assert_eq!(read_only.code, 3, "{}", read_only.stdout);
+    assert_eq!(read_only.code, 2, "{}", read_only.stdout);
     assert_eq!(json_of(&read_only)["error"]["code"], "needs_scope");
+    assert!(engine.scan_posts().is_empty());
     for (args, word) in [
         (vec!["--profile", "fast"], "bad_profile"),
         (vec!["--budget", "0"], "bad_budget"),

@@ -132,24 +132,101 @@ Needs: A paired Runner, git, and `claude` signed in.
 
 Exit codes: 0, 1, 2, 3, 4, 5, 6, 7. JSON shape: one event object per line, each with schemaVersion, event, scanId and at (UTC time); labels, counts and IDs only, never model text. claimed (repo); phase_started (phase); phase_finished (phase, costUsd or null, poolLeftUsd); finding (fingerprint, verdict confirmed|needs_validation, severity or null; the full record goes to Elise; findings arrive per Phase, just before its phase_finished, not live); result (state succeeded|failed, sent, workFolder when kept); stopped (workFolder when kept: the Scan was stopped from Elise and sent no result). When run ends without a Scan (not paired, revoked, offline, nothing to claim with --once, no signal handler) it prints one result object instead: schemaVersion, ok false, exitCode, error {code, message, next}. Failure codes: unpaired, revoked, offline, nothing_to_claim, signals_unavailable. The exit code is the one without --json
 
-#### `elise resume`
+#### `elise scans`
 
-Say whether a failed or stopped Scan can be resumed here.
+List the newest Scans of this Account, newest first.
 
 ```
-elise resume <scan-id>
+elise scans [--repo <repo>] [--json]
 ```
 
-Lists the Phases the kept work folder holds. The resume itself starts in Elise (the Resume button on that Scan); `run` then claims it.
+One line per Scan with its repo, branch, profile, status and start day, up to 100. With `--repo` only that repo's Scans (a URL, `owner/name`, `gitlab:owner/name`, ID or `.`). Uses CLI access (scope read is enough).
 
-Needs: The work folder the Scan kept on this computer.
+Needs: CLI access from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--repo` `<repo>` | every repo | none | Only the Scans of this repo. A name that matches several repos exits 2 and lists them. |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scans (id: the full Scan ID, repo, repoId, branch or null, status queued|running|succeeded|failed|stopped, profile or null, createdAt, finishedAt or null), newest first. Failure codes: bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches: [{id, name, provider, host}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise scan-show`
+
+Show one Scan: status, run details and cost.
+
+```
+elise scan show <scan-id> [--json]
+```
+
+Name the Scan by its full ID, a prefix of at least 8 characters, or `latest`. Shows its repo, branch, commit, profile, model, cap, Runner, times, cost with the split by Phase, and the counts of what it found. Run `elise help ids` for the naming rules. Also reachable as `elise scan-show`.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN.
 
 | Flag | Default | Cost | What it does |
 | --- | --- | --- | --- |
 | `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
 | `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
 
-Exit codes: 0, 1, 2. JSON shape: schemaVersion, ok, exitCode, scanId, resumable, phases (the finished Phases). Failure codes: not_resumable, usage
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scan (id, repo, repoId, branch, commit, status queued|running|succeeded|failed|stopped, step, profile, profileMet, model, effort, budgetUsd, createdAt, updatedAt, finishedAt, error, failureCode: each or null; runner: {id, name} or null; resumes: the Scan this one resumes or null; resumedBy: the Scan that resumed it or null), cost ({costUsd, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, turns, durationMs, phases: [{phase, costUsd, durationMs}]} or null when no usage is recorded), summary ({total, severity: {critical, high, medium, low, informational}, needsValidation, new, carried} or null). Failure codes: bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise trace`
+
+Show the Phases and labels a Scan went through.
+
+```
+elise trace <scan-id> [--json]
+```
+
+The Trace is labels, counts and times only, never what the agent wrote. Name the Scan by its full ID, a prefix of at least 8 characters, or `latest`.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scanId, entries (id, label, phase or null, startedAt, endedAt, count: how many times the label repeated in a row), in display order, candidateFindings (the count so far, or null). Failure codes: bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise stop`
+
+Stop a Scan that is queued or running.
+
+```
+elise stop <scan-id> [--json]
+```
+
+Name the Scan by its full ID, a prefix of at least 8 characters, or `latest`. Elise stops it and keeps what it has; a Scan on a Runner stops that Runner's run. A Scan that already finished is refused with exit 1. Needs CLI access with scope start.
+
+Needs: CLI access with scope start, from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scanId, status (stopped, or the state Elise reports), repo. Failure codes: bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), no_cli_access, needs_scope (exit 2: the CLI access holds scope read), revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise resume`
+
+Start a resume of a stopped or failed Scan, and say whether its work folder can be resumed here.
+
+```
+elise resume <scan-id> [--json]
+```
+
+Name the Scan by its full ID, a prefix of at least 8 characters, or `latest`. Elise queues a new Scan that carries on from the finished Phases, on the Runner that ran the first one; `elise run` there claims it. The output also says whether the work folder this computer kept can be resumed, and which Phases it holds. A Scan that is not stopped or failed is refused with exit 1. Needs CLI access with scope start. With no CLI access on this computer, it only checks the kept work folder, as before.
+
+Needs: CLI access with scope start, from `elise login`, or ELISE_TOKEN. Without it, the work folder the Scan kept on this computer.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scanId (the Scan that was resumed), resumable (this computer's work folder can be resumed), phases (the Phases that folder holds), started (true when a resume was queued), newScanId, status (queued). Without CLI access only scanId, resumable and phases, and the failure code not_resumable (exit 1) when no folder can be resumed. Failure codes: not_resumable, bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), needs_scope (exit 2: the CLI access holds scope read), revoked, offline, not_found, refused, unreadable, usage
 
 ### Repos
 
@@ -190,6 +267,110 @@ Needs: CLI access from `elise login`, or ELISE_TOKEN.
 | `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
 
 Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, repo (id, name, provider, host, url, project, private, defaultBranch: as in repos), branches (name, isDefault, latestScanId, latestCommit, latestScanAt: each or null), verdict ({branch, commit, verdict pass|fail|cannot_tell, reasons: [{code, message}], scans: {required, counted}, counts: {critical, high, medium, low, informational, needsValidation}} or null when the default branch has no succeeded Scan). Failure codes: bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches: [{id, name, provider, host}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+### Results
+
+#### `elise report`
+
+Show a Scan's summary, counts by severity, Verdict and top findings.
+
+```
+elise report <scan-id> [--full] [--json]
+```
+
+The same figures the Scan page in Elise shows: the finding counts, what is new and carried over, the cost, the Verdict of the Scan's commit as Elise computes it, and the worst findings. A Scan that kept no database findings shows them through its findings.json. Name the Scan by its full ID, a prefix of 8 or more characters, or `latest`: run `elise help ids`.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN (scope read is enough).
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--full` | off | none | Print the whole REPORT.md the Scan wrote, and nothing else. With --json it is the field reportMarkdown. |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scan (id, repo, repoId, branch, status queued|running|succeeded|failed|stopped, profile, commit, createdAt, finishedAt, costUsd, runner: its name, error: each or null), summary ({total, severity: {critical, high, medium, low, informational}, needsValidation, new, carried: null when Elise sent no summary and the counts come from findings.json} or null when the Scan has no findings to show), verdict (Elise's Verdict of the Scan's commit, as `verdict` prints it, or null), topFindings (up to 5, worst first, rejected ones left out; each as in `findings`), reportMarkdown with --full. Failure codes: bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), no_report, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise findings`
+
+List findings, for one Scan or for the latest Scan of each repo.
+
+```
+elise findings [--scan <id>] [--repo <repo>] [--severity <level>] [--status <status>] [--json]
+```
+
+With --scan, every finding of that Scan (an old Scan that kept none in the database shows them through its findings.json). Without it, the open findings of each repo's latest Scan of its default branch, as the dashboard Findings page counts them. Worst first. A finding with no severity needs a person to check by hand.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN (scope read is enough).
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--scan` `<id>` | none | none | Only the findings of this Scan: a full ID, a prefix of 8 or more characters, or `latest`. |
+| `--repo` `<repo>` | all repos | none | Only this repo (URL, owner/name, gitlab:owner/name, ID or `.`). With --scan it also narrows what `latest` or a prefix means. |
+| `--severity` `<level>` | all | none | Only critical, high, medium, low or informational. |
+| `--status` `<status>` | all | none | Only confirmed or needs_validation. |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scanId (the Scan asked for or null), findings (scanId, repo, fingerprint, status confirmed|needs_validation|rejected, severity or null, title, class, file, line, actor, impact, evidence, fix, needs, triage: {status open|fixed|false_positive|accepted_risk|duplicate, note} or null: each or null; from an old findings.json only scanId, repo, status, severity, title, file and line are set). Failure codes: bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches: [{id, name, provider, host}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise files`
+
+List the files a Scan saved, or save one with `files get`.
+
+```
+elise files <scan-id> [--json] | elise files get <scan-id> <name> [--out <path>] [--json]
+```
+
+`files` lists what the Scan saved, with sizes. `files get` writes one file's bytes to standard output, or to --out (a path, or a folder: the file keeps its name there). A file that is not text is not printed to a terminal: add --out or pipe it. With --json and no --out, the text comes as the field content.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN (scope read is enough).
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--out` `<path>` | standard output | none | `files get`: write the file here. An existing file is replaced. A folder gets the file under its own name. |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: files: schemaVersion, ok, exitCode, scanId, files (name, sizeBytes, contentType: sizeBytes and contentType are null when Elise sent only the names). files get: schemaVersion, ok, exitCode, scanId, name, bytes, and path with --out or content (the text) without it. Failure codes: bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), file_not_found, binary_to_terminal, binary_needs_out, write_failed, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise diff`
+
+Show what changed since the Scan before it on the same branch.
+
+```
+elise diff <scan-id> [--json]
+```
+
+The same comparison the Scan page shows: new findings, regressed ones, ones still open, ones the check found gone, and ones that vanished without a check. A Scan with no earlier Scan to compare with says so and exits 0.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN (scope read is enough).
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, scanId, previousScanId (or null), new, stillOpen, regressed, fixed, notRechecked: each a list of {fingerprint, status, severity or null, title, class, file, line}. Failure codes: bad_scan_id, scan_not_found, ambiguous_scan (with matches: [{id, repo, status}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
+#### `elise verdict`
+
+Say whether a repo is ready to ship: Elise's Verdict for a commit.
+
+```
+elise verdict <repo> [--commit <sha>] [--json]
+```
+
+The ship answer as Elise computes it: pass, fail or cannot_tell, why, how many Scans count, and the open, accepted and dismissed problems. Without --commit it judges the latest succeeded Scan's commit on the default branch (the checkout's branch for `.`). Name the repo as `elise help repos` says.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN (scope read is enough).
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--commit` `<sha>` | the branch's latest commit | none | Judge this commit: 40 hex digits (64 for an upload). |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, repo ({id, name}), branch (the branch judged, or null with --commit), verdict (Elise's answer: verdict pass|fail|cannot_tell, basis, commit, reasons: [{code, message}], scans: {required, counted, ids}, limits: {critical, high, medium}, counts: {critical, high, medium, low, informational, needsValidation}, open, accepted, dismissed: lists of problems with fingerprint, title, severity, class, file, line). Failure codes: bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches: [{id, name, provider, host}]), no_commit, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
 
 ### Check
 

@@ -171,8 +171,10 @@ pub async fn progress(client: &EngineClient<'_>, scan_id: &str) -> Result<Progre
 }
 
 pub async fn is_partial(client: &EngineClient<'_>, scan_id: &str) -> Result<bool, Denied> {
-    match client.get_text(&format!("/scans/{scan_id}/files/REPORT.md")).await {
-        Ok(report) => Ok(report.lines().next().is_some_and(|first| PARTIAL_LINES.iter().any(|line| first.starts_with(line)))),
+    match client.get_bytes(&format!("/scans/{scan_id}/files/REPORT.md"), &[]).await {
+        Ok(bytes) => {
+            Ok(String::from_utf8_lossy(&bytes).lines().next().is_some_and(|first| PARTIAL_LINES.iter().any(|line| first.starts_with(line))))
+        }
         Err(Denied::NotFound(_)) => Ok(false),
         Err(why) => Err(why),
     }
