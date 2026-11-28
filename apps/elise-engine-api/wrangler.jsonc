@@ -83,6 +83,7 @@
   // Every new scan runs the full Skill and is stored skill full, a scan on a Runner included. A scan on a Runner takes no credit and stops at the Scan's spend limit (its profile's cap unless the request set one), at most RUNNER_MAX_BUDGET_USD.
   // MAX_BUDGET_FULL_USD (at least 50) guards the default cap of each profile (SCAN_PROFILE_CAPS_USD), on either key: a profile whose cap is above it refuses its scans, and a request may lower the cap, never raise it. Changing it is a deploy.
   // MAX_ACTIVE_FULL_SCANS is how many scans in our cloud one account may have live at once. MAX_ACTIVE_SCANS is the same count for scans on a Runner only.
-  // Secrets (wrangler secret put / --secrets-file): ANTHROPIC_API_KEY, SCAN_API_TOKEN, DATABASE_URL, AUTH_SECRET
+  // Secrets (wrangler secret put / --secrets-file): ANTHROPIC_API_KEY, SCAN_API_TOKEN, DATABASE_URL, AUTH_SECRET, DATA_MASTER_KEY
+  // DATA_MASTER_KEY: 32 random bytes in base64 (openssl rand -base64 32). It locks every Account's Data key (ADR 0017). Keep a copy in a second secret store: if it is lost, every Account's sealed text is lost.
   // Optional, for accounts that bring their own Anthropic key: KEY_ENCRYPTION_SECRET (any long random string; changing it makes every saved key unreadable, and those accounts' scans stop until they save the key again)
 }

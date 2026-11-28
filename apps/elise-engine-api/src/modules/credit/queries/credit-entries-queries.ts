@@ -6,6 +6,7 @@ import { tenantCreditLedger } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { roundUsd } from "#/modules/credit/utils";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 
 // -----
 // The account's credit history, newest first. A scan is one entry:
@@ -19,6 +20,7 @@ export const creditEntriesEffect = (
   db: AppDbType,
   tenantId: string,
   query: { limit: number; cursor?: string },
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<CreditEntries, DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -53,14 +55,16 @@ export const creditEntriesEffect = (
         .limit(query.limit + 1);
       const page = rows.slice(0, query.limit);
       return {
-        entries: page.map((row) => ({
-          id: row.id,
-          kind: row.kind,
-          amountUsd: roundUsd(Number(row.amount)),
-          scanId: row.scanId,
-          note: row.note,
-          createdAt: row.createdAt.toISOString(),
-        })),
+        entries: await Promise.all(
+          page.map(async (row) => ({
+            id: row.id,
+            kind: row.kind,
+            amountUsd: roundUsd(Number(row.amount)),
+            scanId: row.scanId,
+            note: await unsealer.textOrNull(row.note),
+            createdAt: row.createdAt.toISOString(),
+          })),
+        ),
         nextCursor: rows.length > query.limit ? (page.at(-1)?.id ?? null) : null,
       };
     },

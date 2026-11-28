@@ -18,7 +18,9 @@ app.get(
   async (c) => {
     const { "x-account-id": accountId } = c.req.valid("header");
     const query = c.req.valid("query");
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listFindingsSvc(db, accountId, query)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(listFindingsSvc(db, accountId, query, c.env.DATA_MASTER_KEY)));
     return c.json({ data, error: null });
   },
 );

@@ -73,6 +73,6 @@ export const updateUsageBudgetSvc = (
   Effect.gen(function* () {
     const now = new Date();
     const spend = yield* monthSpendEffect(db, accountId, monthStartOf(now));
-    const active = yield* activeScansEffect(db, accountId, now.getTime());
+    const active = yield* activeScansEffect(db, accountId, now.getTime(), env.DATA_MASTER_KEY);
     return yield* setUsageBudgetSvc(env, db, accountId, userId, requestedUsd, spend, reservedUsdOf(active), now);
   });

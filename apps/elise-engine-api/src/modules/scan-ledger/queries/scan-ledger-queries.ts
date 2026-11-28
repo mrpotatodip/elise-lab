@@ -18,6 +18,7 @@ import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
 import { RESUME_ALREADY_RESUMED_MESSAGE } from "#/modules/scans/constants";
 import type { ScanParams, ScanStatus } from "#/schemas";
+import { CANNOT_READ, unsealerEffect, type Unsealer } from "#/modules/sealed-data";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
 import {
   displayRepoUrlOf,
@@ -59,6 +60,21 @@ const runnersOf = (db: AppDbType, ids: string[]) =>
 
 type RunnerJob = { scanId: string; id: string | null; name: string | null; optionsJson: string };
 
+const openStatusText = (
+  unsealer: Unsealer,
+  rows: ScanRow[],
+  jobs: RunnerJob[],
+): Effect.Effect<{ rows: ScanRow[]; jobs: RunnerJob[] }> =>
+  Effect.promise(async () => ({
+    rows: await Promise.all(rows.map(async (row) => ({ ...row, error: await unsealer.textOrNull(row.error) }))),
+    jobs: await Promise.all(
+      jobs.map(async (job) => {
+        const optionsJson = await unsealer.text(job.optionsJson);
+        return { ...job, optionsJson: optionsJson === CANNOT_READ ? "{}" : optionsJson };
+      }),
+    ),
+  }));
+
 const runnerOfJob = (job: RunnerJob | undefined) =>
   job?.id != null && job.name !== null ? { id: job.id, name: job.name } : null;
 
@@ -74,9 +90,11 @@ export const activeScansEffect = (
   db: AppDbType,
   accountId: string,
   nowMs: number,
+  masterKey?: string,
 ): Effect.Effect<ScanStatus[], DbError> =>
   Effect.gen(function* () {
-    const rows = yield* Effect.tryPromise({
+    const unsealer = yield* unsealerEffect(db, masterKey, accountId);
+    const found = yield* Effect.tryPromise({
       try: () =>
         db
           .select()
@@ -84,13 +102,14 @@ export const activeScansEffect = (
           .where(and(eq(scans.tenantId, accountId), liveScansSql(nowMs))),
       catch: toDbError,
     });
-    const runners =
-      rows.length === 0
+    const foundJobs =
+      found.length === 0
         ? []
         : yield* runnersOf(
             db,
-            rows.map((row) => row.id),
+            found.map((row) => row.id),
           );
+    const { rows, jobs: runners } = yield* openStatusText(unsealer, found, foundJobs);
     return rows.map((row) => {
       const job = runners.find((runner) => runner.scanId === row.id);
       return scanRowToStatus(row, [], null, runnerOfJob(job), null, job?.optionsJson);
@@ -101,11 +120,11 @@ export const activeScansEffect = (
 // The rows with their files, the Runner a scan ran on and, for a
 // scan whose findings are recorded, the counts of what it found.
 // -----
-const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], DbError> =>
-  rows.length === 0
+const withFiles = (db: AppDbType, found: ScanRow[], unsealer: Unsealer): Effect.Effect<ScanStatus[], DbError> =>
+  found.length === 0
     ? Effect.succeed([])
     : Effect.gen(function* () {
-        const ids = rows.map((row) => row.id);
+        const ids = found.map((row) => row.id);
         const files = yield* Effect.tryPromise({
           try: () =>
             db
@@ -135,8 +154,8 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
               .groupBy(scanFindings.scanId, scanFindings.status, scanFindings.severity, scanFindings.origin),
           catch: toDbError,
         });
-        const runners = yield* runnersOf(db, ids);
-        const archives = yield* scanArchivesEffect(db, ids);
+        const { rows, jobs: runners } = yield* openStatusText(unsealer, found, yield* runnersOf(db, ids));
+        const archives = yield* scanArchivesEffect(db, ids, unsealer);
         const resumers = yield* Effect.tryPromise({
           try: () =>
             db
@@ -171,7 +190,7 @@ const withFiles = (db: AppDbType, rows: ScanRow[]): Effect.Effect<ScanStatus[], 
 // timestamp, so ascending ids are newest first and an id
 // is a cursor.
 // -----
-export const scanReads = (db: AppDbType): ScanReads => ({
+export const scanReads = (db: AppDbType, masterKey?: string): ScanReads => ({
   list: (accountId, limit, cursor, filter): Effect.Effect<ScanPage, DbError> =>
     Effect.tryPromise({
       try: () =>
@@ -191,7 +210,8 @@ export const scanReads = (db: AppDbType): ScanReads => ({
       catch: toDbError,
     }).pipe(
       Effect.flatMap((rows) =>
-        withFiles(db, rows.slice(0, limit)).pipe(
+        unsealerEffect(db, masterKey, accountId).pipe(
+          Effect.flatMap((unsealer) => withFiles(db, rows.slice(0, limit), unsealer)),
           Effect.map((page) => ({ scans: page, nextCursor: rows.length > limit ? rows[limit - 1].id : null })),
         ),
       ),
@@ -206,7 +226,9 @@ export const scanReads = (db: AppDbType): ScanReads => ({
           .where(and(eq(scans.tenantId, accountId), eq(scans.id, scanId))),
       catch: toDbError,
     }).pipe(
-      Effect.flatMap((rows) => withFiles(db, rows)),
+      Effect.flatMap((rows) =>
+        Effect.flatMap(unsealerEffect(db, masterKey, accountId), (unsealer) => withFiles(db, rows, unsealer)),
+      ),
       Effect.map((found) => found[0] ?? null),
     ),
 
@@ -317,8 +339,8 @@ const activeConflictOf =
           ),
         );
 
-const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
-  ...scanReads(db),
+const scanWrites = (db: AppDbType, masterKey?: string): Omit<ScanRepo, "create"> => ({
+  ...scanReads(db, masterKey),
 
   // -----
   // Insert or find the repo's record. The unique index
@@ -442,7 +464,7 @@ const scanWrites = (db: AppDbType): Omit<ScanRepo, "create"> => ({
           catch: toDbError,
         }).pipe(Effect.asVoid),
 
-  activeSince: (accountId, nowMs) => activeScansEffect(db, accountId, nowMs),
+  activeSince: (accountId, nowMs) => activeScansEffect(db, accountId, nowMs, masterKey),
 });
 
 export const stopScanEffect = (
@@ -523,8 +545,8 @@ export const stoppedUsageEffect = (
 // For the Workflow, on the owner connection: one batch is one
 // transaction.
 // -----
-export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
-  ...scanWrites(db),
+export const neonScanRepo = (db: DbConnectType, masterKey?: string): ScanRepo => ({
+  ...scanWrites(db, masterKey),
   create: (params, repoId, nowMs) =>
     Effect.tryPromise({ try: () => db.batch(createStatements(db, params, repoId, nowMs)), catch: createErrorOf }).pipe(
       Effect.catchTag("Conflict", activeConflictOf(db, repoId)),
@@ -537,8 +559,8 @@ export const neonScanRepo = (db: DbConnectType): ScanRepo => ({
 // a new scan run under a savepoint, so a refused insert rolls back
 // alone and the Conflict can still name the running scan.
 // -----
-export const tenantScanRepo = (db: AppTxDbType): ScanRepo => ({
-  ...scanWrites(db),
+export const tenantScanRepo = (db: AppTxDbType, masterKey?: string): ScanRepo => ({
+  ...scanWrites(db, masterKey),
   create: (params, repoId, nowMs) =>
     Effect.tryPromise({
       try: () =>

@@ -28,7 +28,7 @@ app.get(
     const { repoId } = c.req.valid("param");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(listArchivesSvc(db, accountId, repoId)));
+      .withTenant(c, accountId, (db) => runEffect(listArchivesSvc(db, accountId, repoId, c.env.DATA_MASTER_KEY)));
     return c.json({ data, error: null });
   },
 );

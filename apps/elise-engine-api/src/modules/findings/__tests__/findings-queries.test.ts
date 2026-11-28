@@ -97,9 +97,9 @@ describe("listFindingsEffect", () => {
   });
 
   it("returns one extra row so the service can tell there is another page", async () => {
-    const page = await Effect.runPromise(listFindingsSvc(test.http, tenantId, query({ limit: 2 })));
+    const page = await Effect.runPromise(listFindingsSvc(test.http, tenantId, query({ limit: 2 }), undefined));
     const next = await Effect.runPromise(
-      listFindingsSvc(test.http, tenantId, query({ limit: 2, cursor: page.nextCursor ?? undefined })),
+      listFindingsSvc(test.http, tenantId, query({ limit: 2, cursor: page.nextCursor ?? undefined }), undefined),
     );
 
     expect(ids(page.findings)).toEqual(["F-002", "F-001"]);

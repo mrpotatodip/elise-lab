@@ -36,6 +36,7 @@ import {
   listArchivesEffect,
   removeUploadAppEffect,
 } from "#/modules/archives/queries";
+import { unsealerEffect } from "#/modules/sealed-data";
 import { archiveKeyOf, archivePrefixOf, isZip, sha256HexOf, zipContentsOf } from "#/modules/archives/utils";
 
 export const NOT_A_ZIP = UPLOAD_NOT_A_ZIP_MESSAGE;
@@ -44,9 +45,11 @@ export const listArchivesSvc = (
   db: AppDbType,
   accountId: string,
   repoId: string,
+  masterKey?: string,
 ): Effect.Effect<UploadArchiveList, NotFound | DbError> =>
   findUploadAppEffect(db, accountId, repoId).pipe(
-    Effect.flatMap(() => listArchivesEffect(db, accountId, repoId)),
+    Effect.flatMap(() => unsealerEffect(db, masterKey, accountId)),
+    Effect.flatMap((unsealer) => listArchivesEffect(db, accountId, repoId, unsealer)),
     Effect.map((archives) => ({ archives })),
   );
 

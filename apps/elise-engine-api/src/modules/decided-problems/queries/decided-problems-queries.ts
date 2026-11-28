@@ -13,6 +13,7 @@ import {
 } from "#/modules/decided-problems/constants";
 import type { DecidedProblem, OpenProblem } from "#/modules/decided-problems/types";
 import { repoFindingsEffect } from "#/modules/repos/queries";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 import { isUnresolved, severityRank } from "#/modules/repos/utils";
 
 export const openProblemsEffect = (
@@ -20,8 +21,9 @@ export const openProblemsEffect = (
   tenantId: string,
   branchId: string,
   limit: number = OPEN_PROBLEMS_LIMIT,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<OpenProblem[], DbError> =>
-  repoFindingsEffect(db, tenantId, branchId).pipe(
+  repoFindingsEffect(db, tenantId, branchId, unsealer).pipe(
     Effect.map((byBranch) =>
       (byBranch.get(branchId) ?? [])
         .filter(isUnresolved)
@@ -67,6 +69,7 @@ export const decidedProblemsEffect = (
   tenantId: string,
   branchId: string,
   limit: number = DECIDED_PROBLEMS_LIMIT,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<DecidedProblem[], DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -109,14 +112,16 @@ export const decidedProblemsEffect = (
           asc(latest.fingerprint),
         )
         .limit(limit);
-      return rows.map((row): DecidedProblem => ({
-        fingerprint: row.fingerprint,
-        title: row.title,
-        class: row.class,
-        file: row.file,
-        // SAFETY: the where clause above keeps only the three decided statuses.
-        status: row.status as DecidedProblem["status"],
-      }));
+      return Promise.all(
+        rows.map(async (row): Promise<DecidedProblem> => ({
+          fingerprint: row.fingerprint,
+          title: await unsealer.text(row.title),
+          class: await unsealer.text(row.class),
+          file: await unsealer.textOrNull(row.file),
+          // SAFETY: the where clause above keeps only the three decided statuses.
+          status: row.status as DecidedProblem["status"],
+        })),
+      );
     },
     catch: toDbError,
   });

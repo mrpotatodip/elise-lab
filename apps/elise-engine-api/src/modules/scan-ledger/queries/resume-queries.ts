@@ -3,12 +3,14 @@ import { Effect } from "effect";
 import { scanArchiveLinks, scanRepos, scanRunnerJobs, scans } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 import type { ResumeSource } from "#/modules/scan-ledger/types";
 
 export const resumeSourceEffect = (
   db: AppDbType,
   accountId: string,
   scanId: string,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<ResumeSource | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -40,8 +42,9 @@ export const resumeSourceEffect = (
         .where(eq(scanArchiveLinks.scanId, scanId));
       return {
         ...row,
+        error: await unsealer.textOrNull(row.error),
         maxBudgetUsd: Number(row.maxBudgetUsd),
-        job: job ?? null,
+        job: job ? { ...job, optionsJson: await unsealer.text(job.optionsJson) } : null,
         resumedByScanId: resumedBy?.id ?? null,
         archive: archive ?? null,
       };

@@ -17,7 +17,9 @@ app.get(
   async (c) => {
     const { "x-account-id": accountId } = c.req.valid("header");
     const { repoId } = c.req.valid("param");
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(getRepoSvc(db, accountId, repoId)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(getRepoSvc(db, accountId, repoId, c.env.DATA_MASTER_KEY)));
     return c.json({ data, error: null });
   },
 );

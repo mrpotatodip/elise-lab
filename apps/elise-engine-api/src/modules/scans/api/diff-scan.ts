@@ -15,7 +15,9 @@ app.get(
   async (c) => {
     const { "x-account-id": accountId } = c.req.valid("header");
     const { scanId } = c.req.valid("param");
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(scanDiffSvc(db, accountId, scanId)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(scanDiffSvc(db, accountId, scanId, c.env.DATA_MASTER_KEY)));
     return c.json({ data, error: null });
   },
 );

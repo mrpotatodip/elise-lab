@@ -22,6 +22,7 @@ import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query"
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 
 // -----
 // Worst first; a finding that still needs
@@ -62,6 +63,7 @@ export const listFindingsEffect = (
   db: AppDbType,
   tenantId: string,
   query: FindingsQuery,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<Finding[], DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -101,26 +103,28 @@ export const listFindingsEffect = (
         .orderBy(asc(severityRank), desc(scanFindings.createdAt), asc(scanFindings.findingId))
         .limit(query.limit + 1)
         .offset(query.cursor ? Number(query.cursor) : 0);
-      return rows.map(({ finding, repo, triage, person }) => ({
-        id: finding.id,
-        scanId: finding.scanId,
-        repo,
-        findingId: finding.findingId,
-        fingerprint: finding.fingerprint,
-        status: finding.status,
-        severity: finding.severity,
-        title: finding.title,
-        class: finding.class,
-        file: finding.file,
-        line: finding.line,
-        actor: finding.actor,
-        impact: finding.impact,
-        evidence: finding.evidence,
-        fix: finding.fix,
-        needs: finding.needs,
-        createdAt: finding.createdAt.toISOString(),
-        triage: triage ? triageView(triage, person) : null,
-      }));
+      return Promise.all(
+        rows.map(async ({ finding, repo, triage, person }) => ({
+          id: finding.id,
+          scanId: finding.scanId,
+          repo,
+          findingId: await unsealer.text(finding.findingId),
+          fingerprint: finding.fingerprint,
+          status: finding.status,
+          severity: finding.severity,
+          title: await unsealer.text(finding.title),
+          class: await unsealer.text(finding.class),
+          file: await unsealer.textOrNull(finding.file),
+          line: finding.line,
+          actor: finding.actor,
+          impact: await unsealer.textOrNull(finding.impact),
+          evidence: await unsealer.textOrNull(finding.evidence),
+          fix: await unsealer.textOrNull(finding.fix),
+          needs: await unsealer.textOrNull(finding.needs),
+          createdAt: finding.createdAt.toISOString(),
+          triage: triage ? triageView({ ...triage, note: await unsealer.textOrNull(triage.note) }, person) : null,
+        })),
+      );
     },
     catch: toDbError,
   });

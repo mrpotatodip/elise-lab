@@ -3,6 +3,7 @@ import { Conflict, Invalid, NotFound, type DbError, type ExternalError, type Rat
 import type { TenantEffect } from "#/lib/tenant-effect";
 import { ScanOptionsSchema } from "#/schemas";
 import { resumeSourceEffect } from "#/modules/scan-ledger";
+import { unsealerEffect } from "#/modules/sealed-data";
 import { JOB_OPTIONS_UNREADABLE, RESUME_RUNNER_GONE_MESSAGE } from "#/modules/scans/constants";
 import { abandonScanSvc, queueScanSvc, startScanSvc } from "./create-scan-svc";
 import type { ScanQueued } from "#/modules/scans/schemas";
@@ -20,7 +21,8 @@ export const submitResumeSvc = (
 ): Effect.Effect<ScanQueued, Invalid | RateLimited | Conflict | NotFound | DbError | ExternalError> =>
   tenant((db) =>
     Effect.gen(function* () {
-      const source = yield* resumeSourceEffect(db, accountId, scanId);
+      const unsealer = yield* unsealerEffect(db, env.DATA_MASTER_KEY, accountId);
+      const source = yield* resumeSourceEffect(db, accountId, scanId, unsealer);
       if (source === null) return yield* new NotFound({ message: "Scan not found" });
       const refusal = resumeRefusalOf(source);
       if (refusal?.kind === "conflict") return yield* new Conflict({ message: refusal.message });

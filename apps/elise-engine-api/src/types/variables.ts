@@ -25,6 +25,7 @@ export type Bindings = {
   BILLING_ENFORCED: string;
   ANTHROPIC_API_KEY: string;
   KEY_ENCRYPTION_SECRET?: string;
+  DATA_MASTER_KEY: string;
   TYPESAFE_API_KEY?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;

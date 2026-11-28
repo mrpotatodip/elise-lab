@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import type { FindingList, FindingsQuery, FindingTriage, FindingTriageBody } from "@repo/contracts/elise";
 import type { AppDbType, TenantDbType } from "#/lib/db-connection";
 import { Forbidden, Invalid, NotFound, type DbError } from "#/lib/effect-query";
+import { unsealerEffect } from "#/modules/sealed-data";
 import { findingRepoIdEffect, listFindingsEffect, setTriageEffect } from "#/modules/findings/queries";
 
 // -----
@@ -12,9 +13,11 @@ export const listFindingsSvc = (
   db: AppDbType,
   accountId: string,
   query: FindingsQuery,
+  masterKey: string | undefined,
 ): Effect.Effect<FindingList, DbError> =>
   Effect.gen(function* () {
-    const rows = yield* listFindingsEffect(db, accountId, query);
+    const unsealer = yield* unsealerEffect(db, masterKey, accountId);
+    const rows = yield* listFindingsEffect(db, accountId, query, unsealer);
     const hasMore = rows.length > query.limit;
     const offset = query.cursor ? Number(query.cursor) : 0;
     return { findings: rows.slice(0, query.limit), nextCursor: hasMore ? String(offset + query.limit) : null };

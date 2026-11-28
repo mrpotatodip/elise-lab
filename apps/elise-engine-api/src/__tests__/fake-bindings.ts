@@ -3,6 +3,8 @@ import type { Bindings } from "#/types/variables";
 
 export const TEST_TOKEN = "test-token-test-token";
 
+export const TEST_DATA_MASTER_KEY = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)));
+
 // SAFETY: the app calls only waitUntil and passThroughOnException on the context.
 const executionContext = { waitUntil: () => undefined, passThroughOnException: () => undefined } as never;
 
@@ -84,6 +86,7 @@ export function fakeBindings(
     SCAN_API_TOKEN: TEST_TOKEN,
     DATABASE_URL: "postgresql://user:pass@127.0.0.1:1/none",
     AUTH_SECRET: "test-auth-secret-test-auth-secret",
+    DATA_MASTER_KEY: TEST_DATA_MASTER_KEY,
     AUTH_BASE_URL: "http://localhost",
     DASHBOARD_URL: "https://app.example.com",
     AUTH_TRUSTED_ORIGINS: "http://localhost",

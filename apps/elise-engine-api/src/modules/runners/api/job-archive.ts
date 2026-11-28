@@ -18,7 +18,7 @@ app.get("/jobs/:scanId/archive", jobArchiveDoc, zValidator("param", RunnerJobPar
   const runner = await runnerOf(c);
   const { scanId } = c.req.valid("param");
   const { body } = await runEffect(
-    jobArchiveSvc(dbConnect(c.env.DATABASE_URL), c.env.REPORTS, runner.runnerId, scanId),
+    jobArchiveSvc(dbConnect(c.env.DATABASE_URL), c.env.REPORTS, runner.runnerId, scanId, c.env.DATA_MASTER_KEY),
   );
   return c.body(body, 200, { "content-type": "application/zip" });
 });

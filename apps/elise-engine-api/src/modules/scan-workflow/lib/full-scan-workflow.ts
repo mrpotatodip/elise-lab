@@ -33,17 +33,30 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
         maxPolls: maxPollsOf(event.payload.runnerId),
         phases: event.payload.runnerId ? undefined : SCAN_SANDBOX_FULL_PHASES,
         sandbox: event.payload.runnerId
-          ? runnerSandbox(dbConnect(this.env.DATABASE_URL), event.payload, event.payload.runnerId)
+          ? runnerSandbox(
+              dbConnect(this.env.DATABASE_URL),
+              event.payload,
+              event.payload.runnerId,
+              undefined,
+              this.env.DATA_MASTER_KEY,
+            )
           : this.env.SANDBOX_FULL.getByName(event.payload.scanId),
-        ledger: neonScanRepo(dbConnect(this.env.DATABASE_URL)),
+        ledger: neonScanRepo(dbConnect(this.env.DATABASE_URL), this.env.DATA_MASTER_KEY),
         reports: this.env.REPORTS,
         sealedKeyFor: (accountId) => runEffect(findSealedKeyEffect(dbConnect(this.env.DATABASE_URL), accountId)),
         handoverFiles: (params) => {
           const db = dbConnect(this.env.DATABASE_URL);
           return runEffect(
             Effect.all([
-              handoverFilesSvc(db, params.accountId, params.repo, params.ref),
-              previousMapFilesSvc(db, r2TextStore(this.env.REPORTS), params.accountId, params.repo, params.ref),
+              handoverFilesSvc(db, params.accountId, params.repo, params.ref, this.env.DATA_MASTER_KEY),
+              previousMapFilesSvc(
+                db,
+                r2TextStore(this.env.REPORTS),
+                params.accountId,
+                params.repo,
+                params.ref,
+                this.env.DATA_MASTER_KEY,
+              ),
             ]).pipe(Effect.map((lists) => lists.flat())),
           );
         },
@@ -57,6 +70,7 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
               realAppDeps.typesafe(this.env),
               params.accountId,
               params.scanId,
+              this.env.DATA_MASTER_KEY,
             ),
           ),
         settleCredit: (params, status, usage) => settleScanCredit(this.env, params, status, usage),
