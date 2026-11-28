@@ -32,7 +32,7 @@ pub fn denied(json: bool, why: Denied) -> Exit {
                 "This needs CLI access with scope {}, and this computer holds {held}. Run `elise login` again and choose to start Scans.",
                 needed.name()
             );
-            fail(json, Exit::Unpaired, "needs_scope", &message, "elise login")
+            fail(json, Exit::Usage, "needs_scope", &message, "elise login")
         }
         Denied::Revoked => fail(
             json,

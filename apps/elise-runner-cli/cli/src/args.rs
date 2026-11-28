@@ -11,6 +11,10 @@ pub enum Command {
     Resume { scan_id: String, json: bool },
     Repos { json: bool },
     Repo { repo: String, json: bool },
+    Scans { repo: Option<String>, json: bool },
+    ScanShow { scan_id: String, json: bool },
+    Trace { scan_id: String, json: bool },
+    Stop { scan_id: String, json: bool },
     SkillInstall { dir: Option<String>, json: bool },
     Results(crate::results_args::Request),
 }
@@ -102,6 +106,12 @@ fn help_for(wanted: &str) -> Parsed {
 }
 
 pub fn parse(args: &[String]) -> Parsed {
+    if let [first, second, rest @ ..] = args {
+        if first == "scan" && second == "show" {
+            let renamed: Vec<String> = std::iter::once("scan-show".to_string()).chain(rest.iter().cloned()).collect();
+            return parse(&renamed);
+        }
+    }
     let wants_help = args.iter().any(|arg| arg == "--help" || arg == "-h");
     if wants_help {
         return match args.iter().find(|arg| !arg.starts_with('-')).and_then(|first| table::command(first)) {
@@ -138,6 +148,14 @@ pub fn parse(args: &[String]) -> Parsed {
     } else {
         (rest, None)
     };
+    let (rest, repo) = if table::accepts(spec, "--repo") {
+        match crate::scans::take_repo(&rest) {
+            Ok(taken) => taken,
+            Err(problem) => return Parsed::Usage(problem),
+        }
+    } else {
+        (rest, None)
+    };
     let (flags, positional): (Vec<&String>, Vec<&String>) = rest.iter().partition(|arg| arg.starts_with('-'));
     if let Some(flag) = flags.iter().find(|flag| !table::accepts(spec, flag)) {
         return Parsed::Usage(format!("`{command}` does not take `{flag}`"));
@@ -159,10 +177,19 @@ pub fn parse(args: &[String]) -> Parsed {
         ("unpair", []) => Parsed::Command(Command::Unpair { json: has("--json") }),
         ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel, json: has("--json") }),
         ("resume", [scan_id]) => Parsed::Command(Command::Resume { scan_id: scan_id.to_string(), json: has("--json") }),
-        ("resume", []) => Parsed::Usage("`resume` needs the Scan id of a kept work folder (`status` lists them)".to_string()),
+        ("resume", []) => Parsed::Usage("`resume` needs a Scan: a full ID, a prefix of 8 or more characters, or `latest`".to_string()),
         ("repos", []) => Parsed::Command(Command::Repos { json: has("--json") }),
         ("repo", [repo]) => Parsed::Command(Command::Repo { repo: repo.to_string(), json: has("--json") }),
         ("repo", []) => Parsed::Usage("`repo` needs a repo: a URL, owner/name, gitlab:owner/name, an ID or `.`".to_string()),
+        ("scans", []) => Parsed::Command(Command::Scans { repo, json: has("--json") }),
+        ("scan-show", [scan_id]) => Parsed::Command(Command::ScanShow { scan_id: scan_id.to_string(), json: has("--json") }),
+        ("scan-show", []) => {
+            Parsed::Usage("`scan show` needs a Scan: a full ID, a prefix of 8 or more characters, or `latest`".to_string())
+        }
+        ("trace", [scan_id]) => Parsed::Command(Command::Trace { scan_id: scan_id.to_string(), json: has("--json") }),
+        ("trace", []) => Parsed::Usage("`trace` needs a Scan: a full ID, a prefix of 8 or more characters, or `latest`".to_string()),
+        ("stop", [scan_id]) => Parsed::Command(Command::Stop { scan_id: scan_id.to_string(), json: has("--json") }),
+        ("stop", []) => Parsed::Usage("`stop` needs a Scan: a full ID, a prefix of 8 or more characters, or `latest`".to_string()),
         ("help", []) => Parsed::Help,
         ("help", [wanted]) => help_for(wanted),
         ("completions", [shell]) => Parsed::Completions(shell.to_string()),

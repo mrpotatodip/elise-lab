@@ -6,7 +6,7 @@ use elise_runner_core::cli_repos::{self, project_name, ProjectRow, RepoRow, Verd
 use elise_runner_core::engine_client::Scope;
 use serde_json::{json, Value};
 
-fn day(at: &str) -> &str {
+pub fn day(at: &str) -> &str {
     at.get(..10).unwrap_or(at)
 }
 

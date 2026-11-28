@@ -8,6 +8,7 @@ pub mod json;
 pub mod repos;
 pub mod results;
 pub mod results_args;
+pub mod scans;
 pub mod skill;
 pub mod store;
 pub mod table;
@@ -90,7 +91,11 @@ pub fn main(args: &[String]) -> Exit {
             Command::Doctor { hosts, json } => commands::doctor(&store, &hosts, json).await,
             Command::Unpair { json } => commands::unpair(&store, json).await,
             Command::Run { once, parallel, json } => commands::run(&store, once, parallel, json).await,
-            Command::Resume { scan_id, json } => commands::resume(&scan_id, json),
+            Command::Resume { scan_id, json } => scans::resume(&store, &scan_id, json).await,
+            Command::Scans { repo, json } => scans::scans(&store, repo.as_deref(), json).await,
+            Command::ScanShow { scan_id, json } => scans::show(&store, &scan_id, json).await,
+            Command::Trace { scan_id, json } => scans::trace(&store, &scan_id, json).await,
+            Command::Stop { scan_id, json } => scans::stop(&store, &scan_id, json).await,
             Command::Repos { json } => repos::repos(&store, json).await,
             Command::Repo { repo, json } => repos::repo(&store, &repo, json).await,
             Command::SkillInstall { dir, json } => skill::install(dir.as_deref(), json),

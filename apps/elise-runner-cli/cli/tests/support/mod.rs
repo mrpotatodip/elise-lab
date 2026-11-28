@@ -56,6 +56,7 @@ struct State {
     result_findings: Vec<serde_json::Value>,
     result_files: BTreeMap<(String, String), Vec<u8>>,
     result_diffs: BTreeMap<String, serde_json::Value>,
+    traces: BTreeMap<String, serde_json::Value>,
 }
 
 pub const USER_CODE: &str = "WXYZ-1234";
@@ -251,6 +252,10 @@ impl Engine {
 
     pub fn set_diff(&self, scan_id: &str, diff: serde_json::Value) {
         self.state.lock().unwrap().result_diffs.insert(scan_id.to_string(), diff);
+    }
+
+    pub fn set_trace(&self, scan_id: &str, trace: serde_json::Value) {
+        self.state.lock().unwrap().traces.insert(scan_id.to_string(), trace);
     }
 
     pub fn login_expires_at(&self, expires_at: &str) {
@@ -724,6 +729,46 @@ fn cli_answer(request: &Request, state: &mut State) -> (u16, String) {
             let page: Vec<&serde_json::Value> = rows.iter().skip(offset).take(limit).copied().collect();
             let next = (rows.len() > offset + limit).then(|| (offset + limit).to_string());
             data(serde_json::json!({ "findings": page, "nextCursor": next }))
+        }
+        ("GET", ["scans", id, "trace"]) => {
+            if !state.scans.iter().any(|scan| scan["scanId"] == *id) {
+                return refusal(404, "Scan not found");
+            }
+            let empty = serde_json::json!({ "entries": [], "cursor": null, "candidateFindings": null });
+            data(state.traces.get(*id).cloned().unwrap_or(empty))
+        }
+        ("POST", ["scans", id, "stop"]) => match state.scans.iter_mut().find(|scan| scan["scanId"] == *id) {
+            Some(scan) if matches!(scan["status"].as_str(), Some("queued" | "running")) => {
+                scan["status"] = "stopped".into();
+                scan["finishedAt"] = "2026-11-20T10:06:00.000Z".into();
+                data(scan.clone())
+            }
+            Some(_) => refusal(409, "The Scan has already finished"),
+            None => refusal(404, "Scan not found"),
+        },
+        ("POST", ["scans", id, "resume"]) => {
+            let Some(index) = state.scans.iter().position(|scan| scan["scanId"] == *id) else {
+                return refusal(404, "Scan not found");
+            };
+            if !matches!(state.scans[index]["status"].as_str(), Some("stopped" | "failed")) {
+                return refusal(400, "Only a stopped or failed Scan can be resumed");
+            }
+            let mut next = state.scans[index].clone();
+            let new_id = format!("{id}-resumed");
+            next["scanId"] = new_id.clone().into();
+            next["status"] = "queued".into();
+            next["resumesScanId"] = (*id).into();
+            state.scans[index]["resumedByScanId"] = new_id.clone().into();
+            state.scans.push(next);
+            data(serde_json::json!({
+                "scanId": new_id,
+                "status": "queued",
+                "skill": "full",
+                "model": "claude-sonnet-5-5",
+                "effort": "high",
+                "profile": "standard",
+                "maxBudgetUsd": 12,
+            }))
         }
         _ => (REJECTED.0, REJECTED.1.to_string()),
     }
