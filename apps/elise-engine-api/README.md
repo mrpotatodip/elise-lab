@@ -43,7 +43,7 @@ Copy `.dev.vars.example` to `.dev.vars` first. Scans fail in local `wrangler dev
 
 To read one route against the live database without a token, run `pnpm -s --filter elise-engine-api live:get /repos <accountId>` from the repo root.
 
-## Seal old data (the backfill, ADR 0017 step 3)
+## Seal old data (the backfill, ADR 0018 step 3)
 
 A person runs this against the live database, after migration 0116 is applied and the write step (#505) is deployed. It seals the old plain rows and the old R2 objects and Archives, one Account at a time, and writes `fingerprint_hmac` beside the old fingerprint (no fingerprint or index is changed).
 

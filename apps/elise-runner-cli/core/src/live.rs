@@ -13,12 +13,14 @@ const UPLOAD_TIMEOUT: Duration = Duration::from_secs(5);
 const FINISH_TIMEOUT: Duration = Duration::from_secs(3);
 const BATCH_MAX: usize = 200;
 const UNSENT_MAX: usize = 1000;
+const SEEN_MAX: usize = 5000;
 
 #[derive(Default)]
 struct Tail {
     offset: u64,
     pending: Vec<u8>,
     unsent: Vec<serde_json::Value>,
+    seen: Vec<serde_json::Value>,
     refused: bool,
 }
 
@@ -44,10 +46,11 @@ impl LiveSink {
 
     async fn push(&self, file: &Path, last: bool) {
         let mut waiting = self.with_tail(|tail| {
+            let fresh = read_new(file, tail, last);
+            note_seen(tail, &fresh);
             if tail.refused {
                 return Vec::new();
             }
-            let fresh = read_new(file, tail, last);
             tail.unsent.extend(fresh);
             let over = tail.unsent.len().saturating_sub(UNSENT_MAX);
             tail.unsent.drain(..over);
@@ -82,7 +85,15 @@ pub async fn scope<F: std::future::Future>(sink: LiveSink, work: F) -> F::Output
     SINK.scope(sink, work).await
 }
 
+fn note_seen(tail: &mut Tail, fresh: &[serde_json::Value]) {
+    tail.seen.extend(fresh.iter().cloned());
+    let over = tail.seen.len().saturating_sub(SEEN_MAX);
+    tail.seen.drain(..over);
+}
+
 pub struct Follow {
+    file: PathBuf,
+    sink: LiveSink,
     stop: Arc<Notify>,
     task: JoinHandle<()>,
 }
@@ -90,17 +101,22 @@ pub struct Follow {
 pub fn follow(file: &Path) -> Option<Follow> {
     let sink = SINK.try_with(Clone::clone).ok()?;
     let stop = Arc::new(Notify::new());
-    let task = tokio::spawn(push_loop(sink, file.to_path_buf(), stop.clone()));
-    Some(Follow { stop, task })
+    let task = tokio::spawn(push_loop(sink.clone(), file.to_path_buf(), stop.clone()));
+    Some(Follow { file: file.to_path_buf(), sink, stop, task })
 }
 
 impl Follow {
-    pub async fn finish(self) {
+    pub async fn finish(self) -> Vec<serde_json::Value> {
         self.stop.notify_one();
         let mut task = self.task;
         if timeout(FINISH_TIMEOUT, &mut task).await.is_err() {
             task.abort();
         }
+        self.sink.with_tail(|tail| {
+            let fresh = read_new(&self.file, tail, true);
+            note_seen(tail, &fresh);
+            std::mem::take(&mut tail.seen)
+        })
     }
 }
 

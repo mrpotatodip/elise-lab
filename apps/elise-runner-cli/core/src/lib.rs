@@ -9,3 +9,4 @@ pub mod providers;
 pub mod scan;
 pub mod store;
 mod trace;
+pub use trace::now_iso;

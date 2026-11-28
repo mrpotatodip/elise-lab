@@ -229,7 +229,10 @@ describe("sealBackfillEffect", () => {
     const findings = await test.raw.select().from(scanFindings).where(eq(scanFindings.tenantId, acme));
     const sealer = await Effect.runPromise(sealerEffect(test.http, TEST_DATA_MASTER_KEY, acme));
     const [repoRow] = await test.raw.select().from(scanRepoFindings);
-    const [triage] = await test.raw.select().from(scanFindingTriage);
+    const [triage] = await test.raw
+      .select()
+      .from(scanFindingTriage)
+      .where(eq(scanFindingTriage.fingerprint, await sha256Hex("F-1")));
     const hmacOfF1 = await sealer.fingerprint("F-1");
 
     expect(findings.map((row) => row.fingerprintHmac)).toContain(hmacOfF1);

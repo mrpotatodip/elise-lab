@@ -63,12 +63,11 @@ const FAILURE_CAUSES = {
   repo_unreadable: {
     title: "Elise could not read this repository.",
     advice:
-      "Check that the link is correct. If the repository is private, make sure this computer's git login can read it: run `elise-runner doctor`.",
+      "Check that the link is correct. If the repository is private, make sure this computer's git login can read it: run `elise doctor`.",
   },
   clone_failed: {
     title: "The repository could not be cloned.",
-    advice:
-      "Check the link. If the repository is private, run `elise-runner doctor` to check this computer's git login.",
+    advice: "Check the link. If the repository is private, run `elise doctor` to check this computer's git login.",
   },
   no_report: {
     title: "The agent stopped before it wrote the report.",
@@ -100,7 +99,7 @@ export function scanFailure(error: string | null | undefined, failureCode?: Scan
     title: cause?.title ?? (firstLine === "" ? "The scan failed." : firstLine),
     advice:
       cause?.advice ??
-      "Start a new scan of this repository to try again. If it fails the same way, check the link, and run `elise-runner doctor` if the repository is private.",
+      "Start a new scan of this repository to try again. If it fails the same way, check the link, and run `elise doctor` if the repository is private.",
     detail:
       raw === ""
         ? null

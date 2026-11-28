@@ -221,6 +221,7 @@ pub enum Event {
     Claimed { scan_id: String, repo: String },
     PhaseStarted { phase: String },
     PhaseEnded { phase: String, cost_usd: Option<f64>, pool_left_usd: f64 },
+    Finding { fingerprint: String, verdict: String, severity: Option<String> },
     RepairStarted,
     ResultSent { sent: bool },
     StoppedFromElise { repo: String, kept: Option<PathBuf> },
@@ -1098,6 +1099,15 @@ fn timed_out_message(who: &str, minutes: u64) -> String {
 
 fn settle_told(run: AgentRun, spent: &mut Spent, phase: &str, cap: f64, on_event: OnEvent<'_>) -> Result<(), Halt> {
     let cost_usd = run.result.as_ref().and_then(cost_of);
+    for record in &run.findings {
+        if let Some(fingerprint) = record["fingerprint"].as_str() {
+            on_event(Event::Finding {
+                fingerprint: fingerprint.to_string(),
+                verdict: record["verdict"].as_str().unwrap_or_default().to_string(),
+                severity: record["severity"]["overall_severity"].as_str().map(str::to_string),
+            });
+        }
+    }
     let settled = settle(run, spent, phase, cap);
     on_event(Event::PhaseEnded { phase: phase.to_string(), cost_usd, pool_left_usd: money(cap - spent.used()) });
     settled
@@ -1580,6 +1590,7 @@ struct AgentRun {
     end: Result<AgentEnd, String>,
     result: Option<serde_json::Value>,
     stdout: String,
+    findings: Vec<serde_json::Value>,
 }
 
 // One run of `claude` on one prompt, within `limit`. A Phase writes its own log and error file and
@@ -1644,9 +1655,10 @@ async fn run_agent(
     if let Some(following) = following {
         following.finish().await;
     }
-    if let Some(pushing) = pushing {
-        pushing.finish().await;
-    }
+    let findings = match pushing {
+        Some(pushing) => pushing.finish().await,
+        None => Vec::new(),
+    };
     let status = match waited {
         Ok(status) => status.map_err(|e| format!("Claude Code stopped unexpectedly: {e}"))?,
         Err(why) => {
@@ -1657,7 +1669,7 @@ async fn run_agent(
                 append_to_log(work, &stdout);
             }
             let end = if why == TIMED_OUT { Ok(AgentEnd::TimedOut(limit.as_secs() / 60)) } else { Err(why) };
-            return Ok(AgentRun { end, result: last_result(&stdout), stdout });
+            return Ok(AgentRun { end, result: last_result(&stdout), stdout, findings });
         }
     };
     let stdout = fs::read_to_string(work.join(&log_name)).unwrap_or_default();
@@ -1685,7 +1697,7 @@ async fn run_agent(
             })
         }
     };
-    Ok(AgentRun { end, result: last_result(&stdout), stdout })
+    Ok(AgentRun { end, result: last_result(&stdout), stdout, findings })
 }
 
 // What the agent itself said when it ended, from the `result` of its final JSON object: a refusal such as

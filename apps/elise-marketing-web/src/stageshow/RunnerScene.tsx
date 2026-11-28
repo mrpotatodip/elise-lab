@@ -35,7 +35,7 @@ import "./card.css";
 import "./scenes.css";
 import "./runner.css";
 
-// How Elise works with a Runner, as the dashboard shows it today. `elise-runner run` in a terminal
+// How Elise works with a Runner, as the dashboard shows it today. `elise run` in a terminal
 // claims a Scan started in Elise. The Scans list says "In progress" and nothing more (as
 // scan-list.tsx does); the Scan page (scan-detail.tsx) is where the work shows: the info notice, a
 // "Findings so far" table that fills as the checks decide, and the Trace, grouped by Phase. Then
@@ -47,7 +47,7 @@ import "./runner.css";
 // dash, a UUID) and is cut after the first part for the picture. The repository, the id, the costs and the Pool (the Focused profile's $6 cap)
 // are made up, and the page says so. The terminal prints plain text, as the Runner does: no colour.
 
-const COMMAND = "elise-runner run";
+const COMMAND = "elise run";
 
 // The real id is nine base-36 characters, a dash and a UUID; the picture shows the first part and
 // an ellipsis so each line fits the small terminal.
@@ -775,8 +775,8 @@ export default function RunnerScene() {
               </div>
             </Window>
 
-            {/* The Runner, on your own computer: the log of `elise-runner run`, newest line at the foot. */}
-            <Window chrome="terminal" lights="grey" title="elise-runner" className="rn-term">
+            {/* The Runner, on your own computer: the log of `elise run`, newest line at the foot. */}
+            <Window chrome="terminal" lights="grey" title="elise" className="rn-term">
               <div className="rn-log">
                 <Prompt path="~/code">
                   {s.cmd}

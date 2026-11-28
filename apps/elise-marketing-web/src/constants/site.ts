@@ -102,10 +102,10 @@ export const STEPS = [
 
 // Under "Get the Runner". The command and the releases page are the ones the dashboard's Getting
 // started guide shows (GETTING_STARTED_INSTALL_COMMAND and GETTING_STARTED_DESKTOP_URL), so keep them equal.
-// The site offers only the terminal Runner (the `elise-runner` binary), not the desktop app.
+// The site offers only the terminal Runner (the `elise` binary), not the desktop app.
 // The download buttons point at one pinned release. When a new elise-runner-v* release is published,
 // change `version` (the file names come from .github/workflows/release-elise-runner.yml).
-const RUNNER_VERSION = "0.6.0";
+const RUNNER_VERSION = "0.7.0";
 const RUNNER_RELEASES = "https://github.com/mrpotatodip/elise-lab/releases";
 const runnerFile = (asset: string) => `${RUNNER_RELEASES}/download/elise-runner-v${RUNNER_VERSION}/${asset}`;
 
@@ -128,9 +128,9 @@ export const RUNNER = {
     " on it, and if macOS refuses to open it, run ",
     { code: "xattr -d com.apple.quarantine" },
     " on it. Then move it onto your PATH as ",
-    { code: "elise-runner" },
+    { code: "elise" },
     ". On Windows, rename the file to ",
-    { code: "elise-runner.exe" },
+    { code: "elise.exe" },
     " and put it in a folder on your PATH.",
   ],
   commandLabel: "Or install from a terminal, which does all of that for you",
@@ -141,9 +141,9 @@ export const RUNNER = {
     "irm https://raw.githubusercontent.com/mrpotatodip/elise-lab/main/apps/elise-runner-cli/install.ps1 | iex",
   after: [
     "With either option, run ",
-    { code: "elise-runner login" },
+    { code: "elise login" },
     " and then ",
-    { code: "elise-runner doctor" },
+    { code: "elise doctor" },
     ". The macOS and Linux install puts the Runner in ",
     { code: "~/.local/bin" },
     " and the Windows install in your user folder, and both take the newest release for your system.",

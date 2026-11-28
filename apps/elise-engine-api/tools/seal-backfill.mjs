@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // pnpm --filter elise-engine-api seal:backfill [--dry] [--batch N] [--max-batches N] [--account ID]
-// Seals the old plain rows and R2 objects of every Account (ADR 0017, step 3).
+// Seals the old plain rows and R2 objects of every Account (ADR 0018, step 3).
 // Resumable: run it again after a stop. A person runs it, never an agent.
 // Needs, in the environment or in packages/db-elise/.env: DATABASE_URL (owner),
 // DATA_MASTER_KEY (the Worker's), and for R2 over the S3 API: R2_ACCOUNT_ID,

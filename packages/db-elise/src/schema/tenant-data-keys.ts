@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { tenants } from "./tenant";
 
 // -----
-// The Data key of an Account (ADR 0017): the key that seals the
+// The Data key of an Account (ADR 0018): the key that seals the
 // Account's free text. One row per Account, made on first use.
 // wrapped_key is the key locked by the master secret that lives
 // only in the Worker (AES-GCM, with the Account ID as additional

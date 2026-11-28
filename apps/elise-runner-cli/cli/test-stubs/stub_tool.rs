@@ -240,6 +240,11 @@ fn claude(record: &Path, args: &[String]) {
             append(live, r#"{"verdict":"needs_validation","fingerprint":"fp-2"}"#);
             std::thread::sleep(std::time::Duration::from_secs(3));
             append(live, r#"{"verdict":"confirmed","fingerprint":"fp-3"}"#);
+        } else if prompt.contains("live=detail") {
+            append(
+                live,
+                r#"{"verdict":"confirmed","fingerprint":"fp-detail","title":"MODEL-WORDS title","description":"MODEL-WORDS description","severity":{"overall_severity":"high"},"evidence":[{"file":"a.ts","line":1,"description":"MODEL-WORDS"}],"remediation":{"strategy":"MODEL-WORDS fix"}}"#,
+            );
         } else if prompt.contains("live=late") {
             append(live, r#"{"verdict":"confirmed","fingerprint":"fp-late"}"#);
         }

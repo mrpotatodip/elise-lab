@@ -82,7 +82,7 @@ export function RunnerAddDialog() {
             <DialogBody className="grid gap-3">
               <p className="text-sm">
                 On <span className="font-medium">{created.name}</span>, run{" "}
-                <span className="font-mono">elise-runner pair</span> followed by this code. It works once and expires at{" "}
+                <span className="font-mono">elise pair</span> followed by this code. It works once and expires at{" "}
                 {runnerWhen(created.expiresAt)}.
               </p>
               <Label htmlFor="runner-code">Pairing code</Label>

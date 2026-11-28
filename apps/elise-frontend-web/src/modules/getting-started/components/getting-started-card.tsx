@@ -112,7 +112,7 @@ export function GettingStartedCard() {
           </Task>
           <Task done={done("first-scan")} title="Start a first Scan">
             <p className="max-w-copy text-sm leading-relaxed text-muted-foreground">
-              Keep <code className="font-mono">elise-runner run</code> open on the computer so it picks the Scan up.
+              Keep <code className="font-mono">elise run</code> open on the computer so it picks the Scan up.
             </p>
             <div>
               <ScanNewDialog label="Start a Scan" variant="outline" />

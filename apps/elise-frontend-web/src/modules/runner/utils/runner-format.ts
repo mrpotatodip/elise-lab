@@ -35,7 +35,7 @@ export const runnerAddedBy = (runner: Runner): string | null =>
 // -----
 export const runnerDetail = (runner: Runner): string => {
   if (runner.state === "waiting" && runner.expiresAt !== null)
-    return `Run elise-runner pair with the code before ${runnerWhen(runner.expiresAt)}.`;
+    return `Run elise pair with the code before ${runnerWhen(runner.expiresAt)}.`;
   if (runner.state === "expired")
     return "The code ran out before the app used it. Remove this and add the computer again.";
   return runner.lastSeenAt === null ? "Not seen yet." : `Last seen ${runnerWhen(runner.lastSeenAt)}.`;

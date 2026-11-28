@@ -75,7 +75,7 @@ A program on a person's computer (`apps/elise-runner-cli`) that claims a Scan an
 _Avoid_: Worker (that is the Cloudflare Worker), agent (that is the program it starts)
 
 **Elise CLI**:
-The command-line program `elise` (`apps/elise-runner-cli`), for people and for agents. Its `run` mode is the headless Runner. Its output and exit codes are a contract that agents rely on, so they change only by addition.
+The command-line program `elise` (`apps/elise-runner-cli`), for people and for agents. Its `run` mode is the headless Runner. With `--json` every command prints one object with a `schemaVersion` on standard output and prose on standard error, `run --json` prints one event per line, and it never prompts when no terminal is attached or with `--no-input`. Its `--json` output, its events and its exit codes are a contract that agents rely on, so they change only by addition. ADR 0017 holds the rule.
 _Avoid_: elise-runner (the old command name), headless Runner for the whole program (that is only its `run` mode)
 
 **CLI access**:

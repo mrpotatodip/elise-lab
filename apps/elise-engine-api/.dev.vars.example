@@ -3,7 +3,7 @@ SCAN_API_TOKEN=
 ANTHROPIC_API_KEY=
 # Optional: lets an account save its own Anthropic key. Any long random string.
 KEY_ENCRYPTION_SECRET=
-# Required: locks every Account's Data key (ADR 0017). 32 random bytes in base64: `openssl rand -base64 32`. Keep a copy in a second secret store: lose it and every Account's sealed text is lost.
+# Required: locks every Account's Data key (ADR 0018). 32 random bytes in base64: `openssl rand -base64 32`. Keep a copy in a second secret store: lose it and every Account's sealed text is lost.
 DATA_MASTER_KEY=
 # Stripe, test mode first: the secret key and the webhook endpoint's signing secret.
 STRIPE_SECRET_KEY=
