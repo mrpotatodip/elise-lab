@@ -1,7 +1,13 @@
 import { tenantDataKeys } from "@repo/db-elise/schema";
 import { TEST_DATA_MASTER_KEY } from "#/__tests__/fake-bindings";
 import type { TestDb } from "#/__tests__/test-db";
-import { makeDataKey, parseMasterKey, sealBytes, sealText } from "#/modules/sealed-data/utils";
+import { makeDataKey, makeSealer, parseMasterKey, sealBytes, sealText, type Sealer } from "#/modules/sealed-data/utils";
+
+export const testSealer = async (tenantId: string): Promise<Sealer> => {
+  const master = await parseMasterKey(TEST_DATA_MASTER_KEY);
+  if (!master) throw new Error("the test master key must parse");
+  return makeSealer((await makeDataKey(master, tenantId)).dataKey, tenantId);
+};
 
 // -----
 // Gives an Account a Data key under the test master key and returns

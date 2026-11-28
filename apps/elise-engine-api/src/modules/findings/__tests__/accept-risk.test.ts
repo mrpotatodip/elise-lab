@@ -5,17 +5,21 @@ import { scanFindings, scanFindingTriage, scans } from "@repo/db-elise/schema";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asTenantEffect, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { testSealer } from "#/__tests__/sealed-test-helpers";
 import { listFindingsEffect, setTriageEffect } from "#/modules/findings/queries";
+import type { Sealer } from "#/modules/sealed-data";
 
 let test: TestDb;
 let tenantId: string;
 let repoId: string;
 let partyId: string;
+let sealer: Sealer;
 
 const REPO = "https://github.com/octocat/Hello-World";
 const NOW = new Date("2026-11-10T00:00:00Z");
 const DAY_MS = 86_400_000;
 const fp = (letter: string) => letter.repeat(64);
+const SEALED = /^sealed:v1:/;
 
 const body = (letter: string, overrides: Partial<FindingTriageBody> = {}): FindingTriageBody => ({
   repo: REPO,
@@ -28,7 +32,7 @@ const body = (letter: string, overrides: Partial<FindingTriageBody> = {}): Findi
 
 const set = (input: FindingTriageBody, serviceTokenOrLogin: string | null = "admin") =>
   asTenantEffect(test, tenantId, (db) =>
-    setTriageEffect(db, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW),
+    setTriageEffect(db, tenantId, repoId, input, serviceTokenOrLogin ?? undefined, NOW, sealer),
   );
 
 // -----
@@ -45,6 +49,7 @@ beforeAll(async () => {
   const seeded = await seedTenant(test, "acme");
   tenantId = seeded.tenantId;
   partyId = seeded.partyId;
+  sealer = await testSealer(tenantId);
   repoId = await seedRepo(test, tenantId, REPO);
   await test.raw.insert(authUser).values({ id: "admin", name: "Ada Rossi", email: "ada@example.com", partyId });
   await test.raw
@@ -90,7 +95,7 @@ describe("an accepted risk", () => {
           tenantId,
           fingerprint: fp("a"),
           status: "accepted_risk",
-          note: "Behind the VPN until the rewrite",
+          note: expect.stringMatching(SEALED),
           acceptedUntil: new Date(NOW.getTime() + 30 * DAY_MS).toISOString(),
           duplicateOf: null,
         },
@@ -125,7 +130,7 @@ describe("every other decision", () => {
           tenantId,
           fingerprint: fp("b"),
           status: "false_positive",
-          note: "test fixture",
+          note: expect.stringMatching(SEALED),
           acceptedUntil: null,
           duplicateOf: null,
         },
@@ -141,7 +146,7 @@ describe("every other decision", () => {
     expect(rows[1]).toMatchObject({
       action: "finding.triage.set",
       actorPartyId: partyId,
-      before: { status: "false_positive", note: "test fixture", acceptedUntil: null },
+      before: { status: "false_positive", note: expect.stringMatching(SEALED), acceptedUntil: null },
     });
   });
 

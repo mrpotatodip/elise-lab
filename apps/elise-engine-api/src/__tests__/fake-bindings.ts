@@ -17,25 +17,35 @@ export function fakeBindings(
   overrides: Partial<Bindings> = {},
   workflowStatus: WorkflowStatus = { status: "running" },
 ) {
-  const store = new Map<string, string>();
+  const store = new Map<string, string | ArrayBuffer>();
+  const metadata = new Map<string, Record<string, string> | undefined>();
   const uploadedAt = new Map<string, Date>();
   const createdFull: Created[] = [];
 
   const reports = {
-    put: async (key: string, value: string) => {
+    put: async (key: string, value: string | ArrayBuffer, options?: { customMetadata?: Record<string, string> }) => {
       store.set(key, value);
+      metadata.set(key, options?.customMetadata);
       uploadedAt.set(key, new Date());
     },
     delete: async (keys: string | string[]) => {
       for (const key of [keys].flat()) {
         store.delete(key);
+        metadata.delete(key);
         uploadedAt.delete(key);
       }
     },
     get: async (key: string) => {
       const value = store.get(key);
       if (value === undefined) return null;
-      return { body: value, json: async () => JSON.parse(value), text: async () => value };
+      const textOf = async () => (value instanceof ArrayBuffer ? new TextDecoder().decode(value) : value);
+      return {
+        body: value,
+        customMetadata: metadata.get(key),
+        arrayBuffer: async () => (value instanceof ArrayBuffer ? value : new TextEncoder().encode(value).buffer),
+        json: async () => JSON.parse(await textOf()),
+        text: textOf,
+      };
     },
     list: async (options: { prefix: string; limit?: number; cursor?: string; delimiter?: string }) => {
       if (options.delimiter === undefined) {

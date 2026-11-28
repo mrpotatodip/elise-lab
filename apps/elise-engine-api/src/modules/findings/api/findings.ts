@@ -37,7 +37,9 @@ app.put(
       body.status === "accepted_risk" ? await assertPower(c, "company:findings:accepted_risk:update") : c.get("userId");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(setFindingTriageSvc(db, accountId, body, userId)));
+      .withTenant(c, accountId, (db) =>
+        runEffect(setFindingTriageSvc(db, accountId, body, userId, c.env.DATA_MASTER_KEY)),
+      );
     return c.json({ data, error: null });
   },
 );

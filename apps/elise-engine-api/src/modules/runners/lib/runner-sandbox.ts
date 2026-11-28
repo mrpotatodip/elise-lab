@@ -8,7 +8,7 @@ import type { ScanParams } from "#/schemas";
 import { RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_PICKED_UP, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { cancelRunnerJobEffect, insertRunnerJobEffect, readRunnerJobEffect } from "#/modules/runners/queries";
 import { buildAgentPrompt } from "#/modules/scan-sandbox";
-import { openJobText, unsealerEffect } from "#/modules/sealed-data";
+import { openJobText, sealerEffect, unsealerEffect } from "#/modules/sealed-data";
 import type { SandboxPort } from "#/modules/scan-workflow/types";
 
 const FilesSchema = z.record(z.string(), z.string());
@@ -38,6 +38,7 @@ export const runnerSandbox = (
     putHandoverFiles: async () => undefined,
 
     launchAgent: async (options) => {
+      const sealer = await runEffect(sealerEffect(db, masterKey, params.accountId));
       await runEffect(
         insertRunnerJobEffect(db, {
           scanId: params.scanId,
@@ -45,9 +46,9 @@ export const runnerSandbox = (
           runnerId,
           repoUrl: params.repo,
           ref: params.ref ?? null,
-          prompt: buildAgentPrompt(options, RUNNER_PROMPT_PLACE),
-          optionsJson: JSON.stringify(options),
-          priorsJson: "",
+          prompt: await sealer.text(buildAgentPrompt(options, RUNNER_PROMPT_PLACE)),
+          optionsJson: await sealer.text(JSON.stringify(options)),
+          priorsJson: await sealer.text(""),
           resumesScanId: params.resumesScanId ?? null,
         }),
       );

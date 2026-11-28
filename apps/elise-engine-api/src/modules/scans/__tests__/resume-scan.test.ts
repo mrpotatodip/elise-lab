@@ -21,8 +21,7 @@ import {
   RESUME_POOL_SPENT_MESSAGE,
   RESUME_SUCCEEDED_MESSAGE,
 } from "#/modules/scans/constants";
-import { claimJobSvc } from "#/modules/runners/handlers";
-import { runnerSandbox } from "#/modules/runners/lib";
+import { claimJobSvc, runnerSandbox } from "#/__tests__/keyed-test-deps";
 import { claimPairingEffect, createRunnerEffect } from "#/modules/runners/queries";
 
 let test: TestDb;

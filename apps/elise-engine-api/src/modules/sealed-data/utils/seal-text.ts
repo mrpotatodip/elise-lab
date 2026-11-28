@@ -102,7 +102,7 @@ export const openText = async (key: DataKey, accountId: string, value: string): 
   }
 };
 
-export const sealBytes = async (key: DataKey, accountId: string, bytes: ArrayBuffer): Promise<ArrayBuffer> => {
+export const sealBytes = async (key: DataKey, accountId: string, bytes: BufferSource): Promise<ArrayBuffer> => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const sealed = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv, additionalData: encoder.encode(accountId) },

@@ -6,15 +6,15 @@ import { z } from "zod";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
-import { claimJobSvc, reportJobSvc } from "#/modules/runners/handlers";
-import { runnerSandbox } from "#/modules/runners/lib";
+import { claimJobSvc, reportJobSvc, runnerSandbox } from "#/__tests__/keyed-test-deps";
 import {
   claimPairingEffect,
   claimRunnerJobEffect,
   createRunnerEffect,
   readRunnerJobEffect,
 } from "#/modules/runners/queries";
-import { activeScansEffect, neonScanRepo } from "#/modules/scan-ledger";
+import { activeScansEffect } from "#/modules/scan-ledger";
+import { neonScanRepo } from "#/__tests__/keyed-test-deps";
 
 let test: TestDb;
 let tenantId: string;

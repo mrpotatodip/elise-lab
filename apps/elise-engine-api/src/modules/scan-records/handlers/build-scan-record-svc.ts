@@ -4,6 +4,7 @@ import { OPEN_PROBLEM_CHECKS_FILE } from "#/constants";
 import { toExternalError, toParseError, type ExternalError, type ParseError } from "#/lib/effect-query";
 import type { ScanParams, ScanState } from "#/schemas";
 import { readScanFileEffect, scanKey } from "#/modules/scan-store";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 import {
   SCAN_RECORDS_FINDINGS_FILE,
   SCAN_RECORDS_LEDGER_FILE,
@@ -20,10 +21,23 @@ import {
 import type { NewFindingRow, ScanBranch, ScanRecord } from "#/modules/scan-records/types";
 import { checkRunnerProfile, fullFindingRowOf, isPartialScan, profileMetOf } from "#/modules/scan-records/utils";
 
-const readText = (reports: R2Bucket, params: ScanParams, file: string): Effect.Effect<string | null, ExternalError> =>
+const readText = (
+  reports: R2Bucket,
+  params: ScanParams,
+  file: string,
+  unsealer: Unsealer,
+): Effect.Effect<string | null, ExternalError> =>
   Effect.gen(function* () {
     const object = yield* readScanFileEffect(reports, scanKey(params.accountId, params.scanId, file));
-    return object ? yield* Effect.tryPromise({ try: () => object.text(), catch: toExternalError }) : null;
+    if (!object) return null;
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const body = await unsealer.object(object);
+        if (body === null) throw new Error(`${file} of the Scan cannot be read`);
+        return new Response(body).text();
+      },
+      catch: toExternalError,
+    });
   });
 
 export const openProblemChecksOf = (text: string | null): Effect.Effect<OpenProblemCheck[] | null> =>
@@ -49,6 +63,7 @@ export const openProblemChecksOf = (text: string | null): Effect.Effect<OpenProb
 const readProfileScan = (
   reports: R2Bucket,
   params: ScanParams,
+  unsealer: Unsealer,
 ): Effect.Effect<
   {
     findings: NewFindingRow[];
@@ -59,7 +74,7 @@ const readProfileScan = (
   ExternalError | ParseError
 > =>
   Effect.gen(function* () {
-    const findingsText = yield* readText(reports, params, SCAN_RECORDS_FINDINGS_FILE);
+    const findingsText = yield* readText(reports, params, SCAN_RECORDS_FINDINGS_FILE, unsealer);
     const records =
       findingsText === null
         ? []
@@ -71,10 +86,12 @@ const readProfileScan = (
       try: () => Promise.all([...kept.values()].map((record) => fullFindingRowOf(record, params))),
       catch: toExternalError,
     });
-    const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE);
-    const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE);
-    const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE);
-    const openProblemChecks = yield* openProblemChecksOf(yield* readText(reports, params, OPEN_PROBLEM_CHECKS_FILE));
+    const report = yield* readText(reports, params, SCAN_RECORDS_REPORT_FILE, unsealer);
+    const ledger = yield* readText(reports, params, SCAN_RECORDS_LEDGER_FILE, unsealer);
+    const metadata = yield* readText(reports, params, SCAN_RECORDS_METADATA_FILE, unsealer);
+    const openProblemChecks = yield* openProblemChecksOf(
+      yield* readText(reports, params, OPEN_PROBLEM_CHECKS_FILE, unsealer),
+    );
     const scoped = (params.options.scopePaths?.length ?? 0) > 0;
     const check =
       params.runnerId && !scoped
@@ -96,6 +113,7 @@ export const buildScanRecordSvc = (
   status: ScanState,
   error: string | null,
   usage: ScanUsage | null,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<ScanRecord, ExternalError | ParseError> =>
   Effect.gen(function* () {
     // -----
@@ -107,7 +125,7 @@ export const buildScanRecordSvc = (
     // -----
     const profile =
       status === "succeeded" && params.options.skill === SCAN_RECORDS_PROFILE_SKILL
-        ? yield* readProfileScan(reports, params)
+        ? yield* readProfileScan(reports, params, unsealer)
         : null;
     return {
       scan: {

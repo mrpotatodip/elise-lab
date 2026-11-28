@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanParams } from "#/schemas";
-import { neonScanRepo } from "#/modules/scan-ledger";
+import { neonScanRepo } from "#/__tests__/keyed-test-deps";
 import { buildScanRecordSvc } from "#/modules/scan-records";
 import { writeScanRecordEffect } from "#/modules/scan-records/queries";
 

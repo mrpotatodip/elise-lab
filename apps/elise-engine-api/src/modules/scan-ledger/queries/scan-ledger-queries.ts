@@ -12,13 +12,13 @@ import {
 } from "@repo/db-elise/schema";
 import { SCAN_SERVABLE_FILES } from "#/constants";
 import type { AppDbType, AppTxDbType, DbConnectType } from "#/lib/db-connection";
-import { Conflict, NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { Conflict, NotFound, toDbError, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import { scanArchivesEffect } from "#/modules/archives/queries";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { PG_UNIQUE_VIOLATION, pgErrorCode, pgErrorConstraint } from "#/lib/pg-error";
 import { RESUME_ALREADY_RESUMED_MESSAGE } from "#/modules/scans/constants";
 import type { ScanParams, ScanStatus } from "#/schemas";
-import { CANNOT_READ, unsealerEffect, type Unsealer } from "#/modules/sealed-data";
+import { CANNOT_READ, sealerEffect, unsealerEffect, type Unsealer } from "#/modules/sealed-data";
 import type { ScanPage, ScanReads, ScanRepo } from "#/modules/scan-ledger/types";
 import {
   displayRepoUrlOf,
@@ -390,50 +390,63 @@ const scanWrites = (db: AppDbType, masterKey?: string): Omit<ScanRepo, "create">
 
   mark: (accountId, scanId, patch) => {
     const ended = patch.status === "succeeded" || patch.status === "failed";
-    return Effect.tryPromise({
-      try: () => {
-        const update = db
-          .update(scans)
-          .set({
-            ...(patch.status !== undefined && { status: patch.status }),
-            ...(patch.step !== undefined && { step: patch.step }),
-            ...(patch.error !== undefined && { error: patch.error }),
-            ...(patch.commitSha !== undefined && { commitSha: patch.commitSha }),
-            ...(patch.branch !== undefined && { branch: patch.branch }),
-            ...(patch.resumesScanId === null && { resumesScanId: null }),
-            ...(ended && { finishedAt: new Date(), step: null }),
-            ...(patch.usage && {
-              inputTokens: patch.usage.inputTokens,
-              outputTokens: patch.usage.outputTokens,
-              cacheReadTokens: patch.usage.cacheReadTokens,
-              cacheWriteTokens: patch.usage.cacheWriteTokens,
-              costUsd: patch.usage.costUsd.toFixed(4),
-              phaseUsage: patch.usage.phases ?? null,
-              turns: patch.usage.turns,
-              durationMs: patch.usage.durationMs,
-            }),
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(scans.tenantId, accountId),
-              eq(scans.id, scanId),
-              ne(scans.status, "stopped"),
-              patch.status === "failed" ? undefined : ne(scans.status, "failed"),
+    const sealedError: Effect.Effect<string | null | undefined, DbError | ExternalError> =
+      patch.error === undefined || patch.error === null
+        ? Effect.succeed(patch.error)
+        : sealerEffect(db, masterKey, accountId).pipe(
+            Effect.flatMap((sealer) =>
+              Effect.tryPromise({ try: () => sealer.text(patch.error ?? ""), catch: toExternalError }),
             ),
           );
-        if (patch.status !== "failed") return update;
-        const changed = db.$with("changed").as(update.returning({ id: scans.id }));
-        const cleared = db.$with("cleared").as(
-          db
-            .delete(scanFindings)
-            .where(inArray(scanFindings.scanId, db.select({ id: changed.id }).from(changed)))
-            .returning({ id: scanFindings.id }),
-        );
-        return db.with(changed, cleared).select({ id: changed.id }).from(changed);
-      },
-      catch: toDbError,
-    }).pipe(Effect.asVoid);
+    return sealedError.pipe(
+      Effect.flatMap((error) =>
+        Effect.tryPromise({
+          try: () => {
+            const update = db
+              .update(scans)
+              .set({
+                ...(patch.status !== undefined && { status: patch.status }),
+                ...(patch.step !== undefined && { step: patch.step }),
+                ...(error !== undefined && { error }),
+                ...(patch.commitSha !== undefined && { commitSha: patch.commitSha }),
+                ...(patch.branch !== undefined && { branch: patch.branch }),
+                ...(patch.resumesScanId === null && { resumesScanId: null }),
+                ...(ended && { finishedAt: new Date(), step: null }),
+                ...(patch.usage && {
+                  inputTokens: patch.usage.inputTokens,
+                  outputTokens: patch.usage.outputTokens,
+                  cacheReadTokens: patch.usage.cacheReadTokens,
+                  cacheWriteTokens: patch.usage.cacheWriteTokens,
+                  costUsd: patch.usage.costUsd.toFixed(4),
+                  phaseUsage: patch.usage.phases ?? null,
+                  turns: patch.usage.turns,
+                  durationMs: patch.usage.durationMs,
+                }),
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(scans.tenantId, accountId),
+                  eq(scans.id, scanId),
+                  ne(scans.status, "stopped"),
+                  patch.status === "failed" ? undefined : ne(scans.status, "failed"),
+                ),
+              );
+            if (patch.status !== "failed") return update;
+            const changed = db.$with("changed").as(update.returning({ id: scans.id }));
+            const cleared = db.$with("cleared").as(
+              db
+                .delete(scanFindings)
+                .where(inArray(scanFindings.scanId, db.select({ id: changed.id }).from(changed)))
+                .returning({ id: scanFindings.id }),
+            );
+            return db.with(changed, cleared).select({ id: changed.id }).from(changed);
+          },
+          catch: toDbError,
+        }),
+      ),
+      Effect.asVoid,
+    );
   },
 
   addFiles: (accountId, scanId, files) =>

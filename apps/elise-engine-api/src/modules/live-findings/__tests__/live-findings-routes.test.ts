@@ -9,7 +9,8 @@ import {
   type RunnerIdentity,
   type SaveLiveFindingsBody,
 } from "@repo/contracts/elise";
-import { fakeBindings, testExecutionContext } from "#/__tests__/fake-bindings";
+import { fakeBindings, TEST_DATA_MASTER_KEY, testExecutionContext } from "#/__tests__/fake-bindings";
+import { sealerEffect } from "#/modules/sealed-data";
 import { asTenant, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { sha256Hex } from "@repo/db-elise";
@@ -73,10 +74,14 @@ const post = (scanId: string, body: SaveLiveFindingsBody, token = RUNNER_TOKEN) 
   );
 };
 
-const rowsOf = async (scanId: string) =>
-  (await test.raw.select().from(scanFindings).where(eq(scanFindings.scanId, scanId))).toSorted((a, b) =>
-    a.findingId.localeCompare(b.findingId),
+const rowsOf = async (scanId: string) => {
+  const { open } = await Effect.runPromise(sealerEffect(test.pool, TEST_DATA_MASTER_KEY, tenantId));
+  const rows = await test.raw.select().from(scanFindings).where(eq(scanFindings.scanId, scanId));
+  const opened = await Promise.all(
+    rows.map(async (row) => ({ ...row, findingId: await open.text(row.findingId), title: await open.text(row.title) })),
   );
+  return opened.toSorted((a, b) => a.findingId.localeCompare(b.findingId));
+};
 const statusOf = async (scanId: string) =>
   (await test.raw.select({ status: scans.status }).from(scans).where(eq(scans.id, scanId)))[0]?.status;
 
@@ -135,6 +140,20 @@ describe("POST /runners/jobs/:scanId/findings", () => {
       ["A", "confirmed", "Renamed twice"],
       ["B", "needs_validation", "Maybe"],
     ]);
+  });
+
+  it("stores the id and the text sealed, and a repeated record replaces the sealed row it opens to", async () => {
+    const { scanId } = await runnerScan();
+    await post(scanId, { findings: [confirmed("A")] });
+    const [first] = await test.raw.select().from(scanFindings).where(eq(scanFindings.scanId, scanId));
+    await post(scanId, { findings: [confirmed("A", "Renamed")] });
+    const raw = await test.raw.select().from(scanFindings).where(eq(scanFindings.scanId, scanId));
+
+    expect([first.findingId, first.title, first.impact]).toEqual(
+      Array.from({ length: 3 }, () => expect.stringMatching(/^sealed:v1:/)),
+    );
+    expect(raw).toHaveLength(1);
+    expect((await rowsOf(scanId)).map((row) => [row.findingId, row.title])).toEqual([["A", "Renamed"]]);
   });
 
   it.each(["succeeded", "failed", "stopped", "queued"] as const)(
@@ -270,7 +289,9 @@ describe("the end of a Scan", () => {
     const { scanId } = await runnerScan();
     await post(scanId, { findings: [confirmed("A")] });
     await asTenant(test, tenantId, (db) =>
-      Effect.runPromise(tenantScanRepo(db).mark(tenantId, scanId, { status: "failed", error: "boom" })),
+      Effect.runPromise(
+        tenantScanRepo(db, TEST_DATA_MASTER_KEY).mark(tenantId, scanId, { status: "failed", error: "boom" }),
+      ),
     );
 
     expect(await statusOf(scanId)).toBe("failed");

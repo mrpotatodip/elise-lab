@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 import type { ScanStateValue } from "@repo/contracts/elise";
 import { scanFindings, scans } from "@repo/db-elise/schema";
@@ -10,68 +10,40 @@ export const lockScanStatusEffect = (
   db: AppDbType,
   tenantId: string,
   scanId: string,
-): Effect.Effect<ScanStateValue | null, DbError> =>
+): Effect.Effect<{ status: ScanStateValue; repoId: string } | null, DbError> =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ status: scans.status })
+        .select({ status: scans.status, repoId: scans.repoId })
         .from(scans)
         .where(and(eq(scans.tenantId, tenantId), eq(scans.id, scanId)))
         .for("share")
-        .then(([row]) => row?.status ?? null),
+        .then(([row]) => row ?? null),
     catch: toDbError,
   });
 
-export const countLiveFindingsEffect = (db: AppDbType, scanId: string): Effect.Effect<number, DbError> =>
+export const liveFindingIdsEffect = (
+  db: AppDbType,
+  scanId: string,
+): Effect.Effect<{ id: string; findingId: string }[], DbError> =>
   Effect.tryPromise({
     try: () =>
       db
-        .select({ total: count() })
+        .select({ id: scanFindings.id, findingId: scanFindings.findingId })
         .from(scanFindings)
-        .where(eq(scanFindings.scanId, scanId))
-        .then(([row]) => row?.total ?? 0),
+        .where(eq(scanFindings.scanId, scanId)),
     catch: toDbError,
   });
 
-export const knownFindingIdsEffect = (
+export const replaceLiveFindingsEffect = (
   db: AppDbType,
-  scanId: string,
-  ids: readonly string[],
-): Effect.Effect<Set<string>, DbError> =>
-  ids.length === 0
-    ? Effect.succeed(new Set<string>())
-    : Effect.tryPromise({
-        try: () =>
-          db
-            .select({ findingId: scanFindings.findingId })
-            .from(scanFindings)
-            .where(and(eq(scanFindings.scanId, scanId), inArray(scanFindings.findingId, [...ids])))
-            .then((rows) => new Set(rows.map((row) => row.findingId))),
-        catch: toDbError,
-      });
-
-export const upsertLiveFindingsEffect = (db: AppDbType, rows: readonly NewFindingRow[]): Effect.Effect<void, DbError> =>
-  rows.length === 0
-    ? Effect.void
-    : Effect.tryPromise({
-        try: () =>
-          db
-            .insert(scanFindings)
-            .values([...rows])
-            .onConflictDoUpdate({
-              target: [scanFindings.scanId, scanFindings.findingId],
-              set: {
-                fingerprint: sql`excluded.fingerprint`,
-                status: sql`excluded.status`,
-                severity: sql`excluded.severity`,
-                title: sql`excluded.title`,
-                file: sql`excluded.file`,
-                line: sql`excluded.line`,
-                impact: sql`excluded.impact`,
-                evidence: sql`excluded.evidence`,
-                fix: sql`excluded.fix`,
-                needs: sql`excluded.needs`,
-              },
-            }),
-        catch: toDbError,
-      }).pipe(Effect.asVoid);
+  replacedIds: readonly string[],
+  rows: readonly NewFindingRow[],
+): Effect.Effect<void, DbError> =>
+  Effect.tryPromise({
+    try: async () => {
+      if (replacedIds.length > 0) await db.delete(scanFindings).where(inArray(scanFindings.id, [...replacedIds]));
+      if (rows.length > 0) await db.insert(scanFindings).values([...rows]);
+    },
+    catch: toDbError,
+  });

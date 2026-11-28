@@ -8,6 +8,7 @@ import { handoverFilesSvc } from "#/modules/decided-problems";
 import { previousMapFilesSvc, r2TextStore } from "#/modules/previous-map";
 import { detectDuplicateSignalsSvc } from "#/modules/signals";
 import { findSealedKeyEffect } from "#/modules/anthropic-key";
+import { sealerEffect } from "#/modules/sealed-data";
 import { runnerSandbox } from "#/modules/runners/lib";
 import { neonScanRepo } from "#/modules/scan-ledger";
 import { recordScanSvc } from "#/modules/scan-records";
@@ -43,6 +44,8 @@ export class FullScanWorkflow extends WorkflowEntrypoint<Bindings, ScanParams> {
           : this.env.SANDBOX_FULL.getByName(event.payload.scanId),
         ledger: neonScanRepo(dbConnect(this.env.DATABASE_URL), this.env.DATA_MASTER_KEY),
         reports: this.env.REPORTS,
+        sealerFor: (accountId) =>
+          runEffect(sealerEffect(dbConnect(this.env.DATABASE_URL), this.env.DATA_MASTER_KEY, accountId)),
         sealedKeyFor: (accountId) => runEffect(findSealedKeyEffect(dbConnect(this.env.DATABASE_URL), accountId)),
         handoverFiles: (params) => {
           const db = dbConnect(this.env.DATABASE_URL);

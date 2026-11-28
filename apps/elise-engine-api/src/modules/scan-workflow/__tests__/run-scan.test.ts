@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { ScanUsage } from "@repo/contracts/elise";
 import { fakeBindings } from "#/__tests__/fake-bindings";
 import { memoryScanRepo } from "#/__tests__/memory-scan-repo";
+import { testSealer } from "#/__tests__/sealed-test-helpers";
 import type { ScanParams, ScanState } from "#/schemas";
 import { SCAN_SANDBOX_FULL_PHASES, type FullPhase, type OutboundAnthropicKey } from "#/modules/scan-sandbox";
 import { runScan } from "#/modules/scan-workflow/lib";
@@ -99,6 +100,7 @@ const setup = (options: SetupOptions = {}) => {
     sandbox,
     ledger: ledger.repo,
     reports: bindings.env.REPORTS,
+    sealerFor: testSealer,
     sealedKeyFor: async () => options.sealedKey ?? null,
     handoverFiles: async () => [],
     recordScan: async (_params: ScanParams, status: ScanState) => {

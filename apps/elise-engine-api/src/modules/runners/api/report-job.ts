@@ -23,7 +23,9 @@ app.post(
     const runner = await runnerOf(c);
     const { scanId } = c.req.valid("param");
     const body = c.req.valid("json");
-    const data = await runEffect(reportJobSvc(dbConnect(c.env.DATABASE_URL), runner.runnerId, scanId, body));
+    const data = await runEffect(
+      reportJobSvc(dbConnect(c.env.DATABASE_URL), runner.runnerId, scanId, body, c.env.DATA_MASTER_KEY),
+    );
     return c.json({ data, error: null });
   },
 );

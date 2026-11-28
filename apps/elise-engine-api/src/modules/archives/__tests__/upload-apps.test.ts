@@ -203,6 +203,23 @@ describe("the zips of an upload app", () => {
     expect({ status: res.status, rows: rows.length, stored: store.size }).toEqual({ status: 400, rows: 0, stored: 0 });
   });
 
+  it("keeps a zip and its label sealed, and answers the upload and the list with the label as it was sent", async () => {
+    const { env, store } = fakeBindings();
+    const appId = await newApp("acme", "Sealed zips");
+
+    const uploaded = ArchiveSchema.parse(await dataOf(await upload(env, "acme", appId, "private-build.zip", ZIP)));
+    const listed = ArchivesSchema.parse(await dataOf(await send(env, "acme", `/repos/${appId}/archives`)));
+    const [row] = await test.raw.select().from(scanUploadArchives).where(eq(scanUploadArchives.repoId, appId));
+    const bytes = store.get(row.r2Key);
+
+    expect([uploaded.label, listed.archives.map((archive) => archive.label), row.label]).toEqual([
+      "private-build.zip",
+      ["private-build.zip"],
+      expect.stringMatching(/^sealed:v1:/),
+    ]);
+    expect(bytes).toBeInstanceOf(ArrayBuffer);
+  });
+
   it("takes no zip for a git Repo", async () => {
     const { env } = fakeBindings();
     const repoId = DataSchema.parse(
