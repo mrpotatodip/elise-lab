@@ -36,6 +36,8 @@ pub const EXIT_CODES: &[(i32, &str, &str)] = &[
     (5, "offline", "Elise could not be reached"),
     (6, "nothing_to_claim", "run --once: nothing to claim"),
     (7, "stopped_from_elise", "run --once: a Scan was stopped from Elise"),
+    (8, "timeout", "scan --wait: --timeout ran out; the Scan keeps running"),
+    (9, "partial_scan", "scan --wait: the Scan ended as a Partial Scan"),
 ];
 
 pub const GROUPS: &[&str] = &["Connect this computer", "Run Scans", "Repos", "Check", "Help"];
@@ -123,6 +125,93 @@ pub const COMMANDS: &[Spec] = &[
         examples: &["elise unpair", "elise unpair --json", "elise unpair && echo gone   # CI cleanup"],
         exits: &[0, 1, 3, 5],
         json: "schemaVersion, ok, exitCode, wasPaired (a Runner token was dropped), cliAccessRemoved (stored CLI access was removed). Failure codes: read_only_token, offline, usage",
+    },
+    Spec {
+        name: "scan",
+        group: "Run Scans",
+        summary: "Start a Scan of a git repo, and follow it with --wait.",
+        usage: "elise scan [repo] [--branch B] [--profile P] [--budget USD] [--runner R] [--run] [--wait [--timeout T]] [--yes]",
+        about: "Name the repo by URL, `owner/name` (GitHub), `gitlab:owner/name`, ID or `.`; with no argument it is `.`, this checkout and its current branch. A repo that is not added yet is added first. The profile is `standard` unless you pick one (`quick`, `standard`, `deep`, also `focused`, `balanced`, `exhaustive`). In a terminal it shows the repo, branch, profile, cap and Runner and asks `y/N`; with no terminal it needs `--yes` and exits 2 without it, starting nothing. The Runner is `--runner`, else this computer's Runner, else the Account's only connected Runner; with several it exits 2 and lists them. Without `--wait` it returns at once with the Scan ID and link. `--wait` follows the Scan and exits 0 succeeded, 1 failed, 7 stopped, 8 when `--timeout` runs out (the Scan keeps running) or 9 for a Partial Scan. `--run` also runs the Scan on this computer, as `elise run --once` does, and follows it to the end.",
+        flags: &[
+            Flag {
+                name: "--branch",
+                short: None,
+                value: Some("name"),
+                default: "the checkout's branch for `.`, else the repo's default branch",
+                cost: "none",
+                about: "Scan this branch, tag or commit.",
+            },
+            Flag {
+                name: "--profile",
+                short: None,
+                value: Some("profile"),
+                default: "standard",
+                cost: "A deeper profile looks longer and costs more of your Claude plan.",
+                about: "How deep the Scan looks: quick, standard or deep (focused, balanced and exhaustive also work).",
+            },
+            Flag {
+                name: "--budget",
+                short: None,
+                value: Some("USD"),
+                default: "the profile's own cap",
+                cost: "The most this Scan may spend, in dollars.",
+                about: "Set the Scan's cap.",
+            },
+            Flag {
+                name: "--runner",
+                short: None,
+                value: Some("name"),
+                default: "this computer's Runner, else the Account's only Runner",
+                cost: "none",
+                about: "The Runner that takes the Scan, by name or ID.",
+            },
+            Flag {
+                name: "--run",
+                short: None,
+                value: None,
+                default: "off",
+                cost: "The Scan runs on this computer and uses your Claude plan.",
+                about: "Run the Scan on this computer, with this computer's Runner, and follow it to the end. With --json the run's events come first, one per line, then the result object.",
+            },
+            Flag {
+                name: "--wait",
+                short: None,
+                value: None,
+                default: "off",
+                cost: "none",
+                about: "Follow the Scan and exit with its result.",
+            },
+            Flag {
+                name: "--timeout",
+                short: None,
+                value: Some("time"),
+                default: "1h",
+                cost: "none",
+                about: "With --wait: stop waiting after this long (90, 30m or 2h). The Scan keeps running.",
+            },
+            Flag {
+                name: "--yes",
+                short: Some("-y"),
+                value: None,
+                default: "off",
+                cost: "Starts the Scan without asking.",
+                about: "Do not ask. Needed when there is no terminal.",
+            },
+            JSON_FLAG,
+        ],
+        needs: "CLI access with scope start, from `elise login` or ELISE_TOKEN, and a connected Runner. `--run` also needs this computer's Runner token, git and `claude` signed in.",
+        env: &[
+            ("ELISE_TOKEN", "CLI access for CI and containers, read only: login and unpair do not manage it."),
+            ("ELISE_RUNNER_TOKEN", "With --run, the Runner's token, read only."),
+        ],
+        examples: &[
+            "elise scan",
+            "elise scan acme/widgets --branch main --profile deep --yes",
+            "elise scan . --yes --wait --timeout 90m --json   # CI: exit 0, 1, 7, 8 or 9",
+            "elise scan . --run --yes   # run it on this computer",
+        ],
+        exits: &[0, 1, 2, 3, 4, 5, 7, 8, 9],
+        json: "schemaVersion, ok, exitCode, scan (id, repo, branch or null, profile quick|standard|deep, capUsd or null, runner: {id, name}, status queued|running|succeeded|failed|stopped, link; with --wait or --run also costUsd or null, summary or null, error or null, partial), error {code, message, next} unless the Scan succeeded. Without --wait and --run the Scan is queued and status is queued. Failure codes: bad_profile, bad_budget, bad_timeout, timeout_needs_wait, needs_yes, bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches), upload_repo, unknown_runner (with matches: [{id, name}]), runner_needed (with matches), run_needs_this_runner, no_runner, unpaired, declined, scan_failed, scan_stopped, partial_scan, wait_timeout, scan_unfinished, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage",
     },
     Spec {
         name: "run",
@@ -372,7 +461,8 @@ The result goes to standard output. Prose goes to standard error.
         summary: "How deep a Scan looks.",
         body: "\
 A Scan runs with a profile: quick, standard or deep. A deeper profile looks longer and costs more.
-You pick the profile in Elise when you start the Scan. `elise run` runs what Elise sends.
+You pick the profile in Elise, or with `elise scan --profile` (standard unless you say otherwise; focused, balanced and
+exhaustive are other names for quick, standard and deep). `elise run` runs what Elise sends.
 ",
     },
     Topic {

@@ -135,6 +135,37 @@ impl<'a> EngineClient<'a> {
         body: Option<&Value>,
         account: Option<&str>,
     ) -> Result<T, Denied> {
+        let response = self.answered(method, path, body, account).await?;
+        response.json::<Envelope<T>>().await.map(|envelope| envelope.data).map_err(|_| Denied::Unreadable)
+    }
+
+    pub async fn get_text(&self, path: &str) -> Result<String, Denied> {
+        let known = self.account.lock().expect("the account lock is not poisoned").clone();
+        let candidates = match known {
+            Some(id) => vec![id],
+            None => self.accounts().await?,
+        };
+        let mut last = Denied::Refused(OTHER_ACCOUNT.to_string());
+        for id in candidates {
+            match self.answered(&Method::GET, path, None, Some(&id)).await {
+                Err(Denied::Refused(message)) if message == OTHER_ACCOUNT => last = Denied::Refused(message),
+                Err(why) => return Err(why),
+                Ok(response) => {
+                    *self.account.lock().expect("the account lock is not poisoned") = Some(id);
+                    return response.text().await.map_err(|_| Denied::Unreadable);
+                }
+            }
+        }
+        Err(last)
+    }
+
+    async fn answered(
+        &self,
+        method: &Method,
+        path: &str,
+        body: Option<&Value>,
+        account: Option<&str>,
+    ) -> Result<reqwest::Response, Denied> {
         let mut request = self.http.request(method.clone(), format!("{}{path}", engine_url())).bearer_auth(&self.held.token);
         if let Some(account) = account {
             request = request.header("x-account-id", account);
@@ -145,7 +176,7 @@ impl<'a> EngineClient<'a> {
         let response = request.send().await.map_err(|_| Denied::Offline)?;
         let status = response.status();
         if status.is_success() {
-            return response.json::<Envelope<T>>().await.map(|envelope| envelope.data).map_err(|_| Denied::Unreadable);
+            return Ok(response);
         }
         let message = response.json::<Refusal>().await.map(|refusal| refusal.error.message).unwrap_or_default();
         Err(self.denied(status, message))

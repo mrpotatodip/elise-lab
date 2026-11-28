@@ -84,6 +84,33 @@ Exit codes: 0, 1, 3, 5. JSON shape: schemaVersion, ok, exitCode, wasPaired (a Ru
 
 ### Run Scans
 
+#### `elise scan`
+
+Start a Scan of a git repo, and follow it with --wait.
+
+```
+elise scan [repo] [--branch B] [--profile P] [--budget USD] [--runner R] [--run] [--wait [--timeout T]] [--yes]
+```
+
+Name the repo by URL, `owner/name` (GitHub), `gitlab:owner/name`, ID or `.`; with no argument it is `.`, this checkout and its current branch. A repo that is not added yet is added first. The profile is `standard` unless you pick one (`quick`, `standard`, `deep`, also `focused`, `balanced`, `exhaustive`). In a terminal it shows the repo, branch, profile, cap and Runner and asks `y/N`; with no terminal it needs `--yes` and exits 2 without it, starting nothing. The Runner is `--runner`, else this computer's Runner, else the Account's only connected Runner; with several it exits 2 and lists them. Without `--wait` it returns at once with the Scan ID and link. `--wait` follows the Scan and exits 0 succeeded, 1 failed, 7 stopped, 8 when `--timeout` runs out (the Scan keeps running) or 9 for a Partial Scan. `--run` also runs the Scan on this computer, as `elise run --once` does, and follows it to the end.
+
+Needs: CLI access with scope start, from `elise login` or ELISE_TOKEN, and a connected Runner. `--run` also needs this computer's Runner token, git and `claude` signed in.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--branch` `<name>` | the checkout's branch for `.`, else the repo's default branch | none | Scan this branch, tag or commit. |
+| `--profile` `<profile>` | standard | A deeper profile looks longer and costs more of your Claude plan. | How deep the Scan looks: quick, standard or deep (focused, balanced and exhaustive also work). |
+| `--budget` `<USD>` | the profile's own cap | The most this Scan may spend, in dollars. | Set the Scan's cap. |
+| `--runner` `<name>` | this computer's Runner, else the Account's only Runner | none | The Runner that takes the Scan, by name or ID. |
+| `--run` | off | The Scan runs on this computer and uses your Claude plan. | Run the Scan on this computer, with this computer's Runner, and follow it to the end. With --json the run's events come first, one per line, then the result object. |
+| `--wait` | off | none | Follow the Scan and exit with its result. |
+| `--timeout` `<time>` | 1h | none | With --wait: stop waiting after this long (90, 30m or 2h). The Scan keeps running. |
+| `--yes`, `-y` | off | Starts the Scan without asking. | Do not ask. Needed when there is no terminal. |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5, 7, 8, 9. JSON shape: schemaVersion, ok, exitCode, scan (id, repo, branch or null, profile quick|standard|deep, capUsd or null, runner: {id, name}, status queued|running|succeeded|failed|stopped, link; with --wait or --run also costUsd or null, summary or null, error or null, partial), error {code, message, next} unless the Scan succeeded. Without --wait and --run the Scan is queued and status is queued. Failure codes: bad_profile, bad_budget, bad_timeout, timeout_needs_wait, needs_yes, bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches), upload_repo, unknown_runner (with matches: [{id, name}]), runner_needed (with matches), run_needs_this_runner, no_runner, unpaired, declined, scan_failed, scan_stopped, partial_scan, wait_timeout, scan_unfinished, no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
 #### `elise run`
 
 Claim and run Scans until stopped.
@@ -294,6 +321,8 @@ Exit codes: 0, 1, 2. JSON shape: schemaVersion, ok, exitCode, path, snippet. Fai
 | 5 | Elise could not be reached |
 | 6 | run --once: nothing to claim |
 | 7 | run --once: a Scan was stopped from Elise |
+| 8 | scan --wait: --timeout ran out; the Scan keeps running |
+| 9 | scan --wait: the Scan ended as a Partial Scan |
 <!-- command-reference:end -->
 
 ## How the commands behave

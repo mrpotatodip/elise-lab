@@ -6,6 +6,8 @@ pub mod completions;
 pub mod help;
 pub mod json;
 pub mod repos;
+pub mod scan;
+pub mod scan_args;
 pub mod skill;
 pub mod store;
 pub mod table;
@@ -24,6 +26,8 @@ pub enum Exit {
     Offline = 5,
     NothingToClaim = 6,
     StoppedFromElise = 7,
+    TimedOut = 8,
+    PartialScan = 9,
 }
 
 pub fn main(args: &[String]) -> Exit {
@@ -91,6 +95,7 @@ pub fn main(args: &[String]) -> Exit {
             Command::Resume { scan_id, json } => commands::resume(&scan_id, json),
             Command::Repos { json } => repos::repos(&store, json).await,
             Command::Repo { repo, json } => repos::repo(&store, &repo, json).await,
+            Command::Scan(args) => scan::scan(&store, &args, interactive).await,
             Command::SkillInstall { dir, json } => skill::install(dir.as_deref(), json),
         }
     })

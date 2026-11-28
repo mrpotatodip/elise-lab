@@ -234,7 +234,7 @@ pub async fn login(store: &Store, no_browser: bool, json: bool) -> Exit {
     Exit::Ok
 }
 
-fn confirm(question: &str) -> bool {
+pub fn confirm(question: &str) -> bool {
     eprint!("{question} [y/N] ");
     let _ = std::io::stderr().flush();
     let mut answer = String::new();
@@ -851,7 +851,7 @@ impl ScanLog {
     }
 }
 
-fn dollars(usd: f64) -> String {
+pub fn dollars(usd: f64) -> String {
     let text = format!("{usd:.4}");
     let text = text.trim_end_matches('0');
     match text.split_once('.') {

@@ -13,6 +13,7 @@ const CLI_ROUTES: readonly CliRoute[] = [
   { method: "GET", path: /^\/repos\/[^/]+\/?$/, scope: "read" },
   { method: "GET", path: /^\/repos\/[^/]+\/(findings|verdict|archives)\/?$/, scope: "read" },
   { method: "GET", path: /^\/projects\/?$/, scope: "read" },
+  { method: "GET", path: /^\/runners\/?$/, scope: "read" },
   { method: "GET", path: /^\/scans\/?$/, scope: "read" },
   { method: "GET", path: /^\/scans\/[^/]+\/?$/, scope: "read" },
   { method: "GET", path: /^\/scans\/[^/]+\/(files\/[^/]+|diff|trace)\/?$/, scope: "read" },

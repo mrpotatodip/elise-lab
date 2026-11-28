@@ -112,6 +112,12 @@ describe("CLI access on the routes a CLI may use", () => {
     );
   });
 
+  it("lets a read token list the Account's Runners so a Scan can pick one", async () => {
+    const token = await tokenFor("read");
+
+    expect((await call("/runners", { token })).status).toBe(200);
+  });
+
   it("lets a start token reach the start routes", async () => {
     const token = await tokenFor("start");
 
@@ -121,7 +127,7 @@ describe("CLI access on the routes a CLI may use", () => {
   it.each([
     ["GET", "/team"],
     ["GET", "/groups"],
-    ["GET", "/runners"],
+    ["DELETE", `/runners/${MISSING_SCAN}`],
     ["GET", "/usage/plan"],
     ["GET", "/usage/anthropic-key"],
     ["PUT", "/findings/triage"],

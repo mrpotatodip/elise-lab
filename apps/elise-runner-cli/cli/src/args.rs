@@ -1,3 +1,4 @@
+use crate::scan_args::{self, ScanArgs};
 use crate::table::{self, Spec, Topic};
 
 #[derive(Debug, PartialEq)]
@@ -11,6 +12,7 @@ pub enum Command {
     Resume { scan_id: String, json: bool },
     Repos { json: bool },
     Repo { repo: String, json: bool },
+    Scan(ScanArgs),
     SkillInstall { dir: Option<String>, json: bool },
 }
 
@@ -134,6 +136,15 @@ pub fn parse(args: &[String]) -> Parsed {
     } else {
         (rest, None)
     };
+    let mut scan_args = ScanArgs::default();
+    let rest = if command == "scan" {
+        match scan_args::take(&rest, &mut scan_args) {
+            Ok(kept) => kept,
+            Err(problem) => return Parsed::Usage(problem),
+        }
+    } else {
+        rest
+    };
     let (flags, positional): (Vec<&String>, Vec<&String>) = rest.iter().partition(|arg| arg.starts_with('-'));
     if let Some(flag) = flags.iter().find(|flag| !table::accepts(spec, flag)) {
         return Parsed::Usage(format!("`{command}` does not take `{flag}`"));
@@ -159,6 +170,14 @@ pub fn parse(args: &[String]) -> Parsed {
         ("repos", []) => Parsed::Command(Command::Repos { json: has("--json") }),
         ("repo", [repo]) => Parsed::Command(Command::Repo { repo: repo.to_string(), json: has("--json") }),
         ("repo", []) => Parsed::Usage("`repo` needs a repo: a URL, owner/name, gitlab:owner/name, an ID or `.`".to_string()),
+        ("scan", [] | [_]) => {
+            scan_args.repo = positional.first().map(|repo| repo.to_string());
+            scan_args.run = has("--run");
+            scan_args.wait = has("--wait");
+            scan_args.yes = has("--yes") || has("-y");
+            scan_args.json = has("--json");
+            Parsed::Command(Command::Scan(scan_args))
+        }
         ("help", []) => Parsed::Help,
         ("help", [wanted]) => help_for(wanted),
         ("completions", [shell]) => Parsed::Completions(shell.to_string()),

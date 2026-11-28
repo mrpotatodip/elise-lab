@@ -2,6 +2,7 @@ use serde::Deserialize;
 use std::time::Duration;
 
 const ENGINE_URL: &str = "https://api.eliselab.com";
+const DASHBOARD_URL: &str = "https://app.eliselab.com";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub(crate) fn engine_url() -> String {
@@ -10,6 +11,14 @@ pub(crate) fn engine_url() -> String {
         return url.trim_end_matches('/').to_string();
     }
     ENGINE_URL.to_string()
+}
+
+pub fn dashboard_url() -> String {
+    #[cfg(debug_assertions)]
+    if let Ok(url) = std::env::var("ELISE_DASHBOARD_URL") {
+        return url.trim_end_matches('/').to_string();
+    }
+    DASHBOARD_URL.to_string()
 }
 
 pub(crate) fn client() -> reqwest::Client {

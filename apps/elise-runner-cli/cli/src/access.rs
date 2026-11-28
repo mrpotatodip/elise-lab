@@ -59,7 +59,7 @@ pub fn denied(json: bool, why: Denied) -> Exit {
     }
 }
 
-fn refuse_with(json: bool, exit: Exit, code: &str, message: &str, next: &str, matches: Vec<serde_json::Value>) -> Exit {
+pub fn refuse_with(json: bool, exit: Exit, code: &str, message: &str, next: &str, matches: Vec<serde_json::Value>) -> Exit {
     eprintln!("{message}");
     if json {
         return json::emit(exit, json!({ "matches": matches }), Some(json::Failure { code, message, next }));
@@ -67,7 +67,29 @@ fn refuse_with(json: bool, exit: Exit, code: &str, message: &str, next: &str, ma
     exit
 }
 
+pub enum Resolved {
+    Known(Box<Target>),
+    New { name: RepoName, branch: Option<String> },
+}
+
 pub async fn repo(client: &EngineClient<'_>, text: &str, json: bool) -> Result<Target, Exit> {
+    match resolve_repo(client, text, json).await? {
+        Resolved::Known(target) => Ok(*target),
+        Resolved::New { .. } => Err(repo_not_found(json, text)),
+    }
+}
+
+fn repo_not_found(json: bool, text: &str) -> Exit {
+    fail(
+        json,
+        Exit::Error,
+        "repo_not_found",
+        &format!("No repo in this Account matches `{text}`. `elise repos` lists them."),
+        "elise repos",
+    )
+}
+
+pub async fn resolve_repo(client: &EngineClient<'_>, text: &str, json: bool) -> Result<Resolved, Exit> {
     let usage = |message: &str| fail(json, Exit::Usage, "bad_repo_name", message, "elise help repos");
     let mut name = repo_name::parse(text).map_err(|message| usage(&message))?;
     let mut branch = None;
@@ -88,14 +110,11 @@ pub async fn repo(client: &EngineClient<'_>, text: &str, json: bool) -> Result<T
     }
     let repos = cli_repos::list_repos(client).await.map_err(|why| denied(json, why))?;
     match repo_name::find(&repos, &name) {
-        Found::One(repo) => Ok(Target { repo: repo.clone(), branch }),
-        Found::None => Err(fail(
-            json,
-            Exit::Error,
-            "repo_not_found",
-            &format!("No repo in this Account matches `{text}`. `elise repos` lists them."),
-            "elise repos",
-        )),
+        Found::One(repo) => Ok(Resolved::Known(Box::new(Target { repo: repo.clone(), branch }))),
+        Found::None if matches!(name, RepoName::Github(_) | RepoName::Gitlab(_) | RepoName::Url { .. }) => {
+            Ok(Resolved::New { name, branch })
+        }
+        Found::None => Err(repo_not_found(json, text)),
         Found::Many(found) => {
             let mut message = format!("`{text}` matches {} repos. Name one by its ID:", found.len());
             let listed: Vec<serde_json::Value> = found

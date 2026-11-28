@@ -53,8 +53,15 @@ struct State {
     branches: BTreeMap<String, Vec<serde_json::Value>>,
     verdicts: BTreeMap<(String, String), serde_json::Value>,
     scans: Vec<serde_json::Value>,
+    runners: Vec<serde_json::Value>,
+    scan_posts: Vec<serde_json::Value>,
+    repo_posts: Vec<serde_json::Value>,
+    status_script: VecDeque<String>,
+    reports: BTreeMap<String, String>,
+    scan_start_refusal: Option<(u16, String)>,
 }
 
+pub const NEW_SCAN_ID: &str = "zd3u73nfd-06ac9c07-b80c-45da-8fc5-ece4768b5b22";
 pub const USER_CODE: &str = "WXYZ-1234";
 pub const VERIFICATION_URL: &str = "https://app.example/device?code=WXYZ-1234";
 const DEVICE_CODE: &str = "device-code-secret-77";
@@ -238,6 +245,38 @@ impl Engine {
         self.state.lock().unwrap().scans.push(scan);
     }
 
+    pub fn add_runner(&self, id: &str, name: &str, state: &str) {
+        self.state.lock().unwrap().runners.push(serde_json::json!({
+            "id": id,
+            "name": name,
+            "state": state,
+            "createdAt": "2026-11-01T00:00:00.000Z",
+            "expiresAt": null,
+            "pairedAt": "2026-11-01T00:00:00.000Z",
+            "lastSeenAt": null,
+        }));
+    }
+
+    pub fn scan_posts(&self) -> Vec<serde_json::Value> {
+        self.state.lock().unwrap().scan_posts.clone()
+    }
+
+    pub fn repo_posts(&self) -> Vec<serde_json::Value> {
+        self.state.lock().unwrap().repo_posts.clone()
+    }
+
+    pub fn script_new_scan(&self, statuses: &[&str]) {
+        self.state.lock().unwrap().status_script = statuses.iter().map(|status| status.to_string()).collect();
+    }
+
+    pub fn set_report(&self, scan_id: &str, report: &str) {
+        self.state.lock().unwrap().reports.insert(scan_id.to_string(), report.to_string());
+    }
+
+    pub fn refuse_scan_start(&self, status: u16, message: &str) {
+        self.state.lock().unwrap().scan_start_refusal = Some((status, message.to_string()));
+    }
+
     pub fn login_expires_at(&self, expires_at: &str) {
         self.state.lock().unwrap().login_expires_at = Some(expires_at.to_string());
     }
@@ -338,7 +377,7 @@ fn issued_tokens(state: &State) -> Vec<String> {
 }
 
 const ACCOUNT_ID: &str = "5b0c3f0e-1d2a-4c3b-8e4f-6a7b8c9d0e1f";
-const RUNNER_ID: &str = "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b";
+pub const RUNNER_ID: &str = "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b";
 const ACCESS_ID: &str = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
 
 fn access_token_number(n: usize) -> String {
@@ -501,7 +540,7 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             (200, body)
         }
         ("GET", "/runners/me") if live => {
-            (200, format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#))
+            (200, format!(r#"{{"data":{{"runnerId":"{RUNNER_ID}","name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#))
         }
         ("DELETE", "/runners/me") if state.revokes_fail => (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string()),
         ("DELETE", "/runners/me") if live => {
@@ -541,6 +580,11 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
         ("POST", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/result") => {
             let scan_id = path.trim_start_matches("/runners/jobs/").trim_end_matches("/result").to_string();
             state.findings_before_result.push(state.findings.len());
+            let ended =
+                serde_json::from_str::<serde_json::Value>(&request.body).ok().and_then(|body| body["state"].as_str().map(str::to_string));
+            if let Some(scan) = state.scans.iter_mut().find(|scan| scan["scanId"] == scan_id.as_str()) {
+                scan["status"] = ended.unwrap_or_default().into();
+            }
             state.results.push((scan_id, request.body.clone()));
             if state.remove_after_result {
                 state.live.clear();
@@ -637,6 +681,43 @@ fn cli_answer(request: &Request, state: &mut State) -> (u16, String) {
             let next = (scans.len() > limit).then(|| scans[limit - 1]["scanId"].clone());
             scans.truncate(limit);
             data(serde_json::json!({ "scans": scans, "nextCursor": next }))
+        }
+        ("GET", ["runners"]) => data(serde_json::json!(state.runners)),
+        ("POST", ["repos"]) => {
+            state.repo_posts.push(serde_json::from_str(&request.body).unwrap_or_default());
+            data(serde_json::json!({ "id": "d1111111-1111-4111-8111-111111111111" }))
+        }
+        ("POST", ["scans"]) => {
+            if let Some((status, message)) = state.scan_start_refusal.clone() {
+                return refusal(status, &message);
+            }
+            let body: serde_json::Value = serde_json::from_str(&request.body).unwrap_or_default();
+            state.scan_posts.push(body.clone());
+            let profile = body["profile"].as_str().unwrap_or("quick");
+            let cap = body["max_budget_usd"].as_f64().unwrap_or(12.0);
+            let mut scan = scan_json(NEW_SCAN_ID, "e1111111-1111-4111-8111-111111111111", "acme/widgets", "queued");
+            scan["profile"] = profile.into();
+            scan["maxBudgetUsd"] = cap.into();
+            state.scans.push(scan.clone());
+            (201, serde_json::json!({ "data": scan, "error": null }).to_string())
+        }
+        ("GET", ["scans", id, "files", name]) => match (*name, state.reports.get(*id)) {
+            ("REPORT.md", Some(report)) => (200, report.clone()),
+            _ => refusal(404, "File not found"),
+        },
+        ("GET", ["scans", id]) if *id == NEW_SCAN_ID && !state.status_script.is_empty() => {
+            let status =
+                if state.status_script.len() > 1 { state.status_script.pop_front().unwrap() } else { state.status_script[0].clone() };
+            let scan = state.scans.iter_mut().find(|scan| scan["scanId"] == NEW_SCAN_ID).expect("a Scan was started");
+            scan["status"] = status.as_str().into();
+            if matches!(status.as_str(), "succeeded" | "failed" | "stopped") {
+                scan["finishedAt"] = "2026-11-20T10:30:00.000Z".into();
+                scan["usage"] = serde_json::json!({ "costUsd": 3.25 });
+            }
+            if status == "failed" {
+                scan["error"] = "The hunt phase failed".into();
+            }
+            data(scan.clone())
         }
         ("GET", ["scans", id]) => match state.scans.iter().find(|scan| scan["scanId"] == *id) {
             Some(scan) => data(scan.clone()),
@@ -758,7 +839,11 @@ impl Runner {
         Runner {
             home: temp_home(),
             url: engine.url.clone(),
-            env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string()), ("ELISE_JOB_CHECK_MS", "200".to_string())],
+            env: vec![
+                ("ELISE_LOGIN_CHECK_MS", "50".to_string()),
+                ("ELISE_JOB_CHECK_MS", "200".to_string()),
+                ("ELISE_SCAN_POLL_MS", "50".to_string()),
+            ],
             cwd: None,
             engine: engine.state.clone(),
         }
