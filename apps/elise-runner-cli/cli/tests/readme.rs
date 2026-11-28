@@ -16,7 +16,7 @@ fn the_readme_command_reference_is_what_the_cli_generates() {
     runner.url = Engine::unreachable_url();
     let generated = runner.run(&["commands", "--markdown"], "");
     assert_eq!(generated.code, 0, "{}", generated.stderr);
-    let readme = std::fs::read_to_string(readme_path()).unwrap();
+    let readme = std::fs::read_to_string(readme_path()).unwrap().replace("\r\n", "\n");
     let start = readme.find(START).expect("README.md has the command-reference start marker");
     let end = readme.find(END).expect("README.md has the command-reference end marker");
     let current = &readme[start + START.len()..end];
