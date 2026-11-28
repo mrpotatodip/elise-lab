@@ -813,6 +813,13 @@
       "when": 1795830459012,
       "tag": "0115_sealed_comment_body_length",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1795831958294,
+      "tag": "0116_sealed_fingerprint_hmac",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@
     "lint": "oxlint src",
     "test": "vitest run",
     "live:get": "node tools/live-get.mjs",
+    "seal:backfill": "node tools/seal-backfill.mjs",
     "check": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit && oxlint src && vitest run"
   },
   "dependencies": {

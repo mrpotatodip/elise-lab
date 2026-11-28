@@ -29,6 +29,7 @@ export const scanFindingComments = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     repoId: uuid("repo_id").notNull(),
     fingerprint: text("fingerprint").notNull(),
+    fingerprintHmac: text("fingerprint_hmac"),
     authorPartyId: uuid("author_party_id").references(() => parties.id, { onDelete: "set null" }),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

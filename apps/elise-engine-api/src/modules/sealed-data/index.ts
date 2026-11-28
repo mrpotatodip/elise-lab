@@ -1,4 +1,5 @@
-export { DataKeyUnavailable, ensureDataKeyEffect, sealerEffect, unsealerEffect } from "./handlers";
+export { DataKeyUnavailable, ensureDataKeyEffect, sealBackfillEffect, sealerEffect, unsealerEffect } from "./handlers";
+export type { BackfillDeps, BackfillOptions, BackfillSummary } from "./handlers";
 export {
   CANNOT_READ,
   PLAIN_ONLY,

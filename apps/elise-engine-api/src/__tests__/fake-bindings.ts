@@ -35,6 +35,7 @@ export function fakeBindings(
         uploadedAt.delete(key);
       }
     },
+    head: async (key: string) => (store.has(key) ? { key, customMetadata: metadata.get(key) } : null),
     get: async (key: string) => {
       const value = store.get(key);
       if (value === undefined) return null;

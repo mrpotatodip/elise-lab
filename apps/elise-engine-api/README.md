@@ -43,6 +43,19 @@ Copy `.dev.vars.example` to `.dev.vars` first. Scans fail in local `wrangler dev
 
 To read one route against the live database without a token, run `pnpm -s --filter elise-engine-api live:get /repos <accountId>` from the repo root.
 
+## Seal old data (the backfill, ADR 0017 step 3)
+
+A person runs this against the live database, after migration 0116 is applied and the write step (#505) is deployed. It seals the old plain rows and the old R2 objects and Archives, one Account at a time, and writes `fingerprint_hmac` beside the old fingerprint (no fingerprint or index is changed).
+
+```bash
+export DATA_MASTER_KEY=...  R2_ACCOUNT_ID=...  R2_ACCESS_KEY_ID=...  R2_SECRET_ACCESS_KEY=...   # the Worker's master key; an R2 API token for the bucket
+pnpm --filter elise-engine-api seal:backfill --dry                 # counts what is left, writes nothing
+pnpm --filter elise-engine-api seal:backfill --max-batches 20      # a first, small run (a batch is up to --batch rows, 50 by default)
+pnpm --filter elise-engine-api seal:backfill                       # run it again, and again, until it prints "rows":0,"objects":0
+```
+
+The `DATABASE_URL` is the owner's, from the environment or `packages/db-elise/.env`. Every batch is one transaction as one Account. A value that starts with `sealed:v1:` (an object with `sealed=v1`) is skipped, so a stop, a crash or a second run never redoes finished work. `--account <id>` limits a run to one Account. The last line is a summary: `failed` (a value that would not open, nothing written for it), `unmapped` (a Repo-level row whose Finding is gone, so no HMAC), `missing` (a row whose R2 object is not there). Old audit rows keep their plain triage note: the audit log is append-only.
+
 ## Layout
 
 - `src/modules/`: one folder per feature, such as `scan-workflow`, `scan-sandbox`, `scan-ledger`, `files`, `verdict`, `billing`.
