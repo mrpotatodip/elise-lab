@@ -105,7 +105,7 @@ export const STEPS = [
 // The site offers only the terminal Runner (the `elise` binary), not the desktop app.
 // The download buttons point at one pinned release. When a new elise-runner-v* release is published,
 // change `version` (the file names come from .github/workflows/release-elise-runner.yml).
-const RUNNER_VERSION = "0.7.0";
+const RUNNER_VERSION = "0.8.0";
 const RUNNER_RELEASES = "https://github.com/mrpotatodip/elise-lab/releases";
 const runnerFile = (asset: string) => `${RUNNER_RELEASES}/download/elise-runner-v${RUNNER_VERSION}/${asset}`;
 
