@@ -36,6 +36,7 @@ import {
   listArchivesEffect,
   removeUploadAppEffect,
 } from "#/modules/archives/queries";
+import { SEALED_OBJECT_METADATA, sealerEffect, unsealerEffect } from "#/modules/sealed-data";
 import { archiveKeyOf, archivePrefixOf, isZip, sha256HexOf, zipContentsOf } from "#/modules/archives/utils";
 
 export const NOT_A_ZIP = UPLOAD_NOT_A_ZIP_MESSAGE;
@@ -44,9 +45,11 @@ export const listArchivesSvc = (
   db: AppDbType,
   accountId: string,
   repoId: string,
+  masterKey?: string,
 ): Effect.Effect<UploadArchiveList, NotFound | DbError> =>
   findUploadAppEffect(db, accountId, repoId).pipe(
-    Effect.flatMap(() => listArchivesEffect(db, accountId, repoId)),
+    Effect.flatMap(() => unsealerEffect(db, masterKey, accountId)),
+    Effect.flatMap((unsealer) => listArchivesEffect(db, accountId, repoId, unsealer)),
     Effect.map((archives) => ({ archives })),
   );
 
@@ -76,6 +79,7 @@ export const uploadArchiveSvc = (
   repoId: string,
   label: string,
   bytes: ArrayBuffer,
+  masterKey?: string,
 ): Effect.Effect<UploadArchive, Invalid | Conflict | NotFound | DbError | ExternalError> =>
   Effect.gen(function* () {
     yield* findUploadAppEffect(db, accountId, repoId);
@@ -87,20 +91,26 @@ export const uploadArchiveSvc = (
     const contentSha256 = yield* Effect.tryPromise({ try: () => sha256HexOf(bytes), catch: toExternalError });
     const id = crypto.randomUUID();
     const r2Key = archiveKeyOf(accountId, repoId, id);
+    const sealer = yield* sealerEffect(db, masterKey, accountId);
+    const sealedLabel = yield* Effect.tryPromise({ try: () => sealer.text(label), catch: toExternalError });
     const archive = yield* insertArchiveEffect(db, {
       id,
       tenantId: accountId,
       repoId,
-      label,
+      label: sealedLabel,
       r2Key,
       sizeBytes: bytes.byteLength,
       contentSha256,
     });
     yield* Effect.tryPromise({
-      try: () => reports.put(r2Key, bytes, { httpMetadata: { contentType: "application/zip" } }),
+      try: async () =>
+        reports.put(r2Key, await sealer.bytes(bytes), {
+          httpMetadata: { contentType: "application/zip" },
+          customMetadata: SEALED_OBJECT_METADATA,
+        }),
       catch: toExternalError,
     });
-    return archive;
+    return { ...archive, label };
   });
 
 // -----

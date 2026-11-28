@@ -18,7 +18,9 @@ app.get(
   async (c) => {
     const { "x-account-id": accountId } = c.req.valid("header");
     const query = c.req.valid("query");
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(listFindingsSvc(db, accountId, query)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(listFindingsSvc(db, accountId, query, c.env.DATA_MASTER_KEY)));
     return c.json({ data, error: null });
   },
 );
@@ -35,7 +37,9 @@ app.put(
       body.status === "accepted_risk" ? await assertPower(c, "company:findings:accepted_risk:update") : c.get("userId");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(setFindingTriageSvc(db, accountId, body, userId)));
+      .withTenant(c, accountId, (db) =>
+        runEffect(setFindingTriageSvc(db, accountId, body, userId, c.env.DATA_MASTER_KEY)),
+      );
     return c.json({ data, error: null });
   },
 );

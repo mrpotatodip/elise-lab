@@ -2,6 +2,7 @@ import type { HandoverFile, SaveTraceBody, ScanUsage, TraceEntry, TraceSaved } f
 import type { ScanFiles } from "#/lib/scan-file-types";
 import type { ScanOptions, ScanParams, ScanState } from "#/schemas";
 import type { ScanRepo } from "#/modules/scan-ledger";
+import type { Sealer } from "#/modules/sealed-data";
 import type { AgentState, FullPhase, OutboundAnthropicKey, ScanCheckout } from "#/modules/scan-sandbox";
 
 // -----
@@ -60,6 +61,7 @@ export type ScanRunDeps = {
   phases?: readonly FullPhase[];
   ledger: ScanRepo;
   reports: R2Bucket;
+  sealerFor: (accountId: string) => Promise<Sealer>;
   sealedKeyFor: (accountId: string) => Promise<string | null>;
   handoverFiles: (params: ScanParams) => Promise<HandoverFile[]>;
   recordScan: (params: ScanParams, status: ScanState, error: string | null, usage: ScanUsage | null) => Promise<void>;

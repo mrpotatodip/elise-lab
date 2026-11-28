@@ -36,6 +36,12 @@ export class ConflictError extends AppError {
   }
 }
 
+export class UnreadableError extends AppError {
+  constructor(message = "Cannot be read") {
+    super(message, 422, "UNREADABLE");
+  }
+}
+
 export class InternalServiceError extends AppError {
   constructor(message = "Internal service failed", options?: ErrorOptions) {
     super(message, 500, "INTERNAL_SERVICE_ERROR", options);

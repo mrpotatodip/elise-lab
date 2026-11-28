@@ -19,7 +19,16 @@ app.post(
     const data = await c
       .get("deps")
       .withTenant(c, accountId, (db) =>
-        runEffect(stopScanSvc(db, accountId, scanId, new Date(), (id) => c.get("deps").teardownScan(c.env, id))),
+        runEffect(
+          stopScanSvc(
+            db,
+            accountId,
+            scanId,
+            new Date(),
+            (id) => c.get("deps").teardownScan(c.env, id),
+            c.env.DATA_MASTER_KEY,
+          ),
+        ),
       );
     return c.json({ data, error: null });
   },

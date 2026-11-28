@@ -2,6 +2,8 @@ import { HANDOVER_FILE_MAX, type HandoverFile } from "@repo/contracts/elise";
 import { z } from "zod";
 import { PREVIOUS_MAP_FILE } from "#/modules/previous-map/constants";
 
+export * from "./r2-text-store";
+
 const coverageLedgerSchema = z.json();
 type CoverageLedger = z.infer<typeof coverageLedgerSchema>;
 

@@ -1,5 +1,5 @@
 {
-  "id": "7e4a1e58-7ecc-4039-a84f-b31d9041de58",
+  "id": "1719e400-c9b4-4731-8d60-bb54ab50dedd",
   "prevId": "d4cc5b4f-768d-4e84-94f7-6116405e9a41",
   "version": "7",
   "dialect": "postgresql",
@@ -3331,6 +3331,52 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.tenant_data_keys": {
+      "name": "tenant_data_keys",
+      "schema": "",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "wrapped_key": {
+          "name": "wrapped_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tenant_data_keys_tenant_id_tenants_id_fk": {
+          "name": "tenant_data_keys_tenant_id_tenants_id_fk",
+          "tableFrom": "tenant_data_keys",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.tenant_runners": {
       "name": "tenant_runners",
       "schema": "",
@@ -3499,144 +3545,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.tenant_cli_access": {
-      "name": "tenant_cli_access",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "person_id": {
-          "name": "person_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "scope": {
-          "name": "scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "approved_at": {
-          "name": "approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_used_at": {
-          "name": "last_used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "uq_tenant_cli_access_token_hash": {
-          "name": "uq_tenant_cli_access_token_hash",
-          "columns": [
-            {
-              "expression": "token_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_tenant_cli_access_tenant_id": {
-          "name": "idx_tenant_cli_access_tenant_id",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "tenant_cli_access_tenant_id_tenants_id_fk": {
-          "name": "tenant_cli_access_tenant_id_tenants_id_fk",
-          "tableFrom": "tenant_cli_access",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "tenant_cli_access_person_id_party_persons_party_id_fk": {
-          "name": "tenant_cli_access_person_id_party_persons_party_id_fk",
-          "tableFrom": "tenant_cli_access",
-          "tableTo": "party_persons",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "party_id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "tenant_cli_access_scope": {
-          "name": "tenant_cli_access_scope",
-          "value": "\"tenant_cli_access\".\"scope\" in ('read', 'start', 'admin')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.platform_runner_device_logins": {
       "name": "platform_runner_device_logins",
       "schema": "",
@@ -3723,25 +3631,6 @@
         },
         "approver_ip": {
           "name": "approver_ip",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "run_scans": {
-          "name": "run_scans",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "cli_scope": {
-          "name": "cli_scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_name": {
-          "name": "approved_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -3874,10 +3763,6 @@
         "platform_runner_device_logins_state": {
           "name": "platform_runner_device_logins_state",
           "value": "\"platform_runner_device_logins\".\"state\" in ('pending', 'approved', 'denied', 'collected')"
-        },
-        "platform_runner_device_logins_cli_scope": {
-          "name": "platform_runner_device_logins_cli_scope",
-          "value": "\"platform_runner_device_logins\".\"cli_scope\" is null or \"platform_runner_device_logins\".\"cli_scope\" in ('read', 'start', 'admin')"
         }
       },
       "isRLSEnabled": false

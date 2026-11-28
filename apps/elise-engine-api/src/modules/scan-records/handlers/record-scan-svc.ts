@@ -1,11 +1,13 @@
 import { Effect } from "effect";
 import type { ScanUsage } from "@repo/contracts/elise";
-import { dbConnect } from "#/lib/db-connection";
-import type { DbError, ExternalError, ParseError } from "#/lib/effect-query";
+import { dbConnect, type DbConnectType } from "#/lib/db-connection";
+import { toExternalError, type DbError, type ExternalError, type ParseError } from "#/lib/effect-query";
+import { sealerEffect } from "#/modules/sealed-data";
+import { sealFindingRowsSvc } from "./seal-finding-rows-svc";
 import type { ScanParams, ScanState } from "#/schemas";
 import { resolveScanBranchEffect, type ScanBranchOutcome } from "#/modules/branches";
 import { scanRowOfEffect, writeScanRecordEffect } from "#/modules/scan-records/queries";
-import type { RecordScanEnv } from "#/modules/scan-records/types";
+import type { RecordScanEnv, ScanBranch } from "#/modules/scan-records/types";
 import { buildScanRecordSvc } from "./build-scan-record-svc";
 
 // -----
@@ -51,8 +53,9 @@ export const recordScanSvc = (
     const outcome: ScanBranchOutcome = succeeded
       ? yield* resolveScanBranchEffect(db, params.accountId, repoId, { name: branchName, ref })
       : { id: null, reason: null };
-    const record = yield* buildScanRecordSvc(
-      env.REPORTS,
+    yield* recordSealedScanSvc(
+      db,
+      env,
       params,
       repoId,
       { ...outcome, name: outcome.name ?? branchName },
@@ -60,5 +63,25 @@ export const recordScanSvc = (
       error,
       usage,
     );
-    yield* writeScanRecordEffect(db, record);
+  });
+
+export const recordSealedScanSvc = (
+  db: DbConnectType,
+  env: Pick<RecordScanEnv, "REPORTS" | "DATA_MASTER_KEY">,
+  params: ScanParams,
+  repoId: string,
+  branch: ScanBranch,
+  status: ScanState,
+  error: string | null,
+  usage: ScanUsage | null,
+): Effect.Effect<void, DbError | ExternalError | ParseError> =>
+  Effect.gen(function* () {
+    const sealer = yield* sealerEffect(db, env.DATA_MASTER_KEY, params.accountId);
+    const record = yield* buildScanRecordSvc(env.REPORTS, params, repoId, branch, status, error, usage, sealer.open);
+    const findings = yield* sealFindingRowsSvc(db, sealer, params.accountId, repoId, record.findings);
+    const sealedError = yield* Effect.tryPromise({
+      try: () => sealer.textOrNull(record.scan.error ?? null),
+      catch: toExternalError,
+    });
+    yield* writeScanRecordEffect(db, { scan: { ...record.scan, error: sealedError }, findings });
   });

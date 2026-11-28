@@ -4,6 +4,7 @@ import { tenantCreditLedger, tenants } from "@repo/db-elise/schema";
 import type { AppDbType, AppTxDbType, DbConnectType, PoolDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import type { HoldResult, RenewResult, SettleResult } from "#/modules/credit/types";
+import type { Sealer } from "#/modules/sealed-data";
 import { renewalGrantOf, roundUsd } from "#/modules/credit/utils";
 
 // -----
@@ -106,13 +107,18 @@ export const settleCreditEffect = (
     catch: toDbError,
   });
 
+type LedgerNote = { note?: undefined; sealer?: undefined } | { note: string; sealer: Sealer };
+
+const sealedNoteOf = (input: LedgerNote): Promise<string | null> =>
+  input.note === undefined ? Promise.resolve(null) : input.sealer.text(input.note);
+
 // -----
 // Adds credit a customer paid for. The key is the Stripe ID of the
 // payment: a repeated webhook finds it and adds nothing.
 // -----
 export const addTopupEffect = (
   db: DbConnectType,
-  input: { tenantId: string; amountUsd: number; idempotencyKey: string; note?: string },
+  input: { tenantId: string; amountUsd: number; idempotencyKey: string } & LedgerNote,
 ): Effect.Effect<boolean, DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -123,7 +129,7 @@ export const addTopupEffect = (
           kind: "topup",
           amountUsd: input.amountUsd.toFixed(4),
           idempotencyKey: input.idempotencyKey,
-          note: input.note ?? null,
+          note: await sealedNoteOf(input),
         })
         .onConflictDoNothing()
         .returning({ id: tenantCreditLedger.id });
@@ -140,11 +146,12 @@ export const addTopupEffect = (
 // -----
 export const renewCreditEffect = (
   db: PoolDbType,
-  input: { tenantId: string; grantUsd: number; capUsd: number | null; idempotencyKey: string; note?: string },
+  input: { tenantId: string; grantUsd: number; capUsd: number | null; idempotencyKey: string } & LedgerNote,
 ): Effect.Effect<RenewResult, DbError> =>
   Effect.tryPromise({
-    try: () =>
-      db.transaction(async (tx) => {
+    try: async () => {
+      const note = await sealedNoteOf(input);
+      return db.transaction(async (tx) => {
         const balanceUsd = await lockedBalanceOf(tx, input.tenantId);
         const [existing] = await tx
           .select({ id: tenantCreditLedger.id })
@@ -162,9 +169,10 @@ export const renewCreditEffect = (
           kind: "grant",
           amountUsd: grantedUsd.toFixed(4),
           idempotencyKey: input.idempotencyKey,
-          note: input.note ?? null,
+          note,
         });
         return { grantedUsd, duplicate: false };
-      }),
+      });
+    },
     catch: toDbError,
   });

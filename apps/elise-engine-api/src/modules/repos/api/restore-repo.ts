@@ -21,7 +21,9 @@ app.post(
     const { repoId } = c.req.valid("param");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(restoreRepoSvc(db, accountId, repoId, userIdOf(c))));
+      .withTenant(c, accountId, (db) =>
+        runEffect(restoreRepoSvc(db, accountId, repoId, userIdOf(c), c.env.DATA_MASTER_KEY)),
+      );
     return c.json({ data, error: null });
   },
 );

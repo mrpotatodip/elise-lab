@@ -18,10 +18,11 @@ import {
   type TFindingTriage,
 } from "@repo/db-elise/schema";
 import type { AppDbType, TenantDbType } from "#/lib/db-connection";
-import { Forbidden, Invalid, toDbError, type DbError } from "#/lib/effect-query";
+import { Forbidden, Invalid, toDbError, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
+import { PLAIN_ONLY, type Sealer, type Unsealer } from "#/modules/sealed-data";
 
 // -----
 // Worst first; a finding that still needs
@@ -62,6 +63,7 @@ export const listFindingsEffect = (
   db: AppDbType,
   tenantId: string,
   query: FindingsQuery,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<Finding[], DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -98,29 +100,31 @@ export const listFindingsEffect = (
             triageFilter(query.triage),
           ),
         )
-        .orderBy(asc(severityRank), desc(scanFindings.createdAt), asc(scanFindings.findingId))
+        .orderBy(asc(severityRank), desc(scanFindings.createdAt), asc(scanFindings.fingerprint), asc(scanFindings.id))
         .limit(query.limit + 1)
         .offset(query.cursor ? Number(query.cursor) : 0);
-      return rows.map(({ finding, repo, triage, person }) => ({
-        id: finding.id,
-        scanId: finding.scanId,
-        repo,
-        findingId: finding.findingId,
-        fingerprint: finding.fingerprint,
-        status: finding.status,
-        severity: finding.severity,
-        title: finding.title,
-        class: finding.class,
-        file: finding.file,
-        line: finding.line,
-        actor: finding.actor,
-        impact: finding.impact,
-        evidence: finding.evidence,
-        fix: finding.fix,
-        needs: finding.needs,
-        createdAt: finding.createdAt.toISOString(),
-        triage: triage ? triageView(triage, person) : null,
-      }));
+      return Promise.all(
+        rows.map(async ({ finding, repo, triage, person }) => ({
+          id: finding.id,
+          scanId: finding.scanId,
+          repo,
+          findingId: await unsealer.text(finding.findingId),
+          fingerprint: finding.fingerprint,
+          status: finding.status,
+          severity: finding.severity,
+          title: await unsealer.text(finding.title),
+          class: await unsealer.text(finding.class),
+          file: await unsealer.textOrNull(finding.file),
+          line: finding.line,
+          actor: finding.actor,
+          impact: await unsealer.textOrNull(finding.impact),
+          evidence: await unsealer.textOrNull(finding.evidence),
+          fix: await unsealer.textOrNull(finding.fix),
+          needs: await unsealer.textOrNull(finding.needs),
+          createdAt: finding.createdAt.toISOString(),
+          triage: triage ? triageView({ ...triage, note: await unsealer.textOrNull(triage.note) }, person) : null,
+        })),
+      );
     },
     catch: toDbError,
   });
@@ -260,7 +264,8 @@ export const setTriageEffect = (
   body: FindingTriageBody,
   userId: string | undefined,
   now: Date,
-): Effect.Effect<FindingTriage, Forbidden | Invalid | DbError> =>
+  sealer: Sealer,
+): Effect.Effect<FindingTriage, Forbidden | Invalid | ExternalError | DbError> =>
   Effect.gen(function* () {
     const accepting = body.status === "accepted_risk";
     const note = body.note?.trim() ? body.note : null;
@@ -299,6 +304,7 @@ export const setTriageEffect = (
     if (accepting && !actorPartyId) return yield* new Forbidden({ message: "Forbidden" });
     const acceptedUntil =
       accepting && body.acceptDays !== undefined ? new Date(now.getTime() + body.acceptDays * DAY_MS) : null;
+    const sealedNote = yield* Effect.tryPromise({ try: () => sealer.textOrNull(note), catch: toExternalError });
     return yield* Effect.tryPromise({
       try: async () => {
         const key = and(
@@ -314,14 +320,21 @@ export const setTriageEffect = (
             repoId,
             fingerprint: body.fingerprint,
             status: body.status,
-            note,
+            note: sealedNote,
             acceptedUntil,
             duplicateOf,
             setByPartyId: actorPartyId,
           })
           .onConflictDoUpdate({
             target: [scanFindingTriage.tenantId, scanFindingTriage.repoId, scanFindingTriage.fingerprint],
-            set: { status: body.status, note, acceptedUntil, duplicateOf, setByPartyId: actorPartyId, updatedAt: now },
+            set: {
+              status: body.status,
+              note: sealedNote,
+              acceptedUntil,
+              duplicateOf,
+              setByPartyId: actorPartyId,
+              updatedAt: now,
+            },
           })
           .returning();
         await insertAuditEntry(db, {
@@ -340,7 +353,7 @@ export const setTriageEffect = (
           after: {
             fingerprint: body.fingerprint,
             status: body.status,
-            note,
+            note: sealedNote,
             acceptedUntil: acceptedUntil?.toISOString() ?? null,
             duplicateOf,
             signalId: body.signalId,
@@ -349,7 +362,7 @@ export const setTriageEffect = (
         const [person] = actorPartyId
           ? await db.select().from(partyPersons).where(eq(partyPersons.partyId, actorPartyId))
           : [];
-        return triageView(row, person);
+        return triageView({ ...row, note }, person);
       },
       catch: toDbError,
     });

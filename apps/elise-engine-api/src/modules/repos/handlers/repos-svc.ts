@@ -23,6 +23,7 @@ import {
 } from "#/modules/repos/queries";
 import type { AddBranchBody, AddRepoBody } from "#/modules/repos/schemas";
 import { severityRank } from "#/modules/repos/utils";
+import { unsealerEffect } from "#/modules/sealed-data";
 import { DEFAULT_SOURCE_PROVIDER_ID, sourceProviderOf } from "#/providers/registry";
 
 export const listReposSvc = (db: AppDbType, accountId: string, removedOnly = false): Effect.Effect<RepoList, DbError> =>
@@ -33,8 +34,11 @@ export const restoreRepoSvc = (
   accountId: string,
   repoId: string,
   userId: string,
+  masterKey?: string,
 ): Effect.Effect<RepoDetail, NotFound | Conflict | DbError> =>
-  restoreRepoEffect(db, accountId, repoId, userId).pipe(Effect.flatMap(() => getRepoSvc(db, accountId, repoId)));
+  restoreRepoEffect(db, accountId, repoId, userId).pipe(
+    Effect.flatMap(() => getRepoSvc(db, accountId, repoId, masterKey)),
+  );
 
 // -----
 // The repo with its branches and its newest scans, each with
@@ -44,10 +48,11 @@ export const getRepoSvc = (
   db: AppDbType,
   accountId: string,
   repoId: string,
+  masterKey?: string,
 ): Effect.Effect<RepoDetail, NotFound | DbError> =>
   Effect.gen(function* () {
     const repo = yield* getRepoEffect(db, accountId, repoId);
-    const page = yield* scanReads(db).list(accountId, REPOS_HISTORY_LIMIT, undefined, { repoId });
+    const page = yield* scanReads(db, masterKey).list(accountId, REPOS_HISTORY_LIMIT, undefined, { repoId });
     const branches = yield* listRepoBranchesEffect(db, accountId, repoId);
     return { ...repo, history: page.scans, branches };
   });
@@ -63,15 +68,17 @@ export const listRepoFindingsSvc = (
   accountId: string,
   repoId: string,
   query: RepoFindingsQuery,
+  masterKey?: string,
 ): Effect.Effect<RepoFindingList, NotFound | DbError> =>
   Effect.gen(function* () {
+    const unsealer = yield* unsealerEffect(db, masterKey, accountId);
     const repo = yield* getRepoEffect(db, accountId, repoId);
     const wantedName = query.branch ?? repo.defaultBranch;
     const branch = wantedName
       ? (yield* listBranchesEffect(db, accountId, repoId)).find((item) => item.name === wantedName)
       : undefined;
     if (query.branch && !branch) return yield* new NotFound({ message: "Branch not found" });
-    const all = branch ? ((yield* repoFindingsEffect(db, accountId, branch.id)).get(branch.id) ?? []) : [];
+    const all = branch ? ((yield* repoFindingsEffect(db, accountId, branch.id, unsealer)).get(branch.id) ?? []) : [];
     const wanted = all
       .filter((finding) => (query.state ? finding.state === query.state : true))
       .filter((finding) => (query.severity ? finding.severity === query.severity : true))
@@ -91,7 +98,11 @@ export const scanDiffSvc = (
   db: AppDbType,
   accountId: string,
   scanId: string,
-): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> => scanDiffEffect(db, accountId, scanId);
+  masterKey?: string,
+): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
+  Effect.flatMap(unsealerEffect(db, masterKey, accountId), (unsealer) =>
+    scanDiffEffect(db, accountId, scanId, unsealer),
+  );
 
 const branchNamesOf = (names: string[]): Effect.Effect<string[], Invalid> =>
   Effect.forEach(names, (name) => {
@@ -112,12 +123,13 @@ export const addRepoSvc = (
   db: AppTxDbType,
   accountId: string,
   body: AddRepoBody,
+  masterKey?: string,
 ): Effect.Effect<RepoDetail, Invalid | Conflict | NotFound | DbError> =>
   Effect.gen(function* () {
     const fixed = sourceProviderOf(body.provider ?? DEFAULT_SOURCE_PROVIDER_ID).fixedBranch;
     const names = fixed === null ? yield* branchNamesOf(body.branches ?? []) : [fixed];
     const repoId = yield* addRepoEffect(db, accountId, body.repo, names, body.provider);
-    return yield* getRepoSvc(db, accountId, repoId);
+    return yield* getRepoSvc(db, accountId, repoId, masterKey);
   });
 
 export const addBranchSvc = (

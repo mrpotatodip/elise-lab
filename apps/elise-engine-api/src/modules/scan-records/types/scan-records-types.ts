@@ -23,7 +23,7 @@ export type ScanRecord = { scan: NewScanRow; findings: NewFindingRow[] };
 // -----
 // Service inputs
 // -----
-export type RecordScanEnv = Pick<Bindings, "REPORTS" | "DATABASE_URL">;
+export type RecordScanEnv = Pick<Bindings, "REPORTS" | "DATABASE_URL" | "DATA_MASTER_KEY">;
 
 // -----
 // Profile check: the table of what each profile requires, what a

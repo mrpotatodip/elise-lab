@@ -11,6 +11,6 @@ export const getUsageSvc = (env: UsageEnv, db: AppDbType, accountId: string): Ef
   Effect.gen(function* () {
     const now = Date.now();
     const spend = yield* monthSpendEffect(db, accountId, monthStartOf(new Date(now)));
-    const active = yield* activeScansEffect(db, accountId, now);
+    const active = yield* activeScansEffect(db, accountId, now, env.DATA_MASTER_KEY);
     return summarizeUsage(new Date(now), spend, env, reservedUsdOf(active));
   });

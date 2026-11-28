@@ -6,12 +6,12 @@ import { RUNNER_JOB_QUEUE_TIMEOUT_MS, RunnerJobSchema } from "@repo/contracts/el
 import { RUNNER_MAX_BUDGET_USD, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
-import { claimJobSvc, jobArchiveSvc, jobStateSvc, reportJobSvc } from "#/modules/runners/handlers";
-import { runnerSandbox } from "#/modules/runners/lib";
-import { neonScanRepo } from "#/modules/scan-ledger";
+import { claimJobSvc as claimJobUnkeyed, jobStateSvc } from "#/modules/runners/handlers";
+import { claimJobSvc, jobArchiveSvc, neonScanRepo, reportJobSvc, runnerSandbox } from "#/__tests__/keyed-test-deps";
 import { buildScanRecordSvc, writeScanRecordEffect } from "#/modules/scan-records";
 import { saveScanFilesEffect } from "#/modules/scan-store";
-import { fakeBindings } from "#/__tests__/fake-bindings";
+import { fakeBindings, TEST_DATA_MASTER_KEY } from "#/__tests__/fake-bindings";
+import { openJobText, sealerEffect } from "#/modules/sealed-data";
 import { SCAN_SANDBOX_FULL_PHASES, buildAgentPrompt, buildPhasePrompt } from "#/modules/scan-sandbox";
 import { monthSpendEffect } from "#/modules/usage";
 import {
@@ -83,7 +83,10 @@ const queue = async (scanId: string, over: Partial<ScanParams> = {}, at = NOW, o
 
 const report = (scanId: string, body: Parameters<typeof reportJobSvc>[3], by = runnerId) =>
   run(reportJobSvc(test.http, by, scanId, body));
-const jobOf = async (scanId: string) => (await run(readRunnerJobEffect(test.http, scanId)))!;
+const jobOf = async (scanId: string) => {
+  const { open } = await run(sealerEffect(test.http, TEST_DATA_MASTER_KEY, tenantId));
+  return openJobText(open, (await run(readRunnerJobEffect(test.http, scanId)))!);
+};
 
 beforeAll(async () => {
   test = await openTestDb();
@@ -108,6 +111,18 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await test.close();
+});
+
+describe("claiming a job with no usable master key", () => {
+  it("fails and leaves the job queued for the next poll", async () => {
+    const scanId = await queue(await newScan());
+
+    const failed = await Effect.runPromiseExit(claimJobUnkeyed(test.http, runnerId));
+    const claimed = await run(claimJobSvc(test.http, runnerId));
+
+    expect(failed._tag).toBe("Failure");
+    expect(claimed?.scanId).toBe(scanId);
+  });
 });
 
 describe("claiming a job", () => {
@@ -320,6 +335,18 @@ describe("reporting a job", () => {
       costUsd: 1.5,
       turns: 4,
     });
+  });
+
+  it("stores the job's text and the Runner's files and error sealed, and still hands the Runner the plain text", async () => {
+    const scanId = await claimed();
+    const [queued] = await test.raw.select().from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scanId));
+    await report(scanId, { state: "failed", error: "claude exited 1 in src/payments.ts" });
+    const [reported] = await test.raw.select().from(scanRunnerJobs).where(eq(scanRunnerJobs.scanId, scanId));
+
+    expect([queued.prompt, queued.optionsJson, queued.priorsJson, reported.error, reported.filesJson]).toEqual(
+      Array.from({ length: 4 }, () => expect.stringMatching(/^sealed:v1:/)).concat([null]),
+    );
+    expect((await jobOf(scanId)).error).toBe("claude exited 1 in src/payments.ts");
   });
 
   it("fails a scan that reports success without REPORT.md", async () => {
@@ -609,9 +636,11 @@ describe("the profile met after a Runner's result", () => {
     await report(scanId, { state: "succeeded", files });
 
     const bindings = fakeBindings();
+    const sealer = await run(sealerEffect(test.http, TEST_DATA_MASTER_KEY, tenantId));
     await run(
       saveScanFilesEffect(
         bindings.env.REPORTS,
+        sealer,
         tenantId,
         scanId,
         await runnerSandbox(test.http, params, runnerId).readFiles(),
@@ -626,6 +655,7 @@ describe("the profile met after a Runner's result", () => {
         "succeeded",
         null,
         null,
+        sealer.open,
       ),
     );
     await run(writeScanRecordEffect(test.http, record));

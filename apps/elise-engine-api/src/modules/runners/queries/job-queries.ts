@@ -105,6 +105,16 @@ export const claimRunnerJobEffect = (
     catch: toDbError,
   }).pipe(Effect.map(([row]) => row ?? null));
 
+export const releaseRunnerJobEffect = (db: DbConnectType, scanId: string): Effect.Effect<void, DbError> =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .update(scanRunnerJobs)
+        .set({ state: "queued", claimedAt: null })
+        .where(and(eq(scanRunnerJobs.scanId, scanId), eq(scanRunnerJobs.state, "claimed"))),
+    catch: toDbError,
+  }).pipe(Effect.asVoid);
+
 // -----
 // The Runner's report. It counts only while the job is claimed by
 // this Runner: a Scan that already ended (cancelled) refuses it.

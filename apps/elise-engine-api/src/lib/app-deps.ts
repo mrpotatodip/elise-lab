@@ -30,7 +30,7 @@ const sessionUserId = async (c: Context<AppEnv>): Promise<string | undefined> =>
 };
 
 export const realAppDeps: AppDeps = {
-  scanRepo: (_env, db) => tenantScanRepo(db),
+  scanRepo: (env, db) => tenantScanRepo(db, env.DATA_MASTER_KEY),
   monthSpend: (db, accountId) => monthSpendEffect(db, accountId, monthStartOf(new Date())),
   holdCredit: (db, accountId, scanId, holdUsd) => holdCreditEffect(db, { tenantId: accountId, scanId, holdUsd }),
   connectedRunnerSources: findConnectedRunnerEffect,

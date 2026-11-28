@@ -17,7 +17,9 @@ app.post(
   async (c) => {
     const { "x-account-id": accountId } = c.req.valid("header");
     const body = c.req.valid("json");
-    const data = await c.get("deps").withTenant(c, accountId, (db) => runEffect(addRepoSvc(db, accountId, body)));
+    const data = await c
+      .get("deps")
+      .withTenant(c, accountId, (db) => runEffect(addRepoSvc(db, accountId, body, c.env.DATA_MASTER_KEY)));
     return c.json({ data, error: null });
   },
 );

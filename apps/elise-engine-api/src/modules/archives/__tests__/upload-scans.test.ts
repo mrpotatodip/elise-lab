@@ -97,7 +97,7 @@ describe("POST /scans for an upload app", () => {
       scan,
     }).toEqual({
       status: 201,
-      link: { archiveId, label: "app-1.2.zip", contentSha256: ZIP_SHA256 },
+      link: { archiveId, label: expect.stringMatching(/^sealed:v1:/), contentSha256: ZIP_SHA256 },
       scan: { repoId: appId, branch: "upload", commitSha: ZIP_SHA256 },
     });
   });

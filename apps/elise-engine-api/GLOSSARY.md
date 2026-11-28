@@ -273,6 +273,14 @@ _Avoid_: Key type
 How hard the agent thinks: `low`, `medium`, `high`, `xhigh`, or `max`.
 _Avoid_: Quality, depth
 
+**Sealed**:
+Text of an Account that is stored locked with that Account's Data key, so a copy of the database does not show it. Only a signed-in member of that Account sees it unlocked.
+_Avoid_: Encrypted blob, hashed (a hash cannot be read again)
+
+**Data key**:
+The one key that seals the text of one Account. The master key, which lives only in the Worker, locks it.
+_Avoid_: Secret, account key
+
 ## Ambiguities
 
 - "Sandbox" means the Durable Object and the container together. "Container" means the Linux machine only.

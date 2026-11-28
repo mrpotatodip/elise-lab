@@ -19,7 +19,9 @@ app.get(
     const { scanId } = c.req.valid("param");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(detailScanSvc(c.env, scanReads(db), accountId, scanId)));
+      .withTenant(c, accountId, (db) =>
+        runEffect(detailScanSvc(c.env, scanReads(db, c.env.DATA_MASTER_KEY), accountId, scanId)),
+      );
     return c.json({ data, error: null });
   },
 );

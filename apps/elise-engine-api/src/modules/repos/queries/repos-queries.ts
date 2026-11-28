@@ -31,6 +31,7 @@ import {
 } from "#/modules/scan-ledger";
 import { sourceProviderOf, type SourceProviderId } from "#/providers/registry";
 import { SCAN_RECORDS_PROFILE_SKILL } from "#/modules/scan-records/constants";
+import { openFindingText, PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 import { branchStateOf, openCountsOf, type OpenCountRow } from "#/modules/repos/utils";
 import { weighedScanWhere } from "#/modules/verdict/queries";
 
@@ -153,11 +154,12 @@ export const repoFindingsEffect = (
   db: AppDbType,
   tenantId: string,
   branchId?: string,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<Map<string, RepoFinding[]>, DbError> =>
   Effect.tryPromise({
-    try: () => {
+    try: async () => {
       const latest = latestPerProblem(db, tenantId, { branchId });
-      return db
+      const found = await db
         .select({
           finding: scanFindings,
           branchId: latest.branchId,
@@ -176,6 +178,13 @@ export const repoFindingsEffect = (
         .leftJoin(scanFindingTriage, triageOn(latest))
         .leftJoin(partyPersons, eq(partyPersons.partyId, scanFindingTriage.setByPartyId))
         .orderBy(latest.branchId, latest.fingerprint);
+      return Promise.all(
+        found.map(async (row) => ({
+          ...row,
+          finding: await openFindingText(unsealer, row.finding),
+          triage: row.triage && { ...row.triage, note: await unsealer.textOrNull(row.triage.note) },
+        })),
+      );
     },
     catch: toDbError,
   }).pipe(
@@ -498,6 +507,7 @@ export const scanDiffEffect = (
   db: AppDbType,
   tenantId: string,
   scanId: string,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<ScanDiff, NotFound | Invalid | DbError> =>
   Effect.gen(function* () {
     const [scan] = yield* Effect.tryPromise({
@@ -534,8 +544,8 @@ export const scanDiffEffect = (
     });
     const rowsOf = (id: string) =>
       Effect.tryPromise({
-        try: () =>
-          db
+        try: async () => {
+          const found = await db
             .selectDistinctOn([scanFindings.fingerprint], {
               fingerprint: scanFindings.fingerprint,
               status: scanFindings.status,
@@ -548,7 +558,16 @@ export const scanDiffEffect = (
             })
             .from(scanFindings)
             .where(eq(scanFindings.scanId, id))
-            .orderBy(scanFindings.fingerprint),
+            .orderBy(scanFindings.fingerprint);
+          return Promise.all(
+            found.map(async (row) => ({
+              ...row,
+              title: await unsealer.text(row.title),
+              class: await unsealer.text(row.class),
+              file: await unsealer.textOrNull(row.file),
+            })),
+          );
+        },
         catch: toDbError,
       });
     const current = yield* rowsOf(scanId);

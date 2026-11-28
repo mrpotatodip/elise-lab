@@ -1,7 +1,8 @@
 import { Effect } from "effect";
 import type { FindingComment } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
-import { Conflict, Forbidden, NotFound, toDbError, type DbError } from "#/lib/effect-query";
+import { Conflict, Forbidden, NotFound, toDbError, type DbError, type ExternalError } from "#/lib/effect-query";
+import { sealerEffect } from "#/modules/sealed-data";
 import { actorPartyOf } from "#/modules/audit-trail";
 import { editFindingCommentEffect, findFindingCommentEffect } from "#/modules/finding-comments/queries";
 
@@ -17,14 +18,16 @@ export const updateFindingCommentSvc = (
   userId: string,
   commentId: string,
   body: string,
-): Effect.Effect<FindingComment, NotFound | Conflict | Forbidden | DbError> =>
+  masterKey: string | undefined,
+): Effect.Effect<FindingComment, NotFound | Conflict | Forbidden | ExternalError | DbError> =>
   Effect.gen(function* () {
     const comment = yield* findFindingCommentEffect(db, accountId, commentId);
     if (!comment) return yield* new NotFound({ message: "Comment not found" });
     const partyId = yield* Effect.tryPromise({ try: () => actorPartyOf(db, userId), catch: toDbError });
     if (!partyId || comment.authorPartyId !== partyId)
       return yield* new Forbidden({ message: "Only the author can edit a comment" });
-    const saved = yield* editFindingCommentEffect(db, accountId, commentId, body);
+    const sealer = yield* sealerEffect(db, masterKey, accountId);
+    const saved = yield* editFindingCommentEffect(db, accountId, commentId, body, sealer);
     if (!saved) return yield* new Conflict({ message: "A deleted comment cannot be edited" });
     return saved;
   });

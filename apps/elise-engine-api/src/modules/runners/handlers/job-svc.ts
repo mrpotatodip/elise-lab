@@ -19,13 +19,16 @@ import {
   RUNNER_JOB_BAD_OPTIONS,
   RUNNER_JOB_NO_REPORT,
   RUNNER_JOB_NOT_FOUND,
+  RUNNER_JOB_UNREADABLE,
   RUNNER_PROMPT_PLACE,
 } from "#/modules/runners/constants";
+import { CANNOT_READ, openJobText, sealerEffect, unsealerEffect, type Sealer } from "#/modules/sealed-data";
 import {
   claimRunnerJobEffect,
   earlierScanIdsEffect,
   readRunnerJobEffect,
   recordRunnerSourcesEffect,
+  releaseRunnerJobEffect,
   reportRunnerJobEffect,
 } from "#/modules/runners/queries";
 import { archiveKeyEffect, scanArchiveOfEffect } from "#/modules/archives/queries";
@@ -54,30 +57,38 @@ export const claimJobSvc = (
   runnerId: string,
   reported?: readonly string[],
   previousMaps?: PreviousMapStore,
-): Effect.Effect<RunnerJob | null, DbError> =>
+  masterKey?: string,
+): Effect.Effect<RunnerJob | null, DbError | ExternalError> =>
   Effect.gen(function* () {
     const sources = RUNNER_JOB_SOURCE_VALUES.filter((source) => source === "git" || reported?.includes(source));
     yield* recordRunnerSourcesEffect(db, runnerId, sources);
-    return yield* claimNextJob(db, runnerId, sources.includes("archive"), previousMaps);
+    return yield* claimNextJob(db, runnerId, sources.includes("archive"), previousMaps, masterKey);
   });
 
 const failClaimed = (
   db: DbConnectType,
+  sealer: Sealer,
   runnerId: string,
   scanId: string,
   error: string,
   now: Date,
-): Effect.Effect<boolean, DbError> =>
-  reportRunnerJobEffect(db, {
-    scanId,
-    runnerId,
-    state: "failed",
-    error,
-    commitSha: null,
-    branch: null,
-    usageJson: null,
-    filesJson: "{}",
-    now,
+): Effect.Effect<boolean, DbError | ExternalError> =>
+  Effect.gen(function* () {
+    const sealed = yield* Effect.tryPromise({
+      try: async () => ({ error: await sealer.text(error), filesJson: await sealer.text("{}") }),
+      catch: toExternalError,
+    });
+    return yield* reportRunnerJobEffect(db, {
+      scanId,
+      runnerId,
+      state: "failed",
+      error: sealed.error,
+      commitSha: null,
+      branch: null,
+      usageJson: null,
+      filesJson: sealed.filesJson,
+      now,
+    });
   });
 
 const claimNextJob = (
@@ -85,26 +96,36 @@ const claimNextJob = (
   runnerId: string,
   readsArchive: boolean,
   previousMaps?: PreviousMapStore,
-): Effect.Effect<RunnerJob | null, DbError> =>
+  masterKey?: string,
+): Effect.Effect<RunnerJob | null, DbError | ExternalError> =>
   Effect.gen(function* () {
     const now = new Date();
-    const row = yield* claimRunnerJobEffect(db, runnerId, now, readsArchive);
-    if (row === null) return null;
+    const claimed = yield* claimRunnerJobEffect(db, runnerId, now, readsArchive);
+    if (claimed === null) return null;
+    const sealer = yield* sealerEffect(db, masterKey, claimed.tenantId).pipe(
+      Effect.tapError(() => Effect.ignore(releaseRunnerJobEffect(db, claimed.scanId))),
+    );
+    const unsealer = sealer.open;
+    const row = yield* Effect.promise(() => openJobText(unsealer, claimed));
+    if (row.prompt === CANNOT_READ || row.priorsJson === CANNOT_READ) {
+      yield* failClaimed(db, sealer, runnerId, row.scanId, RUNNER_JOB_UNREADABLE, now);
+      return yield* claimNextJob(db, runnerId, readsArchive, previousMaps, masterKey);
+    }
     const options = yield* Effect.try(() => ScanOptionsSchema.parse(JSON.parse(row.optionsJson))).pipe(Effect.option);
     if (options._tag === "None") {
-      yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_BAD_OPTIONS, now);
-      return yield* claimNextJob(db, runnerId, readsArchive, previousMaps);
+      yield* failClaimed(db, sealer, runnerId, row.scanId, RUNNER_JOB_BAD_OPTIONS, now);
+      return yield* claimNextJob(db, runnerId, readsArchive, previousMaps, masterKey);
     }
-    const archive = yield* scanArchiveOfEffect(db, row.scanId);
+    const archive = yield* scanArchiveOfEffect(db, row.scanId, unsealer);
     if (archive !== null && archive.id === null) {
-      yield* failClaimed(db, runnerId, row.scanId, RUNNER_JOB_ARCHIVE_REMOVED, now);
-      return yield* claimNextJob(db, runnerId, readsArchive, previousMaps);
+      yield* failClaimed(db, sealer, runnerId, row.scanId, RUNNER_JOB_ARCHIVE_REMOVED, now);
+      return yield* claimNextJob(db, runnerId, readsArchive, previousMaps, masterKey);
     }
     const handoverFiles = [
-      ...(yield* handoverFilesSvc(db, row.tenantId, row.repoUrl, row.ref ?? undefined)),
+      ...(yield* handoverFilesSvc(db, row.tenantId, row.repoUrl, row.ref ?? undefined, masterKey)),
       ...(previousMaps === undefined
         ? []
-        : yield* previousMapFilesSvc(db, previousMaps, row.tenantId, row.repoUrl, row.ref ?? undefined)),
+        : yield* previousMapFilesSvc(db, previousMaps, row.tenantId, row.repoUrl, row.ref ?? undefined, masterKey)),
     ];
     const handoverNames = handoverFiles.map((file) => file.name);
     const job: RunnerJob = {
@@ -148,7 +169,8 @@ export const jobArchiveSvc = (
   reports: R2Bucket,
   runnerId: string,
   scanId: string,
-): Effect.Effect<{ body: R2ObjectBody["body"] }, NotFound | DbError | ExternalError> =>
+  masterKey?: string,
+): Effect.Effect<{ body: ReadableStream | ArrayBuffer }, NotFound | DbError | ExternalError> =>
   Effect.gen(function* () {
     const job = yield* readRunnerJobEffect(db, scanId);
     if (job === null || job.runnerId !== runnerId || job.state !== "claimed")
@@ -159,7 +181,10 @@ export const jobArchiveSvc = (
     const object =
       key === null ? null : yield* Effect.tryPromise({ try: () => reports.get(key), catch: toExternalError });
     if (object === null) return yield* new NotFound({ message: RUNNER_JOB_ARCHIVE_REMOVED });
-    return { body: object.body };
+    const unsealer = yield* unsealerEffect(db, masterKey, job.tenantId);
+    const body = yield* Effect.promise(() => unsealer.object(object));
+    if (body === null) return yield* new NotFound({ message: RUNNER_JOB_ARCHIVE_REMOVED });
+    return { body };
   });
 
 export const jobStateSvc = (
@@ -208,7 +233,8 @@ export const reportJobSvc = (
   runnerId: string,
   scanId: string,
   body: RunnerJobResultBody,
-): Effect.Effect<{ accepted: true }, NotFound | DbError> =>
+  masterKey?: string,
+): Effect.Effect<{ accepted: true }, NotFound | ExternalError | DbError> =>
   Effect.gen(function* () {
     const job = yield* readRunnerJobEffect(db, scanId);
     if (job === null || job.runnerId !== runnerId)
@@ -224,15 +250,23 @@ export const reportJobSvc = (
     // whatever the Runner says, so the zips stay one History.
     // -----
     const archive = yield* scanArchiveOfEffect(db, scanId);
+    const sealer = yield* sealerEffect(db, masterKey, job.tenantId);
+    const sealed = yield* Effect.tryPromise({
+      try: async () => ({
+        error: succeeded ? null : await sealer.text(body.error ?? RUNNER_JOB_NO_REPORT),
+        filesJson: succeeded ? await sealer.text(JSON.stringify(files)) : null,
+      }),
+      catch: toExternalError,
+    });
     const accepted = yield* reportRunnerJobEffect(db, {
       scanId,
       runnerId,
       state: succeeded ? "succeeded" : "failed",
-      error: succeeded ? null : (body.error ?? RUNNER_JOB_NO_REPORT),
+      error: sealed.error,
       commitSha: archive ? archive.contentSha256 : (body.checkout?.commitSha ?? null),
       branch: archive ? UPLOAD_BRANCH : branchOf(job.ref, body.checkout),
       usageJson: usage === null ? null : JSON.stringify(usage),
-      filesJson: succeeded ? JSON.stringify(files) : null,
+      filesJson: sealed.filesJson,
       now: new Date(),
     });
     if (!accepted) return yield* Effect.fail(new NotFound({ message: RUNNER_JOB_NOT_FOUND }));

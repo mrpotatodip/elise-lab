@@ -6,6 +6,13 @@ import { scanRepos } from "./scans";
 import { tenants } from "./tenant";
 
 // -----
+// The body is stored sealed: base64 of up to three bytes a character
+// of the 4000 allowed, plus the marker, the nonce and the tag. The
+// API still holds a comment to FINDING_COMMENT_BODY_MAX characters.
+// -----
+const SEALED_COMMENT_MAX = FINDING_COMMENT_BODY_MAX * 5 + 100;
+
+// -----
 // What a person wrote about a problem, kept per repo and
 // fingerprint like the triage row, so a rescan shows the
 // same thread. A Party removed from the system leaves the
@@ -22,6 +29,7 @@ export const scanFindingComments = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     repoId: uuid("repo_id").notNull(),
     fingerprint: text("fingerprint").notNull(),
+    fingerprintHmac: text("fingerprint_hmac"),
     authorPartyId: uuid("author_party_id").references(() => parties.id, { onDelete: "set null" }),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -32,7 +40,7 @@ export const scanFindingComments = pgTable(
   (t) => ({
     chkBody: check(
       "scan_finding_comments_body",
-      sql`${t.deletedAt} is not null or char_length(${t.body}) between 1 and ${sql.raw(String(FINDING_COMMENT_BODY_MAX))}`,
+      sql`${t.deletedAt} is not null or char_length(${t.body}) between 1 and ${sql.raw(String(SEALED_COMMENT_MAX))}`,
     ),
     fkRepoTenant: foreignKey({
       name: "scan_finding_comments_repo_tenant_fk",

@@ -1,8 +1,10 @@
+import { Effect } from "effect";
 import { Hono } from "hono";
 import { runEffect } from "#/lib/effect-query";
 import { zValidator } from "#/lib/zod-validator";
 import type { AppEnv } from "#/types/variables";
 import { scanReads } from "#/modules/scan-ledger";
+import { unsealerEffect } from "#/modules/sealed-data";
 import { readScanFileSvc } from "#/modules/scans/handlers";
 import { readScanFileDoc } from "#/modules/scans/openapi";
 import { AccountHeaderSchema, ScanFileParamSchema } from "#/modules/scans/schemas";
@@ -21,9 +23,13 @@ app.get(
     const { body, contentType } = await c
       .get("deps")
       .withTenant(c, accountId, (db) =>
-        runEffect(readScanFileSvc(c.env.REPORTS, scanReads(db), accountId, scanId, file)),
+        runEffect(
+          Effect.flatMap(unsealerEffect(db, c.env.DATA_MASTER_KEY, accountId), (unsealer) =>
+            readScanFileSvc(c.env.REPORTS, scanReads(db, c.env.DATA_MASTER_KEY), accountId, scanId, file, unsealer),
+          ),
+        ),
       );
-    return new Response(body.body, { headers: scanFileHeaders(file, contentType) });
+    return new Response(body, { headers: scanFileHeaders(file, contentType) });
   },
 );
 

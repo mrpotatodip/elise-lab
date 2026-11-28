@@ -56,6 +56,8 @@ const call = (path: string, init: { method?: string; body?: unknown; token?: boo
 const post = (body: string, token = false) =>
   call("/findings/comments", { method: "POST", body: { repo: REPO, fingerprint: FINGERPRINT, body }, token });
 
+const commentOf = async (res: Response) => z.object({ data: FindingCommentSchema }).parse(await res.json()).data;
+
 const threadBodies = async () => {
   const { data } = z
     .object({ data: CommentThreadSchema })
@@ -136,6 +138,31 @@ describe("what a comment may hold", () => {
     [FINDING_COMMENT_BODY_MAX + 1, 400],
   ])("answers a body of %i characters with %i", async (length, status) => {
     expect((await post("x".repeat(length))).status).toBe(status);
+  });
+
+  it("stores the text sealed and answers a create and an edit with it opened", async () => {
+    const created = await commentOf(await post("A private note"));
+    const [stored] = await test.raw.select({ body: scanFindingComments.body }).from(scanFindingComments);
+    const edited = await commentOf(
+      await call(`/findings/comments/${created.id}`, { method: "PATCH", body: { body: "A private edit" } }),
+    );
+    const [after] = await test.raw.select({ body: scanFindingComments.body }).from(scanFindingComments);
+
+    expect([created.body, stored.body, edited.body, after.body]).toEqual([
+      "A private note",
+      expect.stringMatching(/^sealed:v1:/),
+      "A private edit",
+      expect.stringMatching(/^sealed:v1:/),
+    ]);
+  });
+
+  it("keeps edited_at when a save changes nothing, though each sealing of the same text differs", async () => {
+    const created = await commentOf(await post("Same words"));
+    const same = await commentOf(
+      await call(`/findings/comments/${created.id}`, { method: "PATCH", body: { body: "Same words" } }),
+    );
+
+    expect(same.editedAt).toBeNull();
   });
 
   it("refuses a comment from a session whose login has no Party, since there is no author to show", async () => {

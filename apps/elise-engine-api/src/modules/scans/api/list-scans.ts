@@ -19,7 +19,9 @@ app.get(
     const query = c.req.valid("query");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(listScansSvc(scanReads(db), accountId, query)));
+      .withTenant(c, accountId, (db) =>
+        runEffect(listScansSvc(scanReads(db, c.env.DATA_MASTER_KEY), accountId, query)),
+      );
     return c.json({ data, error: null });
   },
 );
