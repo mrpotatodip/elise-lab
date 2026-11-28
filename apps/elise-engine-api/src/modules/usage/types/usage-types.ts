@@ -22,4 +22,5 @@ export type MonthSpend = {
 // -----
 // Service inputs
 // -----
-export type UsageEnv = Pick<Bindings, "MONTHLY_BUDGET_USD" | "BUDGET_ALLOWANCE_USD">;
+export type UsageEnv = Pick<Bindings, "MONTHLY_BUDGET_USD" | "BUDGET_ALLOWANCE_USD"> &
+  Partial<Pick<Bindings, "DATA_MASTER_KEY">>;

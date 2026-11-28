@@ -20,7 +20,13 @@ app.post("/claim", claimJobDoc, zValidator("json", RunnerClaimBodySchema), async
   const runner = await runnerOf(c);
   const { sources } = c.req.valid("json");
   const data = await runEffect(
-    claimJobSvc(dbConnect(c.env.DATABASE_URL), runner.runnerId, sources, r2TextStore(c.env.REPORTS)),
+    claimJobSvc(
+      dbConnect(c.env.DATABASE_URL),
+      runner.runnerId,
+      sources,
+      r2TextStore(c.env.REPORTS),
+      c.env.DATA_MASTER_KEY,
+    ),
   );
   return c.json({ data, error: null });
 });

@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
 import type { ScanArtifact, ScanUsage } from "@repo/contracts/elise";
-import type { Conflict, DbError } from "#/lib/effect-query";
+import type { Conflict, DbError, ExternalError } from "#/lib/effect-query";
 import type { ScanParams, ScanState, ScanStatus } from "#/schemas";
 import type { SourceProviderId } from "#/providers/registry";
 
@@ -37,7 +37,7 @@ export type ScanRepo = {
   ensureRepo: (accountId: string, url: string, provider?: SourceProviderId) => Effect.Effect<RepoRecord, DbError>;
   restoreRepo: (accountId: string, repoId: string, userId?: string) => Effect.Effect<void, Conflict | DbError>;
   create: (params: ScanParams, repoId: string, nowMs: number) => Effect.Effect<void, DbError | Conflict>;
-  mark: (accountId: string, scanId: string, patch: ScanPatch) => Effect.Effect<void, DbError>;
+  mark: (accountId: string, scanId: string, patch: ScanPatch) => Effect.Effect<void, DbError | ExternalError>;
   addFiles: (accountId: string, scanId: string, files: NewScanFile[]) => Effect.Effect<void, DbError>;
   list: (accountId: string, limit: number, cursor?: string, filter?: ScanFilter) => Effect.Effect<ScanPage, DbError>;
   get: (accountId: string, scanId: string) => Effect.Effect<ScanStatus | null, DbError>;

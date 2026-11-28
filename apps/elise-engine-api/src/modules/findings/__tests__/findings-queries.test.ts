@@ -3,6 +3,8 @@ import type { FindingsQuery } from "@repo/contracts/elise";
 import { scanFindings, scans } from "@repo/db-elise/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asTenantEffect, openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
+import { testSealer } from "#/__tests__/sealed-test-helpers";
+import type { Sealer } from "#/modules/sealed-data";
 import { findingRepoIdEffect, listFindingsEffect, setTriageEffect } from "#/modules/findings/queries";
 import { listFindingsSvc } from "#/modules/findings/handlers";
 
@@ -11,6 +13,7 @@ let tenantId: string;
 let otherTenantId: string;
 let repoId: string;
 let otherRepoId: string;
+let sealer: Sealer;
 
 const REPO = "https://github.com/octocat/Hello-World";
 const fp = (letter: string) => letter.repeat(64);
@@ -41,6 +44,7 @@ beforeAll(async () => {
   test = await openTestDb();
   tenantId = (await seedTenant(test, "acme")).tenantId;
   otherTenantId = (await seedTenant(test, "other")).tenantId;
+  sealer = await testSealer(tenantId);
   repoId = await seedRepo(test, tenantId, REPO);
   otherRepoId = await seedRepo(test, otherTenantId, REPO);
   await test.raw
@@ -97,9 +101,9 @@ describe("listFindingsEffect", () => {
   });
 
   it("returns one extra row so the service can tell there is another page", async () => {
-    const page = await Effect.runPromise(listFindingsSvc(test.http, tenantId, query({ limit: 2 })));
+    const page = await Effect.runPromise(listFindingsSvc(test.http, tenantId, query({ limit: 2 }), undefined));
     const next = await Effect.runPromise(
-      listFindingsSvc(test.http, tenantId, query({ limit: 2, cursor: page.nextCursor ?? undefined })),
+      listFindingsSvc(test.http, tenantId, query({ limit: 2, cursor: page.nextCursor ?? undefined }), undefined),
     );
 
     expect(ids(page.findings)).toEqual(["F-002", "F-001"]);
@@ -131,10 +135,11 @@ describe("triage", () => {
           { repo: REPO, fingerprint: fp("a"), status: "false_positive", note: "fixture" },
           undefined,
           new Date(),
+          sealer,
         ),
       ),
     );
-    const all = await Effect.runPromise(listFindingsEffect(test.http, tenantId, query()));
+    const all = await Effect.runPromise(listFindingsEffect(test.http, tenantId, query(), sealer.open));
     const open = await Effect.runPromise(listFindingsEffect(test.http, tenantId, query({ triage: "open" })));
     const decided = await Effect.runPromise(
       listFindingsEffect(test.http, tenantId, query({ triage: "false_positive" })),
@@ -159,6 +164,7 @@ describe("triage", () => {
           { repo: REPO, fingerprint: fp("a"), status: "fixed" },
           undefined,
           new Date(),
+          sealer,
         ),
       ),
     );

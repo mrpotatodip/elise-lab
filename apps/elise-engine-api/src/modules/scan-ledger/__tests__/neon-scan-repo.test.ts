@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { scanFindings, scanRunnerJobs, scans, tenantCreditLedger, tenantRunners } from "@repo/db-elise/schema";
 import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanParams } from "#/schemas";
-import { neonScanRepo } from "#/modules/scan-ledger";
+import { neonScanRepo } from "#/__tests__/keyed-test-deps";
 import { RESUME_ALREADY_RESUMED_MESSAGE } from "#/modules/scans/constants";
 
 let test: TestDb;

@@ -6,7 +6,7 @@ import type { ScanUsage } from "@repo/contracts/elise";
 import { callAs, tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
 import type { ScanOptions, ScanParams } from "#/schemas";
-import { runnerSandbox } from "#/modules/runners/lib";
+import { runnerSandbox } from "#/__tests__/keyed-test-deps";
 import { claimPairingEffect, createRunnerEffect } from "#/modules/runners/queries";
 import { balanceEffect, holdCreditEffect, settleCreditEffect } from "#/modules/credit";
 

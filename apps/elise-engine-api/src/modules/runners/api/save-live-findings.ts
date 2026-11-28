@@ -20,7 +20,9 @@ app.post(
     const body = c.req.valid("json");
     const data = await c
       .get("deps")
-      .withTenant(c, runner.accountId, (db) => runEffect(saveLiveFindingsSvc(db, runner, scanId, body)));
+      .withTenant(c, runner.accountId, (db) =>
+        runEffect(saveLiveFindingsSvc(db, runner, scanId, body, c.env.DATA_MASTER_KEY)),
+      );
     return c.json({ data, error: null });
   },
 );

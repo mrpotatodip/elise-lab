@@ -4,6 +4,7 @@ import { scanSignals, scans, tenants } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, toExternalError, type DbError, type ExternalError } from "#/lib/effect-query";
 import { repoFindingsEffect } from "#/modules/repos/queries";
+import { unsealerEffect } from "#/modules/sealed-data";
 import { isUnresolved } from "#/modules/repos/utils";
 import { SCAN_RECORDS_FULL_CLASS } from "#/modules/scan-records/constants";
 import {
@@ -42,6 +43,7 @@ export const detectDuplicateSignalsSvc = (
   gateway: TypeSafeGateway | null,
   accountId: string,
   scanId: string,
+  masterKey?: string,
 ): Effect.Effect<void, DbError | ExternalError> =>
   Effect.gen(function* () {
     if (gateway === null) return;
@@ -61,7 +63,8 @@ export const detectDuplicateSignalsSvc = (
     });
     if (!enabled || !scan || scan.status !== "succeeded" || scan.branchId === null) return;
     const { branchId, repoId } = scan;
-    const findings = (yield* repoFindingsEffect(db, accountId, branchId)).get(branchId) ?? [];
+    const unsealer = yield* unsealerEffect(db, masterKey, accountId);
+    const findings = (yield* repoFindingsEffect(db, accountId, branchId, unsealer)).get(branchId) ?? [];
     const open = findings.filter(isUnresolved).map(withoutPlaceholderClass);
     const fresh = open.filter((finding) => finding.firstSeenScanId === scanId);
     const stored = yield* Effect.tryPromise({

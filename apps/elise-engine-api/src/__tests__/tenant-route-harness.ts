@@ -1,7 +1,7 @@
 import { buildApp } from "#/index";
 import { realAppDeps } from "#/lib/app-deps";
 import { tenantScanRepo } from "#/modules/scan-ledger";
-import { fakeBindings, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
+import { fakeBindings, TEST_DATA_MASTER_KEY, TEST_TOKEN, testExecutionContext } from "#/__tests__/fake-bindings";
 import { asTenant, type TestDb } from "#/__tests__/test-db";
 import { testDeps } from "#/__tests__/test-deps";
 import type { AppDeps, Bindings } from "#/types/variables";
@@ -10,7 +10,7 @@ import type { AppDeps, Bindings } from "#/types/variables";
 // POST /scans on the real queries of the withTenant transaction.
 // -----
 const tenantScanDeps: Partial<AppDeps> = {
-  scanRepo: (_env, db) => tenantScanRepo(db),
+  scanRepo: (_env, db) => tenantScanRepo(db, TEST_DATA_MASTER_KEY),
   monthSpend: realAppDeps.monthSpend,
   holdCredit: realAppDeps.holdCredit,
   releaseCredit: realAppDeps.releaseCredit,

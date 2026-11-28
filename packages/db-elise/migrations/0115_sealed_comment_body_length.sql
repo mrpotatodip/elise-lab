@@ -1,0 +1,2 @@
+ALTER TABLE "scan_finding_comments" DROP CONSTRAINT "scan_finding_comments_body";--> statement-breakpoint
+ALTER TABLE "scan_finding_comments" ADD CONSTRAINT "scan_finding_comments_body" CHECK ("scan_finding_comments"."deleted_at" is not null or char_length("scan_finding_comments"."body") between 1 and 20100);

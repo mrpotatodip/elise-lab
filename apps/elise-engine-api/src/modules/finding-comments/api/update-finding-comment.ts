@@ -24,7 +24,9 @@ app.patch(
     const userId = userIdOf(c);
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(updateFindingCommentSvc(db, accountId, userId, commentId, body)));
+      .withTenant(c, accountId, (db) =>
+        runEffect(updateFindingCommentSvc(db, accountId, userId, commentId, body, c.env.DATA_MASTER_KEY)),
+      );
     return c.json({ data, error: null });
   },
 );

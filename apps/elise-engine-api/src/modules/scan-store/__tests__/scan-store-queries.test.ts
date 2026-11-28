@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { fakeBindings } from "#/__tests__/fake-bindings";
+import { testSealer } from "#/__tests__/sealed-test-helpers";
 import { readScanFileEffect, saveScanFilesEffect } from "#/modules/scan-store";
 
 const down = async () => {
@@ -15,7 +16,10 @@ describe("files", () => {
   it("saves files and says what each one is", async () => {
     const reports = reportsOf().REPORTS;
     const saved = await Effect.runPromise(
-      saveScanFilesEffect(reports, "acme", "abc", { "REPORT.md": "# r", "findings.json": "[]" }),
+      saveScanFilesEffect(reports, await testSealer("acme"), "acme", "abc", {
+        "REPORT.md": "# r",
+        "findings.json": "[]",
+      }),
     );
 
     expect(saved.toSorted((a, b) => (a.name < b.name ? -1 : 1))).toEqual([
@@ -36,7 +40,7 @@ describe("files", () => {
 
   it("counts bytes, not characters", async () => {
     const saved = await Effect.runPromise(
-      saveScanFilesEffect(reportsOf().REPORTS, "acme", "abc", { "REPORT.md": "é" }),
+      saveScanFilesEffect(reportsOf().REPORTS, await testSealer("acme"), "acme", "abc", { "REPORT.md": "é" }),
     );
 
     expect(saved[0].sizeBytes).toBe(2);
@@ -44,7 +48,9 @@ describe("files", () => {
 
   it("reads back a file by its key", async () => {
     const reports = reportsOf().REPORTS;
-    const [file] = await Effect.runPromise(saveScanFilesEffect(reports, "acme", "abc", { "REPORT.md": "# r" }));
+    const [file] = await Effect.runPromise(
+      saveScanFilesEffect(reports, await testSealer("acme"), "acme", "abc", { "REPORT.md": "# r" }),
+    );
     const object = await Effect.runPromise(readScanFileEffect(reports, file.r2Key));
 
     expect(object).not.toBeNull();
@@ -58,7 +64,7 @@ describe("files", () => {
 
   it("fails with ExternalError when a save rejects", async () => {
     const error = await Effect.runPromise(
-      Effect.flip(saveScanFilesEffect(brokenReports, "acme", "abc", { "REPORT.md": "# r" })),
+      Effect.flip(saveScanFilesEffect(brokenReports, await testSealer("acme"), "acme", "abc", { "REPORT.md": "# r" })),
     );
 
     expect(error._tag).toBe("ExternalError");

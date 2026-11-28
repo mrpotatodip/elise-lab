@@ -8,6 +8,7 @@ import type { ScanParams } from "#/schemas";
 import { RUNNER_JOB_NO_REPORT, RUNNER_JOB_NOT_PICKED_UP, RUNNER_PROMPT_PLACE } from "#/modules/runners/constants";
 import { cancelRunnerJobEffect, insertRunnerJobEffect, readRunnerJobEffect } from "#/modules/runners/queries";
 import { buildAgentPrompt } from "#/modules/scan-sandbox";
+import { openJobText, sealerEffect, unsealerEffect } from "#/modules/sealed-data";
 import type { SandboxPort } from "#/modules/scan-workflow/types";
 
 const FilesSchema = z.record(z.string(), z.string());
@@ -24,14 +25,20 @@ export const runnerSandbox = (
   params: ScanParams,
   runnerId: string,
   now: () => Date = () => new Date(),
+  masterKey?: string,
 ): SandboxPort => {
-  const read = () => runEffect(readRunnerJobEffect(db, params.scanId));
+  const read = async () => {
+    const job = await runEffect(readRunnerJobEffect(db, params.scanId));
+    if (job === null) return null;
+    return openJobText(await runEffect(unsealerEffect(db, masterKey, params.accountId)), job);
+  };
   return {
     prepare: async () => ({ commitSha: null, branch: null }),
 
     putHandoverFiles: async () => undefined,
 
     launchAgent: async (options) => {
+      const sealer = await runEffect(sealerEffect(db, masterKey, params.accountId));
       await runEffect(
         insertRunnerJobEffect(db, {
           scanId: params.scanId,
@@ -39,9 +46,9 @@ export const runnerSandbox = (
           runnerId,
           repoUrl: params.repo,
           ref: params.ref ?? null,
-          prompt: buildAgentPrompt(options, RUNNER_PROMPT_PLACE),
-          optionsJson: JSON.stringify(options),
-          priorsJson: "",
+          prompt: await sealer.text(buildAgentPrompt(options, RUNNER_PROMPT_PLACE)),
+          optionsJson: await sealer.text(JSON.stringify(options)),
+          priorsJson: await sealer.text(""),
           resumesScanId: params.resumesScanId ?? null,
         }),
       );

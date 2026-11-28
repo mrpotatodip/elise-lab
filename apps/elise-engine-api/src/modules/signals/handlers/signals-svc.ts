@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import type { CheckAcceptedRiskBody, Signal, SignalsSettings } from "@repo/contracts/elise";
 import type { AppDbType } from "#/lib/db-connection";
 import { NotFound, toExternalError, type DbError } from "#/lib/effect-query";
+import { unsealerEffect } from "#/modules/sealed-data";
 import { SIGNAL_NO_THRESHOLD } from "#/modules/signals/constants";
 import {
   dismissSignalEffect,
@@ -33,9 +34,11 @@ export const readReasonCheckSvc = (
   db: AppDbType,
   accountId: string,
   body: CheckAcceptedRiskBody,
+  masterKey: string | undefined,
 ): Effect.Effect<ReasonCheckInput, NotFound | DbError> =>
   Effect.gen(function* () {
-    const input = yield* findReasonCheckInputEffect(db, accountId, body);
+    const unsealer = yield* unsealerEffect(db, masterKey, accountId);
+    const input = yield* findReasonCheckInputEffect(db, accountId, body, unsealer);
     if (input.enabled && !input.finding) return yield* new NotFound({ message: "Finding not found" });
     return input;
   });

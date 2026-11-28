@@ -4,13 +4,8 @@ import type { AppDbType } from "#/lib/db-connection";
 import { toExternalError, type DbError } from "#/lib/effect-query";
 import { decidedBranchIdEffect } from "#/modules/decided-problems/queries";
 import { previousMapKeysEffect } from "#/modules/previous-map/queries";
-import { previousMapHandover } from "#/modules/previous-map/utils";
-
-export type PreviousMapStore = { read: (key: string) => Promise<string | null> };
-
-export const r2TextStore = (reports: R2Bucket): PreviousMapStore => ({
-  read: (key) => reports.get(key).then((object) => (object === null ? null : object.text())),
-});
+import { previousMapHandover, type PreviousMapStore } from "#/modules/previous-map/utils";
+import { unsealerEffect } from "#/modules/sealed-data";
 
 export const previousMapFilesSvc = (
   db: AppDbType,
@@ -18,14 +13,16 @@ export const previousMapFilesSvc = (
   tenantId: string,
   repoUrl: string,
   ref: string | undefined,
+  masterKey?: string,
 ): Effect.Effect<HandoverFile[], DbError> =>
   Effect.gen(function* () {
     const branchId = yield* decidedBranchIdEffect(db, tenantId, repoUrl, ref);
     if (branchId === null) return [];
     const keys = yield* previousMapKeysEffect(db, tenantId, branchId);
     if (keys === null) return [];
+    const unsealer = yield* unsealerEffect(db, masterKey, tenantId);
     const read = (key: string) =>
-      Effect.tryPromise({ try: () => store.read(key), catch: toExternalError }).pipe(
+      Effect.tryPromise({ try: () => store.read(key, unsealer), catch: toExternalError }).pipe(
         Effect.orElseSucceed((): string | null => null),
       );
     const architecture = yield* read(keys.architectureKey);

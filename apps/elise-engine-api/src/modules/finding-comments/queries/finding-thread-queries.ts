@@ -12,6 +12,7 @@ import { partyPersons, scanFindingComments, scanFindingTriage, scanRepos } from 
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 import { findingCommentView } from "./finding-comment-view";
 import { DECISION_ACTIONS, findingDecisionView } from "./finding-decision-view";
 
@@ -39,6 +40,7 @@ export const findingThreadEffect = (
   db: AppDbType,
   tenantId: string,
   query: FindingCommentsQuery,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<FindingThreadEvent[], DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -84,11 +86,23 @@ export const findingThreadEffect = (
         )
         .orderBy(desc(accessAuditLog.createdAt), desc(accessAuditLog.id))
         .limit(FINDING_THREAD_EVENT_LIMIT);
-      const comments = commentRows.map(({ comment, person }) => findingCommentView(comment, person));
-      const decisions = decisionRows.flatMap(({ entry, person }) => {
-        const after = DecisionAfterSchema.safeParse(entry.after);
-        return after.success ? [findingDecisionView(entry, after.data, person)] : [];
-      });
+      const comments = await Promise.all(
+        commentRows.map(async ({ comment, person }) =>
+          findingCommentView({ ...comment, body: await unsealer.text(comment.body) }, person),
+        ),
+      );
+      const decisions = await Promise.all(
+        decisionRows.flatMap(({ entry, person }) => {
+          const after = DecisionAfterSchema.safeParse(entry.after);
+          return after.success
+            ? [
+                unsealer
+                  .textOrNull(after.data.note ?? null)
+                  .then((note) => findingDecisionView(entry, { ...after.data, note }, person)),
+              ]
+            : [];
+        }),
+      );
       return [...comments, ...decisions].toSorted(oldestFirst).slice(-FINDING_THREAD_EVENT_LIMIT);
     },
     catch: toDbError,

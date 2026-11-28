@@ -39,7 +39,9 @@ app.post(
     const { "x-account-id": accountId } = c.req.valid("header");
     const body = c.req.valid("json");
     const deps = c.get("deps");
-    const input = await deps.withTenant(c, accountId, (db) => runEffect(readReasonCheckSvc(db, accountId, body)));
+    const input = await deps.withTenant(c, accountId, (db) =>
+      runEffect(readReasonCheckSvc(db, accountId, body, c.env.DATA_MASTER_KEY)),
+    );
     const answer = await runEffect(askWeakReasonSvc(input.enabled ? deps.typesafe(c.env) : null, input, body.note));
     const finding = input.finding;
     const signal =

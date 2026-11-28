@@ -6,6 +6,7 @@ import type { AppDbType } from "#/lib/db-connection";
 import { Conflict, Invalid, NotFound, toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { liveScansSql } from "#/modules/scan-ledger/utils";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 
 export const REPO_HAS_ACTIVE_SCAN = "A Scan of this Repo is queued or running; stop it or wait for it first";
 export const UPLOAD_APP_NOT_FOUND = "Upload app not found";
@@ -109,16 +110,19 @@ export const listArchivesEffect = (
   db: AppDbType,
   tenantId: string,
   repoId: string,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<UploadArchive[], DbError> =>
   Effect.tryPromise({
-    try: () =>
-      db
+    try: async () => {
+      const rows = await db
         .select()
         .from(scanUploadArchives)
         .where(and(eq(scanUploadArchives.tenantId, tenantId), eq(scanUploadArchives.repoId, repoId)))
-        .orderBy(desc(scanUploadArchives.uploadedAt), desc(scanUploadArchives.id)),
+        .orderBy(desc(scanUploadArchives.uploadedAt), desc(scanUploadArchives.id));
+      return Promise.all(rows.map(async (row) => archiveViewOf({ ...row, label: await unsealer.text(row.label) })));
+    },
     catch: toDbError,
-  }).pipe(Effect.map((rows) => rows.map(archiveViewOf)));
+  });
 
 // -----
 // How many zips the app holds and how many bytes of zips the
@@ -284,12 +288,13 @@ export const linkScanArchiveEffect = (
 export const scanArchivesEffect = (
   db: AppDbType,
   scanIds: readonly string[],
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<Map<string, ScanArchiveRef>, DbError> =>
   scanIds.length === 0
     ? Effect.succeed(new Map())
     : Effect.tryPromise({
-        try: () =>
-          db
+        try: async () => {
+          const rows = await db
             .select({
               scanId: scanArchiveLinks.scanId,
               id: scanArchiveLinks.archiveId,
@@ -297,12 +302,25 @@ export const scanArchivesEffect = (
               contentSha256: scanArchiveLinks.contentSha256,
             })
             .from(scanArchiveLinks)
-            .where(inArray(scanArchiveLinks.scanId, [...scanIds])),
+            .where(inArray(scanArchiveLinks.scanId, [...scanIds]));
+          return new Map(
+            await Promise.all(
+              rows.map(async ({ scanId, ...archive }): Promise<[string, ScanArchiveRef]> => [
+                scanId,
+                { ...archive, label: await unsealer.text(archive.label) },
+              ]),
+            ),
+          );
+        },
         catch: toDbError,
-      }).pipe(Effect.map((rows) => new Map(rows.map(({ scanId, ...archive }) => [scanId, archive]))));
+      });
 
-export const scanArchiveOfEffect = (db: AppDbType, scanId: string): Effect.Effect<ScanArchiveRef | null, DbError> =>
-  scanArchivesEffect(db, [scanId]).pipe(Effect.map((found) => found.get(scanId) ?? null));
+export const scanArchiveOfEffect = (
+  db: AppDbType,
+  scanId: string,
+  unsealer: Unsealer = PLAIN_ONLY,
+): Effect.Effect<ScanArchiveRef | null, DbError> =>
+  scanArchivesEffect(db, [scanId], unsealer).pipe(Effect.map((found) => found.get(scanId) ?? null));
 
 // -----
 // Where a zip's bytes are, or null once it is removed. Owner

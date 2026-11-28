@@ -13,10 +13,11 @@ export const stopScanSvc = (
   scanId: string,
   now: Date,
   teardown: (scanId: string) => Promise<ScanUsage | null>,
+  masterKey?: string,
 ): Effect.Effect<ScanStatus, NotFound | Conflict | DbError> =>
   Effect.gen(function* () {
     yield* stopScanEffect(db, accountId, scanId, now);
-    const stopped = yield* scanReads(db).get(accountId, scanId);
+    const stopped = yield* scanReads(db, masterKey).get(accountId, scanId);
     if (!stopped) return yield* new NotFound({ message: "Scan not found" });
     if (stopped.runner) return stopped;
     const usage = yield* Effect.promise(() =>
@@ -32,5 +33,5 @@ export const stopScanSvc = (
       if (settlement.ok)
         yield* settleCreditEffect(db, { tenantId: accountId, scanId, chargeUsd: settlement.chargeUsd });
     }
-    return (yield* scanReads(db).get(accountId, scanId)) ?? stopped;
+    return (yield* scanReads(db, masterKey).get(accountId, scanId)) ?? stopped;
   });

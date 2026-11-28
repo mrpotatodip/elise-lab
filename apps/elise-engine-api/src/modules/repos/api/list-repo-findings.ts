@@ -21,7 +21,9 @@ app.get(
     const query = c.req.valid("query");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(listRepoFindingsSvc(db, accountId, repoId, query)));
+      .withTenant(c, accountId, (db) =>
+        runEffect(listRepoFindingsSvc(db, accountId, repoId, query, c.env.DATA_MASTER_KEY)),
+      );
     return c.json({ data, error: null });
   },
 );

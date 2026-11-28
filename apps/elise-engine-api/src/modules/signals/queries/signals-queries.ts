@@ -11,6 +11,7 @@ import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
 import { repoIdentityOf, sameRepoIdentity } from "#/modules/scan-ledger";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 
 export const findSignalsSettingsEffect = (db: AppDbType, tenantId: string): Effect.Effect<SignalsSettings, DbError> =>
   Effect.tryPromise({
@@ -99,6 +100,7 @@ export const findReasonCheckInputEffect = (
   db: AppDbType,
   tenantId: string,
   body: CheckAcceptedRiskBody,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<ReasonCheckInput, DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -128,7 +130,16 @@ export const findReasonCheckInputEffect = (
         )
         .orderBy(desc(scanFindings.createdAt))
         .limit(1);
-      return { enabled: true, finding: row ?? null };
+      if (!row) return { enabled: true, finding: null };
+      return {
+        enabled: true,
+        finding: {
+          ...row,
+          title: await unsealer.text(row.title),
+          description: await unsealer.textOrNull(row.description),
+          evidence: await unsealer.textOrNull(row.evidence),
+        },
+      };
     },
     catch: toDbError,
   });

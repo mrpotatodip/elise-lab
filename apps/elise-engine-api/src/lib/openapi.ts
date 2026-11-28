@@ -27,6 +27,7 @@ const ERROR_DESCRIPTIONS = {
   404: "The resource does not exist, or it belongs to another account.",
   409: "The resource already exists, for example an email that has a login, or a limit of the account is reached. The message names it, except on sign-up, which gives one answer for every refusal.",
   413: "The request body is over the route's size limit. The message names the limit.",
+  422: "The stored data is sealed and does not open for this account.",
   429: "The account has too many active scans. Wait for one to end, then try again.",
 };
 

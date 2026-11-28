@@ -12,12 +12,15 @@ import {
   seedTenant,
   type TestDb,
 } from "#/__tests__/test-db";
+import { testSealer } from "#/__tests__/sealed-test-helpers";
 import { setTriageEffect } from "#/modules/findings/queries";
+import type { Sealer } from "#/modules/sealed-data";
 
 let test: TestDb;
 let tenantId: string;
 let repoId: string;
 let partyId: string;
+let sealer: Sealer;
 
 const REPO = "https://github.com/octocat/Hello-World";
 const NOW = new Date("2026-11-10T00:00:00Z");
@@ -31,7 +34,7 @@ const body = (status: FindingTriageBody["status"], letter: string, duplicateOf?:
 });
 
 const set = (input: FindingTriageBody) =>
-  asTenantEffect(test, tenantId, (db) => setTriageEffect(db, tenantId, repoId, input, "admin", NOW));
+  asTenantEffect(test, tenantId, (db) => setTriageEffect(db, tenantId, repoId, input, "admin", NOW, sealer));
 const refusal = async (input: FindingTriageBody) => {
   const error = await Effect.runPromise(Effect.flip(set(input)));
   return { tag: error._tag, message: "message" in error ? error.message : "" };
@@ -42,6 +45,7 @@ beforeAll(async () => {
   const seeded = await seedTenant(test, "acme");
   tenantId = seeded.tenantId;
   partyId = seeded.partyId;
+  sealer = await testSealer(tenantId);
   repoId = await seedRepo(test, tenantId, REPO);
   await test.raw.insert(authUser).values({ id: "admin", name: "Ada Rossi", email: "ada@example.com", partyId });
   const [dev] = await test.raw.insert(scanRepoBranches).values({ tenantId, repoId, name: "dev" }).returning();

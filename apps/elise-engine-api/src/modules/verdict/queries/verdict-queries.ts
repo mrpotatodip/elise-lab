@@ -3,6 +3,7 @@ import { Effect } from "effect";
 import { scanFindings, scanFindingTriage, scans } from "@repo/db-elise/schema";
 import type { AppDbType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
+import { PLAIN_ONLY, type Unsealer } from "#/modules/sealed-data";
 import { VERDICT_SCAN_FETCH_LIMIT } from "#/modules/verdict/constants";
 import type { JudgedFinding, JudgedScan, JudgedTriage } from "#/modules/verdict/types";
 
@@ -22,6 +23,7 @@ export const commitEvidenceEffect = (
   tenantId: string,
   repoId: string,
   commit: string,
+  unsealer: Unsealer = PLAIN_ONLY,
 ): Effect.Effect<CommitEvidence, DbError> =>
   Effect.tryPromise({
     try: async () => {
@@ -83,7 +85,22 @@ export const commitEvidenceEffect = (
         })
         .from(scanFindingTriage)
         .where(and(eq(scanFindingTriage.tenantId, tenantId), eq(scanFindingTriage.repoId, repoId)));
-      return { scans: scanRows, findings, triage };
+      return {
+        scans: scanRows,
+        findings: await Promise.all(
+          findings.map(async (finding) => ({
+            ...finding,
+            title: await unsealer.text(finding.title),
+            class: await unsealer.text(finding.class),
+            file: await unsealer.textOrNull(finding.file),
+            impact: await unsealer.textOrNull(finding.impact),
+            evidence: await unsealer.textOrNull(finding.evidence),
+            fix: await unsealer.textOrNull(finding.fix),
+            needs: await unsealer.textOrNull(finding.needs),
+          })),
+        ),
+        triage: await Promise.all(triage.map(async (row) => ({ ...row, note: await unsealer.textOrNull(row.note) }))),
+      };
     },
     catch: toDbError,
   });

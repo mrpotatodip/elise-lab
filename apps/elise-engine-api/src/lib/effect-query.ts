@@ -7,6 +7,7 @@ import {
   InternalServiceError,
   NotFoundError,
   TooManyRequestsError,
+  UnreadableError,
   ValidationError,
 } from "#/lib/errors";
 import { redactForLog } from "#/lib/redact-log";
@@ -33,12 +34,15 @@ export class Forbidden extends Data.TaggedError("Forbidden")<{
 export class Invalid extends Data.TaggedError("Invalid")<{
   message: string;
 }> {}
+export class Unreadable extends Data.TaggedError("Unreadable")<{
+  message: string;
+}> {}
 export class RateLimited extends Data.TaggedError("RateLimited")<{
   code: string;
   message: string;
 }> {}
 
-export type DomainFailure = NotFound | Conflict | Forbidden | Invalid | RateLimited;
+export type DomainFailure = NotFound | Conflict | Forbidden | Invalid | Unreadable | RateLimited;
 export type AppFailure = DomainFailure | DbError | ExternalError | ParseError;
 
 export const toDbError = (cause: unknown): DbError => new DbError({ cause });
@@ -59,6 +63,8 @@ export function toAppError(failure: AppFailure): AppError {
       return new ForbiddenError(failure.message);
     case "Invalid":
       return new ValidationError(failure.message);
+    case "Unreadable":
+      return new UnreadableError(failure.message);
     case "RateLimited":
       return new TooManyRequestsError(failure.message, failure.code);
     case "DbError":

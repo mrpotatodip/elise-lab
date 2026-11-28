@@ -21,7 +21,9 @@ app.get(
     const { commit } = c.req.valid("query");
     const data = await c
       .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(verdictSvc(db, accountId, repoId, commit, new Date())));
+      .withTenant(c, accountId, (db) =>
+        runEffect(verdictSvc(db, accountId, repoId, commit, new Date(), c.env.DATA_MASTER_KEY)),
+      );
     return c.json({ data, error: null });
   },
 );
