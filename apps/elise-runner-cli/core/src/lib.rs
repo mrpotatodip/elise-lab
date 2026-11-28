@@ -1,5 +1,6 @@
 pub mod cli_access;
 pub mod cli_repos;
+pub mod cli_results;
 mod engine;
 pub mod engine_client;
 pub mod find;

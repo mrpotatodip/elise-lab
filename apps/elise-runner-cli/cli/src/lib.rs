@@ -6,6 +6,8 @@ pub mod completions;
 pub mod help;
 pub mod json;
 pub mod repos;
+pub mod results;
+pub mod results_args;
 pub mod skill;
 pub mod store;
 pub mod table;
@@ -92,6 +94,7 @@ pub fn main(args: &[String]) -> Exit {
             Command::Repos { json } => repos::repos(&store, json).await,
             Command::Repo { repo, json } => repos::repo(&store, &repo, json).await,
             Command::SkillInstall { dir, json } => skill::install(dir.as_deref(), json),
+            Command::Results(request) => results::run(&store, request).await,
         }
     })
 }

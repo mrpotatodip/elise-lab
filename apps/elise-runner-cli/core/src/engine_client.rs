@@ -5,6 +5,7 @@ use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::Value;
+use std::future::Future;
 use std::sync::Mutex;
 
 pub const SCOPE_REFUSED: &str = "This CLI access cannot do this";
@@ -102,7 +103,26 @@ impl<'a> EngineClient<'a> {
         self.send(Method::POST, path, Some(body)).await
     }
 
+    pub async fn get_bytes(&self, path: &str, query: &[(&str, String)]) -> Result<Vec<u8>, Denied> {
+        let path = with_query(path, query);
+        let path = path.as_str();
+        self.across(|id| async move {
+            let response = self.once_raw(&Method::GET, path, None, Some(&id)).await?;
+            response.bytes().await.map(|bytes| bytes.to_vec()).map_err(|_| Denied::Offline)
+        })
+        .await
+    }
+
     async fn send<T: DeserializeOwned>(&self, method: Method, path: &str, body: Option<&Value>) -> Result<T, Denied> {
+        let method = &method;
+        self.across(|id| async move { self.once::<T>(method, path, body, Some(&id)).await }).await
+    }
+
+    async fn across<T, F, Fut>(&self, attempt: F) -> Result<T, Denied>
+    where
+        F: Fn(String) -> Fut,
+        Fut: Future<Output = Result<T, Denied>>,
+    {
         let known = self.account.lock().expect("the account lock is not poisoned").clone();
         let candidates = match known {
             Some(id) => vec![id],
@@ -110,7 +130,7 @@ impl<'a> EngineClient<'a> {
         };
         let mut last = Denied::Refused(OTHER_ACCOUNT.to_string());
         for id in candidates {
-            match self.once::<T>(&method, path, body, Some(&id)).await {
+            match attempt(id.clone()).await {
                 Err(Denied::Refused(message)) if message == OTHER_ACCOUNT => last = Denied::Refused(message),
                 answer => {
                     if answer.is_ok() {
@@ -135,6 +155,17 @@ impl<'a> EngineClient<'a> {
         body: Option<&Value>,
         account: Option<&str>,
     ) -> Result<T, Denied> {
+        let response = self.once_raw(method, path, body, account).await?;
+        response.json::<Envelope<T>>().await.map(|envelope| envelope.data).map_err(|_| Denied::Unreadable)
+    }
+
+    async fn once_raw(
+        &self,
+        method: &Method,
+        path: &str,
+        body: Option<&Value>,
+        account: Option<&str>,
+    ) -> Result<reqwest::Response, Denied> {
         let mut request = self.http.request(method.clone(), format!("{}{path}", engine_url())).bearer_auth(&self.held.token);
         if let Some(account) = account {
             request = request.header("x-account-id", account);
@@ -145,7 +176,7 @@ impl<'a> EngineClient<'a> {
         let response = request.send().await.map_err(|_| Denied::Offline)?;
         let status = response.status();
         if status.is_success() {
-            return response.json::<Envelope<T>>().await.map(|envelope| envelope.data).map_err(|_| Denied::Unreadable);
+            return Ok(response);
         }
         let message = response.json::<Refusal>().await.map(|refusal| refusal.error.message).unwrap_or_default();
         Err(self.denied(status, message))

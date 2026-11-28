@@ -12,6 +12,7 @@ pub enum Command {
     Repos { json: bool },
     Repo { repo: String, json: bool },
     SkillInstall { dir: Option<String>, json: bool },
+    Results(crate::results_args::Request),
 }
 
 pub enum Parsed {
@@ -118,6 +119,9 @@ pub fn parse(args: &[String]) -> Parsed {
     let Some(spec) = table::command(command) else {
         return Parsed::Usage(unknown_command(command));
     };
+    if let Some(parsed) = crate::results_args::parse(command, spec, rest) {
+        return parsed;
+    }
     let (rest, parallel) = if table::accepts(spec, "--parallel") {
         match take_parallel(rest) {
             Ok(taken) => taken,

@@ -53,6 +53,9 @@ struct State {
     branches: BTreeMap<String, Vec<serde_json::Value>>,
     verdicts: BTreeMap<(String, String), serde_json::Value>,
     scans: Vec<serde_json::Value>,
+    result_findings: Vec<serde_json::Value>,
+    result_files: BTreeMap<(String, String), Vec<u8>>,
+    result_diffs: BTreeMap<String, serde_json::Value>,
 }
 
 pub const USER_CODE: &str = "WXYZ-1234";
@@ -238,6 +241,18 @@ impl Engine {
         self.state.lock().unwrap().scans.push(scan);
     }
 
+    pub fn add_finding(&self, finding: serde_json::Value) {
+        self.state.lock().unwrap().result_findings.push(finding);
+    }
+
+    pub fn set_file(&self, scan_id: &str, name: &str, bytes: &[u8]) {
+        self.state.lock().unwrap().result_files.insert((scan_id.to_string(), name.to_string()), bytes.to_vec());
+    }
+
+    pub fn set_diff(&self, scan_id: &str, diff: serde_json::Value) {
+        self.state.lock().unwrap().result_diffs.insert(scan_id.to_string(), diff);
+    }
+
     pub fn login_expires_at(&self, expires_at: &str) {
         self.state.lock().unwrap().login_expires_at = Some(expires_at.to_string());
     }
@@ -400,6 +415,16 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
         let _ = stream.write_all(&zip);
         return;
     }
+    if let Some((status, bytes)) = file_of(&request, &mut state.lock().unwrap()) {
+        let _ = write!(
+            stream,
+            "HTTP/1.1 {status} {}\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            if status == 200 { "OK" } else { "Error" },
+            bytes.len()
+        );
+        let _ = stream.write_all(&bytes);
+        return;
+    }
     let (status, body) = answer(&request, &mut state.lock().unwrap());
     if status == 0 {
         return;
@@ -429,6 +454,43 @@ fn archive_of(request: &Request, state: &mut State) -> Option<Vec<u8>> {
     }
     state.archive_downloads.push(scan_id.clone());
     state.archives.get(&scan_id).cloned()
+}
+
+fn file_of(request: &Request, state: &mut State) -> Option<(u16, Vec<u8>)> {
+    request.bearer.as_ref().filter(|token| state.access_live.contains(*token))?;
+    let rest = request.path.strip_prefix("/scans/")?;
+    let (scan_id, name) = rest.split_once("/files/")?;
+    if request.method != "GET" || request.account.as_deref() != Some(ACCOUNT_ID) {
+        return None;
+    }
+    state.access_requests.push(format!("{} {}", request.method, request.path));
+    Some(match state.result_files.get(&(scan_id.to_string(), name.to_string())) {
+        Some(bytes) => (200, bytes.clone()),
+        None => (404, br#"{"data":null,"error":{"code":"NOT_FOUND","message":"File not found"}}"#.to_vec()),
+    })
+}
+
+fn decoded(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        let hex = bytes
+            .get(index + 1..index + 3)
+            .and_then(|pair| std::str::from_utf8(pair).ok())
+            .and_then(|pair| u8::from_str_radix(pair, 16).ok());
+        match (bytes[index], hex) {
+            (b'%', Some(byte)) => {
+                out.push(byte);
+                index += 3;
+            }
+            (byte, _) => {
+                out.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8(out).unwrap_or_default()
 }
 
 fn batch_of(body: &str) -> Vec<serde_json::Value> {
@@ -642,8 +704,52 @@ fn cli_answer(request: &Request, state: &mut State) -> (u16, String) {
             Some(scan) => data(scan.clone()),
             None => refusal(404, "Scan not found"),
         },
+        ("GET", ["scans", id, "diff"]) => match state.result_diffs.get(*id) {
+            Some(diff) => data(diff.clone()),
+            None => refusal(404, "Scan not found"),
+        },
+        ("GET", ["findings"]) => {
+            let limit: usize = query_value(query, "limit").and_then(|limit| limit.parse().ok()).unwrap_or(50);
+            let offset: usize = query_value(query, "cursor").and_then(|cursor| cursor.parse().ok()).unwrap_or(0);
+            let wanted = |name: &str| query_value(query, name).map(|value| decoded(&value));
+            let (scan_id, repo, severity, status) = (wanted("scanId"), wanted("repo"), wanted("severity"), wanted("status"));
+            let rows: Vec<&serde_json::Value> = state
+                .result_findings
+                .iter()
+                .filter(|finding| scan_id.as_ref().is_none_or(|id| finding["scanId"] == id.as_str()))
+                .filter(|finding| repo.as_ref().is_none_or(|url| url.ends_with(finding["repo"].as_str().unwrap_or("?"))))
+                .filter(|finding| severity.as_ref().is_none_or(|severity| finding["severity"] == severity.as_str()))
+                .filter(|finding| status.as_ref().is_none_or(|status| finding["status"] == status.as_str()))
+                .collect();
+            let page: Vec<&serde_json::Value> = rows.iter().skip(offset).take(limit).copied().collect();
+            let next = (rows.len() > offset + limit).then(|| (offset + limit).to_string());
+            data(serde_json::json!({ "findings": page, "nextCursor": next }))
+        }
         _ => (REJECTED.0, REJECTED.1.to_string()),
     }
+}
+
+pub fn finding_json(scan_id: &str, repo: &str, severity: Option<&str>, status: &str, title: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+        "scanId": scan_id,
+        "repo": repo,
+        "findingId": "F-1",
+        "fingerprint": "ab".repeat(32),
+        "status": status,
+        "severity": severity,
+        "title": title,
+        "class": "injection",
+        "file": "src/db.ts",
+        "line": 12,
+        "actor": "an anonymous visitor",
+        "impact": "Reads any row",
+        "evidence": "The query joins request text",
+        "fix": "Use a parameter",
+        "needs": null,
+        "createdAt": "2026-11-20T10:05:00.000Z",
+        "triage": null,
+    })
 }
 
 pub fn repo_json(id: &str, provider: &str, host: Option<&str>, canonical: &str) -> serde_json::Value {
