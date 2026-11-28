@@ -26,6 +26,6 @@ Sealed: the free text of a Finding (title, class, file, impact, evidence, fix, n
 
 - The Worker and its master key are trusted. Someone who holds both reads everything. Keep a copy of the master key in a second secret store: if it is lost, every Account's text is lost. Changing the master key re-wraps the Data keys and leaves the data alone.
 - The database cannot search, sort or group by sealed text. A search by words must run in the Worker after unsealing.
-- The duplicate and weak-reason Signals still send plain Finding text to the TypeSafe model. Sealing does not cover that call. It is a known exposure with its own ticket.
+- The duplicate and weak-reason Signals still send plain Finding text to the TypeSafe model. Sealing does not cover that call. Decided 2026-11-28 (#508): Signals are off by default for new Accounts and an admin can opt in (ADR 0011); existing Accounts keep their value.
 - Claude Code on a Runner still sends repo text to Anthropic. That is out of scope.
 - While the backfill runs, a row may hold the old fingerprint. Read code treats it as the same Finding as the new one.

@@ -17,7 +17,7 @@ export const findSignalsSettingsEffect = (db: AppDbType, tenantId: string): Effe
   Effect.tryPromise({
     try: async () => {
       const [row] = await db.select({ enabled: tenants.signalsEnabled }).from(tenants).where(eq(tenants.id, tenantId));
-      return { enabled: row?.enabled ?? true };
+      return { enabled: row?.enabled ?? false };
     },
     catch: toDbError,
   });

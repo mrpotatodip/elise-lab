@@ -827,6 +827,13 @@
       "when": 1795857761687,
       "tag": "0117_cli_access",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1795862304517,
+      "tag": "0118_signals_off_by_default",
+      "breakpoints": true
     }
   ]
 }

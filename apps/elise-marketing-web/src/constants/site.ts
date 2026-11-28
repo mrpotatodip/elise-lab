@@ -231,7 +231,7 @@ export const FACTS = [
   },
   {
     title: "Signals",
-    text: "Signals are optional hints, such as a possible duplicate finding. They come from an outside model provider, which receives a finding's title, description, evidence text and decision notes, and never your source code. A hint never changes a finding or a pass or fail. Signals are on for new and existing accounts, and an account admin can turn them off in Account settings.",
+    text: "Signals are optional hints, such as a possible duplicate finding. They come from an outside model provider, which receives a finding's title, description, evidence text and decision notes, and never your source code. A hint never changes a finding or a pass or fail. Signals are off for new accounts, and an account admin can turn them on or off in Account settings.",
     more: { href: "/privacy", label: "The privacy page names the provider." },
   },
   {
