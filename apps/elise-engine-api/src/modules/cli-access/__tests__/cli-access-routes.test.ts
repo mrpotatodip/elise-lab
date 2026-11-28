@@ -1,7 +1,8 @@
 import { Effect } from "effect";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { authUser } from "@repo/db-elise/schema";
+import { eq } from "drizzle-orm";
+import { authUser, tenantCliAccess } from "@repo/db-elise/schema";
 import {
   ApprovedRunnerLoginCheckSchema,
   CliAccessListSchema,
@@ -12,6 +13,9 @@ import { openTestDb, seedTenant, type TestDb } from "#/__tests__/test-db";
 import { tenantRouteApp } from "#/__tests__/tenant-route-harness";
 import { cliAccessIdentitySvc } from "#/modules/cli-access";
 import { checkRunnerLoginSvc, runnerIdentitySvc, startRunnerLoginSvc } from "#/modules/runners/handlers";
+import { collectLoginEffect } from "#/modules/runners/queries";
+import { hashDeviceCode } from "#/modules/runners/utils";
+import { hashCliAccessToken } from "#/modules/cli-access";
 
 type Role = "admin" | "watcher" | "none";
 
@@ -25,7 +29,7 @@ let role: Role = "admin";
 
 const app = tenantRouteApp(() => test, {
   sessionUserId: async (c) => c.req.header("x-test-session"),
-  cliAccess: (_c, token) => Effect.runPromise(cliAccessIdentitySvc(test.http, token)),
+  cliAccess: (_c, token, needed) => Effect.runPromise(cliAccessIdentitySvc(test.http, token, needed)),
   runnerIdentity: (_c, token) => Effect.runPromise(runnerIdentitySvc(test.http, token)),
   userHasAccount: async (_c, _userId, accountId) => accountId === tenantId && role !== "none",
   userHasPower: async (_c, _userId, accountId, power) =>
@@ -132,13 +136,46 @@ describe("CLI access on the routes a CLI may use", () => {
     ["GET", "/usage/anthropic-key"],
     ["PUT", "/findings/triage"],
     ["POST", "/runners/login/approve"],
-    ["POST", "/runners/claim"],
     ["DELETE", `/cli-access/${MISSING_SCAN}`],
     ["GET", "/cli-access"],
-  ])("refuses a start token on %s %s", async (method, path) => {
+  ])("refuses a start token on %s %s with 403 and its own message", async (method, path) => {
     const token = await tokenFor("start");
 
-    expect((await call(path, { token, method })).status).toBe(401);
+    const res = await call(path, { token, method });
+
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(res.body)).toContain("does not reach this route");
+  });
+
+  it("does not take a CLI token as a pairing code on /runners/claim", async () => {
+    const token = await tokenFor("start");
+
+    expect((await call("/runners/claim", { token, method: "POST" })).status).toBe(401);
+  });
+
+  it("answers 401 for an unknown token, on a listed route or not", async () => {
+    expect((await call("/repos", { token: "elc_unknown" })).status).toBe(401);
+    expect((await call("/team", { token: "elc_unknown" })).status).toBe(401);
+  });
+
+  it("writes last_used_at once a minute and not on a refused route", async () => {
+    const { collected } = await login({ runScans: false, cliScope: "read" });
+    const token = collected.data?.cliAccess?.token ?? "";
+    const id = collected.data?.cliAccess?.id ?? "";
+    const usedAt = async () =>
+      (await test.raw.select().from(tenantCliAccess).where(eq(tenantCliAccess.id, id)))[0]?.lastUsedAt ?? null;
+
+    await call("/team", { token });
+    expect(await usedAt()).toBeNull();
+    await call("/scans", { token, method: "POST", body: { repo: "https://github.com/o/n" } });
+    expect(await usedAt()).toBeNull();
+
+    await call("/repos", { token });
+    const first = await usedAt();
+    await call("/repos", { token });
+
+    expect(first).not.toBeNull();
+    expect(await usedAt()).toEqual(first);
   });
 
   it("refuses a token on another account", async () => {
@@ -211,8 +248,56 @@ describe("the approval", () => {
   it("gives both credentials in one approval, each token once", async () => {
     const { collected } = await login({ runScans: true, cliScope: "start" });
 
-    expect(collected.data?.token).toMatch(/^elr_/);
-    expect(collected.data?.cliAccess).toMatchObject({ scope: "start", token: expect.stringMatching(/^elc_/) });
+    expect(collected.data).toMatchObject({
+      runnerId: expect.any(String),
+      name: "laptop",
+      token: expect.stringMatching(/^elr_/),
+    });
+    expect(collected.data?.cliAccess).toMatchObject({
+      scope: "start",
+      accountId: tenantId,
+      token: expect.stringMatching(/^elc_/),
+    });
+  });
+
+  it("keeps the login collectable when the CLI access row cannot be saved", async () => {
+    const taken = await tokenFor("read");
+    const started = await Effect.runPromise(
+      startRunnerLoginSvc(
+        test.http,
+        { name: "laptop", os: "macos", cpu: "arm64", version: "0.7.0" },
+        { ip: "203.0.113.7", dashboardUrl: "https://app.example.com" },
+      ),
+    );
+    await call("/runners/login/approve", {
+      method: "POST",
+      session: true,
+      body: { userCode: started.userCode, name: "laptop", runScans: true, cliScope: "start" },
+    });
+    const deviceCodeHash = await hashDeviceCode(started.deviceCode);
+    const now = new Date();
+
+    const failed = await Effect.runPromise(
+      Effect.either(
+        collectLoginEffect(
+          test.http,
+          deviceCodeHash,
+          { runnerTokenHash: "runner-hash-1", cliAccessTokenHash: await hashCliAccessToken(taken) },
+          now,
+        ),
+      ),
+    );
+    const retried = await Effect.runPromise(
+      collectLoginEffect(
+        test.http,
+        deviceCodeHash,
+        { runnerTokenHash: "runner-hash-2", cliAccessTokenHash: "cli-hash-2" },
+        new Date(now.getTime() + 60_000),
+      ),
+    );
+
+    expect(failed._tag).toBe("Left");
+    expect(retried).toMatchObject({ kind: "collected", runner: { name: "laptop" }, cliAccess: { scope: "start" } });
   });
 
   it("refuses an approval that chooses nothing", async () => {

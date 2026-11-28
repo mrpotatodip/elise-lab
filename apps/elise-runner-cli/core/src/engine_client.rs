@@ -91,7 +91,8 @@ impl<'a> EngineClient<'a> {
                 return Err(Denied::Scope { needed, held: held.scope });
             }
         }
-        Ok(EngineClient { http: client(), held, tokens, read_only, account: Mutex::new(None) })
+        let account = Mutex::new(held.account.clone());
+        Ok(EngineClient { http: client(), held, tokens, read_only, account })
     }
 
     pub fn scope(&self) -> Option<&str> {
@@ -132,7 +133,7 @@ impl<'a> EngineClient<'a> {
                 .header(reqwest::header::CONTENT_LENGTH, size)
                 .timeout(UPLOAD_TIMEOUT)
                 .body(reqwest::Body::from(opened));
-            let response = self.finish(request).await?;
+            let response = self.finish(request, Scope::Start).await?;
             response.json::<Envelope<T>>().await.map(|envelope| envelope.data).map_err(|_| Denied::Unreadable)
         })
         .await
@@ -159,28 +160,23 @@ impl<'a> EngineClient<'a> {
         Fut: Future<Output = Result<T, Denied>>,
     {
         let known = self.account.lock().expect("the account lock is not poisoned").clone();
-        let candidates = match known {
-            Some(id) => vec![id],
-            None => self.accounts().await?,
-        };
-        let mut last = Denied::Refused(OTHER_ACCOUNT.to_string());
-        for id in candidates {
-            match attempt(id.clone()).await {
-                Err(Denied::Refused(message)) if message == OTHER_ACCOUNT => last = Denied::Refused(message),
-                answer => {
-                    if answer.is_ok() {
-                        *self.account.lock().expect("the account lock is not poisoned") = Some(id);
-                    }
-                    return answer;
-                }
+        let id = match known {
+            Some(id) => id,
+            None => {
+                let id = self.own_account().await?;
+                *self.account.lock().expect("the account lock is not poisoned") = Some(id.clone());
+                id
             }
-        }
-        Err(last)
+        };
+        attempt(id).await
     }
 
-    async fn accounts(&self) -> Result<Vec<String>, Denied> {
+    async fn own_account(&self) -> Result<String, Denied> {
         let me: Me = self.once(&Method::GET, "/me", None, None).await?;
-        Ok(me.accounts.into_iter().map(|account| account.id).collect())
+        match <[MeAccount; 1]>::try_from(me.accounts) {
+            Ok([account]) => Ok(account.id),
+            Err(_) => Err(Denied::Refused(OTHER_ACCOUNT.to_string())),
+        }
     }
 
     async fn once<T: DeserializeOwned>(
@@ -208,20 +204,21 @@ impl<'a> EngineClient<'a> {
         if let Some(body) = body {
             request = request.json(body);
         }
-        self.finish(request).await
+        let needed = if *method == Method::GET { Scope::Read } else { Scope::Start };
+        self.finish(request, needed).await
     }
 
-    async fn finish(&self, request: reqwest::RequestBuilder) -> Result<reqwest::Response, Denied> {
+    async fn finish(&self, request: reqwest::RequestBuilder, needed: Scope) -> Result<reqwest::Response, Denied> {
         let response = request.send().await.map_err(|_| Denied::Offline)?;
         let status = response.status();
         if status.is_success() {
             return Ok(response);
         }
         let message = response.json::<Refusal>().await.map(|refusal| refusal.error.message).unwrap_or_default();
-        Err(self.denied(status, message))
+        Err(self.denied(status, message, needed))
     }
 
-    fn denied(&self, status: StatusCode, message: String) -> Denied {
+    fn denied(&self, status: StatusCode, message: String, needed: Scope) -> Denied {
         match status {
             StatusCode::UNAUTHORIZED => {
                 if !self.read_only {
@@ -229,7 +226,7 @@ impl<'a> EngineClient<'a> {
                 }
                 Denied::Revoked
             }
-            StatusCode::FORBIDDEN if message == SCOPE_REFUSED => Denied::Scope { needed: Scope::Start, held: self.held.scope.clone() },
+            StatusCode::FORBIDDEN if message == SCOPE_REFUSED => Denied::Scope { needed, held: self.held.scope.clone() },
             StatusCode::NOT_FOUND => Denied::NotFound(message),
             status if status.is_server_error() => Denied::Offline,
             status if message.is_empty() => Denied::Refused(format!("Elise answered {status}")),

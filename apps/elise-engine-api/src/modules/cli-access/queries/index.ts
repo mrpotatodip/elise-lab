@@ -1,7 +1,9 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { authUser, partyPersons, tenantCliAccess } from "@repo/db-elise";
-import type { CliAccess } from "@repo/contracts/elise";
+import type { CliAccess, CliAccessScope } from "@repo/contracts/elise";
+import { CLI_ACCESS_TOUCH_INTERVAL_MS } from "#/modules/cli-access/constants";
+import { scopeCovers } from "#/modules/cli-access/utils";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { toDbError, type DbError } from "#/lib/effect-query";
 import { actorPartyOf, insertAuditEntry } from "#/modules/audit-trail";
@@ -24,22 +26,27 @@ export const findCliAccessByTokenEffect = (
   db: DbConnectType,
   tokenHash: string,
   now: Date,
+  needed: CliAccessScope | null,
 ): Effect.Effect<CliAccessIdentity | null, DbError> =>
   Effect.tryPromise({
     try: async () => {
       const [row] = await db
-        .update(tenantCliAccess)
-        .set({ lastUsedAt: now })
-        .where(and(eq(tenantCliAccess.tokenHash, tokenHash), isNull(tenantCliAccess.revokedAt)))
-        .returning({
+        .select({
           id: tenantCliAccess.id,
           personId: tenantCliAccess.personId,
           accountId: tenantCliAccess.tenantId,
           scope: tenantCliAccess.scope,
-        });
+          lastUsedAt: tenantCliAccess.lastUsedAt,
+        })
+        .from(tenantCliAccess)
+        .where(and(eq(tenantCliAccess.tokenHash, tokenHash), isNull(tenantCliAccess.revokedAt)));
       if (!row) return null;
       const [login] = await db.select({ id: authUser.id }).from(authUser).where(eq(authUser.partyId, row.personId));
-      return login ? { id: row.id, userId: login.id, accountId: row.accountId, scope: row.scope } : null;
+      if (!login) return null;
+      const stale = row.lastUsedAt === null || now.getTime() - row.lastUsedAt.getTime() >= CLI_ACCESS_TOUCH_INTERVAL_MS;
+      if (needed && scopeCovers(row.scope, needed) && stale)
+        await db.update(tenantCliAccess).set({ lastUsedAt: now }).where(eq(tenantCliAccess.id, row.id));
+      return { id: row.id, userId: login.id, accountId: row.accountId, scope: row.scope };
     },
     catch: toDbError,
   });

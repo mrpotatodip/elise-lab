@@ -1,7 +1,13 @@
 import type { CliAccessScope } from "@repo/contracts/elise";
 import type { Context } from "hono";
 import { ForbiddenError } from "#/lib/errors";
-import { CLI_ACCESS_OTHER_ACCOUNT, CLI_ACCESS_REFUSED } from "#/modules/cli-access/constants";
+import {
+  CLI_ACCESS_OTHER_ACCOUNT,
+  CLI_ACCESS_REFUSED,
+  CLI_ACCESS_ROUTE_REFUSED,
+  CLI_ACCESS_TOKEN_PREFIX,
+} from "#/modules/cli-access/constants";
+import { scopeCovers } from "#/modules/cli-access/utils";
 import { bearerTokenOf } from "#/modules/runners/utils";
 import type { AppEnv } from "#/types/variables";
 
@@ -30,21 +36,17 @@ const CLI_ROUTES: readonly CliRoute[] = [
 export const cliRouteScopeOf = (method: string, path: string): CliRoute["scope"] | null =>
   CLI_ROUTES.find((route) => route.method === method && route.path.test(path))?.scope ?? null;
 
-const SCOPE_RANK = { read: 0, start: 1, admin: 2 } satisfies Record<CliAccessScope, number>;
-
-export const scopeCovers = (held: CliAccessScope, needed: CliAccessScope): boolean =>
-  SCOPE_RANK[held] >= SCOPE_RANK[needed];
-
 const cliAccessUserId = async (c: Context<AppEnv>): Promise<string | undefined> => {
   const token = bearerTokenOf(c.req.header("authorization"));
-  if (!token) return undefined;
+  if (!token?.startsWith(CLI_ACCESS_TOKEN_PREFIX)) return undefined;
   const needed = cliRouteScopeOf(c.req.method, c.req.path);
-  if (!needed) return undefined;
-  const access = await c.get("deps").cliAccess(c, token);
+  const access = await c.get("deps").cliAccess(c, token, needed);
   if (!access) return undefined;
+  if (!needed) throw new ForbiddenError(CLI_ACCESS_ROUTE_REFUSED);
   if (!scopeCovers(access.scope, needed)) throw new ForbiddenError(CLI_ACCESS_REFUSED);
   const accountId = c.req.header("x-account-id");
   if (accountId !== undefined && accountId !== access.accountId) throw new ForbiddenError(CLI_ACCESS_OTHER_ACCOUNT);
+  c.set("cliAccountId", access.accountId);
   return access.userId;
 };
 

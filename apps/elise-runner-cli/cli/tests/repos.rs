@@ -303,13 +303,28 @@ fn an_unreachable_engine_exits_5() {
 }
 
 #[test]
-fn the_account_is_the_one_the_cli_access_belongs_to_even_when_the_person_has_two() {
+fn a_token_from_the_variable_asks_me_once_for_its_one_account() {
     let (engine, runner) = seeded("read");
-    engine.list_another_account_first();
 
     let output = runner.run(&["repos", "--json"], "");
 
     assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
-    let calls: Vec<String> = engine.access_requests().into_iter().filter(|call| call != "GET /me").collect();
-    assert_eq!(calls, ["GET /repos", "GET /repos", "GET /projects"]);
+    let calls = engine.access_requests();
+    assert_eq!(calls.iter().filter(|call| *call == "GET /me").count(), 1, "{calls:?}");
+    assert_eq!(calls.iter().filter(|call| *call != "GET /me").collect::<Vec<_>>(), ["GET /repos", "GET /projects"]);
+}
+
+#[test]
+fn a_stored_cli_access_names_its_account_and_never_probes_me() {
+    let engine = Engine::start();
+    engine.add_repo(repo_json(GADGETS, "github", None, "acme/gadgets"));
+    let runner = Runner::new(&engine);
+    login_with_read(&runner, &engine);
+
+    let output = runner.run(&["repos", "--json"], "");
+
+    assert_eq!(output.code, 0, "{}{}", output.stdout, output.stderr);
+    let calls = engine.access_requests();
+    assert!(calls.iter().any(|call| call == "GET /repos"), "{calls:?}");
+    assert!(!calls.iter().any(|call| call == "GET /me"), "{calls:?}");
 }

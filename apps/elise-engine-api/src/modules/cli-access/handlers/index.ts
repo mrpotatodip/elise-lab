@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { CliAccessList, CliAccessRevoked } from "@repo/contracts/elise";
+import type { CliAccessList, CliAccessRevoked, CliAccessScope } from "@repo/contracts/elise";
 import type { AppDbType, DbConnectType } from "#/lib/db-connection";
 import { NotFound, type DbError } from "#/lib/effect-query";
 import { CLI_ACCESS_NOT_FOUND } from "#/modules/cli-access/constants";
@@ -27,8 +27,9 @@ export const revokeCliAccessSvc = (
 export const cliAccessIdentitySvc = (
   db: DbConnectType,
   token: string,
+  needed: CliAccessScope | null,
 ): Effect.Effect<CliAccessIdentity | null, DbError> =>
   Effect.gen(function* () {
     const tokenHash = yield* Effect.promise(() => hashCliAccessToken(token));
-    return yield* findCliAccessByTokenEffect(db, tokenHash, new Date());
+    return yield* findCliAccessByTokenEffect(db, tokenHash, new Date(), needed);
   });

@@ -47,7 +47,7 @@ export const realAppDeps: AppDeps = {
   },
   sessionUserId,
   runnerIdentity: (c, token) => runEffect(runnerIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
-  cliAccess: (c, token) => runEffect(cliAccessIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
+  cliAccess: (c, token, needed) => runEffect(cliAccessIdentitySvc(dbConnect(c.env.DATABASE_URL), token, needed)),
   userHasAccount: (c, userId, accountId) =>
     runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) =>

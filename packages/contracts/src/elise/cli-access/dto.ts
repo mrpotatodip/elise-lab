@@ -36,10 +36,12 @@ export const CliAccessRevokedSchema = z.object({
 
 // -----
 // What the CLI collects once when the approval gave it CLI access:
-// the token, shown only here, with the scope it was given.
+// the token, shown only here, with the scope it was given and the
+// one Account it belongs to, so the CLI names it on every call.
 // -----
 export const CliAccessGrantSchema = z.object({
   id: CliAccessIdSchema,
+  accountId: z.uuid(),
   name: z.string(),
   scope: CliAccessScopeSchema,
   token: z.string(),

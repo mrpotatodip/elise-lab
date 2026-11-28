@@ -156,6 +156,10 @@ export const approveLoginEffect = (
 // answers "slow_down" and adds 5 seconds to the interval (RFC 8628).
 // After approval the token hash is set by one UPDATE that needs no
 // token yet, so two checks cannot both collect; the loser is missing.
+// The CLI access row is inserted before the Runner token is set and
+// before the login is claimed, so a failed insert leaves the login
+// approved and collectable; a check that then loses a race deletes
+// the row it made, whose token nobody was given.
 // -----
 export const collectLoginEffect = (
   db: DbConnectType,
@@ -209,27 +213,6 @@ export const collectLoginEffect = (
       const { tenantId, approvedBy } = login;
       if (login.state !== "approved" || !tenantId || !approvedBy) return { kind: "missing" };
       if (login.runScans && !login.runnerId) return { kind: "missing" };
-      const runnerRows =
-        login.runScans && login.runnerId
-          ? await db
-              .update(tenantRunners)
-              .set({ tokenHash: tokens.runnerTokenHash, pairingExpiresAt: null, pairedAt: now, lastSeenAt: now })
-              .where(
-                and(
-                  eq(tenantRunners.id, login.runnerId),
-                  isNull(tenantRunners.tokenHash),
-                  isNull(tenantRunners.revokedAt),
-                ),
-              )
-              .returning({ id: tenantRunners.id, name: tenantRunners.name, tenantId: tenantRunners.tenantId })
-          : [];
-      if (login.runScans && runnerRows.length === 0) return { kind: "missing" };
-      const claimed = await db
-        .update(platformRunnerDeviceLogins)
-        .set({ state: "collected", collectedAt: now })
-        .where(and(eq(platformRunnerDeviceLogins.id, login.id), eq(platformRunnerDeviceLogins.state, "approved")))
-        .returning({ id: platformRunnerDeviceLogins.id });
-      if (claimed.length === 0) return { kind: "missing" };
       const cliName = login.approvedName ?? login.suggestedName;
       const [cliRow] = login.cliScope
         ? await db
@@ -244,6 +227,36 @@ export const collectLoginEffect = (
             })
             .returning({ id: tenantCliAccess.id })
         : [];
+      const dropCliAccess = async (): Promise<void> => {
+        if (cliRow) await db.delete(tenantCliAccess).where(eq(tenantCliAccess.id, cliRow.id));
+      };
+      const runnerRows =
+        login.runScans && login.runnerId
+          ? await db
+              .update(tenantRunners)
+              .set({ tokenHash: tokens.runnerTokenHash, pairingExpiresAt: null, pairedAt: now, lastSeenAt: now })
+              .where(
+                and(
+                  eq(tenantRunners.id, login.runnerId),
+                  isNull(tenantRunners.tokenHash),
+                  isNull(tenantRunners.revokedAt),
+                ),
+              )
+              .returning({ id: tenantRunners.id, name: tenantRunners.name, tenantId: tenantRunners.tenantId })
+          : [];
+      if (login.runScans && runnerRows.length === 0) {
+        await dropCliAccess();
+        return { kind: "missing" };
+      }
+      const claimed = await db
+        .update(platformRunnerDeviceLogins)
+        .set({ state: "collected", collectedAt: now })
+        .where(and(eq(platformRunnerDeviceLogins.id, login.id), eq(platformRunnerDeviceLogins.state, "approved")))
+        .returning({ id: platformRunnerDeviceLogins.id });
+      if (claimed.length === 0) {
+        await dropCliAccess();
+        return { kind: "missing" };
+      }
       const cliAccess = login.cliScope && cliRow ? { id: cliRow.id, name: cliName, scope: login.cliScope } : null;
       return { kind: "collected", accountId: tenantId, runnerRows, cliAccess };
     },

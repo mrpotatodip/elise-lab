@@ -24,7 +24,8 @@ The CLI had only a Runner token, which cannot list repos or start a Scan. Three 
 - **One Account.** A call whose `x-account-id` differs from the Account of the CLI access is refused.
 - **Stored hashed.** The token (prefix `elc_`, so a leaked one is easy to find and never mistaken for a Runner token) is shown to the CLI once. Only its SHA-256 is kept, with the person, the Account, the scope, who approved it and when, and when it was last used.
 - **Revocable.** An admin with `company:runners:delete` revokes it from the Runners area, and the next call fails. The list never holds a token or a hash.
-- **Not behind the two-factor gate.** `requireTwoFactor` looks at a session. A CLI access is not one, and it does not need the gate because it is created from an approval by a signed-in member, who already passed it, on the `/device` page. It cannot be created any other way.
+- **Not behind the two-factor gate.** `requireTwoFactor` looks at a session. A CLI access is not one, and it does not need the gate because it is created from an approval by a signed-in member, who already passed it, on the `/device` page. It cannot be created any other way. It stays exempt by design: when two-factor is enforced for an Account, revoking the CLI access is the control. A pre-0.7 Runner CLI cannot parse an approval that gave CLI access and no Runner (`docs/standards/contracts.md` 5.4).
+- **`/me` shows one Account.** Through a CLI access `GET /me` answers with the token's own Account only, no platform-staff flag and no email, and the login grant carries that `accountId` so the CLI names it on every call. A valid token on a route outside the list gets 403 (`This CLI access does not reach this route`); only an unknown or revoked one gets 401.
 
 ## What it costs
 

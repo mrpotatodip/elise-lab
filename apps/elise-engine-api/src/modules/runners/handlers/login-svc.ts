@@ -161,6 +161,8 @@ export const checkRunnerLoginSvc = (
       runnerId: result.runner?.runnerId,
       name: result.runner?.name,
       token: result.runner ? runnerToken : undefined,
-      cliAccess: result.cliAccess ? { ...result.cliAccess, token: cliAccessToken } : undefined,
+      cliAccess: result.cliAccess
+        ? { ...result.cliAccess, accountId: result.accountId, token: cliAccessToken }
+        : undefined,
     };
   });

@@ -22,7 +22,11 @@ import { twoFactorStatusEffect } from "#/modules/two-factor";
 // it holds a Role in, and whether it is platform
 // staff: three reads, none of them cached.
 // -----
-export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me, DbError | NotFound> =>
+export const getMeEffect = (
+  db: DbConnectType,
+  userId: string,
+  onlyAccountId?: string,
+): Effect.Effect<Me, DbError | NotFound> =>
   Effect.gen(function* () {
     const [login] = yield* Effect.tryPromise({
       try: () =>
@@ -73,10 +77,12 @@ export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me
           .orderBy(asc(accessMasterPowers.power)),
       catch: toDbError,
     });
-    const accounts: MeAccount[] = rows.map((row) => ({
-      ...row,
-      powers: granted.filter((grant) => grant.tenantId === row.id).map((grant) => grant.power),
-    }));
+    const accounts: MeAccount[] = rows
+      .filter((row) => onlyAccountId === undefined || row.id === onlyAccountId)
+      .map((row) => ({
+        ...row,
+        powers: granted.filter((grant) => grant.tenantId === row.id).map((grant) => grant.power),
+      }));
 
     const staff = yield* Effect.tryPromise({
       try: () =>
@@ -95,9 +101,14 @@ export const getMeEffect = (db: DbConnectType, userId: string): Effect.Effect<Me
     return {
       twoFactorEnabled: twoFactor.enabled,
       twoFactorSetupRequired: twoFactor.setupRequired,
-      user: { id: login.id, name: login.name, email: login.email, partyId: login.partyId },
+      user: {
+        id: login.id,
+        name: login.name,
+        email: onlyAccountId === undefined ? login.email : "",
+        partyId: login.partyId,
+      },
       partyType: login.partyType,
-      isSuperuser: staff.length > 0,
+      isSuperuser: onlyAccountId === undefined && staff.length > 0,
       accounts,
     };
   });

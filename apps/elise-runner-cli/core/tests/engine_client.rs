@@ -11,6 +11,7 @@ const REPO: &str = "11111111-1111-4111-8111-111111111111";
 const OTHER_REPO: &str = "22222222-2222-4222-8222-222222222222";
 
 static REQUESTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+static ME_CALLS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 fn scan_id(number: usize) -> String {
     format!("{number:09}-{number:08x}")
@@ -29,12 +30,16 @@ fn query_value(query: &str, name: &str) -> Option<String> {
 
 fn answer(method: &str, path: &str, bearer: &str, account: &str) -> (u16, serde_json::Value) {
     let (route, query) = path.split_once('?').unwrap_or((path, ""));
-    if bearer != "elc_good" {
+    if !["elc_good", "elc_probe", "elc_stored"].contains(&bearer) {
         return (401, serde_json::json!({ "data": null, "error": { "message": "unauthorized" } }));
     }
     if route == "/me" {
-        let accounts = [OTHER_ACCOUNT, OWN_ACCOUNT].map(|id| serde_json::json!({ "id": id }));
+        ME_CALLS.lock().unwrap().push(bearer.to_string());
+        let accounts = [OWN_ACCOUNT].map(|id| serde_json::json!({ "id": id }));
         return (200, serde_json::json!({ "data": { "accounts": accounts }, "error": null }));
+    }
+    if route == "/team" {
+        return (403, serde_json::json!({ "data": null, "error": { "message": "This CLI access does not reach this route" } }));
     }
     if account != OWN_ACCOUNT {
         return (403, serde_json::json!({ "data": null, "error": { "message": "This CLI access belongs to another account" } }));
@@ -138,16 +143,46 @@ async fn latest_is_the_first_scan_of_the_repo_or_of_the_account() {
 }
 
 #[tokio::test]
-async fn the_account_is_found_by_trying_each_account_the_person_has() {
+async fn a_stored_account_is_sent_directly_and_no_account_is_probed() {
     engine();
-    let store = GivenToken::new("elc_good".to_string());
+    let store = GivenToken::new(format!("start:{OWN_ACCOUNT}:elc_stored"));
     let client = EngineClient::open(&store, true, Scope::Read).unwrap();
 
     scan_ref::list_scans(&client, Some("33333333-3333-4333-8333-333333333333"), 1).await.unwrap();
-    scan_ref::list_scans(&client, Some("33333333-3333-4333-8333-333333333333"), 1).await.unwrap();
 
     let path = "/scans?limit=1&repoId=33333333-3333-4333-8333-333333333333";
-    assert_eq!((requests_to(path, OTHER_ACCOUNT), requests_to(path, OWN_ACCOUNT)), (1, 2));
+    assert_eq!(requests_to(path, OWN_ACCOUNT), 1);
+    assert_eq!(requests_to(path, OTHER_ACCOUNT), 0);
+    assert_eq!(ME_CALLS.lock().unwrap().iter().filter(|bearer| *bearer == "elc_stored").count(), 0);
+}
+
+#[tokio::test]
+async fn a_token_with_no_stored_account_asks_me_once_and_uses_its_one_account() {
+    engine();
+    let store = GivenToken::new("elc_probe".to_string());
+    let client = EngineClient::open(&store, true, Scope::Read).unwrap();
+
+    scan_ref::list_scans(&client, Some("44444444-4444-4444-8444-444444444444"), 1).await.unwrap();
+    scan_ref::list_scans(&client, Some("44444444-4444-4444-8444-444444444444"), 1).await.unwrap();
+
+    let path = "/scans?limit=1&repoId=44444444-4444-4444-8444-444444444444";
+    assert_eq!((requests_to(path, OTHER_ACCOUNT), requests_to(path, OWN_ACCOUNT)), (0, 2));
+    assert_eq!(ME_CALLS.lock().unwrap().iter().filter(|bearer| *bearer == "elc_probe").count(), 1);
+}
+
+#[tokio::test]
+async fn a_valid_token_on_a_route_it_does_not_reach_is_refused_and_kept() {
+    engine();
+    let dir = std::env::temp_dir().join(format!("elise-core-route-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = FileStore::new(dir.join("cli-access"));
+    file.save(&format!("start:{OWN_ACCOUNT}:elc_good")).unwrap();
+    let client = EngineClient::open(&file, false, Scope::Read).unwrap();
+
+    let answered = client.get::<serde_json::Value>("/team", &[]).await;
+
+    assert_eq!(answered.err(), Some(Denied::Refused("This CLI access does not reach this route".to_string())));
+    assert_eq!(file.token().as_deref(), Some(&*format!("start:{OWN_ACCOUNT}:elc_good")));
 }
 
 #[tokio::test]
@@ -156,7 +191,7 @@ async fn a_rejected_token_is_forgotten_unless_it_comes_from_the_environment() {
     let dir = std::env::temp_dir().join(format!("elise-core-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let file = FileStore::new(dir.join("cli-access"));
-    file.save("start:elc_revoked").unwrap();
+    file.save(&format!("start:{OWN_ACCOUNT}:elc_revoked")).unwrap();
     let given = GivenToken::new("elc_revoked".to_string());
 
     let stored = EngineClient::open(&file, false, Scope::Read).unwrap();

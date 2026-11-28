@@ -47,7 +47,6 @@ struct State {
     access_calls: Vec<String>,
     access_scopes: BTreeMap<String, String>,
     access_requests: Vec<String>,
-    other_account_first: bool,
     repos: Vec<serde_json::Value>,
     projects: Vec<serde_json::Value>,
     branches: BTreeMap<String, Vec<serde_json::Value>>,
@@ -235,10 +234,6 @@ impl Engine {
 
     pub fn access_requests(&self) -> Vec<String> {
         self.state.lock().unwrap().access_requests.clone()
-    }
-
-    pub fn list_another_account_first(&self) {
-        self.state.lock().unwrap().other_account_first = true;
     }
 
     pub fn add_project(&self, project: serde_json::Value) {
@@ -638,7 +633,8 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
                 let token = access_token_number(state.access_issued);
                 state.access_live.insert(token.clone());
                 state.access_scopes.insert(token.clone(), scope.clone());
-                data["cliAccess"] = serde_json::json!({ "id": ACCESS_ID, "name": RUNNER_NAME, "scope": scope, "token": token });
+                data["cliAccess"] =
+                    serde_json::json!({ "id": ACCESS_ID, "accountId": ACCOUNT_ID, "name": RUNNER_NAME, "scope": scope, "token": token });
             }
             (200, serde_json::json!({ "data": data, "error": null }).to_string())
         }
@@ -709,7 +705,6 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
     }
 }
 
-pub const OTHER_ACCOUNT_ID: &str = "7c1d2e3f-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
 pub const SCOPE_REFUSED: &str = "This CLI access cannot do this";
 const OTHER_ACCOUNT_REFUSED: &str = "This CLI access belongs to another account";
 
@@ -750,16 +745,10 @@ fn cli_answer(request: &Request, state: &mut State) -> (u16, String) {
     let repo_of = |state: &State, id: &str| state.repos.iter().find(|repo| repo["id"] == id).cloned();
     match (request.method.as_str(), segments.as_slice()) {
         ("GET", ["me"]) => {
-            let mut accounts =
+            let accounts =
                 vec![serde_json::json!({ "id": ACCOUNT_ID, "name": ACCOUNT_NAME, "slug": "acme", "role": "admin", "roleLabel": "Admin" })];
-            if state.other_account_first {
-                accounts.insert(
-                    0,
-                    serde_json::json!({ "id": OTHER_ACCOUNT_ID, "name": "Other", "slug": "other", "role": "admin", "roleLabel": "Admin" }),
-                );
-            }
             data(serde_json::json!({
-                "user": { "id": "user-1", "name": "Dev", "email": "dev@example.com" },
+                "user": { "id": "user-1", "name": "Dev", "email": "" },
                 "partyType": "person",
                 "isSuperuser": false,
                 "accounts": accounts,
