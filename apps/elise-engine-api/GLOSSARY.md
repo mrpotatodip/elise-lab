@@ -79,7 +79,7 @@ The command-line program `elise` (`apps/elise-runner-cli`), for people and for a
 _Avoid_: elise-runner (the old command name), headless Runner for the whole program (that is only its `run` mode)
 
 **CLI access**:
-What a person lets one Elise CLI do for them in one Account: `read`, `start` or `admin`. It never goes beyond that person's Role, and the person can revoke it.
+What a person lets one Elise CLI do for them in one Account: a scope of `read` (list and read), `start` (read, plus start, stop and resume a Scan, add repos and Branches, upload and delete Archives) or `admin` (reserved for later: an approval cannot give it). It is its own credential, an `elc_` token the approval on the dashboard's `/device` page hands the CLI once, stored hashed and tied to one person and one Account. It works only on the repos, projects, Scans, findings, files, usage and current-user routes, acts as that person so their Role limits it (a Watcher gets `read` at most), and an admin can revoke it from the Runners area, where it is listed with who approved it and when. It is not behind the two-factor gate, because it is created from an approval by a signed-in member. ADR 0019 holds the reason, as an exception to ADR 0007.
 _Avoid_: token (that is the Runner token), API key, session (a CLI never holds a person's session)
 
 **Runner login**:
