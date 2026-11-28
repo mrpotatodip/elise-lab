@@ -6,7 +6,7 @@ use elise_runner_core::cli_repos::{self, project_name, ProjectRow, RepoRow, Verd
 use elise_runner_core::engine_client::Scope;
 use serde_json::{json, Value};
 
-fn day(at: &str) -> &str {
+pub fn day(at: &str) -> &str {
     at.get(..10).unwrap_or(at)
 }
 
@@ -44,7 +44,7 @@ fn last_scan_text(repo: &RepoRow) -> String {
     }
 }
 
-fn print_table(rows: &[Vec<String>]) {
+pub fn print_table(rows: &[Vec<String>]) {
     let widths: Vec<usize> =
         (0..rows[0].len()).map(|column| rows.iter().map(|row| row[column].chars().count()).max().unwrap_or(0)).collect();
     for row in rows {
