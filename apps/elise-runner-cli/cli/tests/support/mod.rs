@@ -41,6 +41,10 @@ struct State {
     login_expires_at: Option<String>,
     login_script: VecDeque<String>,
     login_check_times: Vec<std::time::Instant>,
+    login_choice: Option<(bool, Option<String>)>,
+    access_issued: usize,
+    access_live: BTreeSet<String>,
+    access_calls: Vec<String>,
 }
 
 pub const USER_CODE: &str = "WXYZ-1234";
@@ -170,6 +174,25 @@ impl Engine {
         self.state.lock().unwrap().login_approved = true;
     }
 
+    pub fn approve_login_with(&self, run_scans: bool, cli_scope: Option<&str>) {
+        let mut state = self.state.lock().unwrap();
+        state.login_choice = Some((run_scans, cli_scope.map(str::to_string)));
+        state.login_approved = true;
+    }
+
+    pub fn access_tokens(&self) -> Vec<String> {
+        let issued = self.state.lock().unwrap().access_issued;
+        (1..=issued).map(access_token_number).collect()
+    }
+
+    pub fn revoke_all_cli_access(&self) {
+        self.state.lock().unwrap().access_live.clear();
+    }
+
+    pub fn access_calls(&self) -> Vec<String> {
+        self.state.lock().unwrap().access_calls.clone()
+    }
+
     pub fn login_expires_at(&self, expires_at: &str) {
         self.state.lock().unwrap().login_expires_at = Some(expires_at.to_string());
     }
@@ -263,6 +286,18 @@ pub const REPO: &str = "acme/widgets";
 
 fn token_number(n: usize) -> String {
     format!("elise-test-token-{n}-0f9a7c")
+}
+
+fn issued_tokens(state: &State) -> Vec<String> {
+    (1..=state.issued).map(token_number).chain((1..=state.access_issued).map(access_token_number)).collect()
+}
+
+const ACCOUNT_ID: &str = "5b0c3f0e-1d2a-4c3b-8e4f-6a7b8c9d0e1f";
+const RUNNER_ID: &str = "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b";
+const ACCESS_ID: &str = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+
+fn access_token_number(n: usize) -> String {
+    format!("elc_test{n}0f9a7c")
 }
 
 struct Request {
@@ -387,13 +422,32 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
         ("POST", "/runners/login/check") if !state.login_approved => (200, r#"{"data":{"status":"pending"},"error":null}"#.to_string()),
         ("POST", "/runners/login/check") => {
             state.login_pending = false;
-            state.issued += 1;
-            let token = token_number(state.issued);
-            state.live.insert(token.clone());
-            let body = format!(
-                r#"{{"data":{{"status":"approved","name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}","token":"{token}"}},"error":null}}"#
-            );
-            (200, body)
+            let (run_scans, cli_scope) = state.login_choice.clone().unwrap_or((true, None));
+            let mut data = serde_json::json!({ "status": "approved", "accountId": ACCOUNT_ID, "accountName": ACCOUNT_NAME });
+            if run_scans {
+                state.issued += 1;
+                let token = token_number(state.issued);
+                state.live.insert(token.clone());
+                data["runnerId"] = RUNNER_ID.into();
+                data["name"] = RUNNER_NAME.into();
+                data["token"] = token.into();
+            }
+            if let Some(scope) = cli_scope {
+                state.access_issued += 1;
+                let token = access_token_number(state.access_issued);
+                state.access_live.insert(token.clone());
+                data["cliAccess"] = serde_json::json!({ "id": ACCESS_ID, "name": RUNNER_NAME, "scope": scope, "token": token });
+            }
+            (200, serde_json::json!({ "data": data, "error": null }).to_string())
+        }
+        ("GET", "/me") if request.bearer.as_ref().is_some_and(|token| token.starts_with("elc_")) => {
+            let token = request.bearer.clone().unwrap();
+            state.access_calls.push(token.clone());
+            if state.access_live.contains(&token) {
+                (200, r#"{"data":{"id":"user-1"},"error":null}"#.to_string())
+            } else {
+                (REJECTED.0, REJECTED.1.to_string())
+            }
         }
         ("POST", "/runners/enroll") => {
             if !request.body.contains(&format!("\"{CODE}\"")) {
@@ -489,8 +543,7 @@ impl Runner {
 
     pub fn run(&self, args: &[&str], stdin: &str) -> Output {
         let output = self.run_allowing_token(args, stdin);
-        let issued = self.engine.lock().unwrap().issued;
-        for token in (1..=issued).map(token_number) {
+        for token in issued_tokens(&self.engine.lock().unwrap()) {
             assert!(
                 !output.stdout.contains(&token) && !output.stderr.contains(&token),
                 "a token leaked into the output of {args:?}:\n{}\n{}",
@@ -517,6 +570,7 @@ impl Runner {
         command
             .args(args)
             .env_remove("ELISE_RUNNER_TOKEN")
+            .env_remove("ELISE_TOKEN")
             .env_remove("SSH_CONNECTION")
             .env_remove("DISPLAY")
             .env_remove("WAYLAND_DISPLAY")
@@ -642,8 +696,7 @@ impl Running {
             stdout: self.stdout.lock().unwrap().clone(),
             stderr: self.stderr.lock().unwrap().clone(),
         };
-        let issued = self.engine.lock().unwrap().issued;
-        for token in (1..=issued).map(token_number) {
+        for token in issued_tokens(&self.engine.lock().unwrap()) {
             assert!(!output.stdout.contains(&token) && !output.stderr.contains(&token), "a token leaked into the output");
         }
         output

@@ -1,3 +1,4 @@
+pub mod cli_access;
 mod engine;
 pub mod find;
 pub mod git_access;

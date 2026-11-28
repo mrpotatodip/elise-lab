@@ -51,9 +51,9 @@ Connect through the browser, with no code.
 elise login [--no-browser]
 ```
 
-Prints a link and a code, opens the link when this computer has a desktop session, and waits up to 10 minutes for you to approve it in Elise.
+Prints a link and a code, opens the link when this computer has a desktop session, and waits up to 10 minutes for you to approve it in Elise. The approval page has two choices: run Scans on this computer (a Runner token) and start and read Scans from this CLI (CLI access, scope read or start). Login keeps whichever you choose, each in its own place.
 
-Needs: A person who can approve the login in Elise. Not paired yet.
+Needs: A person who can approve the login in Elise.
 
 | Flag | Default | Cost | What it does |
 | --- | --- | --- | --- |
@@ -61,26 +61,26 @@ Needs: A person who can approve the login in Elise. Not paired yet.
 | `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
 | `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
 
-Exit codes: 0, 1, 2, 5. JSON shape: schemaVersion, ok, exitCode, account, runner, tokenPlace. Failure codes: unsupported, read_only_token, no_signals, cancelled, expired, denied, refused, save_failed, offline, usage
+Exit codes: 0, 1, 2, 5. JSON shape: schemaVersion, ok, exitCode, account; runner and tokenPlace when a Runner token was kept; cliAccess (stored, scope, place when stored) when CLI access was given. Never a token. Failure codes: unsupported, read_only_token, no_signals, cancelled, expired, denied, refused, save_failed, offline, usage
 
 #### `elise unpair`
 
-Tell Elise to drop this Runner's token, then forget it.
+Tell Elise to drop this Runner's token, then forget it and any stored CLI access.
 
 ```
 elise unpair
 ```
 
-The Runner stops claiming Scans and disappears from the Runners list.
+The Runner stops claiming Scans and disappears from the Runners list. Stored CLI access is removed from this computer, but only an admin can revoke it in Elise's Runners list.
 
-Needs: A paired Runner.
+Needs: A paired Runner or stored CLI access.
 
 | Flag | Default | Cost | What it does |
 | --- | --- | --- | --- |
 | `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
 | `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
 
-Exit codes: 0, 1, 3, 5. JSON shape: schemaVersion, ok, exitCode, wasPaired. Failure codes: read_only_token, offline, usage
+Exit codes: 0, 1, 3, 5. JSON shape: schemaVersion, ok, exitCode, wasPaired (a Runner token was dropped), cliAccessRemoved (stored CLI access was removed). Failure codes: read_only_token, offline, usage
 
 ### Run Scans
 
@@ -128,13 +128,13 @@ Exit codes: 0, 1, 2. JSON shape: schemaVersion, ok, exitCode, scanId, resumable,
 
 #### `elise status`
 
-Say whether this Runner is unpaired, connected, revoked or offline.
+Say whether this Runner is unpaired, connected, revoked or offline, and what CLI access it holds.
 
 ```
 elise status
 ```
 
-Also says where the token is kept and lists the kept work folders.
+Also says where each credential is kept, the scope of the CLI access, and lists the kept work folders. A computer with working CLI access and no Runner token exits 0: it is set up, it just does not run Scans.
 
 Needs: Nothing. It works unpaired.
 
@@ -143,7 +143,7 @@ Needs: Nothing. It works unpaired.
 | `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
 | `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
 
-Exit codes: 0, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, state (connected, unpaired, revoked, offline), tokenPlace (variable, keychain, file), runner and account when connected, folders (scanId, path, resumable, phases). Failure codes: unpaired, revoked, offline, usage
+Exit codes: 0, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, state (the Runner: connected, unpaired, revoked, offline), runnerTokenHeld, tokenPlace (variable, keychain, file), runner and account when connected, cliAccess (held, state none|valid|revoked|offline, scope read|start|admin or null, place variable|keychain|file or null), folders (scanId, path, resumable, phases). Failure codes: unpaired, revoked, offline, usage
 
 #### `elise doctor`
 

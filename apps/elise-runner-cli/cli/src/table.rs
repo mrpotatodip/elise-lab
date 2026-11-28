@@ -87,7 +87,7 @@ pub const COMMANDS: &[Spec] = &[
         group: "Connect this computer",
         summary: "Connect through the browser, with no code.",
         usage: "elise login [--no-browser]",
-        about: "Prints a link and a code, opens the link when this computer has a desktop session, and waits up to 10 minutes for you to approve it in Elise.",
+        about: "Prints a link and a code, opens the link when this computer has a desktop session, and waits up to 10 minutes for you to approve it in Elise. The approval page has two choices: run Scans on this computer (a Runner token) and start and read Scans from this CLI (CLI access, scope read or start). Login keeps whichever you choose, each in its own place.",
         flags: &[
             Flag {
                 name: "--no-browser",
@@ -99,24 +99,30 @@ pub const COMMANDS: &[Spec] = &[
             },
             JSON_FLAG,
         ],
-        needs: "A person who can approve the login in Elise. Not paired yet.",
-        env: &[("ELISE_RUNNER_TOKEN", "If set, login refuses: that token is read only.")],
+        needs: "A person who can approve the login in Elise.",
+        env: &[
+            ("ELISE_RUNNER_TOKEN", "If set, login refuses: that token is read only."),
+            ("ELISE_TOKEN", "If set, login does not store CLI access over it: the new CLI access is not saved and must be revoked in Elise."),
+        ],
         examples: &["elise login", "elise login --json", "elise login --no-browser   # CI or a box with no desktop session"],
         exits: &[0, 1, 2, 5],
-        json: "schemaVersion, ok, exitCode, account, runner, tokenPlace. Failure codes: unsupported, read_only_token, no_signals, cancelled, expired, denied, refused, save_failed, offline, usage",
+        json: "schemaVersion, ok, exitCode, account; runner and tokenPlace when a Runner token was kept; cliAccess (stored, scope, place when stored) when CLI access was given. Never a token. Failure codes: unsupported, read_only_token, no_signals, cancelled, expired, denied, refused, save_failed, offline, usage",
     },
     Spec {
         name: "unpair",
         group: "Connect this computer",
-        summary: "Tell Elise to drop this Runner's token, then forget it.",
+        summary: "Tell Elise to drop this Runner's token, then forget it and any stored CLI access.",
         usage: "elise unpair",
-        about: "The Runner stops claiming Scans and disappears from the Runners list.",
+        about: "The Runner stops claiming Scans and disappears from the Runners list. Stored CLI access is removed from this computer, but only an admin can revoke it in Elise's Runners list.",
         flags: ONLY_JSON,
-        needs: "A paired Runner.",
-        env: &[("ELISE_RUNNER_TOKEN", "If set, unpair refuses: that token is read only.")],
+        needs: "A paired Runner or stored CLI access.",
+        env: &[
+            ("ELISE_RUNNER_TOKEN", "If set, unpair does not touch that Runner token: it is read only."),
+            ("ELISE_TOKEN", "Never removed: CLI access from the variable is read only."),
+        ],
         examples: &["elise unpair", "elise unpair --json", "elise unpair && echo gone   # CI cleanup"],
         exits: &[0, 1, 3, 5],
-        json: "schemaVersion, ok, exitCode, wasPaired. Failure codes: read_only_token, offline, usage",
+        json: "schemaVersion, ok, exitCode, wasPaired (a Runner token was dropped), cliAccessRemoved (stored CLI access was removed). Failure codes: read_only_token, offline, usage",
     },
     Spec {
         name: "run",
@@ -153,7 +159,7 @@ pub const COMMANDS: &[Spec] = &[
         needs: "A paired Runner, git, and `claude` signed in.",
         env: &[
             ("ELISE_GIT_TOKEN", "One read-only git token for clones, for CI and containers."),
-            ("ELISE_RUNNER_TOKEN", "The Runner's token, read only."),
+            ("ELISE_RUNNER_TOKEN", "The Runner's token, read only. CLI access alone is not enough: run needs it."),
         ],
         examples: &[
             "elise run",
@@ -180,15 +186,18 @@ pub const COMMANDS: &[Spec] = &[
     Spec {
         name: "status",
         group: "Check",
-        summary: "Say whether this Runner is unpaired, connected, revoked or offline.",
+        summary: "Say whether this Runner is unpaired, connected, revoked or offline, and what CLI access it holds.",
         usage: "elise status",
-        about: "Also says where the token is kept and lists the kept work folders.",
+        about: "Also says where each credential is kept, the scope of the CLI access, and lists the kept work folders. A computer with working CLI access and no Runner token exits 0: it is set up, it just does not run Scans.",
         flags: ONLY_JSON,
         needs: "Nothing. It works unpaired.",
-        env: &[("ELISE_RUNNER_TOKEN", "If set, it is the token used.")],
+        env: &[
+            ("ELISE_RUNNER_TOKEN", "If set, it is the Runner token used."),
+            ("ELISE_TOKEN", "If set, it is the CLI access used. Its scope is not known here, so scope is null."),
+        ],
         examples: &["elise status", "elise status --json", "elise status || echo not ready   # CI: exit 3, 4 or 5"],
         exits: &[0, 3, 4, 5],
-        json: "schemaVersion, ok, exitCode, state (connected, unpaired, revoked, offline), tokenPlace (variable, keychain, file), runner and account when connected, folders (scanId, path, resumable, phases). Failure codes: unpaired, revoked, offline, usage",
+        json: "schemaVersion, ok, exitCode, state (the Runner: connected, unpaired, revoked, offline), runnerTokenHeld, tokenPlace (variable, keychain, file), runner and account when connected, cliAccess (held, state none|valid|revoked|offline, scope read|start|admin or null, place variable|keychain|file or null), folders (scanId, path, resumable, phases). Failure codes: unpaired, revoked, offline, usage",
     },
     Spec {
         name: "doctor",
@@ -289,17 +298,23 @@ pub const TOPICS: &[Topic] = &[
         name: "auth",
         summary: "How this computer proves who it is.",
         body: "\
-The Elise CLI acts as a Runner. A Runner holds one token that Elise issued.
+The Elise CLI holds up to two credentials that Elise issued, each its own entry:
+  Runner token  lets this computer run Scans. `run` needs it.
+  CLI access    lets the CLI act as you on repos and Scans, with a scope: read, or start (read plus
+                start, stop and resume).
 
-Get the token with `elise login` (browser) or `elise pair <code>` (a code from Elise).
+Get them with `elise login` (browser): the approval page asks which you want. `elise pair <code>`
+gives the Runner token only.
 
-Where the token is kept, in order:
-  1. ELISE_RUNNER_TOKEN, if set. Read only: pair, login and unpair do not manage it.
-  2. The system keychain, under a service name of its own.
+Where each is kept, in order:
+  1. ELISE_RUNNER_TOKEN (Runner token) or ELISE_TOKEN (CLI access), if set. Read only: pair, login
+     and unpair do not manage them.
+  2. The system keychain, under a service name of its own for each.
   3. A file in your config folder that only you can read.
 
-No command prints the token, except `pair --print-token`.
-Revoke it by removing the Runner in Elise, or run `elise unpair`.
+No command prints a token, except `pair --print-token`.
+Revoke a Runner token by removing the Runner in Elise, or run `elise unpair`. Only an admin can
+revoke CLI access, in the Runners list; `elise unpair` just removes it from this computer.
 ",
     },
     Topic {

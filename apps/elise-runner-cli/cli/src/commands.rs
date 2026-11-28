@@ -1,8 +1,9 @@
 use crate::browser;
 use crate::json;
-use crate::store::{settings_file, Store, TokenPlace, TOKEN_VARIABLE};
+use crate::store::{settings_file, Store, CLI_ACCESS_VARIABLE, TOKEN_VARIABLE};
 use crate::tools::Skill;
 use crate::Exit;
+use elise_runner_core::cli_access::{self, AccessStatus};
 use elise_runner_core::git_access;
 use elise_runner_core::login::{self, LoginError, Waited};
 use elise_runner_core::pairing::{self, Replaced, RunnerError, RunnerStatus};
@@ -34,11 +35,7 @@ fn fail_quietly(json: bool, exit: Exit, code: &str, message: &str, next: &str) -
 }
 
 fn token_place(store: &Store) -> &'static str {
-    match store.place {
-        TokenPlace::Variable => "variable",
-        TokenPlace::Keychain => "keychain",
-        TokenPlace::File(_) => "file",
-    }
+    store.runner.place_name()
 }
 
 pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool, interactive: bool, json: bool) -> Exit {
@@ -160,7 +157,7 @@ pub async fn login(store: &Store, no_browser: bool, json: bool) -> Exit {
     let say = |line: &str| json::say(json, line);
     let previous = earlier_runner(store, &say).await;
     if let Some(previous) = &previous {
-        say(&format!("This computer is already paired as {previous}. Logging in replaces it."));
+        say(&format!("This computer is already paired as {previous}. Choosing to run Scans on this computer replaces it."));
     }
 
     let started = match login::start(env!("CARGO_PKG_VERSION")).await {
@@ -180,8 +177,8 @@ pub async fn login(store: &Store, no_browser: bool, json: bool) -> Exit {
     }
     say("Waiting for approval. Stop with Ctrl-C.");
 
-    let enrolled = match login::wait(&started, &stop).await {
-        Waited::Approved(enrolled) => enrolled,
+    let approval = match login::wait(&started, &stop).await {
+        Waited::Approved(approval) => approval,
         Waited::Cancelled => return fail_quietly(json, Exit::Error, "cancelled", "Login cancelled.", "elise login"),
         Waited::Expired => return fail(json, Exit::Error, "expired", "The code expired; run `elise login` again.", "elise login"),
         Waited::Denied => return fail(json, Exit::Error, "denied", "The request was denied in Elise.", "elise login"),
@@ -190,27 +187,51 @@ pub async fn login(store: &Store, no_browser: bool, json: bool) -> Exit {
         }
     };
 
-    let (name, account_name) = (enrolled.name.clone(), enrolled.account_name.clone());
-    match pairing::accept_replacing(store.tokens(), enrolled).await {
-        Ok((_, replaced)) => {
-            say(&format!("Logged in as \"{name}\" in {account_name}. The token is kept in {}.", store.describe()));
-            if replaced == Replaced::StillLive {
-                eprintln!(
-                    "Could not reach Elise to revoke the token of {}. Remove that Runner in Elise's Runners list.",
-                    previous.as_deref().unwrap_or("this computer's earlier Runner")
-                );
+    let account_name = approval.account_name;
+    let mut fields = serde_json::json!({ "account": account_name });
+    if let Some(enrolled) = approval.runner {
+        let name = enrolled.name.clone();
+        match pairing::accept_replacing(store.tokens(), enrolled).await {
+            Ok((_, replaced)) => {
+                say(&format!("Logged in as Runner \"{name}\" in {account_name}. The Runner token is kept in {}.", store.describe()));
+                if replaced == Replaced::StillLive {
+                    eprintln!(
+                        "Could not reach Elise to revoke the token of {}. Remove that Runner in Elise's Runners list.",
+                        previous.as_deref().unwrap_or("this computer's earlier Runner")
+                    );
+                }
+                fields["runner"] = name.into();
+                fields["tokenPlace"] = store.runner.place_name().into();
             }
-            if json {
-                let fields = serde_json::json!({ "account": account_name, "runner": name, "tokenPlace": token_place(store) });
-                return json::emit(Exit::Ok, fields, None);
+            Err(_) => {
+                let message = format!("The token could not be saved in {}. Elise was told to drop it.", store.describe());
+                return fail(json, Exit::Error, "save_failed", &message, "elise login");
             }
-            Exit::Ok
-        }
-        Err(_) => {
-            let message = format!("The token could not be saved in {}. Elise was told to drop it.", store.describe());
-            fail(json, Exit::Error, "save_failed", &message, "elise login")
         }
     }
+    if let Some(grant) = approval.cli_access {
+        if store.access.is_read_only() {
+            eprintln!(
+                "{CLI_ACCESS_VARIABLE} is set, so the new CLI access was not saved here. Revoke \"{}\" in Elise's Runners list, or unset the variable and log in again.",
+                grant.name
+            );
+            fields["cliAccess"] = serde_json::json!({ "stored": false, "scope": grant.scope });
+        } else if cli_access::save(store.access.tokens(), &grant).is_err() {
+            let message = format!(
+                "The CLI access could not be saved in {}. Revoke \"{}\" in Elise's Runners list.",
+                store.access.describe(),
+                grant.name
+            );
+            return fail(json, Exit::Error, "save_failed", &message, "elise login");
+        } else {
+            say(&format!("CLI access ({}) for {account_name} is kept in {}.", grant.scope, store.access.describe()));
+            fields["cliAccess"] = serde_json::json!({ "stored": true, "scope": grant.scope, "place": store.access.place_name() });
+        }
+    }
+    if json {
+        return json::emit(Exit::Ok, fields, None);
+    }
+    Exit::Ok
 }
 
 fn confirm(question: &str) -> bool {
@@ -224,8 +245,16 @@ fn confirm(question: &str) -> bool {
 }
 
 pub async fn status(store: &Store, json: bool) -> Exit {
-    let connection = connection_status(store).await;
+    let mut connection = connection_status(store).await;
+    let access = cli_access::status(store.access.tokens(), store.access.is_read_only()).await;
+    let (access_line, access_json) = describe_access(store, &access);
+    if connection.state == "unpaired" && matches!(access, AccessStatus::Valid { .. }) {
+        connection.exit = Exit::Ok;
+        connection.next = None;
+        connection.line = "no Runner token: this computer does not run Scans. Pair with `elise login`.".to_string();
+    }
     json::say(json, &connection.line);
+    json::say(json, &access_line);
     let kept = scan::kept_folders();
     if !kept.is_empty() {
         json::say(json, "Kept work folders (a failed or stopped Scan leaves one; delete a folder you no longer need):");
@@ -250,7 +279,14 @@ pub async fn status(store: &Store, json: bool) -> Exit {
                 })
             })
             .collect();
-        let mut fields = serde_json::json!({ "state": connection.state, "tokenPlace": token_place(store), "folders": folders });
+        let runner_held = connection.state != "unpaired" && connection.state != "revoked";
+        let mut fields = serde_json::json!({
+            "state": connection.state,
+            "runnerTokenHeld": runner_held,
+            "tokenPlace": token_place(store),
+            "cliAccess": access_json,
+            "folders": folders,
+        });
         if let Some((name, account_name)) = &connection.runner {
             fields["runner"] = name.as_str().into();
             fields["account"] = account_name.as_str().into();
@@ -283,6 +319,32 @@ pub fn resume(scan_id: &str, json: bool) -> Exit {
                 return json::emit(Exit::Error, fields, Some(failure));
             }
             Exit::Error
+        }
+    }
+}
+
+fn describe_access(store: &Store, access: &AccessStatus) -> (String, serde_json::Value) {
+    let place = store.access.describe();
+    let scope_text = |scope: &Option<String>| scope.as_deref().map(|scope| format!(" ({scope})")).unwrap_or_default();
+    match access {
+        AccessStatus::None => (
+            format!("CLI access: none in {place}. `elise login` can add it."),
+            serde_json::json!({ "held": false, "state": "none", "scope": null, "place": null }),
+        ),
+        AccessStatus::Valid { scope } => (
+            format!("CLI access{}: held, in {place}", scope_text(scope)),
+            serde_json::json!({ "held": true, "state": "valid", "scope": scope, "place": store.access.place_name() }),
+        ),
+        AccessStatus::Offline { scope } => (
+            format!("CLI access{}: held, in {place}, but Elise could not be reached to check it", scope_text(scope)),
+            serde_json::json!({ "held": true, "state": "offline", "scope": scope, "place": store.access.place_name() }),
+        ),
+        AccessStatus::Revoked => {
+            let forgotten = if store.access.is_read_only() { String::new() } else { " and was removed".to_string() };
+            (
+                format!("CLI access: Elise rejected the token in {place}{forgotten}. Run `elise login` to get a new one."),
+                serde_json::json!({ "held": false, "state": "revoked", "scope": null, "place": null }),
+            )
         }
     }
 }
@@ -458,33 +520,41 @@ pub async fn doctor(store: &Store, named: &[String], json: bool) -> Exit {
 }
 
 pub async fn unpair(store: &Store, json: bool) -> Exit {
-    if store.is_read_only() {
+    let access_stored = !store.access.is_read_only() && store.access.tokens().token().is_some();
+    if store.is_read_only() && !access_stored {
         let message = format!(
             "The token comes from {TOKEN_VARIABLE}, which elise does not manage. \
              Remove the Runner in Elise, then unset the variable."
         );
         return fail(json, Exit::Error, "read_only_token", &message, "unset ELISE_RUNNER_TOKEN");
     }
-    if store.tokens().token().is_none() {
-        json::say(json, "This computer is not paired.");
-        if json {
-            return json::emit(Exit::Ok, serde_json::json!({ "wasPaired": false }), None);
-        }
-        return Exit::Ok;
-    }
-    match pairing::unpair(store.tokens()).await {
-        Ok(_) => {
-            json::say(json, &format!("Unpaired: Elise dropped the token and it was removed from {}.", store.describe()));
-            if json {
-                return json::emit(Exit::Ok, serde_json::json!({ "wasPaired": true }), None);
+    let was_paired = !store.is_read_only() && store.tokens().token().is_some();
+    if was_paired {
+        match pairing::unpair(store.tokens()).await {
+            Ok(_) => json::say(json, &format!("Unpaired: Elise dropped the token and it was removed from {}.", store.describe())),
+            Err(_) => {
+                let message =
+                    format!("Could not reach Elise. The token is kept in {}, so you can run `elise unpair` again.", store.describe());
+                return fail(json, Exit::Offline, "offline", &message, "elise unpair");
             }
-            Exit::Ok
         }
-        Err(_) => {
-            let message = format!("Could not reach Elise. The token is kept in {}, so you can run `elise unpair` again.", store.describe());
-            fail(json, Exit::Offline, "offline", &message, "elise unpair")
-        }
+    } else if !access_stored {
+        json::say(json, "This computer is not paired.");
     }
+    if access_stored {
+        store.access.tokens().forget();
+        json::say(
+            json,
+            &format!(
+                "CLI access was removed from {}. It stays valid in Elise until an admin revokes it in the Runners list.",
+                store.access.describe()
+            ),
+        );
+    }
+    if json {
+        return json::emit(Exit::Ok, serde_json::json!({ "wasPaired": was_paired, "cliAccessRemoved": access_stored }), None);
+    }
+    Exit::Ok
 }
 
 type Running<'a> = Vec<Pin<Box<dyn Future<Output = JobEnd> + 'a>>>;
@@ -585,6 +655,10 @@ pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit
         let claiming = !(once && claimed_any);
         if claiming && running.len() < parallel {
             let Some(token) = store.tokens().token() else {
+                if store.cli_access().is_some() {
+                    let message = "This computer holds CLI access but no Runner token, and `run` needs the Runner token. Run `elise login` and choose to run Scans on this computer.";
+                    return fail(json, Exit::Unpaired, "unpaired", message, "elise login");
+                }
                 let message = "This computer is not paired. Pair it with `elise pair <code>`.";
                 return fail(json, Exit::Unpaired, "unpaired", message, "elise pair <code>");
             };

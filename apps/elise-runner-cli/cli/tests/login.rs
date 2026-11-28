@@ -87,7 +87,7 @@ fn logging_in_again_says_it_replaces_the_runner_then_revokes_the_old_token() {
 
     assert_eq!(done.code, 0, "{}{}", done.stdout, done.stderr);
     let first_line = done.stdout.lines().next().unwrap_or_default();
-    assert!(first_line.contains("Logging in replaces it"), "{}", done.stdout);
+    assert!(first_line.contains("replaces it"), "{}", done.stdout);
     let tokens = engine.tokens();
     assert_eq!(engine.revoked(), vec![tokens[0].clone()]);
     assert_eq!(engine.live(), [tokens[1].clone()].into());

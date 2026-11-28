@@ -1,3 +1,4 @@
+use crate::cli_access::Grant;
 use crate::engine::{client, engine_url, Envelope};
 use crate::pairing::Enrolled;
 use crate::scan::Stop;
@@ -17,8 +18,14 @@ pub enum LoginError {
     Unreachable,
 }
 
+pub struct Approval {
+    pub account_name: String,
+    pub runner: Option<Enrolled>,
+    pub cli_access: Option<Grant>,
+}
+
 pub enum Waited {
-    Approved(Enrolled),
+    Approved(Approval),
     Cancelled,
     Expired,
     Denied,
@@ -60,9 +67,10 @@ struct CheckBody<'a> {
 enum Check {
     Pending,
     Approved {
-        name: String,
+        name: Option<String>,
         account_name: String,
-        token: String,
+        token: Option<String>,
+        cli_access: Option<Grant>,
     },
     Denied,
     Expired,
@@ -77,7 +85,7 @@ enum Checked {
     Denied,
     Expired,
     SlowDown(Duration),
-    Approved(Enrolled),
+    Approved(Approval),
     Refused,
 }
 
@@ -123,8 +131,12 @@ async fn check(login: &StartedLogin) -> Checked {
     };
     match response.status() {
         StatusCode::OK => match response.json::<Envelope<Check>>().await {
-            Ok(Envelope { data: Check::Approved { name, account_name, token } }) => {
-                Checked::Approved(Enrolled::new(name, account_name, token))
+            Ok(Envelope { data: Check::Approved { name, account_name, token, cli_access } }) => {
+                let runner = name.zip(token).map(|(name, token)| Enrolled::new(name, account_name.clone(), token));
+                if runner.is_none() && cli_access.is_none() {
+                    return Checked::Refused;
+                }
+                Checked::Approved(Approval { account_name, runner, cli_access })
             }
             Ok(Envelope { data: Check::Denied }) => Checked::Denied,
             Ok(Envelope { data: Check::Expired }) => Checked::Expired,
@@ -189,7 +201,7 @@ pub async fn wait(login: &StartedLogin, stop: &Stop) -> Waited {
             _ = stop.stopped() => return Waited::Cancelled,
         };
         match checked {
-            Checked::Approved(enrolled) => return Waited::Approved(enrolled),
+            Checked::Approved(approval) => return Waited::Approved(approval),
             Checked::Refused => return Waited::Refused,
             Checked::Denied => return Waited::Denied,
             Checked::Expired => return Waited::Expired,
