@@ -1,9 +1,11 @@
+pub mod access;
 pub mod args;
 pub mod browser;
 pub mod commands;
 pub mod completions;
 pub mod help;
 pub mod json;
+pub mod repos;
 pub mod skill;
 pub mod store;
 pub mod table;
@@ -87,6 +89,8 @@ pub fn main(args: &[String]) -> Exit {
             Command::Unpair { json } => commands::unpair(&store, json).await,
             Command::Run { once, parallel, json } => commands::run(&store, once, parallel, json).await,
             Command::Resume { scan_id, json } => commands::resume(&scan_id, json),
+            Command::Repos { json } => repos::repos(&store, json).await,
+            Command::Repo { repo, json } => repos::repo(&store, &repo, json).await,
             Command::SkillInstall { dir, json } => skill::install(dir.as_deref(), json),
         }
     })

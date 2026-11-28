@@ -22,7 +22,7 @@ The line above is this Runner's token. It is a credential: anyone who has it can
 this Runner until the Runner is removed in Elise. Copies stay wherever it is pasted (shell history,
 CI variables, container settings).";
 
-fn fail(json: bool, exit: Exit, code: &str, message: &str, next: &str) -> Exit {
+pub fn fail(json: bool, exit: Exit, code: &str, message: &str, next: &str) -> Exit {
     eprintln!("{message}");
     fail_quietly(json, exit, code, message, next)
 }

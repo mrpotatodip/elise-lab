@@ -9,6 +9,8 @@ pub enum Command {
     Unpair { json: bool },
     Run { once: bool, parallel: usize, json: bool },
     Resume { scan_id: String, json: bool },
+    Repos { json: bool },
+    Repo { repo: String, json: bool },
     SkillInstall { dir: Option<String>, json: bool },
 }
 
@@ -154,6 +156,9 @@ pub fn parse(args: &[String]) -> Parsed {
         ("run", []) => Parsed::Command(Command::Run { once: has("--once"), parallel, json: has("--json") }),
         ("resume", [scan_id]) => Parsed::Command(Command::Resume { scan_id: scan_id.to_string(), json: has("--json") }),
         ("resume", []) => Parsed::Usage("`resume` needs the Scan id of a kept work folder (`status` lists them)".to_string()),
+        ("repos", []) => Parsed::Command(Command::Repos { json: has("--json") }),
+        ("repo", [repo]) => Parsed::Command(Command::Repo { repo: repo.to_string(), json: has("--json") }),
+        ("repo", []) => Parsed::Usage("`repo` needs a repo: a URL, owner/name, gitlab:owner/name, an ID or `.`".to_string()),
         ("help", []) => Parsed::Help,
         ("help", [wanted]) => help_for(wanted),
         ("completions", [shell]) => Parsed::Completions(shell.to_string()),

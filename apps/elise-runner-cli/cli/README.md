@@ -124,6 +124,46 @@ Needs: The work folder the Scan kept on this computer.
 
 Exit codes: 0, 1, 2. JSON shape: schemaVersion, ok, exitCode, scanId, resumable, phases (the finished Phases). Failure codes: not_resumable, usage
 
+### Repos
+
+#### `elise repos`
+
+List the repos of this Account with their last Scan.
+
+```
+elise repos [--json]
+```
+
+One line per repo: its Project, provider, whether it is private, its branches and the status of its last Scan. Uses CLI access (scope read is enough).
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, repos (id, name: the text that names the repo, provider github|gitlab|gitlab-sh|upload, host, url, project: its name or null, private: true, false or null when unknown, defaultBranch or null, branches: the tracked branch names, lastScan: {id, status queued|running|succeeded|failed|stopped, at} or null). Failure codes: no_cli_access, needs_scope, revoked, offline, refused, unreadable, usage
+
+#### `elise repo`
+
+Show one repo with its branches and Verdict.
+
+```
+elise repo <repo> [--json]
+```
+
+Name the repo by URL, `owner/name` (GitHub), `gitlab:owner/name`, ID or `.` (this checkout's origin). A name that matches several repos exits 2 and lists them. The Verdict is the ship answer of the default branch at its latest succeeded Scan's commit, as Elise computes it. Run `elise help repos` for the naming rules.
+
+Needs: CLI access from `elise login`, or ELISE_TOKEN.
+
+| Flag | Default | Cost | What it does |
+| --- | --- | --- | --- |
+| `--json` | off | none | Print one JSON object on standard output. Prose goes to standard error. |
+| `--no-input` | off; on when stdin is not a terminal | none | Never ask a question. A command that needs an answer exits 2 and names the flag that gives it. |
+
+Exit codes: 0, 1, 2, 3, 4, 5. JSON shape: schemaVersion, ok, exitCode, repo (id, name, provider, host, url, project, private, defaultBranch: as in repos), branches (name, isDefault, latestScanId, latestCommit, latestScanAt: each or null), verdict ({branch, commit, verdict pass|fail|cannot_tell, reasons: [{code, message}], scans: {required, counted}, counts: {critical, high, medium, low, informational, needsValidation}} or null when the default branch has no succeeded Scan). Failure codes: bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches: [{id, name, provider, host}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage
+
 ### Check
 
 #### `elise status`

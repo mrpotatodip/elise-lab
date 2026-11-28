@@ -45,6 +45,14 @@ struct State {
     access_issued: usize,
     access_live: BTreeSet<String>,
     access_calls: Vec<String>,
+    access_scopes: BTreeMap<String, String>,
+    access_requests: Vec<String>,
+    other_account_first: bool,
+    repos: Vec<serde_json::Value>,
+    projects: Vec<serde_json::Value>,
+    branches: BTreeMap<String, Vec<serde_json::Value>>,
+    verdicts: BTreeMap<(String, String), serde_json::Value>,
+    scans: Vec<serde_json::Value>,
 }
 
 pub const USER_CODE: &str = "WXYZ-1234";
@@ -193,6 +201,43 @@ impl Engine {
         self.state.lock().unwrap().access_calls.clone()
     }
 
+    pub fn grant_cli_access(&self, scope: &str) -> String {
+        let mut state = self.state.lock().unwrap();
+        state.access_issued += 1;
+        let token = access_token_number(state.access_issued);
+        state.access_live.insert(token.clone());
+        state.access_scopes.insert(token.clone(), scope.to_string());
+        token
+    }
+
+    pub fn access_requests(&self) -> Vec<String> {
+        self.state.lock().unwrap().access_requests.clone()
+    }
+
+    pub fn list_another_account_first(&self) {
+        self.state.lock().unwrap().other_account_first = true;
+    }
+
+    pub fn add_project(&self, project: serde_json::Value) {
+        self.state.lock().unwrap().projects.push(project);
+    }
+
+    pub fn add_repo(&self, repo: serde_json::Value) {
+        self.state.lock().unwrap().repos.push(repo);
+    }
+
+    pub fn set_branches(&self, repo_id: &str, branches: Vec<serde_json::Value>) {
+        self.state.lock().unwrap().branches.insert(repo_id.to_string(), branches);
+    }
+
+    pub fn set_verdict(&self, repo_id: &str, commit: &str, verdict: serde_json::Value) {
+        self.state.lock().unwrap().verdicts.insert((repo_id.to_string(), commit.to_string()), verdict);
+    }
+
+    pub fn add_scan(&self, scan: serde_json::Value) {
+        self.state.lock().unwrap().scans.push(scan);
+    }
+
     pub fn login_expires_at(&self, expires_at: &str) {
         self.state.lock().unwrap().login_expires_at = Some(expires_at.to_string());
     }
@@ -304,6 +349,7 @@ struct Request {
     method: String,
     path: String,
     bearer: Option<String>,
+    account: Option<String>,
     body: String,
 }
 
@@ -316,6 +362,7 @@ fn read_request(stream: &TcpStream) -> Option<Request> {
     let path = parts.next()?.to_string();
     let mut length = 0;
     let mut bearer = None;
+    let mut account = None;
     loop {
         let mut header = String::new();
         reader.read_line(&mut header).ok()?;
@@ -328,12 +375,13 @@ fn read_request(stream: &TcpStream) -> Option<Request> {
         match name.to_ascii_lowercase().as_str() {
             "content-length" => length = value.parse().ok()?,
             "authorization" => bearer = value.strip_prefix("Bearer ").map(str::to_string),
+            "x-account-id" => account = Some(value.to_string()),
             _ => {}
         }
     }
     let mut body = vec![0; length];
     reader.read_exact(&mut body).ok()?;
-    Some(Request { method, path, bearer, body: String::from_utf8(body).ok()? })
+    Some(Request { method, path, bearer, account, body: String::from_utf8(body).ok()? })
 }
 
 fn serve(mut stream: TcpStream, state: &Mutex<State>) {
@@ -436,19 +484,12 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
                 state.access_issued += 1;
                 let token = access_token_number(state.access_issued);
                 state.access_live.insert(token.clone());
+                state.access_scopes.insert(token.clone(), scope.clone());
                 data["cliAccess"] = serde_json::json!({ "id": ACCESS_ID, "name": RUNNER_NAME, "scope": scope, "token": token });
             }
             (200, serde_json::json!({ "data": data, "error": null }).to_string())
         }
-        ("GET", "/me") if request.bearer.as_ref().is_some_and(|token| token.starts_with("elc_")) => {
-            let token = request.bearer.clone().unwrap();
-            state.access_calls.push(token.clone());
-            if state.access_live.contains(&token) {
-                (200, r#"{"data":{"id":"user-1"},"error":null}"#.to_string())
-            } else {
-                (REJECTED.0, REJECTED.1.to_string())
-            }
-        }
+        _ if request.bearer.as_ref().is_some_and(|token| token.starts_with("elc_")) => cli_answer(request, state),
         ("POST", "/runners/enroll") => {
             if !request.body.contains(&format!("\"{CODE}\"")) {
                 return (403, r#"{"data":null,"error":{"code":"invalid_code"}}"#.to_string());
@@ -510,6 +551,186 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
     }
 }
 
+pub const OTHER_ACCOUNT_ID: &str = "7c1d2e3f-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
+pub const SCOPE_REFUSED: &str = "This CLI access cannot do this";
+const OTHER_ACCOUNT_REFUSED: &str = "This CLI access belongs to another account";
+
+fn data(value: serde_json::Value) -> (u16, String) {
+    (200, serde_json::json!({ "data": value, "error": null }).to_string())
+}
+
+fn refusal(status: u16, message: &str) -> (u16, String) {
+    (status, serde_json::json!({ "data": null, "error": { "code": "refused", "message": message } }).to_string())
+}
+
+fn query_value(query: &str, name: &str) -> Option<String> {
+    query.split('&').find_map(|pair| pair.split_once('=').filter(|(key, _)| *key == name).map(|(_, value)| value.to_string()))
+}
+
+fn cli_answer(request: &Request, state: &mut State) -> (u16, String) {
+    let token = request.bearer.clone().unwrap_or_default();
+    let (route, query) = request.path.split_once('?').unwrap_or((request.path.as_str(), ""));
+    if route == "/me" {
+        state.access_calls.push(token.clone());
+    }
+    if !state.access_live.contains(&token) {
+        return (REJECTED.0, REJECTED.1.to_string());
+    }
+    state.access_requests.push(format!("{} {}", request.method, request.path));
+    let scope = state.access_scopes.get(&token).map(String::as_str).unwrap_or("start");
+    if request.method != "GET" && scope == "read" {
+        return refusal(403, SCOPE_REFUSED);
+    }
+    let segments: Vec<&str> = route.trim_matches('/').split('/').collect();
+    if segments != ["me"] {
+        match request.account.as_deref() {
+            None => return refusal(400, "x-account-id: must be the ID of one of your accounts"),
+            Some(account) if account != ACCOUNT_ID => return refusal(403, OTHER_ACCOUNT_REFUSED),
+            Some(_) => {}
+        }
+    }
+    let repo_of = |state: &State, id: &str| state.repos.iter().find(|repo| repo["id"] == id).cloned();
+    match (request.method.as_str(), segments.as_slice()) {
+        ("GET", ["me"]) => {
+            let mut accounts =
+                vec![serde_json::json!({ "id": ACCOUNT_ID, "name": ACCOUNT_NAME, "slug": "acme", "role": "admin", "roleLabel": "Admin" })];
+            if state.other_account_first {
+                accounts.insert(
+                    0,
+                    serde_json::json!({ "id": OTHER_ACCOUNT_ID, "name": "Other", "slug": "other", "role": "admin", "roleLabel": "Admin" }),
+                );
+            }
+            data(serde_json::json!({
+                "user": { "id": "user-1", "name": "Dev", "email": "dev@example.com" },
+                "partyType": "person",
+                "isSuperuser": false,
+                "accounts": accounts,
+            }))
+        }
+        ("GET", ["repos"]) => data(serde_json::json!({ "repos": state.repos })),
+        ("GET", ["repos", id]) => match repo_of(state, id) {
+            Some(mut repo) => {
+                repo["branches"] = state.branches.get(*id).cloned().unwrap_or_default().into();
+                repo["history"] = serde_json::json!([]);
+                data(repo)
+            }
+            None => refusal(404, "Repo not found"),
+        },
+        ("GET", ["repos", id, "verdict"]) => {
+            let commit = query_value(query, "commit").unwrap_or_default();
+            match state.verdicts.get(&(id.to_string(), commit)) {
+                Some(verdict) => data(verdict.clone()),
+                None => refusal(404, "No verdict for that commit"),
+            }
+        }
+        ("GET", ["projects"]) => data(serde_json::json!(state.projects)),
+        ("GET", ["scans"]) => {
+            let limit: usize = query_value(query, "limit").and_then(|limit| limit.parse().ok()).unwrap_or(50);
+            let (repo_id, cursor) = (query_value(query, "repoId"), query_value(query, "cursor"));
+            let mut scans: Vec<&serde_json::Value> = state
+                .scans
+                .iter()
+                .filter(|scan| repo_id.as_ref().is_none_or(|id| scan["repoId"] == id.as_str()))
+                .filter(|scan| cursor.as_ref().is_none_or(|after| scan["scanId"].as_str().unwrap_or_default() > after.as_str()))
+                .collect();
+            scans.sort_by_key(|scan| scan["scanId"].as_str().unwrap_or_default().to_string());
+            let next = (scans.len() > limit).then(|| scans[limit - 1]["scanId"].clone());
+            scans.truncate(limit);
+            data(serde_json::json!({ "scans": scans, "nextCursor": next }))
+        }
+        ("GET", ["scans", id]) => match state.scans.iter().find(|scan| scan["scanId"] == *id) {
+            Some(scan) => data(scan.clone()),
+            None => refusal(404, "Scan not found"),
+        },
+        _ => (REJECTED.0, REJECTED.1.to_string()),
+    }
+}
+
+pub fn repo_json(id: &str, provider: &str, host: Option<&str>, canonical: &str) -> serde_json::Value {
+    let url = match (provider, host) {
+        ("github", _) => format!("https://github.com/{canonical}"),
+        (_, Some(host)) => format!("https://{host}/{canonical}"),
+        _ => canonical.to_string(),
+    };
+    serde_json::json!({
+        "id": id,
+        "provider": provider,
+        "host": host,
+        "url": url,
+        "canonical": canonical,
+        "isPrivate": false,
+        "projectId": null,
+        "defaultBranch": "main",
+        "branchNames": ["main"],
+        "scans": 0,
+        "lastScanId": null,
+        "lastScanStatus": null,
+        "lastScanAt": null,
+        "open": {
+            "total": 0,
+            "severity": { "critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0 },
+            "needsValidation": 0,
+            "regressed": 0,
+            "unchecked": 0,
+        },
+    })
+}
+
+pub fn branch_json(name: &str, is_default: bool, latest_scan_id: Option<&str>, latest_commit: Option<&str>) -> serde_json::Value {
+    serde_json::json!({
+        "id": "3f1e2d4c-5b6a-4978-8a9b-0c1d2e3f4a5b",
+        "name": name,
+        "isDefault": is_default,
+        "open": {
+            "total": 0,
+            "severity": { "critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0 },
+            "needsValidation": 0,
+            "regressed": 0,
+            "unchecked": 0,
+        },
+        "latestScanId": latest_scan_id,
+        "latestCommit": latest_commit,
+        "latestScanAt": latest_scan_id.map(|_| "2026-11-20T10:00:00.000Z"),
+        "fullScanId": null,
+    })
+}
+
+pub fn scan_json(scan_id: &str, repo_id: &str, repo: &str, status: &str) -> serde_json::Value {
+    serde_json::json!({
+        "scanId": scan_id,
+        "accountId": ACCOUNT_ID,
+        "repo": repo,
+        "repoId": repo_id,
+        "skill": "full",
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "profile": "standard",
+        "maxBudgetUsd": 12,
+        "branch": "main",
+        "status": status,
+        "createdAt": "2026-11-20T10:00:00.000Z",
+        "updatedAt": "2026-11-20T10:05:00.000Z",
+        "finishedAt": null,
+        "error": null,
+        "files": null,
+    })
+}
+
+pub fn verdict_json(commit: &str, verdict: &str) -> serde_json::Value {
+    serde_json::json!({
+        "verdict": verdict,
+        "basis": "ai_audit",
+        "commit": commit,
+        "reasons": if verdict == "pass" { serde_json::json!([]) } else { serde_json::json!([{ "code": "too_few_scans", "message": "One more full Scan is needed before this can pass." }]) },
+        "scans": { "required": 2, "counted": 1, "ids": [] },
+        "limits": { "critical": 0, "high": 0, "medium": 5 },
+        "counts": { "critical": 0, "high": 1, "medium": 2, "low": 0, "informational": 0, "needsValidation": 1 },
+        "open": [],
+        "accepted": [],
+        "dismissed": [],
+    })
+}
+
 pub fn temp_home() -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let dir = std::env::temp_dir().join(format!("elise-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)));
@@ -528,6 +749,7 @@ pub struct Runner {
     pub home: PathBuf,
     pub url: String,
     pub env: Vec<(&'static str, String)>,
+    pub cwd: Option<PathBuf>,
     engine: Arc<Mutex<State>>,
 }
 
@@ -537,6 +759,7 @@ impl Runner {
             home: temp_home(),
             url: engine.url.clone(),
             env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string()), ("ELISE_JOB_CHECK_MS", "200".to_string())],
+            cwd: None,
             engine: engine.state.clone(),
         }
     }
@@ -571,6 +794,10 @@ impl Runner {
             .args(args)
             .env_remove("ELISE_RUNNER_TOKEN")
             .env_remove("ELISE_TOKEN")
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_PREFIX")
             .env_remove("SSH_CONNECTION")
             .env_remove("DISPLAY")
             .env_remove("WAYLAND_DISPLAY")
@@ -581,6 +808,9 @@ impl Runner {
             .stderr(Stdio::piped());
         for (name, value) in &self.env {
             command.env(name, value);
+        }
+        if let Some(cwd) = &self.cwd {
+            command.current_dir(cwd);
         }
         command
     }

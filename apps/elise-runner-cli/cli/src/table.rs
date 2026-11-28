@@ -38,7 +38,7 @@ pub const EXIT_CODES: &[(i32, &str, &str)] = &[
     (7, "stopped_from_elise", "run --once: a Scan was stopped from Elise"),
 ];
 
-pub const GROUPS: &[&str] = &["Connect this computer", "Run Scans", "Check", "Help"];
+pub const GROUPS: &[&str] = &["Connect this computer", "Run Scans", "Repos", "Check", "Help"];
 
 const NO_FLAGS: &[Flag] = &[];
 
@@ -182,6 +182,32 @@ pub const COMMANDS: &[Spec] = &[
         examples: &["elise resume SCAN_ID", "elise resume SCAN_ID --json", "elise resume \"$SCAN_ID\" || echo no folder   # CI"],
         exits: &[0, 1, 2],
         json: "schemaVersion, ok, exitCode, scanId, resumable, phases (the finished Phases). Failure codes: not_resumable, usage",
+    },
+    Spec {
+        name: "repos",
+        group: "Repos",
+        summary: "List the repos of this Account with their last Scan.",
+        usage: "elise repos [--json]",
+        about: "One line per repo: its Project, provider, whether it is private, its branches and the status of its last Scan. Uses CLI access (scope read is enough).",
+        flags: ONLY_JSON,
+        needs: "CLI access from `elise login`, or ELISE_TOKEN.",
+        env: &[("ELISE_TOKEN", "CLI access for CI and containers, read only: login and unpair do not manage it.")],
+        examples: &["elise repos", "elise repos --json", "elise repos --json | jq '.repos[].name'   # CI"],
+        exits: &[0, 1, 3, 4, 5],
+        json: "schemaVersion, ok, exitCode, repos (id, name: the text that names the repo, provider github|gitlab|gitlab-sh|upload, host, url, project: its name or null, private: true, false or null when unknown, defaultBranch or null, branches: the tracked branch names, lastScan: {id, status queued|running|succeeded|failed|stopped, at} or null). Failure codes: no_cli_access, needs_scope, revoked, offline, refused, unreadable, usage",
+    },
+    Spec {
+        name: "repo",
+        group: "Repos",
+        summary: "Show one repo with its branches and Verdict.",
+        usage: "elise repo <repo> [--json]",
+        about: "Name the repo by URL, `owner/name` (GitHub), `gitlab:owner/name`, ID or `.` (this checkout's origin). A name that matches several repos exits 2 and lists them. The Verdict is the ship answer of the default branch at its latest succeeded Scan's commit, as Elise computes it. Run `elise help repos` for the naming rules.",
+        flags: ONLY_JSON,
+        needs: "CLI access from `elise login`, or ELISE_TOKEN.",
+        env: &[("ELISE_TOKEN", "CLI access for CI and containers, read only: login and unpair do not manage it.")],
+        examples: &["elise repo acme/widgets", "elise repo . --json", "elise repo \"$REPO\" --json | jq -r '.verdict.verdict'   # CI"],
+        exits: &[0, 1, 2, 3, 4, 5],
+        json: "schemaVersion, ok, exitCode, repo (id, name, provider, host, url, project, private, defaultBranch: as in repos), branches (name, isDefault, latestScanId, latestCommit, latestScanAt: each or null), verdict ({branch, commit, verdict pass|fail|cannot_tell, reasons: [{code, message}], scans: {required, counted}, counts: {critical, high, medium, low, informational, needsValidation}} or null when the default branch has no succeeded Scan). Failure codes: bad_repo_name, not_a_checkout, repo_not_found, ambiguous_repo (with matches: [{id, name, provider, host}]), no_cli_access, needs_scope, revoked, offline, not_found, refused, unreadable, usage",
     },
     Spec {
         name: "status",
@@ -351,9 +377,19 @@ You pick the profile in Elise when you start the Scan. `elise run` runs what Eli
     },
     Topic {
         name: "repos",
-        summary: "Which repositories a Runner can read.",
+        summary: "Which repositories a Runner can read, and how to name a repo.",
         body: "\
-A Scan clones a Repo on this computer, with this computer's git login.
+Naming a repo. Commands that take <repo> accept:
+  https://github.com/acme/widgets   a URL (also .git, git@host:path and a link into the repo)
+  acme/widgets                      owner/name, always GitHub
+  gitlab:group/sub/app              GitLab (gitlab.com or a self-managed server): `gitlab:` then the path
+  5b0c3f0e-1d2a-4c3b-8e4f-6a7b8c9d0e1f   the repo's ID, as `elise repos --json` prints it
+  .                                 the git checkout you are in: its `origin` remote, and its current branch
+Case does not matter. Only repos already in this Account match. If a name matches several repos
+(the same GitLab path on two servers), the command exits 2 and lists them with their IDs: name one by ID or URL.
+A name that matches none exits 1. `elise repos` lists the repos and the name to type for each.
+
+Reading a repo. A Scan clones a Repo on this computer, with this computer's git login.
 github.com and gitlab.com need no setup. For another GitLab server, list it in settings.json
 in the config folder: {\"gitlabHosts\": [\"git.example.com\"]}. A Scan on any other host is refused.
 In CI, ELISE_GIT_TOKEN gives one read-only token. Run `elise doctor` to check access.
@@ -365,6 +401,12 @@ In CI, ELISE_GIT_TOKEN gives one read-only token. Run `elise doctor` to check ac
         body: "\
 A Scan id names one Scan. `elise resume <scan-id>` takes it, and `elise status` lists the kept folders.
 Every `run` log line starts with [repo scan-id]. Ids are opaque: compare them, do not parse them.
+
+A command that works through CLI access names a Scan by its full id, by any unique prefix of at
+least 8 characters, or by `latest`. A shorter prefix is refused with exit 2. A prefix that fits several Scans
+exits 2 and lists them with their full ids. `latest` is the newest Scan: of the repo when the command
+names one, else of the Account. Output always prints full ids.
+A repo has an id too, and a name: see `elise help repos`.
 ",
     },
     Topic {

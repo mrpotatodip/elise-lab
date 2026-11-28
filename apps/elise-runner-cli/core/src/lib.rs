@@ -1,5 +1,7 @@
 pub mod cli_access;
+pub mod cli_repos;
 mod engine;
+pub mod engine_client;
 pub mod find;
 pub mod git_access;
 mod git_token;
@@ -7,7 +9,9 @@ mod live;
 pub mod login;
 pub mod pairing;
 pub mod providers;
+pub mod repo_name;
 pub mod scan;
+pub mod scan_ref;
 pub mod store;
 mod trace;
 pub use trace::now_iso;
