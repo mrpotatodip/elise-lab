@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ALTER COLUMN "signals_enabled" SET DEFAULT false;

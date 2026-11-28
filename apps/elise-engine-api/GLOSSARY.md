@@ -193,7 +193,7 @@ A triage change to a Finding: its status (`open`, `fixed`, `false_positive`, `ac
 _Avoid_: Verdict (that answers a whole commit), status (a Finding has two)
 
 **Signal**:
-A hint about a Finding or a decision from a model other than the Scan's agent, such as "possible duplicate" or "weak reason". It is shown to people and never changes a Finding, a decision or the Verdict; a person acts on it or ignores it. An admin can turn Signals off for the Account, and only people who can make decisions see them.
+A hint about a Finding or a decision from a model other than the Scan's agent, such as "possible duplicate" or "weak reason". It is shown to people and never changes a Finding, a decision or the Verdict; a person acts on it or ignores it. Signals are off for a new Account; an admin can turn them on or off for the Account, and only people who can make decisions see them.
 _Avoid_: Oracle (in security, a feature that leaks secrets), second opinion, check (the Phase and the Profile check), Jev (the model's name)
 
 **Comment**:

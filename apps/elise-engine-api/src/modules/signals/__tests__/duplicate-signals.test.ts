@@ -92,6 +92,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   accounts += 1;
   tenantId = (await seedTenant(test, `acme-${accounts}`)).tenantId;
+  await test.raw.update(tenants).set({ signalsEnabled: true }).where(eq(tenants.id, tenantId));
   repoId = await seedRepo(test, tenantId);
 });
 

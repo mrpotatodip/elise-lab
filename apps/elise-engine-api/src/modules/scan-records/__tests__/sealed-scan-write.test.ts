@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { sha256Hex } from "@repo/db-elise";
-import { scanFindings, scanFindingTriage, scanSignals, scans } from "@repo/db-elise/schema";
+import { scanFindings, scanFindingTriage, scanSignals, scans, tenants } from "@repo/db-elise/schema";
 import { fakeBindings, TEST_DATA_MASTER_KEY } from "#/__tests__/fake-bindings";
 import { fakeTypeSafe } from "#/__tests__/fake-typesafe";
 import { openTestDb, scanValues, seedRepo, seedTenant, type TestDb } from "#/__tests__/test-db";
@@ -217,6 +217,7 @@ describe("a second Scan of the same Branch", () => {
       confirmed("SQLI-9", "Another one"),
     ]);
     const fake = fakeTypeSafe(0.9);
+    await test.raw.update(tenants).set({ signalsEnabled: true }).where(eq(tenants.id, acme));
 
     await run(detectDuplicateSignalsSvc(test.http, fake.gateway, acme, "s4", TEST_DATA_MASTER_KEY));
     const stored = await test.raw

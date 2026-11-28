@@ -91,8 +91,14 @@ beforeEach(async () => {
 });
 
 describe("the Signals switch", () => {
-  it("reads on for an Account that never set it", async () => {
-    expect(await switchOf()).toBe(true);
+  it("reads off for a new Account and lets an admin switch it on", async () => {
+    const created = await seedTenant(test, "fresh");
+    const [row] = await test.raw.select().from(tenants).where(eq(tenants.id, created.tenantId));
+    await test.raw.update(tenants).set({ signalsEnabled: false }).where(eq(tenants.id, tenantId));
+    const before = await switchOf();
+    const res = await setSwitch(true);
+
+    expect([row.signalsEnabled, before, res.status, await switchOf()]).toEqual([false, false, 200, true]);
   });
 
   it("lets a holder of the Signals Power turn it off and writes the Audit trail", async () => {
