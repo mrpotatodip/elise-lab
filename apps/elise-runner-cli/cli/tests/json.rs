@@ -4,8 +4,9 @@ use serde_json::Value;
 use support::{Engine, Output, Runner, ACCOUNT_NAME, CODE, RUNNER_NAME};
 
 fn json_of(output: &Output) -> Value {
+    let leaked = |text: &str| text.contains("elise-test-token") || text.contains("elc_");
     assert!(
-        !output.stdout.contains("elise-test-token") && !output.stderr.contains("elise-test-token"),
+        !leaked(&output.stdout) && !leaked(&output.stderr),
         "a token-shaped value in the output:\n{}\n{}",
         output.stdout,
         output.stderr

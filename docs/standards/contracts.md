@@ -212,3 +212,5 @@ A reviewer checks that the two lists match exactly.
 | Remove an enum value that stored rows still carry | Keep the value in the schema the backend uses for **responses** (a separate `*_RECORDED_VALUES` list) and remove it only from the request schema. A response schema built from the request enum throws on the first stored row with the old value, and every list that reaches that row returns 500. Then deploy the frontend first, as for tightened request validation. |
 
 **5.3 `[House]` Say which rows of 5.2 apply.** A PR that changes the contracts package names the change type and the deploy order in its description.
+
+**5.4 `[House]` A Runner CLI older than 0.7 cannot parse a CLI-only approval.** Its login check expects `name` and `token` on every approved answer. The engine sends them whenever `runScans` is true, so an older Runner keeps working; one that collects an approval with `runScans: false` fails to parse it and must be updated.

@@ -34,6 +34,7 @@ export type AuditAction =
   | "anthropic.key.removed"
   | "runner.login.approve"
   | "runner.login.deny"
+  | "cli_access.revoke"
   | "signals.switched";
 
 // -----
@@ -60,6 +61,8 @@ export type AuditDetails = {
   required?: boolean;
   requestIp?: string;
   approverIp?: string;
+  runScans?: boolean;
+  cliScope?: string | null;
 };
 
 // -----

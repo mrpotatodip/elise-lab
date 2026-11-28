@@ -1,8 +1,12 @@
 import { Hono } from "hono";
 import { ApproveRunnerLoginBodySchema } from "@repo/contracts/elise";
 import { runEffect } from "#/lib/effect-query";
-import { requirePower, userIdOf } from "#/lib/require-power";
+import { ForbiddenError, ValidationError } from "#/lib/errors";
+import { assertPower, userIdOf } from "#/lib/require-power";
+import { requireSession } from "#/lib/require-session";
 import { zValidator } from "#/lib/zod-validator";
+import { CLI_ACCESS_NO_CHOICE, CLI_ACCESS_ROLE_REFUSED } from "#/modules/cli-access/constants";
+import { cliScopeNeeds } from "#/modules/cli-access/utils";
 import { approveRunnerLoginSvc } from "#/modules/runners/handlers";
 import { notifyRunnerChange } from "#/modules/runners/lib";
 import { approveRunnerLoginDoc } from "#/modules/runners/openapi";
@@ -14,24 +18,34 @@ const app = new Hono<AppEnv>();
 app.post(
   "/login/approve",
   approveRunnerLoginDoc,
-  requirePower("company:runners:create"),
+  requireSession,
   zValidator("header", AccountHeaderSchema),
   zValidator("json", ApproveRunnerLoginBodySchema),
   async (c) => {
     const { "x-account-id": accountId } = c.req.valid("header");
     const body = c.req.valid("json");
-    const ip = c.req.header("cf-connecting-ip") ?? "local";
+    if (!body.runScans && !body.cliScope) throw new ValidationError(CLI_ACCESS_NO_CHOICE);
+    const deps = c.get("deps");
     const actorUserId = userIdOf(c);
-    const data = await c
-      .get("deps")
-      .withTenant(c, accountId, (db) => runEffect(approveRunnerLoginSvc(db, accountId, actorUserId, ip, body)));
-    await notifyRunnerChange(c, {
-      kind: "runner-added",
-      power: "company:runners:create",
-      accountId,
-      runnerId: data.runnerId,
-      actorUserId,
-    });
+    if (body.runScans) await assertPower(c, "company:runners:create");
+    if (body.cliScope) {
+      const needs = cliScopeNeeds(body.cliScope);
+      const held = await Promise.all(needs.powers.map((power) => deps.userHasPower(c, actorUserId, accountId, power)));
+      if (!(needs.all ? held.every(Boolean) : held.some(Boolean))) throw new ForbiddenError(CLI_ACCESS_ROLE_REFUSED);
+    }
+    const ip = c.req.header("cf-connecting-ip") ?? "local";
+    const data = await deps.withTenant(c, accountId, (db) =>
+      runEffect(approveRunnerLoginSvc(db, accountId, actorUserId, ip, body)),
+    );
+    if (data.runnerId) {
+      await notifyRunnerChange(c, {
+        kind: "runner-added",
+        power: "company:runners:create",
+        accountId,
+        runnerId: data.runnerId,
+        actorUserId,
+      });
+    }
     return c.json({ data, error: null });
   },
 );

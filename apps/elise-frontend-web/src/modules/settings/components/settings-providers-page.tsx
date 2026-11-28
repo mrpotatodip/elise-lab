@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { RunnersCard, RunnersSummary } from "#/modules/runner";
+import { CliAccessCard, RunnersCard, RunnersSummary } from "#/modules/runner";
 import { ShellPageHeader } from "#/modules/shell";
 
 export function SettingsProvidersPage() {
@@ -12,6 +12,7 @@ export function SettingsProvidersPage() {
       <Suspense fallback={null}>
         <RunnersSummary />
         <RunnersCard />
+        <CliAccessCard />
       </Suspense>
     </>
   );

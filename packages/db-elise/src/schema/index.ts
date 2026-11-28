@@ -15,6 +15,7 @@ export * from "./tenant-team-invites";
 export * from "./tenant-anthropic-keys";
 export * from "./tenant-data-keys";
 export * from "./tenant-runners";
+export * from "./tenant-cli-access";
 export * from "./platform-runner-device-logins";
 export * from "./scan-runner-jobs";
 export * from "./tenant-groups";

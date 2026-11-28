@@ -1,11 +1,14 @@
 import { queryOptions } from "@tanstack/react-query";
-import { fetchRunners } from "../api";
+import { fetchCliAccess, fetchRunners } from "../api";
 import { RUNNER_WAITING_POLL_MS } from "../constants";
 
 export const runnerKeys = {
   all: ["runners"] as const,
   list: () => [...runnerKeys.all, "list"] as const,
+  cliAccess: () => [...runnerKeys.all, "cli-access"] as const,
 };
+
+export const cliAccessQuery = () => queryOptions({ queryKey: runnerKeys.cliAccess(), queryFn: () => fetchCliAccess() });
 
 // -----
 // While a pairing code is waiting, the list asks again every few

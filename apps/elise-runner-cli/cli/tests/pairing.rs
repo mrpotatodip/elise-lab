@@ -297,7 +297,7 @@ fn the_command_line_is_checked() {
         (&[], 2, "no command given"),
         (&["pair"], 2, "needs the pairing code"),
         (&["status", "--yes"], 2, "does not take `--yes`"),
-        (&["scan"], 2, "unknown command"),
+        (&["frobnicate"], 2, "unknown command"),
     ];
     let engine = Engine::start();
     let runner = Runner::new(&engine);

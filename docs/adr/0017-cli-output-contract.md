@@ -6,7 +6,7 @@ How people, scripts and AI agents rely on the `elise` command (#475). Terms: `ap
 
 **What the Elise CLI prints with `--json`, the events `run --json` prints, and its exit codes change only by addition.** A field, an event, a command or an exit code may be added. None is removed, renamed, retyped or given a new meaning. Anything else needs a new `schemaVersion`, and a new version is a new decision with its own record.
 
-- **Exit codes:** 0 success, 1 error, 2 bad usage, 3 unpaired, 4 revoked, 5 offline, 6 nothing to claim (`run --once`), 7 a Scan was stopped from Elise. A refusal to prompt reuses 2.
+- **Exit codes:** 0 success, 1 error, 2 bad usage, 3 unpaired, 4 revoked, 5 offline, 6 nothing to claim (`run --once`), 7 a Scan was stopped from Elise, 8 `scan --wait` ran out of `--timeout` (the Scan keeps running), 9 a Scan ended as a Partial Scan. A refusal to prompt reuses 2.
 - **`--json`:** one object on standard output with `schemaVersion`, `ok`, `exitCode` and the command's fields. A failure is `{ ok: false, error: { code, message, next } }`. Prose and progress go to standard error. The `exitCode` field and the process exit code agree.
 - **`run --json`:** one object per line, in six events: `claimed`, `phase_started`, `phase_finished`, `finding`, `result`, `stopped`. They hold labels, counts and IDs only. `finding` events arrive per Phase, just before its `phase_finished`, not live. When `run` ends without running a Scan (unpaired, revoked, offline, nothing to claim, no signal handler) it prints one failure object, as any other command does, with the same exit code.
 - **No input:** with no terminal on stdin, or with `--no-input`, the program never prompts. `pair` then needs `--yes` and exits 2 without it.

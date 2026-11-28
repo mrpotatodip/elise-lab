@@ -1,5 +1,6 @@
 import type { AccessPower } from "@repo/contracts/elise";
 import { createMiddleware } from "hono/factory";
+import { callerUserId } from "#/lib/caller";
 import { ForbiddenError, UnauthorizedError, ValidationError } from "#/lib/errors";
 import { hasServiceToken } from "#/lib/require-service-token";
 import { AccountHeaderSchema } from "#/modules/scans/schemas";
@@ -30,7 +31,7 @@ export const requireScanAccess = createMiddleware<AppEnv>(async (c, next) => {
   if (await hasServiceToken(c)) return next();
 
   const deps = c.get("deps");
-  const userId = await deps.sessionUserId(c);
+  const userId = await callerUserId(c);
   if (!userId) throw new UnauthorizedError();
 
   const header = AccountHeaderSchema.safeParse({ "x-account-id": c.req.header("x-account-id") });

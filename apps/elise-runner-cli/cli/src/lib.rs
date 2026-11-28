@@ -1,9 +1,17 @@
+pub mod access;
+pub mod archives;
 pub mod args;
 pub mod browser;
 pub mod commands;
 pub mod completions;
 pub mod help;
 pub mod json;
+pub mod repos;
+pub mod results;
+pub mod results_args;
+pub mod scan;
+pub mod scan_args;
+pub mod scans;
 pub mod skill;
 pub mod store;
 pub mod table;
@@ -22,6 +30,8 @@ pub enum Exit {
     Offline = 5,
     NothingToClaim = 6,
     StoppedFromElise = 7,
+    TimedOut = 8,
+    PartialScan = 9,
 }
 
 pub fn main(args: &[String]) -> Exit {
@@ -86,8 +96,19 @@ pub fn main(args: &[String]) -> Exit {
             Command::Doctor { hosts, json } => commands::doctor(&store, &hosts, json).await,
             Command::Unpair { json } => commands::unpair(&store, json).await,
             Command::Run { once, parallel, json } => commands::run(&store, once, parallel, json).await,
-            Command::Resume { scan_id, json } => commands::resume(&scan_id, json),
+            Command::Resume { scan_id, json } => scans::resume(&store, &scan_id, json).await,
+            Command::Scans { repo, json } => scans::scans(&store, repo.as_deref(), json).await,
+            Command::ScanShow { scan_id, json } => scans::show(&store, &scan_id, json).await,
+            Command::Trace { scan_id, json } => scans::trace(&store, &scan_id, json).await,
+            Command::Stop { scan_id, json } => scans::stop(&store, &scan_id, json).await,
+            Command::ArchivesAdd { app, file, json } => archives::add(&store, &app, &file, json).await,
+            Command::ArchivesList { app, json } => archives::list(&store, &app, json).await,
+            Command::ArchivesRemove { app, archive, yes, json } => archives::remove(&store, &app, &archive, yes, interactive, json).await,
+            Command::Repos { json } => repos::repos(&store, json).await,
+            Command::Repo { repo, json } => repos::repo(&store, &repo, json).await,
+            Command::Scan(args) => scan::scan(&store, &args, interactive).await,
             Command::SkillInstall { dir, json } => skill::install(dir.as_deref(), json),
+            Command::Results(request) => results::run(&store, request).await,
         }
     })
 }

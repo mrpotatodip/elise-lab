@@ -4,6 +4,7 @@ import { createAuth, verifiedUserId } from "#/lib/auth";
 import { dbConnect, withPool, withTenant } from "#/lib/db-connection";
 import { runEffect } from "#/lib/effect-query";
 import { linkScanArchiveEffect } from "#/modules/archives/queries";
+import { cliAccessIdentitySvc } from "#/modules/cli-access";
 import { holdCreditEffect, settleCreditEffect } from "#/modules/credit";
 import { enqueueEmail } from "#/modules/email";
 import { runnerIdentitySvc } from "#/modules/runners/handlers";
@@ -46,6 +47,7 @@ export const realAppDeps: AppDeps = {
   },
   sessionUserId,
   runnerIdentity: (c, token) => runEffect(runnerIdentitySvc(dbConnect(c.env.DATABASE_URL), token)),
+  cliAccess: (c, token, needed) => runEffect(cliAccessIdentitySvc(dbConnect(c.env.DATABASE_URL), token, needed)),
   userHasAccount: (c, userId, accountId) =>
     runEffect(userHasAccountEffect(dbConnect(c.env.DATABASE_URL), userId, accountId)),
   userHasPower: (c, userId, accountId, power) =>

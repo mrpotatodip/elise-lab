@@ -42,7 +42,7 @@ pnpm --filter elise-runner-cli check       # tsc --noEmit, cargo fmt --check, ca
 
 ## The headless Runner
 
-`elise` does what the desktop app does without a window, on macOS, Linux and Windows (x64). The desktop app is not built for Windows. It is its own Runner with its own token, so on one computer it and the desktop app are two Runners. Its commands, exit codes, token store order and setup are in `cli/README.md`. Build it with `cargo build -p elise-runner-cli` (or `--release`).
+`elise` does what the desktop app does without a window, on macOS, Linux and Windows (x64). The desktop app is not built for Windows. It is its own Runner with its own token, so on one computer it and the desktop app are two Runners. To find, start and read Scans for a person it uses CLI access, a separate credential the same login approval can give (scope `read` or `start`, limited by the person's Role, revocable on the dashboard; `docs/adr/0019-cli-access.md`). It never holds a person's session. Its commands, exit codes, token store order and setup are in `cli/README.md`. Build it with `cargo build -p elise-runner-cli` (or `--release`).
 
 ### Install
 

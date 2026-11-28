@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MeAccount } from "@repo/contracts/elise";
 import { safeRedirectPath } from "#/modules/auth/utils";
-import { denyAccountId, ipDiffers, preselectedAccountId, runnerAccounts } from "#/modules/device/utils";
+import { denyAccountId, deviceAccounts, ipDiffers, preselectedAccountId } from "#/modules/device/utils";
 
 const account = (id: string, name: string, powers: string[] | undefined): MeAccount => ({
   id,
@@ -17,25 +17,24 @@ const ADMIN = account("11111111-1111-4111-8111-111111111111", "Acme", [
   "company:team:members:read",
 ]);
 const MEMBER = account("22222222-2222-4222-8222-222222222222", "Beta", ["company:dashboard:read"]);
+const LISTED_A = { id: "a", name: "A", runScans: true, maxCli: "start" } as const;
+const LISTED_B = { id: "b", name: "B", runScans: true, maxCli: "start" } as const;
 const OLD_ENGINE = account("33333333-3333-4333-8333-333333333333", "Gamma", undefined);
 
 describe("which Accounts the device page lists", () => {
-  it("lists only the Accounts where the Role holds company:runners:create", () => {
-    expect(runnerAccounts([ADMIN, MEMBER, OLD_ENGINE])).toEqual([{ id: ADMIN.id, name: "Acme" }]);
+  it("lists the Accounts where the Role holds a Runner or CLI Power", () => {
+    expect(deviceAccounts([ADMIN, MEMBER, OLD_ENGINE]).map(({ id }) => id)).toEqual([ADMIN.id, MEMBER.id]);
   });
 
-  it("lists nothing when no Account carries the Power", () => {
-    expect(runnerAccounts([MEMBER, OLD_ENGINE])).toEqual([]);
+  it("lists nothing when no Account carries a Power", () => {
+    expect(deviceAccounts([OLD_ENGINE])).toEqual([]);
   });
 
   it.each([
-    { listed: [{ id: "a", name: "A" }], expected: "a" },
+    { listed: [LISTED_A], expected: "a" },
     { listed: [], expected: "" },
     {
-      listed: [
-        { id: "a", name: "A" },
-        { id: "b", name: "B" },
-      ],
+      listed: [LISTED_A, LISTED_B],
       expected: "",
     },
   ])("preselects $expected out of $listed.length listed", ({ listed, expected }) => {
@@ -44,10 +43,7 @@ describe("which Accounts the device page lists", () => {
 });
 
 describe("which Account a denial is written in", () => {
-  const listed = [
-    { id: "a", name: "A" },
-    { id: "b", name: "B" },
-  ];
+  const listed = [LISTED_A, LISTED_B];
 
   it.each([
     { listed, picked: "b", expected: "b" },

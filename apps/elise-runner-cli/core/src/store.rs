@@ -6,7 +6,11 @@ use std::sync::Mutex;
 pub const DESKTOP_KEYCHAIN_SERVICE: &str = "com.eliselab.runner";
 pub const HEADLESS_KEYCHAIN_SERVICE: &str = "com.eliselab.runner.headless";
 
+pub const HEADLESS_CLI_ACCESS_KEYCHAIN_SERVICE: &str = "com.eliselab.runner.headless.cli-access";
+
 pub const TOKEN_VARIABLE: &str = "ELISE_RUNNER_TOKEN";
+
+pub const CLI_ACCESS_VARIABLE: &str = "ELISE_TOKEN";
 
 pub trait TokenStore: Send + Sync {
     fn token(&self) -> Option<String>;

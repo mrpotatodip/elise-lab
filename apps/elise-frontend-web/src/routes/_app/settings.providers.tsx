@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { hasAccessPower } from "@repo/contracts/elise";
-import { runnersQuery } from "#/modules/runner";
+import { cliAccessQuery, runnersQuery } from "#/modules/runner";
 import { SettingsProvidersPage } from "#/modules/settings";
 
 export const Route = createFileRoute("/_app/settings/providers")({
@@ -8,6 +8,8 @@ export const Route = createFileRoute("/_app/settings/providers")({
   beforeLoad: ({ context }) => {
     if (!hasAccessPower(context.user?.powers ?? [], "company:runners:create")) throw redirect({ to: "/overview" });
   },
-  loader: ({ context }) => context.queryClient.query(runnersQuery()),
+  loader: async ({ context }) => {
+    await Promise.all([context.queryClient.query(runnersQuery()), context.queryClient.query(cliAccessQuery())]);
+  },
   component: SettingsProvidersPage,
 });

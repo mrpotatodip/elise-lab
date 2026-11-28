@@ -2,7 +2,7 @@
 
 The scan Worker. Terms: `GLOSSARY.md`. Rules: `docs/standards/hono.md`, `docs/standards/effect.md`, `docs/standards/database.md`. Routes are mounted in `src/index.ts`.
 
-- Two ways into `/scans/*` (`src/lib/require-scan-access.ts`): the shared `SCAN_API_TOKEN` plus an `x-account-id` the caller vouches for (the dashboard server), or a signed-in session whose user holds a Role in that account. `/auth`, `/sign-up`, `/me`, `/team` and `/groups` check for themselves.
+- Three ways into `/scans/*` and the other Scan routes (`src/lib/require-scan-access.ts`): the shared `SCAN_API_TOKEN` plus an `x-account-id` the caller vouches for (the dashboard server), a signed-in session whose user holds a Role in that account, or CLI access (an `elc_` bearer token of one person in one Account, resolved in `src/lib/caller.ts`, accepted only on the routes listed there and limited by its scope and the person's Role: `docs/adr/0019-cli-access.md`). A route added to that list is a review decision. `/auth`, `/sign-up`, `/me`, `/team` and `/groups` check for themselves.
 - `/team` and `/groups` (`src/lib/require-power.ts`: a route asks for a Power from the access catalogue, and the role's grants decide), and a Repo's History (frozen, read for state only; one active scan per Repo): `docs/adr/0002-repo-history-and-team-management.md` before changing either.
 - Branches (one History for each, the default as a pointer, the limit of 25, one-off Scans): `docs/adr/0004-repo-branches.md` before changing how a Scan finds its Branch.
 - Private repos run on a Runner with the person's Git login: `docs/adr/0010-runner-git-login.md`. The cloud container clones public repos only, anonymously; the GitHub App path (ADR 0005) is retired.

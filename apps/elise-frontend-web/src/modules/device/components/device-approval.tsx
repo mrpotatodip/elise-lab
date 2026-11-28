@@ -2,10 +2,13 @@ import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { CircleCheck, TriangleAlert } from "lucide-react";
+import type { z } from "zod";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader } from "#/components/ui/card";
+import { Checkbox } from "#/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "#/components/ui/radio-group";
 import { FieldError } from "#/components/ui/field-error";
 import { Input } from "#/components/ui/input";
 import { Label } from "#/components/ui/label";
@@ -15,14 +18,28 @@ import { ShellPublicBrand, ShellPublicThemeSwitch } from "#/modules/shell";
 import { approveDeviceLogin, denyDeviceLogin } from "../api";
 import { DEVICE_COPY } from "../constants";
 import { deviceKeys, deviceLoginQuery } from "../hooks";
-import { DeviceFormSchema, type DeviceAccount, type PendingRunnerLogin } from "../schemas";
-import { denyAccountId, displayCode, ipDiffers, preselectedAccountId } from "../utils";
+import {
+  DeviceFormSchema,
+  type DeviceAccount,
+  type DeviceChoices,
+  type DeviceCli,
+  type PendingRunnerLogin,
+} from "../schemas";
+import {
+  approvalBody,
+  approvedMessage,
+  clampChoices,
+  denyAccountId,
+  displayCode,
+  ipDiffers,
+  preselectedAccountId,
+} from "../utils";
 import { DeviceUnusable } from "./device-unusable";
 
 const NAME_ID = "device-runner-name";
 const ACCOUNT_ID = "device-account";
 
-type Approved = { name: string; accountName: string };
+type Approved = { name: string; accountName: string; runScans: boolean; cliScope: "read" | "start" | null };
 
 function DeviceShell({ children }: { children: React.ReactNode }) {
   return (
@@ -44,7 +61,7 @@ function DeviceConnected({ approved }: { approved: Approved }) {
             {DEVICE_COPY.doneTitle}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {approved.name} is now a Runner of {approved.accountName}. {DEVICE_COPY.doneHint}
+            {approvedMessage(approved)} {DEVICE_COPY.doneHint}
           </p>
         </CardHeader>
       </Card>
@@ -129,19 +146,92 @@ function DeviceAccountField({
   );
 }
 
+const RUN_SCANS_ID = "device-run-scans";
+
+const CLI_OPTIONS = [
+  { value: "none", label: DEVICE_COPY.cliNone },
+  { value: "read", label: DEVICE_COPY.cliRead },
+  { value: "start", label: DEVICE_COPY.cliStart },
+] as const;
+
+function DeviceChoicesField({
+  limits,
+  choices,
+  onChange,
+  error,
+}: {
+  limits: DeviceAccount | undefined;
+  choices: DeviceChoices;
+  onChange: (next: DeviceChoices) => void;
+  error: string | null;
+}) {
+  const canRun = limits?.runScans ?? true;
+  const maxCli = limits?.maxCli ?? "start";
+  const allowed = (value: DeviceCli) => value === "none" || (value === "read" ? maxCli !== "none" : maxCli === "start");
+  return (
+    <div className="grid gap-5">
+      <fieldset className="grid gap-3">
+        <legend className="mb-1 text-sm font-medium">{DEVICE_COPY.choicesLegend}</legend>
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id={RUN_SCANS_ID}
+            checked={choices.runScans && canRun}
+            disabled={!canRun}
+            onCheckedChange={(checked) => onChange({ ...choices, runScans: checked })}
+          />
+          <div className="grid gap-0.5">
+            <Label htmlFor={RUN_SCANS_ID}>{DEVICE_COPY.runScansLabel}</Label>
+            <span className="text-sm text-muted-foreground">
+              {canRun ? DEVICE_COPY.runScansHint : DEVICE_COPY.roleLimit}
+            </span>
+          </div>
+        </div>
+      </fieldset>
+      <div className="grid gap-2">
+        <span id="device-cli-legend" className="text-sm font-medium">
+          {DEVICE_COPY.cliLegend}
+        </span>
+        <p className="text-sm text-muted-foreground">{DEVICE_COPY.cliHint}</p>
+        <RadioGroup
+          aria-labelledby="device-cli-legend"
+          value={allowed(choices.cli) ? choices.cli : "none"}
+          onValueChange={(next) => onChange({ ...choices, cli: next === "read" || next === "start" ? next : "none" })}
+        >
+          {CLI_OPTIONS.map((option) => (
+            <label key={option.value} className="flex items-center gap-3 text-sm">
+              <RadioGroupItem value={option.value} disabled={!allowed(option.value)} />
+              {option.label}
+            </label>
+          ))}
+        </RadioGroup>
+      </div>
+      <FieldError id={RUN_SCANS_ID} message={error ?? undefined} />
+    </div>
+  );
+}
+
 export function DeviceApproval({ code }: { code: string }) {
   const { data } = useSuspenseQuery(deviceLoginQuery(code));
   const queryClient = useQueryClient();
   const [approved, setApproved] = useState<Approved | null>(null);
   const [denied, setDenied] = useState(false);
 
+  const [choiceError, setChoiceError] = useState<string | null>(null);
+
   const approve = useMutation({
-    mutationFn: (input: { accountId: string; name: string }) =>
-      approveDeviceLogin({ data: { userCode: code, ...input } }),
-    onSuccess: (_result, input) =>
+    mutationFn: (input: { accountId: string; name: string } & DeviceChoices) =>
+      approveDeviceLogin({
+        data: {
+          accountId: input.accountId,
+          ...approvalBody({ userCode: code, name: input.name, runScans: input.runScans, cli: input.cli }),
+        },
+      }),
+    onSuccess: (result, input) =>
       setApproved({
         name: input.name,
         accountName: data.accounts.find((account) => account.id === input.accountId)?.name ?? "",
+        runScans: result.runnerId !== null,
+        cliScope: result.cliScope,
       }),
     onError: async (error) => {
       toast.error(`We couldn't approve this login. ${error.message}`);
@@ -158,10 +248,25 @@ export function DeviceApproval({ code }: { code: string }) {
     },
   });
 
+  const defaultValues: z.infer<typeof DeviceFormSchema> = {
+    accountId: preselectedAccountId(data.accounts),
+    name: data.login?.suggestedName ?? "",
+    runScans: true,
+    cli: "none",
+  };
   const form = useForm({
-    defaultValues: { accountId: preselectedAccountId(data.accounts), name: data.login?.suggestedName ?? "" },
+    defaultValues,
     validators: { onSubmit: DeviceFormSchema },
-    onSubmit: ({ value }) => approve.mutate({ accountId: value.accountId, name: value.name.trim() }),
+    onSubmit: ({ value }) => {
+      const limits = data.accounts.find((account) => account.id === value.accountId);
+      const sent = limits ? clampChoices(limits, value) : value;
+      if (!sent.runScans && sent.cli === "none") {
+        setChoiceError(DEVICE_COPY.noChoice);
+        return;
+      }
+      setChoiceError(null);
+      approve.mutate({ accountId: value.accountId, name: value.name.trim(), ...sent });
+    },
   });
 
   const busy = approve.isPending || deny.isPending;
@@ -237,6 +342,20 @@ export function DeviceApproval({ code }: { code: string }) {
                   </div>
                 )}
               </form.Field>
+              <form.Subscribe selector={(state) => state.values}>
+                {(values) => (
+                  <DeviceChoicesField
+                    limits={data.accounts.find((account) => account.id === values.accountId)}
+                    choices={{ runScans: values.runScans, cli: values.cli }}
+                    error={choiceError}
+                    onChange={(next) => {
+                      setChoiceError(null);
+                      form.setFieldValue("runScans", next.runScans);
+                      form.setFieldValue("cli", next.cli);
+                    }}
+                  />
+                )}
+              </form.Subscribe>
               <div className="grid gap-2">
                 <Button type="submit" size="lg" disabled={busy}>
                   {approve.isPending ? DEVICE_COPY.approving : DEVICE_COPY.approve}

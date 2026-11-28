@@ -12,7 +12,7 @@ const app = new Hono<AppEnv>();
 app.get("/", getMeDoc, requireSession, async (c) => {
   const userId = c.get("userId");
   if (!userId) throw new UnauthorizedError();
-  const data = await runEffect(getMeSvc(dbConnect(c.env.DATABASE_URL), userId));
+  const data = await runEffect(getMeSvc(dbConnect(c.env.DATABASE_URL), userId, c.get("cliAccountId")));
   return c.json({ data, error: null });
 });
 

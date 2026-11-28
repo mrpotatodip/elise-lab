@@ -41,8 +41,42 @@ struct State {
     login_expires_at: Option<String>,
     login_script: VecDeque<String>,
     login_check_times: Vec<std::time::Instant>,
+    login_choice: Option<(bool, Option<String>)>,
+    access_issued: usize,
+    access_live: BTreeSet<String>,
+    access_calls: Vec<String>,
+    access_scopes: BTreeMap<String, String>,
+    access_requests: Vec<String>,
+    repos: Vec<serde_json::Value>,
+    projects: Vec<serde_json::Value>,
+    branches: BTreeMap<String, Vec<serde_json::Value>>,
+    verdicts: BTreeMap<(String, String), serde_json::Value>,
+    scans: Vec<serde_json::Value>,
+    runners: Vec<serde_json::Value>,
+    scan_posts: Vec<serde_json::Value>,
+    repo_posts: Vec<serde_json::Value>,
+    status_script: VecDeque<String>,
+    reports: BTreeMap<String, String>,
+    scan_start_refusal: Option<(u16, String)>,
+    result_findings: Vec<serde_json::Value>,
+    result_files: BTreeMap<(String, String), Vec<u8>>,
+    result_diffs: BTreeMap<String, serde_json::Value>,
+    traces: BTreeMap<String, serde_json::Value>,
+    app_archives: BTreeMap<String, Vec<serde_json::Value>>,
+    archive_uploads: Vec<Upload>,
+    archive_removals: Vec<String>,
+    archive_refusal: Option<(u16, String)>,
 }
 
+#[derive(Clone, Debug)]
+pub struct Upload {
+    pub path: String,
+    pub content_type: Option<String>,
+    pub declared_length: Option<usize>,
+    pub bytes: Vec<u8>,
+}
+
+pub const NEW_SCAN_ID: &str = "zd3u73nfd-06ac9c07-b80c-45da-8fc5-ece4768b5b22";
 pub const USER_CODE: &str = "WXYZ-1234";
 pub const VERIFICATION_URL: &str = "https://app.example/device?code=WXYZ-1234";
 const DEVICE_CODE: &str = "device-code-secret-77";
@@ -170,6 +204,122 @@ impl Engine {
         self.state.lock().unwrap().login_approved = true;
     }
 
+    pub fn approve_login_with(&self, run_scans: bool, cli_scope: Option<&str>) {
+        let mut state = self.state.lock().unwrap();
+        state.login_choice = Some((run_scans, cli_scope.map(str::to_string)));
+        state.login_approved = true;
+    }
+
+    pub fn access_tokens(&self) -> Vec<String> {
+        let issued = self.state.lock().unwrap().access_issued;
+        (1..=issued).map(access_token_number).collect()
+    }
+
+    pub fn revoke_all_cli_access(&self) {
+        self.state.lock().unwrap().access_live.clear();
+    }
+
+    pub fn access_calls(&self) -> Vec<String> {
+        self.state.lock().unwrap().access_calls.clone()
+    }
+
+    pub fn grant_cli_access(&self, scope: &str) -> String {
+        let mut state = self.state.lock().unwrap();
+        state.access_issued += 1;
+        let token = access_token_number(state.access_issued);
+        state.access_live.insert(token.clone());
+        state.access_scopes.insert(token.clone(), scope.to_string());
+        token
+    }
+
+    pub fn access_requests(&self) -> Vec<String> {
+        self.state.lock().unwrap().access_requests.clone()
+    }
+
+    pub fn add_project(&self, project: serde_json::Value) {
+        self.state.lock().unwrap().projects.push(project);
+    }
+
+    pub fn add_repo(&self, repo: serde_json::Value) {
+        self.state.lock().unwrap().repos.push(repo);
+    }
+
+    pub fn set_branches(&self, repo_id: &str, branches: Vec<serde_json::Value>) {
+        self.state.lock().unwrap().branches.insert(repo_id.to_string(), branches);
+    }
+
+    pub fn set_verdict(&self, repo_id: &str, commit: &str, verdict: serde_json::Value) {
+        self.state.lock().unwrap().verdicts.insert((repo_id.to_string(), commit.to_string()), verdict);
+    }
+
+    pub fn add_scan(&self, scan: serde_json::Value) {
+        self.state.lock().unwrap().scans.push(scan);
+    }
+
+    pub fn add_runner(&self, id: &str, name: &str, state: &str) {
+        self.state.lock().unwrap().runners.push(serde_json::json!({
+            "id": id,
+            "name": name,
+            "state": state,
+            "createdAt": "2026-11-01T00:00:00.000Z",
+            "expiresAt": null,
+            "pairedAt": "2026-11-01T00:00:00.000Z",
+            "lastSeenAt": null,
+        }));
+    }
+
+    pub fn scan_posts(&self) -> Vec<serde_json::Value> {
+        self.state.lock().unwrap().scan_posts.clone()
+    }
+
+    pub fn repo_posts(&self) -> Vec<serde_json::Value> {
+        self.state.lock().unwrap().repo_posts.clone()
+    }
+
+    pub fn add_archive(&self, repo_id: &str, archive: serde_json::Value) {
+        self.state.lock().unwrap().app_archives.entry(repo_id.to_string()).or_default().push(archive);
+    }
+
+    pub fn archive_uploads(&self) -> Vec<Upload> {
+        self.state.lock().unwrap().archive_uploads.clone()
+    }
+
+    pub fn archive_removals(&self) -> Vec<String> {
+        self.state.lock().unwrap().archive_removals.clone()
+    }
+
+    pub fn refuse_archive_uploads(&self, status: u16, message: &str) {
+        self.state.lock().unwrap().archive_refusal = Some((status, message.to_string()));
+    }
+
+    pub fn script_new_scan(&self, statuses: &[&str]) {
+        self.state.lock().unwrap().status_script = statuses.iter().map(|status| status.to_string()).collect();
+    }
+
+    pub fn set_report(&self, scan_id: &str, report: &str) {
+        self.state.lock().unwrap().reports.insert(scan_id.to_string(), report.to_string());
+    }
+
+    pub fn refuse_scan_start(&self, status: u16, message: &str) {
+        self.state.lock().unwrap().scan_start_refusal = Some((status, message.to_string()));
+    }
+
+    pub fn add_finding(&self, finding: serde_json::Value) {
+        self.state.lock().unwrap().result_findings.push(finding);
+    }
+
+    pub fn set_file(&self, scan_id: &str, name: &str, bytes: &[u8]) {
+        self.state.lock().unwrap().result_files.insert((scan_id.to_string(), name.to_string()), bytes.to_vec());
+    }
+
+    pub fn set_diff(&self, scan_id: &str, diff: serde_json::Value) {
+        self.state.lock().unwrap().result_diffs.insert(scan_id.to_string(), diff);
+    }
+
+    pub fn set_trace(&self, scan_id: &str, trace: serde_json::Value) {
+        self.state.lock().unwrap().traces.insert(scan_id.to_string(), trace);
+    }
+
     pub fn login_expires_at(&self, expires_at: &str) {
         self.state.lock().unwrap().login_expires_at = Some(expires_at.to_string());
     }
@@ -265,11 +415,27 @@ fn token_number(n: usize) -> String {
     format!("elise-test-token-{n}-0f9a7c")
 }
 
+fn issued_tokens(state: &State) -> Vec<String> {
+    (1..=state.issued).map(token_number).chain((1..=state.access_issued).map(access_token_number)).collect()
+}
+
+const ACCOUNT_ID: &str = "5b0c3f0e-1d2a-4c3b-8e4f-6a7b8c9d0e1f";
+pub const RUNNER_ID: &str = "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b";
+const ACCESS_ID: &str = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+
+fn access_token_number(n: usize) -> String {
+    format!("elc_test{n}0f9a7c")
+}
+
 struct Request {
     method: String,
     path: String,
     bearer: Option<String>,
+    account: Option<String>,
     body: String,
+    raw: Vec<u8>,
+    content_type: Option<String>,
+    declared_length: Option<usize>,
 }
 
 fn read_request(stream: &TcpStream) -> Option<Request> {
@@ -281,6 +447,9 @@ fn read_request(stream: &TcpStream) -> Option<Request> {
     let path = parts.next()?.to_string();
     let mut length = 0;
     let mut bearer = None;
+    let mut account = None;
+    let mut content_type = None;
+    let mut declared_length = None;
     loop {
         let mut header = String::new();
         reader.read_line(&mut header).ok()?;
@@ -291,14 +460,28 @@ fn read_request(stream: &TcpStream) -> Option<Request> {
         let (name, value) = header.split_once(':')?;
         let value = value.trim();
         match name.to_ascii_lowercase().as_str() {
-            "content-length" => length = value.parse().ok()?,
+            "content-length" => {
+                length = value.parse().ok()?;
+                declared_length = Some(length);
+            }
+            "content-type" => content_type = Some(value.to_string()),
             "authorization" => bearer = value.strip_prefix("Bearer ").map(str::to_string),
+            "x-account-id" => account = Some(value.to_string()),
             _ => {}
         }
     }
     let mut body = vec![0; length];
     reader.read_exact(&mut body).ok()?;
-    Some(Request { method, path, bearer, body: String::from_utf8(body).ok()? })
+    Some(Request {
+        method,
+        path,
+        bearer,
+        account,
+        body: String::from_utf8_lossy(&body).into_owned(),
+        raw: body,
+        content_type,
+        declared_length,
+    })
 }
 
 fn serve(mut stream: TcpStream, state: &Mutex<State>) {
@@ -315,6 +498,16 @@ fn serve(mut stream: TcpStream, state: &Mutex<State>) {
             zip.len()
         );
         let _ = stream.write_all(&zip);
+        return;
+    }
+    if let Some((status, bytes)) = file_of(&request, &mut state.lock().unwrap()) {
+        let _ = write!(
+            stream,
+            "HTTP/1.1 {status} {}\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            if status == 200 { "OK" } else { "Error" },
+            bytes.len()
+        );
+        let _ = stream.write_all(&bytes);
         return;
     }
     let (status, body) = answer(&request, &mut state.lock().unwrap());
@@ -346,6 +539,44 @@ fn archive_of(request: &Request, state: &mut State) -> Option<Vec<u8>> {
     }
     state.archive_downloads.push(scan_id.clone());
     state.archives.get(&scan_id).cloned()
+}
+
+fn file_of(request: &Request, state: &mut State) -> Option<(u16, Vec<u8>)> {
+    request.bearer.as_ref().filter(|token| state.access_live.contains(*token))?;
+    let rest = request.path.strip_prefix("/scans/")?;
+    let (scan_id, name) = rest.split_once("/files/")?;
+    if request.method != "GET" || request.account.as_deref() != Some(ACCOUNT_ID) {
+        return None;
+    }
+    state.access_requests.push(format!("{} {}", request.method, request.path));
+    let report = if name == "REPORT.md" { state.reports.get(scan_id).map(|report| report.clone().into_bytes()) } else { None };
+    Some(match state.result_files.get(&(scan_id.to_string(), name.to_string())).cloned().or(report) {
+        Some(bytes) => (200, bytes),
+        None => (404, br#"{"data":null,"error":{"code":"NOT_FOUND","message":"File not found"}}"#.to_vec()),
+    })
+}
+
+fn decoded(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        let hex = bytes
+            .get(index + 1..index + 3)
+            .and_then(|pair| std::str::from_utf8(pair).ok())
+            .and_then(|pair| u8::from_str_radix(pair, 16).ok());
+        match (bytes[index], hex) {
+            (b'%', Some(byte)) => {
+                out.push(byte);
+                index += 3;
+            }
+            (byte, _) => {
+                out.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8(out).unwrap_or_default()
 }
 
 fn batch_of(body: &str) -> Vec<serde_json::Value> {
@@ -387,14 +618,27 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
         ("POST", "/runners/login/check") if !state.login_approved => (200, r#"{"data":{"status":"pending"},"error":null}"#.to_string()),
         ("POST", "/runners/login/check") => {
             state.login_pending = false;
-            state.issued += 1;
-            let token = token_number(state.issued);
-            state.live.insert(token.clone());
-            let body = format!(
-                r#"{{"data":{{"status":"approved","name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}","token":"{token}"}},"error":null}}"#
-            );
-            (200, body)
+            let (run_scans, cli_scope) = state.login_choice.clone().unwrap_or((true, None));
+            let mut data = serde_json::json!({ "status": "approved", "accountId": ACCOUNT_ID, "accountName": ACCOUNT_NAME });
+            if run_scans {
+                state.issued += 1;
+                let token = token_number(state.issued);
+                state.live.insert(token.clone());
+                data["runnerId"] = RUNNER_ID.into();
+                data["name"] = RUNNER_NAME.into();
+                data["token"] = token.into();
+            }
+            if let Some(scope) = cli_scope {
+                state.access_issued += 1;
+                let token = access_token_number(state.access_issued);
+                state.access_live.insert(token.clone());
+                state.access_scopes.insert(token.clone(), scope.clone());
+                data["cliAccess"] =
+                    serde_json::json!({ "id": ACCESS_ID, "accountId": ACCOUNT_ID, "name": RUNNER_NAME, "scope": scope, "token": token });
+            }
+            (200, serde_json::json!({ "data": data, "error": null }).to_string())
         }
+        _ if request.bearer.as_ref().is_some_and(|token| token.starts_with("elc_")) => cli_answer(request, state),
         ("POST", "/runners/enroll") => {
             if !request.body.contains(&format!("\"{CODE}\"")) {
                 return (403, r#"{"data":null,"error":{"code":"invalid_code"}}"#.to_string());
@@ -406,7 +650,7 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
             (200, body)
         }
         ("GET", "/runners/me") if live => {
-            (200, format!(r#"{{"data":{{"name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#))
+            (200, format!(r#"{{"data":{{"runnerId":"{RUNNER_ID}","name":"{RUNNER_NAME}","accountName":"{ACCOUNT_NAME}"}},"error":null}}"#))
         }
         ("DELETE", "/runners/me") if state.revokes_fail => (503, r#"{"data":null,"error":{"code":"unavailable"}}"#.to_string()),
         ("DELETE", "/runners/me") if live => {
@@ -446,6 +690,11 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
         ("POST", path) if live && path.starts_with("/runners/jobs/") && path.ends_with("/result") => {
             let scan_id = path.trim_start_matches("/runners/jobs/").trim_end_matches("/result").to_string();
             state.findings_before_result.push(state.findings.len());
+            let ended =
+                serde_json::from_str::<serde_json::Value>(&request.body).ok().and_then(|body| body["state"].as_str().map(str::to_string));
+            if let Some(scan) = state.scans.iter_mut().find(|scan| scan["scanId"] == scan_id.as_str()) {
+                scan["status"] = ended.unwrap_or_default().into();
+            }
             state.results.push((scan_id, request.body.clone()));
             if state.remove_after_result {
                 state.live.clear();
@@ -454,6 +703,360 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
         }
         _ => (REJECTED.0, REJECTED.1.to_string()),
     }
+}
+
+pub const SCOPE_REFUSED: &str = "This CLI access cannot do this";
+const OTHER_ACCOUNT_REFUSED: &str = "This CLI access belongs to another account";
+
+fn data(value: serde_json::Value) -> (u16, String) {
+    (200, serde_json::json!({ "data": value, "error": null }).to_string())
+}
+
+fn refusal(status: u16, message: &str) -> (u16, String) {
+    (status, serde_json::json!({ "data": null, "error": { "code": "refused", "message": message } }).to_string())
+}
+
+fn query_value(query: &str, name: &str) -> Option<String> {
+    query.split('&').find_map(|pair| pair.split_once('=').filter(|(key, _)| *key == name).map(|(_, value)| value.to_string()))
+}
+
+fn cli_answer(request: &Request, state: &mut State) -> (u16, String) {
+    let token = request.bearer.clone().unwrap_or_default();
+    let (route, query) = request.path.split_once('?').unwrap_or((request.path.as_str(), ""));
+    if route == "/me" {
+        state.access_calls.push(token.clone());
+    }
+    if !state.access_live.contains(&token) {
+        return (REJECTED.0, REJECTED.1.to_string());
+    }
+    state.access_requests.push(format!("{} {}", request.method, request.path));
+    let scope = state.access_scopes.get(&token).map(String::as_str).unwrap_or("start");
+    if request.method != "GET" && scope == "read" {
+        return refusal(403, SCOPE_REFUSED);
+    }
+    let segments: Vec<&str> = route.trim_matches('/').split('/').collect();
+    if segments != ["me"] {
+        match request.account.as_deref() {
+            None => return refusal(400, "x-account-id: must be the ID of one of your accounts"),
+            Some(account) if account != ACCOUNT_ID => return refusal(403, OTHER_ACCOUNT_REFUSED),
+            Some(_) => {}
+        }
+    }
+    let repo_of = |state: &State, id: &str| state.repos.iter().find(|repo| repo["id"] == id).cloned();
+    match (request.method.as_str(), segments.as_slice()) {
+        ("GET", ["me"]) => {
+            let accounts =
+                vec![serde_json::json!({ "id": ACCOUNT_ID, "name": ACCOUNT_NAME, "slug": "acme", "role": "admin", "roleLabel": "Admin" })];
+            data(serde_json::json!({
+                "user": { "id": "user-1", "name": "Dev", "email": "" },
+                "partyType": "person",
+                "isSuperuser": false,
+                "accounts": accounts,
+            }))
+        }
+        ("GET", ["repos"]) => data(serde_json::json!({ "repos": state.repos })),
+        ("GET", ["repos", id]) => match repo_of(state, id) {
+            Some(mut repo) => {
+                repo["branches"] = state.branches.get(*id).cloned().unwrap_or_default().into();
+                repo["history"] = serde_json::json!([]);
+                data(repo)
+            }
+            None => refusal(404, "Repo not found"),
+        },
+        ("GET", ["repos", id, "verdict"]) => {
+            let commit = query_value(query, "commit").unwrap_or_default();
+            match state.verdicts.get(&(id.to_string(), commit)) {
+                Some(verdict) => data(verdict.clone()),
+                None => refusal(404, "No verdict for that commit"),
+            }
+        }
+        ("GET", ["projects"]) => data(serde_json::json!(state.projects)),
+        ("GET", ["scans"]) => {
+            let limit: usize = query_value(query, "limit").and_then(|limit| limit.parse().ok()).unwrap_or(50);
+            let (repo_id, cursor) = (query_value(query, "repoId"), query_value(query, "cursor"));
+            let mut scans: Vec<&serde_json::Value> = state
+                .scans
+                .iter()
+                .filter(|scan| repo_id.as_ref().is_none_or(|id| scan["repoId"] == id.as_str()))
+                .filter(|scan| cursor.as_ref().is_none_or(|after| scan["scanId"].as_str().unwrap_or_default() > after.as_str()))
+                .collect();
+            scans.sort_by_key(|scan| scan["scanId"].as_str().unwrap_or_default().to_string());
+            let next = (scans.len() > limit).then(|| scans[limit - 1]["scanId"].clone());
+            scans.truncate(limit);
+            data(serde_json::json!({ "scans": scans, "nextCursor": next }))
+        }
+        ("GET", ["runners"]) => data(serde_json::json!(state.runners)),
+        ("POST", ["repos"]) => {
+            let body: serde_json::Value = serde_json::from_str(&request.body).unwrap_or_default();
+            state.repo_posts.push(body.clone());
+            if body["provider"] == "upload" {
+                state.repos.push(upload_app_json(NEW_APP_ID, body["repo"].as_str().unwrap_or_default()));
+            }
+            data(serde_json::json!({ "id": NEW_APP_ID }))
+        }
+        ("GET", ["repos", id, "archives"]) => match (repo_of(state, id), state.app_archives.get(*id)) {
+            (None, None) => refusal(404, "Upload app not found"),
+            (_, archives) => data(serde_json::json!({ "archives": archives.cloned().unwrap_or_default() })),
+        },
+        ("POST", ["repos", id, "archives"]) => {
+            if let Some((status, message)) = state.archive_refusal.clone() {
+                return refusal(status, &message);
+            }
+            state.archive_uploads.push(Upload {
+                path: request.path.clone(),
+                content_type: request.content_type.clone(),
+                declared_length: request.declared_length,
+                bytes: request.raw.clone(),
+            });
+            let number = state.archive_uploads.len();
+            let archive = serde_json::json!({
+                "id": format!("f000000{number}-0000-4000-8000-000000000000"),
+                "repoId": id,
+                "label": decoded(&query_value(query, "label").unwrap_or_default()),
+                "sizeBytes": request.raw.len(),
+                "contentSha256": format!("sha-of-{number}"),
+                "uploadedAt": "2026-11-20T10:00:00.000Z",
+            });
+            state.app_archives.entry(id.to_string()).or_default().push(archive.clone());
+            (201, serde_json::json!({ "data": archive, "error": null }).to_string())
+        }
+        ("DELETE", ["repos", id, "archives", archive_id]) => {
+            let archives = state.app_archives.entry(id.to_string()).or_default();
+            let Some(index) = archives.iter().position(|archive| archive["id"] == *archive_id) else {
+                return refusal(404, "Zip not found");
+            };
+            archives.remove(index);
+            state.archive_removals.push(archive_id.to_string());
+            data(serde_json::json!({ "removed": true }))
+        }
+        ("POST", ["scans"]) => {
+            if let Some((status, message)) = state.scan_start_refusal.clone() {
+                return refusal(status, &message);
+            }
+            let body: serde_json::Value = serde_json::from_str(&request.body).unwrap_or_default();
+            state.scan_posts.push(body.clone());
+            let profile = body["profile"].as_str().unwrap_or("quick");
+            let cap = body["max_budget_usd"].as_f64().unwrap_or(12.0);
+            let mut scan = scan_json(NEW_SCAN_ID, "e1111111-1111-4111-8111-111111111111", "acme/widgets", "queued");
+            scan["profile"] = profile.into();
+            scan["maxBudgetUsd"] = cap.into();
+            state.scans.push(scan.clone());
+            (201, serde_json::json!({ "data": scan, "error": null }).to_string())
+        }
+        ("GET", ["scans", id, "files", name]) => match (*name, state.reports.get(*id)) {
+            ("REPORT.md", Some(report)) => (200, report.clone()),
+            _ => refusal(404, "File not found"),
+        },
+        ("GET", ["scans", id]) if *id == NEW_SCAN_ID && !state.status_script.is_empty() => {
+            let status =
+                if state.status_script.len() > 1 { state.status_script.pop_front().unwrap() } else { state.status_script[0].clone() };
+            let scan = state.scans.iter_mut().find(|scan| scan["scanId"] == NEW_SCAN_ID).expect("a Scan was started");
+            scan["status"] = status.as_str().into();
+            if matches!(status.as_str(), "succeeded" | "failed" | "stopped") {
+                scan["finishedAt"] = "2026-11-20T10:30:00.000Z".into();
+                scan["usage"] = serde_json::json!({ "costUsd": 3.25 });
+            }
+            if status == "failed" {
+                scan["error"] = "The hunt phase failed".into();
+            }
+            data(scan.clone())
+        }
+        ("GET", ["scans", id]) => match state.scans.iter().find(|scan| scan["scanId"] == *id) {
+            Some(scan) => data(scan.clone()),
+            None => refusal(404, "Scan not found"),
+        },
+        ("GET", ["scans", id, "diff"]) => match state.result_diffs.get(*id) {
+            Some(diff) => data(diff.clone()),
+            None => refusal(404, "Scan not found"),
+        },
+        ("GET", ["findings"]) => {
+            let limit: usize = query_value(query, "limit").and_then(|limit| limit.parse().ok()).unwrap_or(50);
+            let offset: usize = query_value(query, "cursor").and_then(|cursor| cursor.parse().ok()).unwrap_or(0);
+            let wanted = |name: &str| query_value(query, name).map(|value| decoded(&value));
+            let (scan_id, repo, severity, status) = (wanted("scanId"), wanted("repo"), wanted("severity"), wanted("status"));
+            let rows: Vec<&serde_json::Value> = state
+                .result_findings
+                .iter()
+                .filter(|finding| scan_id.as_ref().is_none_or(|id| finding["scanId"] == id.as_str()))
+                .filter(|finding| repo.as_ref().is_none_or(|url| url.ends_with(finding["repo"].as_str().unwrap_or("?"))))
+                .filter(|finding| severity.as_ref().is_none_or(|severity| finding["severity"] == severity.as_str()))
+                .filter(|finding| status.as_ref().is_none_or(|status| finding["status"] == status.as_str()))
+                .collect();
+            let page: Vec<&serde_json::Value> = rows.iter().skip(offset).take(limit).copied().collect();
+            let next = (rows.len() > offset + limit).then(|| (offset + limit).to_string());
+            data(serde_json::json!({ "findings": page, "nextCursor": next }))
+        }
+        ("GET", ["scans", id, "trace"]) => {
+            if !state.scans.iter().any(|scan| scan["scanId"] == *id) {
+                return refusal(404, "Scan not found");
+            }
+            let empty = serde_json::json!({ "entries": [], "cursor": null, "candidateFindings": null });
+            data(state.traces.get(*id).cloned().unwrap_or(empty))
+        }
+        ("POST", ["scans", id, "stop"]) => match state.scans.iter_mut().find(|scan| scan["scanId"] == *id) {
+            Some(scan) if matches!(scan["status"].as_str(), Some("queued" | "running")) => {
+                scan["status"] = "stopped".into();
+                scan["finishedAt"] = "2026-11-20T10:06:00.000Z".into();
+                data(scan.clone())
+            }
+            Some(_) => refusal(409, "The Scan has already finished"),
+            None => refusal(404, "Scan not found"),
+        },
+        ("POST", ["scans", id, "resume"]) => {
+            let Some(index) = state.scans.iter().position(|scan| scan["scanId"] == *id) else {
+                return refusal(404, "Scan not found");
+            };
+            if !matches!(state.scans[index]["status"].as_str(), Some("stopped" | "failed")) {
+                return refusal(400, "Only a stopped or failed Scan can be resumed");
+            }
+            let mut next = state.scans[index].clone();
+            let new_id = format!("{id}-resumed");
+            next["scanId"] = new_id.clone().into();
+            next["status"] = "queued".into();
+            next["resumesScanId"] = (*id).into();
+            state.scans[index]["resumedByScanId"] = new_id.clone().into();
+            state.scans.push(next);
+            data(serde_json::json!({
+                "scanId": new_id,
+                "status": "queued",
+                "skill": "full",
+                "model": "claude-sonnet-5-5",
+                "effort": "high",
+                "profile": "standard",
+                "maxBudgetUsd": 12,
+            }))
+        }
+        _ => (REJECTED.0, REJECTED.1.to_string()),
+    }
+}
+
+pub fn finding_json(scan_id: &str, repo: &str, severity: Option<&str>, status: &str, title: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+        "scanId": scan_id,
+        "repo": repo,
+        "findingId": "F-1",
+        "fingerprint": "ab".repeat(32),
+        "status": status,
+        "severity": severity,
+        "title": title,
+        "class": "injection",
+        "file": "src/db.ts",
+        "line": 12,
+        "actor": "an anonymous visitor",
+        "impact": "Reads any row",
+        "evidence": "The query joins request text",
+        "fix": "Use a parameter",
+        "needs": null,
+        "createdAt": "2026-11-20T10:05:00.000Z",
+        "triage": null,
+    })
+}
+
+pub const NEW_APP_ID: &str = "d1111111-1111-4111-8111-111111111111";
+
+pub fn upload_app_json(id: &str, name: &str) -> serde_json::Value {
+    let mut app = repo_json(id, "upload", None, &name.to_lowercase());
+    app["url"] = name.into();
+    app["defaultBranch"] = "upload".into();
+    app["branchNames"] = serde_json::json!(["upload"]);
+    app
+}
+
+pub fn archive_json(id: &str, repo_id: &str, label: &str) -> serde_json::Value {
+    serde_json::json!({
+        "id": id,
+        "repoId": repo_id,
+        "label": label,
+        "sizeBytes": 2048,
+        "contentSha256": "abc123",
+        "uploadedAt": "2026-11-18T09:00:00.000Z",
+    })
+}
+
+pub fn repo_json(id: &str, provider: &str, host: Option<&str>, canonical: &str) -> serde_json::Value {
+    let url = match (provider, host) {
+        ("github", _) => format!("https://github.com/{canonical}"),
+        (_, Some(host)) => format!("https://{host}/{canonical}"),
+        _ => canonical.to_string(),
+    };
+    serde_json::json!({
+        "id": id,
+        "provider": provider,
+        "host": host,
+        "url": url,
+        "canonical": canonical,
+        "isPrivate": false,
+        "projectId": null,
+        "defaultBranch": "main",
+        "branchNames": ["main"],
+        "scans": 0,
+        "lastScanId": null,
+        "lastScanStatus": null,
+        "lastScanAt": null,
+        "open": {
+            "total": 0,
+            "severity": { "critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0 },
+            "needsValidation": 0,
+            "regressed": 0,
+            "unchecked": 0,
+        },
+    })
+}
+
+pub fn branch_json(name: &str, is_default: bool, latest_scan_id: Option<&str>, latest_commit: Option<&str>) -> serde_json::Value {
+    serde_json::json!({
+        "id": "3f1e2d4c-5b6a-4978-8a9b-0c1d2e3f4a5b",
+        "name": name,
+        "isDefault": is_default,
+        "open": {
+            "total": 0,
+            "severity": { "critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0 },
+            "needsValidation": 0,
+            "regressed": 0,
+            "unchecked": 0,
+        },
+        "latestScanId": latest_scan_id,
+        "latestCommit": latest_commit,
+        "latestScanAt": latest_scan_id.map(|_| "2026-11-20T10:00:00.000Z"),
+        "fullScanId": null,
+    })
+}
+
+pub fn scan_json(scan_id: &str, repo_id: &str, repo: &str, status: &str) -> serde_json::Value {
+    serde_json::json!({
+        "scanId": scan_id,
+        "accountId": ACCOUNT_ID,
+        "repo": repo,
+        "repoId": repo_id,
+        "skill": "full",
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "profile": "standard",
+        "maxBudgetUsd": 12,
+        "branch": "main",
+        "status": status,
+        "createdAt": "2026-11-20T10:00:00.000Z",
+        "updatedAt": "2026-11-20T10:05:00.000Z",
+        "finishedAt": null,
+        "error": null,
+        "files": null,
+    })
+}
+
+pub fn verdict_json(commit: &str, verdict: &str) -> serde_json::Value {
+    serde_json::json!({
+        "verdict": verdict,
+        "basis": "ai_audit",
+        "commit": commit,
+        "reasons": if verdict == "pass" { serde_json::json!([]) } else { serde_json::json!([{ "code": "too_few_scans", "message": "One more full Scan is needed before this can pass." }]) },
+        "scans": { "required": 2, "counted": 1, "ids": [] },
+        "limits": { "critical": 0, "high": 0, "medium": 5 },
+        "counts": { "critical": 0, "high": 1, "medium": 2, "low": 0, "informational": 0, "needsValidation": 1 },
+        "open": [],
+        "accepted": [],
+        "dismissed": [],
+    })
 }
 
 pub fn temp_home() -> PathBuf {
@@ -474,6 +1077,7 @@ pub struct Runner {
     pub home: PathBuf,
     pub url: String,
     pub env: Vec<(&'static str, String)>,
+    pub cwd: Option<PathBuf>,
     engine: Arc<Mutex<State>>,
 }
 
@@ -482,15 +1086,19 @@ impl Runner {
         Runner {
             home: temp_home(),
             url: engine.url.clone(),
-            env: vec![("ELISE_LOGIN_CHECK_MS", "50".to_string()), ("ELISE_JOB_CHECK_MS", "200".to_string())],
+            env: vec![
+                ("ELISE_LOGIN_CHECK_MS", "50".to_string()),
+                ("ELISE_JOB_CHECK_MS", "200".to_string()),
+                ("ELISE_SCAN_POLL_MS", "50".to_string()),
+            ],
+            cwd: None,
             engine: engine.state.clone(),
         }
     }
 
     pub fn run(&self, args: &[&str], stdin: &str) -> Output {
         let output = self.run_allowing_token(args, stdin);
-        let issued = self.engine.lock().unwrap().issued;
-        for token in (1..=issued).map(token_number) {
+        for token in issued_tokens(&self.engine.lock().unwrap()) {
             assert!(
                 !output.stdout.contains(&token) && !output.stderr.contains(&token),
                 "a token leaked into the output of {args:?}:\n{}\n{}",
@@ -517,6 +1125,11 @@ impl Runner {
         command
             .args(args)
             .env_remove("ELISE_RUNNER_TOKEN")
+            .env_remove("ELISE_TOKEN")
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .env_remove("GIT_PREFIX")
             .env_remove("SSH_CONNECTION")
             .env_remove("DISPLAY")
             .env_remove("WAYLAND_DISPLAY")
@@ -527,6 +1140,9 @@ impl Runner {
             .stderr(Stdio::piped());
         for (name, value) in &self.env {
             command.env(name, value);
+        }
+        if let Some(cwd) = &self.cwd {
+            command.current_dir(cwd);
         }
         command
     }
@@ -642,8 +1258,7 @@ impl Running {
             stdout: self.stdout.lock().unwrap().clone(),
             stderr: self.stderr.lock().unwrap().clone(),
         };
-        let issued = self.engine.lock().unwrap().issued;
-        for token in (1..=issued).map(token_number) {
+        for token in issued_tokens(&self.engine.lock().unwrap()) {
             assert!(!output.stdout.contains(&token) && !output.stderr.contains(&token), "a token leaked into the output");
         }
         output

@@ -7,7 +7,7 @@ pub fn overview() -> String {
     for group in GROUPS {
         text.push_str(&format!("\n{group}:\n"));
         for spec in COMMANDS.iter().filter(|spec| spec.group == *group) {
-            text.push_str(&format!("  {:<10}{}\n", spec.name, spec.summary));
+            text.push_str(&format!("  {:<17}{}\n", spec.name, spec.summary));
         }
     }
     text.push_str("\nTopics:\n");
@@ -66,7 +66,7 @@ pub fn topic(topic: &Topic) -> String {
 }
 
 pub fn commands_list() -> String {
-    COMMANDS.iter().map(|spec| format!("{:<10}{}\n", spec.name, spec.summary)).collect()
+    COMMANDS.iter().map(|spec| format!("{:<17}{}\n", spec.name, spec.summary)).collect()
 }
 
 fn cell(text: &str) -> String {

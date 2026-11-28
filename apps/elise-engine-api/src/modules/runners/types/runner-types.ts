@@ -1,3 +1,5 @@
+import type { CliAccessGrantableScope } from "@repo/contracts/elise";
+
 export type NewRunner = {
   tenantId: string;
   actorUserId: string;
@@ -60,6 +62,8 @@ export type RunnerLoginApproval = {
   tenantId: string;
   actorUserId: string;
   name: string;
+  runScans: boolean;
+  cliScope: CliAccessGrantableScope | null;
   approverIp: string;
   now: Date;
 };
