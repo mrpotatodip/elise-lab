@@ -190,7 +190,7 @@ export function ConnectStep() {
             </div>
             <footer className="sv-dialog__foot">
               <span className="sv-dialog__hint">
-                Your Runner clones with this computer&apos;s git login. If a private repository fails, run `elise-runner
+                Your Runner clones with this computer&apos;s git login. If a private repository fails, run `elise
                 doctor`.
               </span>
               <span className="sv-dialog__row">

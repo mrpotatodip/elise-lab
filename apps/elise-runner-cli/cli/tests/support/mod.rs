@@ -458,7 +458,7 @@ fn answer(request: &Request, state: &mut State) -> (u16, String) {
 
 pub fn temp_home() -> PathBuf {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let dir = std::env::temp_dir().join(format!("elise-runner-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)));
+    let dir = std::env::temp_dir().join(format!("elise-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::SeqCst)));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -502,7 +502,7 @@ impl Runner {
     }
 
     pub fn run_allowing_token(&self, args: &[&str], stdin: &str) -> Output {
-        let mut child = self.command(args).spawn().expect("the elise-runner binary starts");
+        let mut child = self.command(args).spawn().expect("the elise binary starts");
         let _ = child.stdin.take().unwrap().write_all(stdin.as_bytes());
         let output = child.wait_with_output().unwrap();
         Output {
@@ -513,7 +513,7 @@ impl Runner {
     }
 
     fn command(&self, args: &[&str]) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_elise-runner"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_elise"));
         command
             .args(args)
             .env_remove("ELISE_RUNNER_TOKEN")
@@ -532,7 +532,7 @@ impl Runner {
     }
 
     pub fn start(&self, args: &[&str]) -> Running {
-        let mut child = self.command(args).spawn().expect("the elise-runner binary starts");
+        let mut child = self.command(args).spawn().expect("the elise binary starts");
         let collect = |mut pipe: Box<dyn Read + Send>| {
             let text = Arc::new(Mutex::new(String::new()));
             let shared = text.clone();

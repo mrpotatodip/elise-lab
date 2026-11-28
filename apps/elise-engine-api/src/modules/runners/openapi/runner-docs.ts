@@ -30,7 +30,7 @@ export const createRunnerDoc = describeRoute({
   summary: "Add a Runner and get its pairing code",
   description: routeText({
     context:
-      "A member of the account adds a computer that will run Scans. The answer holds a pairing code, shown once. The person runs `elise-runner pair` with it on that computer, within 10 minutes.",
+      "A member of the account adds a computer that will run Scans. The answer holds a pairing code, shown once. The person runs `elise pair` with it on that computer, within 10 minutes.",
     steps: [
       "The Worker checks the session and that the login holds a Role in the account named by `x-account-id`.",
       "The Worker makes a pairing code and saves only its hash, with the name and an expiry 10 minutes away.",

@@ -91,7 +91,7 @@ fn a_failing_check_prints_its_fix_the_others_still_run_and_the_exit_is_1() {
     for (broken, fix) in [
         ("git", "https://git-scm.com"),
         ("claude", "claude auth login"),
-        ("paired", "elise-runner pair"),
+        ("paired", "elise pair"),
         ("github.com", "gh auth login"),
         ("gitlab.com", "glab auth login"),
         ("git.acme.dev", "credential helper"),

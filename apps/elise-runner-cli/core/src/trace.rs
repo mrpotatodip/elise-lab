@@ -234,7 +234,7 @@ fn read_new(log: &Path, offset: &mut u64, pending: &mut Vec<u8>, last: bool, sin
     });
 }
 
-fn now_iso() -> String {
+pub fn now_iso() -> String {
     let since = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
     let (days, rest) = ((since.as_secs() / 86_400) as i64, since.as_secs() % 86_400);
     let z = days + 719_468;

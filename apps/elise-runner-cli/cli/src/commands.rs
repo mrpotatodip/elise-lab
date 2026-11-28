@@ -1,5 +1,6 @@
 use crate::browser;
-use crate::store::{settings_file, Store, TOKEN_VARIABLE};
+use crate::json;
+use crate::store::{settings_file, Store, TokenPlace, TOKEN_VARIABLE};
 use crate::tools::Skill;
 use crate::Exit;
 use elise_runner_core::git_access;
@@ -20,20 +21,44 @@ The line above is this Runner's token. It is a credential: anyone who has it can
 this Runner until the Runner is removed in Elise. Copies stay wherever it is pasted (shell history,
 CI variables, container settings).";
 
-pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Exit {
+fn fail(json: bool, exit: Exit, code: &str, message: &str, next: &str) -> Exit {
+    eprintln!("{message}");
+    fail_quietly(json, exit, code, message, next)
+}
+
+fn fail_quietly(json: bool, exit: Exit, code: &str, message: &str, next: &str) -> Exit {
+    if json {
+        return json::emit(exit, serde_json::json!({}), Some(json::Failure { code, message, next }));
+    }
+    exit
+}
+
+fn token_place(store: &Store) -> &'static str {
+    match store.place {
+        TokenPlace::Variable => "variable",
+        TokenPlace::Keychain => "keychain",
+        TokenPlace::File(_) => "file",
+    }
+}
+
+pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool, interactive: bool, json: bool) -> Exit {
+    if !yes && !interactive {
+        let message = "`pair` asks before it connects this computer, and no question can be asked here. Add `--yes` to accept.";
+        return fail(json, Exit::Usage, "needs_yes", message, "elise pair <code> --yes");
+    }
     let say = |line: &str| {
         if print_token {
             eprintln!("{line}");
         } else {
-            println!("{line}");
+            json::say(json, line);
         }
     };
     if !print_token && store.is_read_only() {
-        eprintln!(
-            "The token comes from {TOKEN_VARIABLE}, which elise-runner does not manage. \
+        let message = format!(
+            "The token comes from {TOKEN_VARIABLE}, which elise does not manage. \
              Unset it to pair this computer, or use `pair <code> --print-token` to get a token for it."
         );
-        return Exit::Error;
+        return fail(json, Exit::Error, "read_only_token", &message, "elise pair <code> --print-token");
     }
 
     let previous = if print_token { None } else { earlier_runner(store, &say).await };
@@ -41,12 +66,18 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
     let enrolled = match pairing::enroll(code).await {
         Ok(enrolled) => enrolled,
         Err(RunnerError::InvalidCode) => {
-            eprintln!("That pairing code is wrong, already used or expired. Make a new one in Elise.");
-            return Exit::Error;
+            let message = "That pairing code is wrong, already used or expired. Make a new one in Elise.";
+            return fail(
+                json,
+                Exit::Error,
+                "invalid_code",
+                message,
+                "Make a new code in Elise (Add a Runner), then run `elise pair <code>`",
+            );
         }
         Err(_) => {
-            eprintln!("Could not reach Elise. Check the connection and try again.");
-            return Exit::Offline;
+            let message = "Could not reach Elise. Check the connection and try again.";
+            return fail(json, Exit::Offline, "offline", message, "elise pair <code>");
         }
     };
     say(&format!("Account: {}\nRunner:  {}", enrolled.account_name, enrolled.name));
@@ -57,11 +88,24 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
     if !yes && !confirm(&format!("Connect this computer to {} as \"{}\"?", enrolled.account_name, enrolled.name)) {
         pairing::decline(enrolled).await;
         say("Not paired. Elise was told to drop the token it issued.");
-        return Exit::Error;
+        return fail_quietly(
+            json,
+            Exit::Error,
+            "declined",
+            "Not paired. Elise was told to drop the token it issued.",
+            "elise pair <code> --yes",
+        );
     }
 
     if print_token {
-        println!("{}", enrolled.into_token());
+        let (name, account_name) = (enrolled.name.clone(), enrolled.account_name.clone());
+        let token = enrolled.into_token();
+        if json {
+            let fields = serde_json::json!({ "account": account_name, "runner": name, "token": token });
+            json::emit(Exit::Ok, fields, None);
+        } else {
+            println!("{token}");
+        }
         eprintln!("{TOKEN_WARNING}");
         return Exit::Ok;
     }
@@ -76,11 +120,15 @@ pub async fn pair(store: &Store, code: &str, yes: bool, print_token: bool) -> Ex
                     previous.as_deref().unwrap_or("this computer's earlier Runner")
                 );
             }
+            if json {
+                let fields = serde_json::json!({ "account": account_name, "runner": name, "tokenPlace": token_place(store) });
+                return json::emit(Exit::Ok, fields, None);
+            }
             Exit::Ok
         }
         Err(_) => {
-            eprintln!("The token could not be saved in {}. Elise was told to drop it.", store.describe());
-            Exit::Error
+            let message = format!("The token could not be saved in {}. Elise was told to drop it.", store.describe());
+            fail(json, Exit::Error, "save_failed", &message, "elise pair <code>")
         }
     }
 }
@@ -97,72 +145,70 @@ async fn earlier_runner(store: &Store, say: &dyn Fn(&str)) -> Option<String> {
     }
 }
 
-pub async fn login(store: &Store, no_browser: bool) -> Exit {
+pub async fn login(store: &Store, no_browser: bool, json: bool) -> Exit {
     if store.is_read_only() {
-        eprintln!(
-            "The token comes from {TOKEN_VARIABLE}, which elise-runner does not manage. \
+        let message = format!(
+            "The token comes from {TOKEN_VARIABLE}, which elise does not manage. \
              Unset it to log in this computer."
         );
-        return Exit::Error;
+        return fail(json, Exit::Error, "read_only_token", &message, "unset ELISE_RUNNER_TOKEN, then run `elise login`");
     }
     let Some(stop) = stop_on_signal("Login cancelled.") else {
-        eprintln!("Could not listen for Ctrl-C and stop signals, so the login could not be cancelled.");
-        return Exit::Error;
+        let message = "Could not listen for Ctrl-C and stop signals, so the login could not be cancelled.";
+        return fail(json, Exit::Error, "no_signals", message, "elise login");
     };
-    let previous = earlier_runner(store, &|line| println!("{line}")).await;
+    let say = |line: &str| json::say(json, line);
+    let previous = earlier_runner(store, &say).await;
     if let Some(previous) = &previous {
-        println!("This computer is already paired as {previous}. Logging in replaces it.");
+        say(&format!("This computer is already paired as {previous}. Logging in replaces it."));
     }
 
     let started = match login::start(env!("CARGO_PKG_VERSION")).await {
         Ok(started) => started,
         Err(LoginError::Unsupported) => {
-            eprintln!("This Elise does not support login yet; use `elise-runner pair <code>`.");
-            return Exit::Error;
+            let message = "This Elise does not support login yet; use `elise pair <code>`.";
+            return fail(json, Exit::Error, "unsupported", message, "elise pair <code>");
         }
         Err(LoginError::Unreachable) => {
-            eprintln!("Could not reach Elise. Check the connection and try again.");
-            return Exit::Offline;
+            let message = "Could not reach Elise. Check the connection and try again.";
+            return fail(json, Exit::Offline, "offline", message, "elise login");
         }
     };
-    println!("Open this link and approve this computer in Elise:\n  {}\nCode: {}", started.verification_url, started.user_code);
+    say(&format!("Open this link and approve this computer in Elise:\n  {}\nCode: {}", started.verification_url, started.user_code));
     if !no_browser {
         browser::open(&started.verification_url);
     }
-    println!("Waiting for approval. Stop with Ctrl-C.");
+    say("Waiting for approval. Stop with Ctrl-C.");
 
     let enrolled = match login::wait(&started, &stop).await {
         Waited::Approved(enrolled) => enrolled,
-        Waited::Cancelled => return Exit::Error,
-        Waited::Expired => {
-            eprintln!("The code expired; run `elise-runner login` again.");
-            return Exit::Error;
-        }
-        Waited::Denied => {
-            eprintln!("The request was denied in Elise.");
-            return Exit::Error;
-        }
+        Waited::Cancelled => return fail_quietly(json, Exit::Error, "cancelled", "Login cancelled.", "elise login"),
+        Waited::Expired => return fail(json, Exit::Error, "expired", "The code expired; run `elise login` again.", "elise login"),
+        Waited::Denied => return fail(json, Exit::Error, "denied", "The request was denied in Elise.", "elise login"),
         Waited::Refused => {
-            eprintln!("Elise did not accept this login. Run `elise-runner login` again.");
-            return Exit::Error;
+            return fail(json, Exit::Error, "refused", "Elise did not accept this login. Run `elise login` again.", "elise login");
         }
     };
 
     let (name, account_name) = (enrolled.name.clone(), enrolled.account_name.clone());
     match pairing::accept_replacing(store.tokens(), enrolled).await {
         Ok((_, replaced)) => {
-            println!("Logged in as \"{name}\" in {account_name}. The token is kept in {}.", store.describe());
+            say(&format!("Logged in as \"{name}\" in {account_name}. The token is kept in {}.", store.describe()));
             if replaced == Replaced::StillLive {
                 eprintln!(
                     "Could not reach Elise to revoke the token of {}. Remove that Runner in Elise's Runners list.",
                     previous.as_deref().unwrap_or("this computer's earlier Runner")
                 );
             }
+            if json {
+                let fields = serde_json::json!({ "account": account_name, "runner": name, "tokenPlace": token_place(store) });
+                return json::emit(Exit::Ok, fields, None);
+            }
             Exit::Ok
         }
         Err(_) => {
-            eprintln!("The token could not be saved in {}. Elise was told to drop it.", store.describe());
-            Exit::Error
+            let message = format!("The token could not be saved in {}. Elise was told to drop it.", store.describe());
+            fail(json, Exit::Error, "save_failed", &message, "elise login")
         }
     }
 }
@@ -177,64 +223,114 @@ fn confirm(question: &str) -> bool {
     matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
-pub async fn status(store: &Store) -> Exit {
-    let exit = connection_status(store).await;
+pub async fn status(store: &Store, json: bool) -> Exit {
+    let connection = connection_status(store).await;
+    json::say(json, &connection.line);
     let kept = scan::kept_folders();
     if !kept.is_empty() {
-        println!("Kept work folders (a failed or stopped Scan leaves one; delete a folder you no longer need):");
-        for folder in kept {
-            let state = match folder.done {
+        json::say(json, "Kept work folders (a failed or stopped Scan leaves one; delete a folder you no longer need):");
+        for folder in &kept {
+            let state = match &folder.done {
                 Some(done) if done.is_empty() => "can be resumed from the start".to_string(),
                 Some(done) => format!("can be resumed after {}", done.join(", ")),
-                None => "cannot be resumed (`elise-runner resume` says why)".to_string(),
+                None => "cannot be resumed (`elise resume` says why)".to_string(),
             };
-            println!("  Scan {}: {state}\n    {}", folder.scan_id, folder.path.display());
+            json::say(json, &format!("  Scan {}: {state}\n    {}", folder.scan_id, folder.path.display()));
         }
     }
-    exit
+    if json {
+        let folders: Vec<serde_json::Value> = kept
+            .iter()
+            .map(|folder| {
+                serde_json::json!({
+                    "scanId": folder.scan_id,
+                    "path": folder.path.display().to_string(),
+                    "resumable": folder.done.is_some(),
+                    "phases": folder.done.clone().unwrap_or_default(),
+                })
+            })
+            .collect();
+        let mut fields = serde_json::json!({ "state": connection.state, "tokenPlace": token_place(store), "folders": folders });
+        if let Some((name, account_name)) = &connection.runner {
+            fields["runner"] = name.as_str().into();
+            fields["account"] = account_name.as_str().into();
+        }
+        let failure = connection.next.map(|next| json::Failure { code: connection.state, message: &connection.line, next });
+        return json::emit(connection.exit, fields, failure);
+    }
+    connection.exit
 }
 
-pub fn resume(scan_id: &str) -> Exit {
+pub fn resume(scan_id: &str, json: bool) -> Exit {
     match scan::check_kept(scan_id) {
         Ok(done) => {
             let held =
                 if done.is_empty() { "no finished Phase yet".to_string() } else { format!("the finished Phases {}", done.join(", ")) };
-            println!(
-                "Scan {scan_id}'s work folder holds {held} and can be resumed. Press Resume on that Scan in Elise; `elise-runner run` on this computer then claims it."
+            json::say(
+                json,
+                &format!("Scan {scan_id}'s work folder holds {held} and can be resumed. Press Resume on that Scan in Elise; `elise run` on this computer then claims it."),
             );
+            if json {
+                return json::emit(Exit::Ok, serde_json::json!({ "scanId": scan_id, "resumable": true, "phases": done }), None);
+            }
             Exit::Ok
         }
         Err(why) => {
             eprintln!("{why}");
+            if json {
+                let fields = serde_json::json!({ "scanId": scan_id, "resumable": false, "phases": [] });
+                let failure = json::Failure { code: "not_resumable", message: &why, next: "elise status" };
+                return json::emit(Exit::Error, fields, Some(failure));
+            }
             Exit::Error
         }
     }
 }
 
-async fn connection_status(store: &Store) -> Exit {
+struct Connection {
+    exit: Exit,
+    state: &'static str,
+    line: String,
+    runner: Option<(String, String)>,
+    next: Option<&'static str>,
+}
+
+async fn connection_status(store: &Store) -> Connection {
     let place = store.describe();
-    match pairing::status(store.tokens()).await {
-        RunnerStatus::Connected { name, account_name } => {
-            println!("connected: Runner \"{name}\" in {account_name}\nToken store: {place}");
-            Exit::Ok
-        }
-        RunnerStatus::Unpaired => {
-            println!("unpaired: no token in {place}. Pair with `elise-runner pair <code>`.");
-            Exit::Unpaired
-        }
-        RunnerStatus::Revoked if store.is_read_only() => {
-            println!("revoked: Elise rejected the token in {TOKEN_VARIABLE}. Pair again to get a new one.");
-            Exit::Revoked
-        }
-        RunnerStatus::Revoked => {
-            println!("revoked: Elise rejected the token, so it was removed from {place}. Pair again with a new code.");
-            Exit::Revoked
-        }
+    let (exit, state, line, runner, next) = match pairing::status(store.tokens()).await {
+        RunnerStatus::Connected { name, account_name } => (
+            Exit::Ok,
+            "connected",
+            format!("connected: Runner \"{name}\" in {account_name}\nToken store: {place}"),
+            Some((name, account_name)),
+            None,
+        ),
+        RunnerStatus::Unpaired => (
+            Exit::Unpaired,
+            "unpaired",
+            format!("unpaired: no token in {place}. Pair with `elise pair <code>`."),
+            None,
+            Some("elise login"),
+        ),
+        RunnerStatus::Revoked if store.is_read_only() => (
+            Exit::Revoked,
+            "revoked",
+            format!("revoked: Elise rejected the token in {TOKEN_VARIABLE}. Pair again to get a new one."),
+            None,
+            Some("elise login"),
+        ),
+        RunnerStatus::Revoked => (
+            Exit::Revoked,
+            "revoked",
+            format!("revoked: Elise rejected the token, so it was removed from {place}. Pair again with a new code."),
+            None,
+            Some("elise login"),
+        ),
         RunnerStatus::Offline => {
-            println!("offline: Elise could not be reached.\nToken store: {place}");
-            Exit::Offline
+            (Exit::Offline, "offline", format!("offline: Elise could not be reached.\nToken store: {place}"), None, Some("elise status"))
         }
-    }
+    };
+    Connection { exit, state, line, runner, next }
 }
 
 async fn tool_output(program: &std::path::Path, args: &[&str]) -> Option<std::process::Output> {
@@ -269,45 +365,64 @@ async fn runner_paired(store: &Store) -> Result<String, String> {
     match pairing::status(store.tokens()).await {
         RunnerStatus::Connected { name, account_name } => Ok(format!("Runner \"{name}\" in {account_name}")),
         RunnerStatus::Unpaired => {
-            Err("this computer is not paired. Run `elise-runner login`, or `elise-runner pair <code>` with a code from Elise.".to_string())
+            Err("this computer is not paired. Run `elise login`, or `elise pair <code>` with a code from Elise.".to_string())
         }
-        RunnerStatus::Revoked => {
-            Err("Elise rejected this Runner's token. Run `elise-runner login` or `elise-runner pair <code>` again.".to_string())
-        }
+        RunnerStatus::Revoked => Err("Elise rejected this Runner's token. Run `elise login` or `elise pair <code>` again.".to_string()),
         RunnerStatus::Offline => Err("Elise could not be reached. Check the connection, then run doctor again.".to_string()),
     }
 }
 
-pub async fn doctor(store: &Store, named: &[String]) -> Exit {
-    let mut all_passed = true;
-    let mut report = |name: &str, result: Result<String, String>| match result {
-        Ok(detail) => println!("pass  {name}: {detail}"),
-        Err(fix) => {
-            all_passed = false;
-            println!("FAIL  {name}: {fix}");
+struct Checks {
+    json: bool,
+    all_passed: bool,
+    list: Vec<serde_json::Value>,
+}
+
+impl Checks {
+    fn line(&mut self, status: &str, name: &str, detail: &str) {
+        let label = match status {
+            "pass" => "pass",
+            "fail" => "FAIL",
+            _ => "skip",
+        };
+        json::say(self.json, &format!("{label}  {name}: {detail}"));
+        self.list.push(serde_json::json!({ "name": name, "status": status, "detail": detail }));
+    }
+
+    fn report(&mut self, name: &str, result: Result<String, String>) {
+        match result {
+            Ok(detail) => self.line("pass", name, &detail),
+            Err(fix) => {
+                self.all_passed = false;
+                self.line("fail", name, &fix);
+            }
         }
-    };
+    }
+}
+
+pub async fn doctor(store: &Store, named: &[String], json: bool) -> Exit {
+    let mut checks = Checks { json, all_passed: true, list: Vec::new() };
     let git = git_installed().await;
     let git_found = git.is_ok();
-    report("git", git);
+    checks.report("git", git);
     #[cfg(windows)]
     {
         use elise_runner_core::find;
-        report("git for windows", find::git_for_windows_verdict(git_found, &find::WinEnv::from_process(), &|p| p.is_file()));
+        checks.report("git for windows", find::git_for_windows_verdict(git_found, &find::WinEnv::from_process(), &|p| p.is_file()));
     }
-    report("claude", claude_signed_in().await);
+    checks.report("claude", claude_signed_in().await);
     #[cfg(windows)]
-    report(
+    checks.report(
         "node",
         elise_runner_core::find::find_on_windows("node").map(|node| node.display().to_string()).ok_or_else(|| {
             "`node` (Node.js) was not found on this computer. Install it from https://nodejs.org, then run doctor again.".to_string()
         }),
     );
-    report("paired", runner_paired(store).await);
+    checks.report("paired", runner_paired(store).await);
 
     let settings = Settings::load(&settings_file());
     if let Some(problem) = &settings.problem {
-        report("settings", Err(format!("the Runner's settings file was not used: {problem}.")));
+        checks.report("settings", Err(format!("the Runner's settings file was not used: {problem}.")));
     }
     let defaults = ["github.com".to_string(), "gitlab.com".to_string()];
     let mut hosts: Vec<&String> = Vec::new();
@@ -321,42 +436,53 @@ pub async fn doctor(store: &Store, named: &[String]) -> Exit {
     }
     for host in hosts {
         if !git_found {
-            println!("skip  {host}: needs git");
+            checks.line("skip", host, "needs git");
             continue;
         }
         let result = match elise_runner_core::providers::probe_address(host, &settings) {
             Ok(address) => git_access::check_host(&address).await.map(|()| "git can read from this host".to_string()),
             Err(refusal) => Err(refusal),
         };
-        report(host, result);
+        checks.report(host, result);
     }
-    if all_passed {
-        Exit::Ok
-    } else {
-        Exit::Error
+    let exit = if checks.all_passed { Exit::Ok } else { Exit::Error };
+    if json {
+        let failure = (!checks.all_passed).then_some(json::Failure {
+            code: "check_failed",
+            message: "A check failed. The fix is in its detail.",
+            next: "elise doctor",
+        });
+        return json::emit(exit, serde_json::json!({ "checks": checks.list }), failure);
     }
+    exit
 }
 
-pub async fn unpair(store: &Store) -> Exit {
+pub async fn unpair(store: &Store, json: bool) -> Exit {
     if store.is_read_only() {
-        eprintln!(
-            "The token comes from {TOKEN_VARIABLE}, which elise-runner does not manage. \
+        let message = format!(
+            "The token comes from {TOKEN_VARIABLE}, which elise does not manage. \
              Remove the Runner in Elise, then unset the variable."
         );
-        return Exit::Error;
+        return fail(json, Exit::Error, "read_only_token", &message, "unset ELISE_RUNNER_TOKEN");
     }
     if store.tokens().token().is_none() {
-        println!("This computer is not paired.");
+        json::say(json, "This computer is not paired.");
+        if json {
+            return json::emit(Exit::Ok, serde_json::json!({ "wasPaired": false }), None);
+        }
         return Exit::Ok;
     }
     match pairing::unpair(store.tokens()).await {
         Ok(_) => {
-            println!("Unpaired: Elise dropped the token and it was removed from {}.", store.describe());
+            json::say(json, &format!("Unpaired: Elise dropped the token and it was removed from {}.", store.describe()));
+            if json {
+                return json::emit(Exit::Ok, serde_json::json!({ "wasPaired": true }), None);
+            }
             Exit::Ok
         }
         Err(_) => {
-            eprintln!("Could not reach Elise. The token is kept in {}, so you can run `elise-runner unpair` again.", store.describe());
-            Exit::Offline
+            let message = format!("Could not reach Elise. The token is kept in {}, so you can run `elise unpair` again.", store.describe());
+            fail(json, Exit::Offline, "offline", &message, "elise unpair")
         }
     }
 }
@@ -403,24 +529,33 @@ impl Ends {
     }
 }
 
-pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
+fn revoked_body(json: bool, message: &str) -> Exit {
+    fail_quietly(json, Exit::Revoked, "revoked", message, "elise pair <code>")
+}
+
+pub async fn run(store: &Store, once: bool, parallel: usize, json: bool) -> Exit {
     let Some(stop) = stop_on_signal("Stopping.") else {
-        eprintln!("Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.");
-        return Exit::Error;
+        let message = "Could not listen for Ctrl-C and stop signals, so a Scan could not be stopped cleanly.";
+        return fail(json, Exit::Error, "signals_unavailable", message, "elise run");
     };
     let skill = Skill::new();
     let find_tools = || skill.tools();
-    let log = ScanLog::default();
+    let log = ScanLog { json, ..ScanLog::default() };
     let on_event = |scan_id: &str, event: Event| log.tell(scan_id, event);
     let (find_tools, on_event, stop) = (&find_tools, &on_event, &stop);
     let mut running: Running<'_> = Vec::new();
     let mut claimed_any = false;
     let mut offline = false;
     if !once {
-        println!("Waiting for Scans from Elise. Stop with Ctrl-C.");
+        json::say(json, "Waiting for Scans from Elise. Stop with Ctrl-C.");
     }
     if parallel > 1 {
-        println!("Running up to {parallel} Scans at once. Elise allows 3 live Runner Scans for an Account, shared with its other Runners.");
+        json::say(
+            json,
+            &format!(
+                "Running up to {parallel} Scans at once. Elise allows 3 live Runner Scans for an Account, shared with its other Runners."
+            ),
+        );
     }
     let stopped_idle = || {
         eprintln!("Stopped. No Scan was running.");
@@ -441,7 +576,7 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
     loop {
         if ends.removed {
             ends.drain(store, &mut running).await;
-            return Exit::Revoked;
+            return revoked_body(json, "Elise rejected the token during the Scan: the Runner was removed. Pair again with a new code.");
         }
         if stop.is_stopped() {
             ends.drain(store, &mut running).await;
@@ -450,8 +585,8 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
         let claiming = !(once && claimed_any);
         if claiming && running.len() < parallel {
             let Some(token) = store.tokens().token() else {
-                eprintln!("This computer is not paired. Pair it with `elise-runner pair <code>`.");
-                return Exit::Unpaired;
+                let message = "This computer is not paired. Pair it with `elise pair <code>`.";
+                return fail(json, Exit::Unpaired, "unpaired", message, "elise pair <code>");
             };
             while running.len() < parallel {
                 match scan::claim(&token).await {
@@ -465,22 +600,25 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
                     }
                     Claimed::Removed => {
                         store.tokens().forget();
-                        if store.is_read_only() {
-                            eprintln!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.");
+                        let message = if store.is_read_only() {
+                            format!("Elise rejected the token in {TOKEN_VARIABLE}: the Runner was removed. Pair again to get a new one.")
                         } else {
-                            eprintln!("Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code.");
-                        }
+                            "Elise rejected the token: the Runner was removed in Elise, so the token was forgotten. Pair again with a new code."
+                                .to_string()
+                        };
+                        eprintln!("{message}");
                         ends.drain(store, &mut running).await;
-                        return Exit::Revoked;
+                        return revoked_body(json, &message);
                     }
                     _ if stop.is_stopped() => break,
                     Claimed::Nothing if once && !claimed_any => {
-                        println!("Nothing to claim.");
-                        return Exit::NothingToClaim;
+                        let message = "Nothing to claim.";
+                        json::say(json, message);
+                        return fail_quietly(json, Exit::NothingToClaim, "nothing_to_claim", message, "elise run --once");
                     }
                     Claimed::Offline if once && !claimed_any => {
-                        eprintln!("Could not reach Elise. Check the connection and try again.");
-                        return Exit::Offline;
+                        let message = "Could not reach Elise. Check the connection and try again.";
+                        return fail(json, Exit::Offline, "offline", message, "elise run --once");
                     }
                     Claimed::Nothing => {
                         offline = false;
@@ -500,6 +638,9 @@ pub async fn run(store: &Store, once: bool, parallel: usize) -> Exit {
             }
         }
         if once && claimed_any && running.is_empty() {
+            if ends.removed {
+                return revoked_body(json, "Elise rejected the token during the Scan: the Runner was removed. Pair again with a new code.");
+            }
             return finished(&ends);
         }
         let may_claim = !(once && claimed_any) && running.len() < parallel;
@@ -545,12 +686,14 @@ fn stop_on_signal(message: &'static str) -> Option<Stop> {
 
 #[derive(Default)]
 struct ScanLog {
+    json: bool,
     state: Mutex<LogState>,
 }
 
 #[derive(Default)]
 struct LogState {
     repos: HashMap<String, String>,
+    sent: HashMap<String, bool>,
     ended: usize,
     failed: usize,
 }
@@ -562,21 +705,44 @@ impl ScanLog {
             state.repos.insert(scan_id.to_string(), repo.clone());
         }
         let repo = state.repos.get(scan_id).cloned().unwrap_or_default();
+        let mut line_event: Option<serde_json::Value> = None;
+        let mut say = |name: &str, fields: serde_json::Value| line_event = Some(json::event(name, scan_id, fields));
         let line = match event {
-            Event::Claimed { .. } => "Scan claimed".to_string(),
-            Event::PhaseStarted { phase } => format!("{} started", scan::run_label(&phase)),
+            Event::Claimed { repo, .. } => {
+                say("claimed", serde_json::json!({ "repo": repo }));
+                "Scan claimed".to_string()
+            }
+            Event::PhaseStarted { phase } => {
+                say("phase_started", serde_json::json!({ "phase": phase }));
+                format!("{} started", scan::run_label(&phase))
+            }
             Event::PhaseEnded { phase, cost_usd, pool_left_usd } => {
+                say("phase_finished", serde_json::json!({ "phase": phase, "costUsd": cost_usd, "poolLeftUsd": pool_left_usd }));
                 let spent = cost_usd.map(dollars).unwrap_or_else(|| "an unknown amount".to_string());
                 format!("{} ended: spent {spent}, {} left of the Pool", scan::run_label(&phase), dollars(pool_left_usd))
             }
+            Event::Finding { fingerprint, verdict, severity } => {
+                say("finding", serde_json::json!({ "fingerprint": fingerprint, "verdict": verdict, "severity": severity }));
+                String::new()
+            }
             Event::RepairStarted => "the repair run started: the check failed, the agent gets one run to fix it".to_string(),
-            Event::ResultSent { sent: true } => "result sent to Elise".to_string(),
-            Event::ResultSent { sent: false } => "the result could not be sent to Elise".to_string(),
+            Event::ResultSent { sent } => {
+                state.sent.insert(scan_id.to_string(), sent);
+                if sent { "result sent to Elise" } else { "the result could not be sent to Elise" }.to_string()
+            }
             Event::StoppedFromElise { kept, .. } => {
+                say("stopped", serde_json::json!({ "workFolder": kept.as_ref().map(|path| path.display().to_string()) }));
                 let kept = kept.map(|path| format!(" Work folder kept: {}", path.display())).unwrap_or_default();
                 format!("Scan stopped from Elise.{kept}")
             }
             Event::Ended { ok, message, kept, .. } => {
+                let sent = state.sent.remove(scan_id).unwrap_or(false);
+                let fields = serde_json::json!({
+                    "state": if ok { "succeeded" } else { "failed" },
+                    "sent": sent,
+                    "workFolder": kept.as_ref().map(|path| path.display().to_string()),
+                });
+                say("result", fields);
                 state.ended += 1;
                 if !ok {
                     state.failed += 1;
@@ -589,7 +755,16 @@ impl ScanLog {
                 }
             }
         };
-        println!("[{repo} {scan_id}] {line}");
+        if self.json {
+            if let Some(event) = line_event {
+                println!("{event}");
+            }
+            if !line.is_empty() {
+                eprintln!("[{repo} {scan_id}] {line}");
+            }
+        } else if !line.is_empty() {
+            println!("[{repo} {scan_id}] {line}");
+        }
     }
 
     fn any_ended(&self) -> bool {

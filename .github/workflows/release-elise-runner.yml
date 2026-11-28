@@ -37,14 +37,14 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match cli/Cargo.toml version ${version}" >&2
             exit 1
           }
-      - run: cargo build --release --locked -p elise-runner-cli --bin elise-runner
+      - run: cargo build --release --locked -p elise-runner-cli --bin elise
       - name: Name the binary
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp target/release/elise-runner.exe "${{ matrix.asset }}"
+            cp target/release/elise.exe "${{ matrix.asset }}"
           else
-            cp target/release/elise-runner "${{ matrix.asset }}"
+            cp target/release/elise "${{ matrix.asset }}"
           fi
       - uses: actions/upload-artifact@v4
         with:

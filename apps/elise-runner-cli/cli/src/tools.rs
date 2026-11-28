@@ -12,7 +12,7 @@ pub struct Skill {
 
 impl Skill {
     pub fn new() -> Skill {
-        Skill { root: std::env::temp_dir().join(format!("elise-runner-skill-{}", std::process::id())) }
+        Skill { root: std::env::temp_dir().join(format!("elise-skill-{}", std::process::id())) }
     }
 
     fn write(&self) -> std::io::Result<()> {

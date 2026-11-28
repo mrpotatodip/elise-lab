@@ -6,13 +6,13 @@ export const RUNNER_WAITING_POLL_MS = 4_000;
 // -----
 // The terminal command that connects a Runner through the browser.
 // -----
-export const RUNNER_LOGIN_COMMAND = "elise-runner login";
+export const RUNNER_LOGIN_COMMAND = "elise login";
 
 // -----
 // Where a private repository's access comes from, and what to run when it fails.
 // -----
 export const RUNNER_GIT_LOGIN_HINT =
-  "Your Runner clones with this computer's git login. If a private repository fails, run `elise-runner doctor`.";
+  "Your Runner clones with this computer's git login. If a private repository fails, run `elise doctor`.";
 
 // -----
 // What the person reads for each state of a Runner. Raw values
